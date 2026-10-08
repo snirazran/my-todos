@@ -10,6 +10,7 @@ const INTRO_KEYS = new Set([
   'plannerTour',
   'quickAddNl',
   'quickAddTagEdit',
+  'firstRun',
 ]);
 
 export async function GET() {

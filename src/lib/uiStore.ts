@@ -21,6 +21,9 @@ interface UIState {
   isCinematicActive: boolean;
   setIsCinematicActive: (active: boolean) => void;
 
+  isFirstRunGuided: boolean;
+  setFirstRunGuided: (guided: boolean) => void;
+
   isDebugMode: boolean;
   setIsDebugMode: (debug: boolean) => void;
 
@@ -81,6 +84,9 @@ export const useUIStore = create<UIState>()(
 
       isCinematicActive: false,
       setIsCinematicActive: (active: boolean) => set({ isCinematicActive: active }),
+
+      isFirstRunGuided: false,
+      setFirstRunGuided: (guided: boolean) => set({ isFirstRunGuided: guided }),
 
       isDebugMode: false,
       setIsDebugMode: (debug: boolean) => set({ isDebugMode: debug }),

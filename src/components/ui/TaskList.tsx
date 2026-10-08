@@ -1643,6 +1643,7 @@ export default function TaskList({
   isFrozen = false,
   quickAddOpen = false,
   paused = false,
+  hideAddControls = false,
   sections = [],
   onCreateSection,
   onUpdateSection,
@@ -1715,6 +1716,7 @@ export default function TaskList({
   isFrozen?: boolean;
   quickAddOpen?: boolean;
   paused?: boolean;
+  hideAddControls?: boolean;
   sections?: TaskListSection[];
   onCreateSection?: (name: string, tagIds: string[]) => void;
   onUpdateSection?: (
@@ -2610,7 +2612,7 @@ export default function TaskList({
                     {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} done
                   </p>
                 )}
-                <div className="mt-3 w-full">
+                <div className={hideAddControls ? 'hidden' : 'mt-3 w-full'}>
                   <EmptyAddRow
                     label="Add another task"
                     quickAddOpen={quickAddOpen}
@@ -2782,7 +2784,8 @@ export default function TaskList({
         </div>
 
         {/* Add Task footer at the end of the list */}
-        {(exitAction ||
+        {!hideAddControls &&
+          (exitAction ||
           (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
           <div className="p-1.5 pt-2 bg-card/40 md:p-2 md:pt-2.5">
             <button

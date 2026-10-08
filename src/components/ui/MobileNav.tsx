@@ -12,12 +12,14 @@ import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { useSheetStore } from '@/lib/sheetStore';
+import { useUIStore } from '@/lib/uiStore';
 
 const NAV_STUCK_MS = 5000;
 
 export default function MobileNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const firstRunGuided = useUIStore((state) => state.isFirstRunGuided);
   const { inventoryBadge } = useWardrobeBadges();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -133,7 +135,13 @@ export default function MobileNav() {
     <>
       <nav
         data-app-bottom-nav
+        aria-hidden={firstRunGuided || undefined}
         className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]"
+        style={{
+          transform: firstRunGuided ? 'translateY(110%)' : 'translateY(0)',
+          pointerEvents: firstRunGuided ? 'none' : undefined,
+          transition: 'transform 500ms cubic-bezier(0.22,1,0.36,1)',
+        }}
       >
         <div className="grid grid-cols-5 h-[76px] py-2.5">
           {navItems.map((item) => {

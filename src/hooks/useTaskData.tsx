@@ -13,6 +13,7 @@ import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
 import { recordTaskCompleted } from '@/lib/widget/prompt';
+import { HUNGER_FULL_SNAP_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 
 // --- Types ---
 export interface ChecklistItem {
@@ -350,8 +351,27 @@ export function useTaskData({
 
       const sortedTasks = sortTasks(updatedTasks);
 
+      const hungerBefore = todayData.hungerStatus;
+      let optimisticHunger = hungerBefore;
+      if (nextCompleted && hungerBefore && hungerBefore.maxHunger > 0) {
+        const fed = Math.min(
+          hungerBefore.maxHunger,
+          Math.max(0, hungerBefore.hunger) + TASK_HUNGER_REWARD_MS,
+        );
+        optimisticHunger = {
+          ...hungerBefore,
+          hunger:
+            hungerBefore.maxHunger - fed <= HUNGER_FULL_SNAP_MS
+              ? hungerBefore.maxHunger
+              : fed,
+        };
+      }
+
       // Revalidate: false to prevent immediate fetch override
-      mutateToday({ ...todayData, tasks: sortedTasks }, { revalidate: false });
+      mutateToday(
+        { ...todayData, tasks: sortedTasks, hungerStatus: optimisticHunger },
+        { revalidate: false },
+      );
 
       try {
         const res = await fetch('/api/tasks', {

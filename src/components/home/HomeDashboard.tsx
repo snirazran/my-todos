@@ -88,6 +88,8 @@ import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
+import { useFirstRun } from '@/hooks/useFirstRun';
+import { useQuestRevealQueueLength } from '@/components/ui/questRewardReveal';
 import { PactCard } from '@/components/pact/PactCard';
 import { pactViewKey } from '@/lib/pact/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
@@ -563,7 +565,11 @@ export default function HomeDashboard() {
   const flyBalance = user ? flyStatus.balance : 5;
   const laterThisWeek = user ? backlogTasks : [];
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
-  const { data: questsData, mutate: mutateQuests } = useSWR<{
+  const {
+    data: questsData,
+    error: questsError,
+    mutate: mutateQuests,
+  } = useSWR<{
     isPremium?: boolean;
     claimableCount?: number;
     activeCount?: number;
@@ -588,6 +594,38 @@ export default function HomeDashboard() {
   );
   const isPremium = !!questsData?.isPremium;
   const questOnboarding = questsData?.onboarding;
+
+  const starterTask = user ? tasks.find((t) => t.isStarter) : undefined;
+  const revealQueueLength = useQuestRevealQueueLength();
+  const firstRun = useFirstRun({
+    pending: !!user && seenIntros?.firstRun === false,
+    ready: !!user && !isLoading && (questsData !== undefined || !!questsError),
+    starterDone: !starterTask || !!starterTask.completed,
+    hasClaim: !!questsData?.claimables?.some((c) => c.placement === 'onboarding'),
+    revealCount: revealQueueLength,
+    onFinish: () => markIntroSeen('firstRun'),
+  });
+  const guided = firstRun.guided;
+  const earnedChipsVisible =
+    !guided || firstRun.phase === 'quest' || firstRun.phase === 'claiming';
+  const flyCounterVisible = !guided || firstRun.phase === 'claiming';
+  const taskListHidden =
+    guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off';
+  const [finaleRevealCount, setFinaleRevealCount] = useState(0);
+  useEffect(() => {
+    if (firstRun.phase !== 'finale') return;
+    const timer = window.setInterval(
+      () => setFinaleRevealCount((count) => count + 1),
+      180,
+    );
+    return () => window.clearInterval(timer);
+  }, [firstRun.phase]);
+  const listTasks = useMemo(() => {
+    if (guided) return data.filter((t) => t.isStarter);
+    if (firstRun.phase !== 'finale') return data;
+    let shown = 0;
+    return data.filter((t) => t.isStarter || shown++ < finaleRevealCount);
+  }, [data, guided, firstRun.phase, finaleRevealCount]);
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -736,17 +774,35 @@ export default function HomeDashboard() {
 
   return (
     <main className="relative min-h-screen pb-20 overflow-x-hidden md:pb-8">
-      <MobileMenuCluster position="absolute" />
+      {!guided && <MobileMenuCluster position="absolute" />}
       {user && (
         <MobileHeaderActions position="absolute">
-          <StyleShuffleHeaderButton />
-          <StreakChip variant="mobile" />
-          <FlyCounter
-            balance={flyBalance}
-            variant="mobile"
-            onClick={() => openFlyShop()}
-            showGoal={!!user}
-          />
+          {!guided && <StyleShuffleHeaderButton />}
+          {earnedChipsVisible && (
+            <motion.span
+              className="inline-flex"
+              initial={firstRun.active ? { opacity: 0, scale: 0.4 } : false}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 18 }}
+            >
+              <StreakChip variant="mobile" />
+            </motion.span>
+          )}
+          {flyCounterVisible && (
+            <motion.span
+              className="inline-flex"
+              initial={firstRun.active ? { opacity: 0, scale: 0.4 } : false}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 18 }}
+            >
+              <FlyCounter
+                balance={flyBalance}
+                variant="mobile"
+                onClick={() => openFlyShop()}
+                showGoal={!!user}
+              />
+            </motion.span>
+          )}
         </MobileHeaderActions>
       )}
       <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-12">
@@ -775,6 +831,7 @@ export default function HomeDashboard() {
                     visuallyDone={visuallyDone}
                     sheetOpen={showTimer}
                     hidden={
+                      guided ||
                       ((cinematic || !!grab) && !focusGrabActive) ||
                       (isAnyPanelOpen && !showTimer)
                     }
@@ -804,11 +861,12 @@ export default function HomeDashboard() {
               questActiveCount={questsData?.activeCount ?? 0}
               paused={isAnyPanelOpen}
               onBellyPress={user ? () => setBellyIntroOpen(true) : undefined}
+              fixedSpeech={firstRun.speech}
             />
             </div>
           </FlyCatchSwipeLauncher>
 
-          {user && !isAnyPanelOpen && !cinematic && !taskCinematic && (
+          {user && !guided && !isAnyPanelOpen && !cinematic && !taskCinematic && (
             <div className="pointer-events-none relative z-30 -mt-1 flex justify-center">
               <TryOnPill />
             </div>
@@ -820,22 +878,32 @@ export default function HomeDashboard() {
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div className="flex w-full flex-col gap-2 md:gap-5">
-              <GuestAccountBanner />
-              {user && <PactCard />}
-              {user && (
-                <NextQuestStrip
-                  claimables={questsData?.claimables}
-                  trackables={questsData?.trackables}
-                  catalog={questsData?.claimablesRewardCatalog}
-                  isPremium={isPremium}
-                />
+              {!firstRun.active && <GuestAccountBanner />}
+              {user && !firstRun.active && <PactCard />}
+              {user && earnedChipsVisible && (
+                <motion.div
+                  initial={firstRun.active ? { opacity: 0, y: -12 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <NextQuestStrip
+                    claimables={questsData?.claimables}
+                    trackables={questsData?.trackables}
+                    catalog={questsData?.claimablesRewardCatalog}
+                    isPremium={isPremium}
+                    introFill={guided}
+                  />
+                </motion.div>
               )}
-              <div className="min-h-[360px] pb-16 md:pb-4" ref={taskListRef}>
+              <div
+                className={taskListHidden ? 'pb-16 md:pb-4' : 'min-h-[360px] pb-16 md:pb-4'}
+                ref={taskListRef}
+              >
                 {renderGuestPrompt()}
                 {/* A cleared day says it better on the card, and an empty day
                     has nothing to count or filter — either way the header
                     steps aside, unless filters are on and must stay reachable. */}
-                {!((dayCleared || data.length === 0) && !filtersActive) && (
+                {!guided && !((dayCleared || data.length === 0) && !filtersActive) && (
                   <div className="mb-2 flex items-center justify-between gap-2 px-2 md:mb-4 md:px-4">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:gap-x-2.5">
                       <Icon
@@ -896,8 +964,18 @@ export default function HomeDashboard() {
                   />
                 )}
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
+                <AnimatePresence initial={false}>
+                {!taskListHidden && (
+                <motion.div
+                  key="home-task-list"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.25 } }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                >
                 <TaskList
-                  tasks={data}
+                  tasks={listTasks}
+                  hideAddControls={guided}
                   toggle={handleToggle}
                   showConfetti={rate === 100}
                   visuallyCompleted={visuallyDone}
@@ -1071,8 +1149,11 @@ export default function HomeDashboard() {
                   quickAddOpen={showQuickAdd}
                   paused={isAnyPanelOpen}
                 />
-                <BuddyNudgeCard />
-                <HomeShopRail />
+                </motion.div>
+                )}
+                </AnimatePresence>
+                {!firstRun.active && <BuddyNudgeCard />}
+                {!firstRun.active && <HomeShopRail />}
               </div>
             </div>
           </div>
@@ -1330,6 +1411,7 @@ export default function HomeDashboard() {
         show={
           !!user &&
           !!questOnboarding &&
+          !firstRun.active &&
           (isQuestOnboardingOpen ||
             (!questOnboarding.complete && !dismissQuestOnboarding))
         }
@@ -1357,15 +1439,15 @@ export default function HomeDashboard() {
         bottomMd={`calc(env(safe-area-inset-bottom) + ${
           notificationStackHeight > 0 ? 96 + notificationStackHeight : 92
         }px)`}
-        concealed={fabsConcealed}
+        concealed={fabsConcealed || guided}
       />
 
       {/* Floating Add Task FAB */}
       <button
         type="button"
         aria-label="Add task"
-        aria-hidden={fabsConcealed || undefined}
-        tabIndex={fabsConcealed ? -1 : undefined}
+        aria-hidden={fabsConcealed || guided || undefined}
+        tabIndex={fabsConcealed || guided ? -1 : undefined}
         data-hint="add-task"
         onClick={() => {
           if (!user) {
@@ -1376,7 +1458,7 @@ export default function HomeDashboard() {
           setShowQuickAdd(true);
         }}
         className={`fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_4px_10px_-2px_rgba(0,0,0,0.25)] hover:brightness-105 active:scale-95 active:shadow-[0_2px_6px_-2px_rgba(0,0,0,0.25)] bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
-          fabsConcealed ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
+          fabsConcealed || guided ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
         }`}
         style={
           {
@@ -1391,6 +1473,12 @@ export default function HomeDashboard() {
           } as React.CSSProperties
         }
       >
+        {firstRun.phase === 'finale' && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -inset-1 rounded-full ring-[3px] ring-primary animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
+          />
+        )}
         <Plus className="h-6 w-6 stroke-[3]" />
       </button>
 

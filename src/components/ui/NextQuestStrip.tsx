@@ -55,6 +55,9 @@ const LEAP_SESSION_EFFORT_DAYS = 0.25;
  */
 const NEAR_MISS_SALVAGE = 0.5;
 
+const INTRO_FILL_DELAY_MS = 700;
+const INTRO_FILL_HOLD_MS = 1100;
+
 function hoursUntilLocalEndOfDay(now: Date): number {
   const endOfDay = new Date(now);
   endOfDay.setHours(24, 0, 0, 0);
@@ -74,11 +77,13 @@ export function NextQuestStrip({
   trackables,
   catalog,
   isPremium,
+  introFill = false,
 }: {
   claimables?: Claimable[];
   trackables?: Trackable[];
   catalog?: Record<string, QuestRewardCatalogItem>;
   isPremium?: boolean;
+  introFill?: boolean;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -161,8 +166,43 @@ export function NextQuestStrip({
     claimable && !claimableRevealed && held && held.id === claimable.id
       ? { ...held, progress: Math.max(1, held.target) }
       : null;
-  const displayNextUp = fillingTrackable ?? nextUp;
-  const showClaimable = !!claimable && !fillingTrackable;
+
+  const [introStage, setIntroStage] = useState<'idle' | 'empty' | 'full' | 'done'>(
+    'idle',
+  );
+  const introClaimable =
+    introFill && claimable?.kind === 'objective' ? claimable : null;
+  useEffect(() => {
+    if (introStage === 'idle' && introClaimable) {
+      setIntroStage(reduceMotion ? 'done' : 'empty');
+    }
+  }, [introStage, introClaimable, reduceMotion]);
+  useEffect(() => {
+    if (introStage !== 'empty' && introStage !== 'full') return;
+    const timer = window.setTimeout(
+      () => setIntroStage(introStage === 'empty' ? 'full' : 'done'),
+      introStage === 'empty' ? INTRO_FILL_DELAY_MS : INTRO_FILL_HOLD_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [introStage]);
+  const introTrackable: Trackable | null =
+    introClaimable && (introStage === 'empty' || introStage === 'full')
+      ? {
+          id: introClaimable.id,
+          questId: introClaimable.questId,
+          placement: introClaimable.placement ?? 'onboarding',
+          objectiveLabel: introClaimable.objectiveLabel ?? '',
+          remainingLabel: introClaimable.objectiveLabel ?? '',
+          tags: introClaimable.tags,
+          progress: introStage === 'full' ? 1 : 0,
+          target: 1,
+          reward: introClaimable.reward,
+          rewards: introClaimable.rewards,
+        }
+      : null;
+
+  const displayNextUp = introTrackable ?? fillingTrackable ?? nextUp;
+  const showClaimable = !!claimable && !fillingTrackable && !introTrackable;
 
   // One slot, one winner. Rewards outrank work, so a finished pact week comes
   // first and a quest claimable second; below that the pact holds the slot for
@@ -281,6 +321,7 @@ export function NextQuestStrip({
         : null;
 
   const goToQuests = () => {
+    if (introFill) return;
     if (targetQuestId) setQuestScrollTarget(targetQuestId);
     router.push('/quests');
   };
@@ -484,7 +525,9 @@ export function NextQuestStrip({
                   className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                 />
                 <span className="shrink-0">Next quest</span>
-                {!fillingTrackable && (nextUpReasonLabel || nextUpResetLabel) ? (
+                {!fillingTrackable &&
+                !introTrackable &&
+                (nextUpReasonLabel || nextUpResetLabel) ? (
                   <span className="min-w-0 truncate text-muted-foreground/80">
                     · {nextUpReasonLabel ?? nextUpResetLabel}
                   </span>

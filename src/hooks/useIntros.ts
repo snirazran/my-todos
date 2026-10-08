@@ -8,7 +8,8 @@ export type IntroKey =
   | 'savedTask'
   | 'plannerTour'
   | 'quickAddNl'
-  | 'quickAddTagEdit';
+  | 'quickAddTagEdit'
+  | 'firstRun';
 
 type IntrosResponse = { seenIntros?: Partial<Record<IntroKey, boolean>> };
 

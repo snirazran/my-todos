@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/questRewardReveal';
 import { useDismissNotification } from '@/components/providers/NotificationProvider';
 import { pactViewKey } from '@/lib/pact/viewKey';
+import { useUIStore } from '@/lib/uiStore';
 import type { RatingMoment } from '@/lib/rateApp';
 
 const RewardTile = dynamic(
@@ -276,6 +277,7 @@ export async function notifyQuestClaims(
   const prevProgress = progressBaseline;
   progressBaseline = toProgressMap(data.trackables);
   if (prev === null) return;
+  if (useUIStore.getState().isFirstRunGuided) return;
   let claimToastShown = false;
   for (const c of data.claimables) {
     if (prev.has(c.id)) continue;

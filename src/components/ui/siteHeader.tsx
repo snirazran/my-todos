@@ -58,6 +58,7 @@ export default function SiteHeader() {
     isLoadingScreenVisible,
     isWardrobeStuck,
     openFlyShop,
+    isFirstRunGuided,
   } = useUIStore();
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
@@ -148,6 +149,11 @@ export default function SiteHeader() {
         )}
       <header
         data-app-site-header
+        style={{
+          opacity: isFirstRunGuided ? 0 : 1,
+          pointerEvents: isFirstRunGuided ? 'none' : undefined,
+          transition: 'opacity 500ms ease',
+        }}
         className={cn(
           'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
           pathname !== '/planner' &&

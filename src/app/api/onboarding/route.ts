@@ -110,6 +110,7 @@ export async function POST(req: Request) {
       {
         $set: {
           onboardingCompleted: true,
+          'seenIntros.firstRun': false,
           frogName,
           ...(humanName ? { name: humanName } : {}),
           ...(ageRange ? { ageRange } : {}),
