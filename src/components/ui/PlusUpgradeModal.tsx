@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { mutate } from 'swr';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { Capacitor } from '@capacitor/core';
@@ -10,9 +10,10 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { Bell, Check, ChevronLeft, ChevronRight, Crown, Loader2, ShieldAlert, Sparkle, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
-import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { CATALOG, rarityRank, type ItemDef, type Rarity } from '@/lib/skins/catalog';
+import type { FrogStampIndices } from '@/lib/frogStampEngine';
 import Frog from '@/components/ui/frog';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { useSettled } from '@/hooks/useSettled';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import {
   getPlusPricing,
@@ -77,18 +78,19 @@ type PaywallContext = {
 };
 
 const DEFAULT_CONTEXT: PaywallContext = {
-  headline: 'Keep showing up.',
-  accent: 'Even on the hard days.',
-  sub: 'Plus gives you the backup to stay consistent until it sticks.',
+  headline: 'Fun makes habits stick.',
+  accent: 'Plus doubles your rewards.',
+  sub: 'Watch your frog glow up with every task you finish.',
 };
 
 function contextFor(placement: string, frogName?: string): PaywallContext {
   if (placement === 'onboarding') {
+    const name = frogName?.trim();
     return {
-      headline: `${frogName?.trim() || 'Your frog'} is ready.`,
-      accent: 'Now make it stick.',
-      sub: 'New habits take about 66 days to stick. Plus is your backup for the days you slip.',
-      lead: 'lilyPad',
+      headline: 'Fun makes habits stick.',
+      accent: 'Plus doubles your rewards.',
+      sub: `Watch ${name || 'your frog'} glow up with every task you finish.`,
+      lead: 'x2',
     };
   }
   if (placement === 'gift_double') {
@@ -115,9 +117,9 @@ function contextFor(placement: string, frogName?: string): PaywallContext {
   }
   if (placement === 'streak_rescue') {
     return {
-      headline: 'Save your streak.',
-      accent: 'And never lose one again.',
-      sub: 'Plus saves it right now, with a free rescue every week.',
+      headline: 'Keep your streak going.',
+      accent: 'Plus covers today.',
+      sub: 'Plus rescues it right now and adds a free Lily Pad every month.',
       lead: 'lilyPad',
     };
   }
@@ -155,6 +157,26 @@ function useIsDesktop() {
     () => false,
   );
 }
+
+const shortScreenQuery = '(max-height: 760px)';
+
+function subscribeShortScreen(callback: () => void) {
+  const mql = window.matchMedia(shortScreenQuery);
+  mql.addEventListener('change', callback);
+  return () => mql.removeEventListener('change', callback);
+}
+
+function useIsShortScreen() {
+  return useSyncExternalStore(
+    subscribeShortScreen,
+    () => window.matchMedia(shortScreenQuery).matches,
+    () => false,
+  );
+}
+
+const PERCH_FROG = { width: 160, height: 180 };
+const PERCH_FROG_SHORT = { width: 128, height: 144 };
+const PERCH_FEET_RATIO = 0.205;
 
 const PREMIUM_CONFIRM_LATE_MS = 10 * 60 * 1000;
 
@@ -228,6 +250,10 @@ export function PlusUpgradeModal({
   > | null>(null);
   const [pricingFailed, setPricingFailed] = useState(false);
   const isDesktop = useIsDesktop();
+  const compact = useIsShortScreen() && !isDesktop;
+  const perchFrog = compact ? PERCH_FROG_SHORT : PERCH_FROG;
+  const perchFeetOffset = Math.round(perchFrog.height * PERCH_FEET_RATIO);
+  const perchClearance = perchFrog.height - perchFeetOffset - 12 + (compact ? 4 : 20);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -429,7 +455,7 @@ export function PlusUpgradeModal({
           >
             <div className="plus-sheet pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden text-white md:h-[min(640px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,56rem)] md:flex-row md:rounded-[32px] md:shadow-2xl">
               <div aria-hidden className="plus-glow pointer-events-none absolute inset-0" />
-              {isDesktop && <DesktopRail ready={sheetReady} />}
+              {isDesktop && <DesktopRail />}
 
               <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
                 <div className="relative z-20 flex h-14 shrink-0 items-center justify-between px-4 pt-[env(safe-area-inset-top)] box-content md:box-border md:h-16 md:px-6 md:pt-0">
@@ -464,7 +490,8 @@ export function PlusUpgradeModal({
 
                 <div
                   ref={scrollRef}
-                  className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+                  className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain"
+                  style={isDesktop ? undefined : { paddingBottom: perchClearance }}
                 >
                   <AnimatePresence
                     mode="wait"
@@ -474,9 +501,9 @@ export function PlusUpgradeModal({
                     <StepShell key={String(view)}>
                       {view === 0 && (
                         <WhyPlusStep
+                          compact={compact}
                           context={paywallContext}
                           benefits={benefitsFor(paywallContext.lead)}
-                          showHero={!isDesktop}
                           ready={sheetReady}
                           onCompare={() => setView('compare')}
                         />
@@ -489,7 +516,13 @@ export function PlusUpgradeModal({
                         />
                       )}
                       {view === 2 && (
-                        <PlanStep plan={plan} onSelect={setPlan} pricing={pricing} pricingFailed={pricingFailed} />
+                        <PlanStep
+                          plan={plan}
+                          onSelect={setPlan}
+                          pricing={pricing}
+                          pricingFailed={pricingFailed}
+                          compact={compact}
+                        />
                       )}
                       {view === 'compare' && <CompareView />}
                     </StepShell>
@@ -499,8 +532,23 @@ export function PlusUpgradeModal({
                 <div className="relative z-10 shrink-0 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-10 md:pb-8">
                   <span
                     aria-hidden
-                    className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-[color:var(--plus-field-deep)] to-transparent"
+                    className="pointer-events-none absolute inset-x-0 bottom-full h-28 bg-gradient-to-t from-[color:var(--plus-field-deep)] from-40% to-transparent md:h-8 md:from-0%"
                   />
+                  {!isDesktop && (
+                    <div
+                      className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
+                      style={{
+                        bottom: `calc(100% - 0.75rem - ${perchFeetOffset}px)`,
+                      }}
+                    >
+                      <PlusFrog
+                        width={perchFrog.width}
+                        height={perchFrog.height}
+                        visualOffsetY={0}
+                        glow={false}
+                      />
+                    </div>
+                  )}
                   {(view === 0 || view === 'compare') && (
                     <>
                       <PrimaryButton onClick={() => goToStep(1)}>
@@ -514,7 +562,7 @@ export function PlusUpgradeModal({
                         <button
                           type="button"
                           onClick={onClose}
-                          className="mt-1 h-10 w-full text-center text-sm font-bold text-white/60 transition-colors hover:text-white"
+                          className={`w-full text-center text-sm font-bold text-white/60 transition-colors hover:text-white ${compact ? 'h-9' : 'mt-1 h-10'}`}
                         >
                           Not now
                         </button>
@@ -628,67 +676,282 @@ export function PlusUpgradeModal({
   );
 }
 
+type ShowcaseItem = Pick<ItemDef, 'slot' | 'rarity' | 'riveIndex'>;
+type ShowcaseLook = { indices: FrogStampIndices; rarity: Rarity };
+
+const SHOWCASE_RARITIES: readonly Rarity[] = ['rare', 'epic', 'legendary'];
+const LOOK_ROTATE_MS = 2800;
+const LOOK_SWAP_DELAY_MS = 110;
+
+let liveShowcaseItems: ShowcaseItem[] | null = null;
+let liveShowcaseRequest: Promise<ShowcaseItem[] | null> | null = null;
+
+function loadLiveShowcaseItems() {
+  liveShowcaseRequest ??= fetch('/api/skins/catalog')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((payload: { items?: ShowcaseItem[] } | null) => {
+      if (payload?.items?.length) liveShowcaseItems = payload.items;
+      return liveShowcaseItems;
+    })
+    .catch(() => {
+      liveShowcaseRequest = null;
+      return null;
+    });
+  return liveShowcaseRequest;
+}
+
+type ShowcaseSlot = 'skin' | 'hat' | 'body' | 'hand_item';
+
+const SHOWCASE_SLOTS: readonly ShowcaseSlot[] = ['skin', 'hat', 'body', 'hand_item'];
+
+const SLOT_WEAR_CHANCE: Record<ShowcaseSlot, number> = {
+  skin: 0.35,
+  hat: 0.8,
+  body: 0.55,
+  hand_item: 0.6,
+};
+
+function shuffle<T>(list: T[]) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+function createShowcaseDrawer(items: readonly ShowcaseItem[]) {
+  const pools = Object.fromEntries(
+    SHOWCASE_SLOTS.map((slot) => [
+      slot,
+      items.filter((item) => item.slot === slot && SHOWCASE_RARITIES.includes(item.rarity)),
+    ]),
+  ) as Record<ShowcaseSlot, ShowcaseItem[]>;
+  const bags: Record<ShowcaseSlot, ShowcaseItem[]> = { skin: [], hat: [], body: [], hand_item: [] };
+  const last: Partial<Record<ShowcaseSlot, ShowcaseItem>> = {};
+
+  const draw = (slot: ShowcaseSlot) => {
+    if (!pools[slot].length) return undefined;
+    if (!bags[slot].length) {
+      bags[slot] = shuffle([...pools[slot]]);
+      const end = bags[slot].length - 1;
+      if (end > 0 && bags[slot][end] === last[slot]) {
+        [bags[slot][0], bags[slot][end]] = [bags[slot][end], bags[slot][0]];
+      }
+    }
+    const item = bags[slot].pop();
+    last[slot] = item;
+    return item;
+  };
+
+  return (): ShowcaseLook | null => {
+    const available = SHOWCASE_SLOTS.filter((slot) => pools[slot].length);
+    if (!available.length) return null;
+    let slots = available.filter((slot) => Math.random() < SLOT_WEAR_CHANCE[slot]);
+    if (slots.length < 2) {
+      slots = shuffle([...available]).slice(0, Math.min(2, available.length));
+    }
+    const indices: FrogStampIndices = { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
+    let rarity: Rarity = 'rare';
+    for (const slot of slots) {
+      const item = draw(slot);
+      if (!item) continue;
+      indices[slot] = item.riveIndex;
+      if (rarityRank[item.rarity] > rarityRank[rarity]) rarity = item.rarity;
+    }
+    return { indices, rarity };
+  };
+}
+
+const STATIC_SHOWCASE_ITEMS = CATALOG.filter((item) => item.slot !== 'skin');
+const EMPTY_LOOK: ShowcaseLook = {
+  indices: { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 },
+  rarity: 'rare',
+};
+
+function useShowcaseLook(rotating: boolean) {
+  const drawRef = React.useRef<(() => ShowcaseLook | null) | null>(null);
+  const [look, setLook] = useState<ShowcaseLook>(() => {
+    drawRef.current = createShowcaseDrawer(liveShowcaseItems ?? STATIC_SHOWCASE_ITEMS);
+    return drawRef.current() ?? EMPTY_LOOK;
+  });
+  const [tick, setTick] = useState(0);
+  const rotatingRef = React.useRef(rotating);
+  rotatingRef.current = rotating;
+
+  useEffect(() => {
+    if (liveShowcaseItems) return;
+    let cancelled = false;
+    void loadLiveShowcaseItems().then((items) => {
+      if (cancelled || !items) return;
+      drawRef.current = createShowcaseDrawer(items);
+      if (!rotatingRef.current) {
+        const next = drawRef.current();
+        if (next) setLook(next);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rotating) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      const next = drawRef.current?.();
+      if (!next) return;
+      setLook(next);
+      setTick((t) => t + 1);
+    }, LOOK_ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [rotating]);
+
+  return { look, tick };
+}
+
+const SPARKLE_ANGLES = [-150, -105, -60, -20, 200, 245];
+
 function PlusFrog({
-  ready,
   width,
   height,
+  visualOffsetY,
+  glow = true,
 }: {
-  ready: boolean;
   width: number;
   height: number;
+  visualOffsetY?: number;
+  glow?: boolean;
 }) {
-  const { indices: wardrobeIndices } = useWardrobeIndices(true);
-  const indices = React.useMemo(
-    () => ({ ...wardrobeIndices }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      wardrobeIndices.skin,
-      wardrobeIndices.hat,
-      wardrobeIndices.body,
-      wardrobeIndices.hand_item,
-    ],
-  );
   const reduceMotion = useReducedMotion();
+  const settled = useSettled();
+  const [dressed, setDressed] = useState(false);
+  const companionReady = useSettledAfter(dressed, 180);
+
+  const { look, tick } = useShowcaseLook(dressed);
+  const [shown, setShown] = useState(look);
+  const hop = useAnimationControls();
+  useEffect(() => {
+    if (shown === look) return;
+    if (reduceMotion || !dressed) {
+      setShown(look);
+      return;
+    }
+    void hop.start({
+      scaleX: [1, 1.08, 0.96, 1],
+      scaleY: [1, 0.9, 1.06, 1],
+      y: [0, 3, -9, 0],
+      transition: { duration: 0.55, times: [0, 0.2, 0.55, 1], ease: 'easeOut' },
+    });
+    const t = window.setTimeout(() => setShown(look), LOOK_SWAP_DELAY_MS);
+    return () => window.clearTimeout(t);
+  }, [look, shown, dressed, reduceMotion, hop]);
+
+  const sparkleColor =
+    shown.rarity === 'legendary' ? '#fcd34d' : shown.rarity === 'epic' ? '#d8b4fe' : '#93c5fd';
+
   return (
     <div className="relative shrink-0" style={{ width, height }}>
+      {glow && (
+        <motion.div
+          aria-hidden
+          className="absolute inset-y-0 -inset-x-1/4 bg-[radial-gradient(closest-side,rgba(251,191,36,0.3)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
+          initial={false}
+          animate={
+            dressed
+              ? { opacity: 1, scale: 1 }
+              : { opacity: 0, scale: reduceMotion ? 1 : 0.6 }
+          }
+          transition={{ type: 'spring', stiffness: 160, damping: 18 }}
+        />
+      )}
       <motion.div
-        aria-hidden
-        className="absolute inset-y-0 -inset-x-1/4 bg-[radial-gradient(closest-side,rgba(251,191,36,0.3)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
-        initial={false}
-        animate={
-          ready
-            ? { opacity: 1, scale: 1 }
-            : { opacity: 0, scale: reduceMotion ? 1 : 0.6 }
-        }
-        transition={{ type: 'spring', stiffness: 160, damping: 18 }}
-      />
-      {ready ? (
-        <>
-          <Frog width={width} height={height} indices={indices} emote="love" />
+        className="absolute inset-0 origin-[50%_77%] will-change-transform"
+        animate={hop}
+      >
+        <motion.div
+          className="absolute inset-0 origin-[50%_77%]"
+          initial={false}
+          animate={
+            dressed
+              ? { opacity: 1, scale: 1, y: 0 }
+              : { opacity: 0, scale: reduceMotion ? 1 : 0.9, y: reduceMotion ? 0 : 10 }
+          }
+          transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+        >
+          {settled && (
+            <Frog
+              width={width}
+              height={height}
+              indices={shown.indices}
+              visualOffsetY={visualOffsetY}
+              emote="love"
+              onDressed={() => setDressed(true)}
+            />
+          )}
+        </motion.div>
+      </motion.div>
+      {!reduceMotion && tick > 0 && (
+        <span key={tick} aria-hidden className="pointer-events-none absolute inset-0">
+          {SPARKLE_ANGLES.map((angle, i) => {
+            const rad = (angle * Math.PI) / 180;
+            const dist = width * (0.42 + (i % 2) * 0.1);
+            return (
+              <motion.span
+                key={angle}
+                className="absolute left-1/2 top-[55%] h-2 w-2 rounded-full"
+                style={{ backgroundColor: sparkleColor, boxShadow: `0 0 8px ${sparkleColor}` }}
+                initial={{ x: -4, y: -4, scale: 0, opacity: 0 }}
+                animate={{
+                  x: Math.cos(rad) * dist - 4,
+                  y: Math.sin(rad) * dist * 0.8 - 4,
+                  scale: [0, 1.1, 0],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{ duration: 0.7, delay: 0.08 + i * 0.02, ease: 'easeOut' }}
+              />
+            );
+          })}
+        </span>
+      )}
+      {companionReady && (
+        <motion.div
+          className="pointer-events-none absolute inset-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+        >
           <PremiumFrogAura show alwaysPlay />
-        </>
-      ) : (
-        <FrogSnapshot width={width} height={height} indices={indices} />
+        </motion.div>
       )}
     </div>
   );
 }
 
-function DesktopRail({ ready }: { ready: boolean }) {
+function useSettledAfter(trigger: boolean, delayMs: number) {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!trigger) return;
+    const t = window.setTimeout(() => setSettled(true), delayMs);
+    return () => window.clearTimeout(t);
+  }, [trigger, delayMs]);
+  return settled;
+}
+
+function DesktopRail() {
   return (
     <aside
       aria-hidden
       className="relative flex w-[42%] shrink-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(90%_70%_at_50%_40%,#1d5a3f_0%,#123a2a_55%,#0b271c_100%)]"
     >
-      <PlusFrog ready={ready} width={250} height={282} />
+      <PlusFrog width={250} height={282} />
       <div className="absolute inset-x-0 bottom-0 p-8">
         <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[color:var(--plus-gold)]">
           Frogress Plus
         </p>
         <p className="mt-1.5 text-lg font-black leading-tight tracking-tight text-white">
-          Your backup plan for
+          More rewards for
           <br />
-          habits that stick.
+          every habit you build.
         </p>
       </div>
     </aside>
@@ -711,7 +974,7 @@ function StepShell({ children }: { children: React.ReactNode }) {
             }
       }
       transition={{ type: 'spring', stiffness: 400, damping: 36, mass: 0.8 }}
-      className="flex min-h-full flex-col"
+      className="flex shrink-0 grow flex-col"
     >
       {children}
     </motion.div>
@@ -757,41 +1020,56 @@ function PrimaryButton({
 function WhyPlusStep({
   context,
   benefits,
-  showHero,
   ready,
+  compact,
   onCompare,
 }: {
   context: PaywallContext;
   benefits: typeof BENEFITS;
-  showHero: boolean;
   ready: boolean;
+  compact: boolean;
   onCompare: () => void;
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <div className="flex flex-1 flex-col items-center px-6 pb-4 text-center md:items-start md:justify-center md:px-10 md:text-left">
-      {showHero && (
-        <div className="flex justify-center pb-1 pt-3">
-          <PlusFrog ready={ready} width={172} height={194} />
-        </div>
+    <div
+      className={`flex flex-1 flex-col items-center justify-center px-6 text-center md:items-start md:px-10 md:pt-0 md:text-left ${
+        compact ? 'pb-1 pt-0' : 'pb-4 pt-2'
+      }`}
+    >
+      {!compact && (
+        <p className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-[color:var(--plus-gold)]">
+          Frogress Plus
+        </p>
       )}
-      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[color:var(--plus-gold)]">
-        Frogress Plus
-      </p>
-      <h2 className="mt-2 text-[1.75rem] font-black leading-[1.08] tracking-tight md:text-[2.1rem]">
-        {context.headline}
-        <br />
-        <span className="text-[color:var(--plus-gold-soft)]">{context.accent}</span>
+      <h2
+        className="font-black leading-[1.1] tracking-tight"
+        style={{
+          fontSize: compact
+            ? 'clamp(1.375rem, 1.375rem + (100vw - 20rem) * 0.1, 1.625rem)'
+            : 'clamp(1.5rem, 1.5rem + (100vw - 20rem) * 0.1, 1.75rem)',
+        }}
+      >
+        <span className="block text-balance">{context.headline}</span>
+        <span className="block text-balance text-[color:var(--plus-gold-soft)]">{context.accent}</span>
       </h2>
-      <p className="mt-2.5 max-w-xs text-[15px] font-medium leading-snug text-white/75">
+      <p
+        className={`mt-2 max-w-xs text-balance font-medium leading-[1.35] text-white/75 md:max-w-sm ${
+          compact ? 'text-[15px]' : 'text-base'
+        }`}
+      >
         {context.sub}
       </p>
 
-      <ul className="mt-6 w-full max-w-sm space-y-4 text-left">
+      <ul
+        className={`w-full max-w-sm text-left md:mt-5 md:space-y-3 ${
+          compact ? 'mt-5 space-y-3' : 'mt-6 space-y-4'
+        }`}
+      >
         {benefits.map((benefit, i) => (
           <motion.li
             key={benefit.title}
-            className="flex items-center gap-3.5"
+            className={`flex items-center ${compact ? 'gap-3' : 'gap-3.5'}`}
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={ready ? { opacity: 1, y: 0 } : undefined}
             transition={{
@@ -802,7 +1080,9 @@ function WhyPlusStep({
             }}
           >
             <motion.span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.08] ring-1 ring-inset ring-white/10"
+              className={`flex shrink-0 items-center justify-center bg-white/[0.08] ring-1 ring-inset ring-white/10 ${
+                compact ? 'h-10 w-10 rounded-xl' : 'h-12 w-12 rounded-2xl'
+              }`}
               initial={reduceMotion ? false : { scale: 0.4, rotate: -12 }}
               animate={ready ? { scale: 1, rotate: 0 } : undefined}
               transition={{
@@ -812,11 +1092,26 @@ function WhyPlusStep({
                 delay: 0.14 + i * 0.09,
               }}
             >
-              <Icon name={benefit.icon} className="h-8 w-8" />
+              <Icon
+                name={benefit.icon}
+                className={
+                  benefit.icon === 'leap'
+                    ? compact
+                      ? 'h-8 w-8'
+                      : 'h-10 w-10'
+                    : compact
+                      ? 'h-7 w-7'
+                      : 'h-8 w-8'
+                }
+              />
             </motion.span>
             <span className="min-w-0">
-              <span className="block text-[15px] font-black leading-tight">{benefit.title}</span>
-              <span className="mt-0.5 block text-[13px] font-medium leading-snug text-white/65">
+              <span className={`block font-black leading-[1.25] ${compact ? 'text-[15px]' : 'text-base'}`}>
+                {benefit.title}
+              </span>
+              <span
+                className="mt-0.5 block text-[13px] font-medium leading-[1.35] text-white/65"
+              >
                 {benefit.body}
               </span>
             </span>
@@ -827,7 +1122,9 @@ function WhyPlusStep({
       <button
         type="button"
         onClick={onCompare}
-        className="mt-5 inline-flex h-10 items-center gap-1 rounded-full px-3 text-sm font-bold text-white/70 transition-colors hover:text-white md:-ml-3"
+        className={`inline-flex items-center gap-1 rounded-full px-3 text-[15px] font-bold text-white/70 transition-colors hover:text-white md:-ml-3 ${
+          compact ? 'mt-3 h-9' : 'mt-4 h-10'
+        }`}
       >
         See everything in Plus
         <ChevronRight className="h-4 w-4" strokeWidth={2.75} />
@@ -912,11 +1209,13 @@ function PlanStep({
   onSelect,
   pricing,
   pricingFailed,
+  compact,
 }: {
   plan: PlanId;
   onSelect: (p: PlanId) => void;
   pricing: Partial<Record<PlanId, PlusPriceInfo>> | null;
   pricingFailed: boolean;
+  compact: boolean;
 }) {
   const yearly = pricing?.yearly;
   const monthly = pricing?.monthly;
@@ -933,7 +1232,11 @@ function PlanStep({
 
   return (
     <div className="flex flex-1 flex-col justify-center px-6 pb-4 md:px-10">
-      <div className="relative mx-auto mb-4 flex h-32 w-40 items-center justify-center md:mx-0 md:-ml-4 md:h-28 md:w-32">
+      <div
+        className={`relative mx-auto flex items-center justify-center md:mx-0 md:-ml-4 md:mb-4 md:h-28 md:w-32 ${
+          compact ? 'mb-2 h-[4.5rem] w-24' : 'mb-4 h-32 w-40'
+        }`}
+      >
         <div
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(closest-side,rgba(251,191,36,0.3)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
@@ -949,19 +1252,26 @@ function PlanStep({
         >
           <Icon
             name="frogPlus"
-            className="h-28 w-28 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)] md:h-24 md:w-24"
+            className={`drop-shadow-[0_5px_0_rgba(0,0,0,0.3)] md:h-24 md:w-24 ${
+              compact ? 'h-16 w-16' : 'h-28 w-28'
+            }`}
           />
         </motion.div>
       </div>
-      <h2 className="text-center text-[1.75rem] font-black leading-[1.08] tracking-tight md:text-left md:text-[2.1rem]">
+      <h2
+        className={`text-center font-black leading-[1.1] tracking-tight md:text-left md:text-[2.1rem] ${
+          compact ? 'text-[1.5rem]' : 'text-[1.75rem]'
+        }`}
+      >
         Choose your plan
       </h2>
       <p className="mt-2 text-center text-[15px] font-medium text-white/70 md:text-left">
         Nothing is charged today.
       </p>
-      <div className="mt-7 space-y-3">
+      <div className={compact ? 'mt-4 space-y-2.5' : 'mt-7 space-y-3'}>
         <PlanCard
           id="yearly"
+          compact={compact}
           selected={plan === 'yearly'}
           onSelect={onSelect}
           badge={yearlySavings >= 5 ? `Save ${yearlySavings}%` : PLAN_DETAILS.yearly.badge}
@@ -982,6 +1292,7 @@ function PlanStep({
         />
         <PlanCard
           id="monthly"
+          compact={compact}
           selected={plan === 'monthly'}
           onSelect={onSelect}
           title={PLAN_DETAILS.monthly.title}
@@ -1017,14 +1328,14 @@ function PlanFooter({
   const period = plan === 'yearly' ? 'year' : 'month';
   return (
     <div className="space-y-2.5 text-center">
+      <PrimaryButton onClick={onStart} disabled={busy}>
+        {busy ? 'Processing…' : `Start my ${trialDays}-day free trial`}
+      </PrimaryButton>
       {error && (
         <p className="text-xs font-bold text-rose-200" role="alert">
           {error}
         </p>
       )}
-      <PrimaryButton onClick={onStart} disabled={busy}>
-        {busy ? 'Processing…' : `Start my ${trialDays}-day free trial`}
-      </PrimaryButton>
       <p className="text-[11px] font-medium leading-relaxed text-white/60">
         {trialDays} days free, then{' '}
         {selected ? selected.priceString : 'the price shown at checkout'}/{period}.
@@ -1149,6 +1460,7 @@ function StepDots({ step }: { step: Step }) {
 
 function PlanCard({
   id,
+  compact,
   selected,
   onSelect,
   badge,
@@ -1157,6 +1469,7 @@ function PlanCard({
   detail,
 }: {
   id: PlanId;
+  compact: boolean;
   selected: boolean;
   onSelect: (p: PlanId) => void;
   badge?: string;
@@ -1170,7 +1483,7 @@ function PlanCard({
       role="radio"
       aria-checked={selected}
       onClick={() => onSelect(id)}
-      className={`relative flex w-full items-center gap-4 rounded-2xl px-4 py-4 text-left transition-all [-webkit-tap-highlight-color:transparent] active:scale-[0.99] ${
+      className={`relative flex w-full items-center gap-4 rounded-2xl px-4 text-left ${compact ? 'py-3' : 'py-4'} transition-all [-webkit-tap-highlight-color:transparent] active:scale-[0.99] ${
         selected
           ? 'bg-white/[0.12] ring-2 ring-[color:var(--plus-gold)]'
           : 'bg-white/[0.05] ring-1 ring-white/15 hover:bg-white/[0.08]'
@@ -1190,14 +1503,15 @@ function PlanCard({
         <span className="flex items-center gap-2">
           <span className="text-base font-black tracking-tight">{title}</span>
           {badge && (
-            <span className="rounded-md bg-[color:var(--plus-gold)] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[color:var(--plus-gold-ink)]">
+            <span className="whitespace-nowrap rounded-md bg-[color:var(--plus-gold)] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[color:var(--plus-gold-ink)]">
               {badge}
             </span>
           )}
         </span>
         <span className="mt-0.5 block text-xs font-medium text-white/65">{detail}</span>
+        <span className="mt-1 block text-[15px] font-black tracking-tight [@media(min-width:360px)]:hidden">{price}</span>
       </span>
-      <span className="shrink-0 text-right text-[15px] font-black tracking-tight">{price}</span>
+      <span className="hidden shrink-0 text-right text-[15px] font-black tracking-tight [@media(min-width:360px)]:block">{price}</span>
     </button>
   );
 }
