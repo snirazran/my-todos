@@ -15,8 +15,8 @@ const POSITIVE_KEY = 'rate-app:positive-moments';
 const NEGATIVE_AT_KEY = 'rate-app:negative-at';
 const VERSION_KEY = 'rate-app:prompted-version';
 
-const MIN_USAGE_DAYS = 3;
-const MIN_POSITIVE_MOMENTS = 3;
+const MIN_USAGE_DAYS = 2;
+const MIN_POSITIVE_MOMENTS = 2;
 const DAY_MS = 86_400_000;
 const YEAR_MS = 365 * DAY_MS;
 const NEGATIVE_QUIET_MS = 2 * DAY_MS;
