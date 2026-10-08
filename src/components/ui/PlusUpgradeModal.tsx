@@ -15,7 +15,6 @@ import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import {
-  formatPlusPrice,
   getPlusPricing,
   purchasePlus,
   restorePlusPurchases,
@@ -83,7 +82,15 @@ const DEFAULT_CONTEXT: PaywallContext = {
   sub: 'Plus gives you the backup to stay consistent until it sticks.',
 };
 
-function contextFor(placement: string): PaywallContext {
+function contextFor(placement: string, frogName?: string): PaywallContext {
+  if (placement === 'onboarding') {
+    return {
+      headline: `${frogName?.trim() || 'Your frog'} is ready.`,
+      accent: 'Now make it stick.',
+      sub: 'New habits take about 66 days to stick. Plus is your backup for the days you slip.',
+      lead: 'lilyPad',
+    };
+  }
   if (placement === 'gift_double') {
     return {
       headline: 'Open this gift again.',
@@ -195,11 +202,13 @@ export function PlusUpgradeModal({
   onClose,
   onStartTrial,
   placement = 'unknown',
+  frogName,
 }: {
   open: boolean;
   onClose: () => void;
   onStartTrial?: (plan: PlanId) => void | Promise<void>;
   placement?: string;
+  frogName?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -388,7 +397,7 @@ export function PlusUpgradeModal({
   const reminderDate = addDays(Math.max(1, trialDays - 2));
   const endDate = addDays(trialDays);
   const activeStep: Step = view === 'compare' ? 0 : view;
-  const paywallContext = contextFor(placement);
+  const paywallContext = contextFor(placement, frogName);
 
   return createPortal(
     <AnimatePresence>
@@ -915,6 +924,10 @@ function PlanStep({
     yearly && monthly && monthly.currency === yearly.currency
       ? monthly.amount * 12
       : null;
+  const yearlySavings =
+    yearly && yearlyCompareAt !== null && yearlyCompareAt > yearly.amount
+      ? Math.round((1 - yearly.amount / yearlyCompareAt) * 100)
+      : 0;
   const placeholder = pricingFailed ? 'See price at checkout' : '—';
   const reduceMotion = useReducedMotion();
 
@@ -951,25 +964,15 @@ function PlanStep({
           id="yearly"
           selected={plan === 'yearly'}
           onSelect={onSelect}
-          badge={PLAN_DETAILS.yearly.badge}
+          badge={yearlySavings >= 5 ? `Save ${yearlySavings}%` : PLAN_DETAILS.yearly.badge}
           title={PLAN_DETAILS.yearly.title}
-          price={
-            <>
-              {yearly?.pricePerMonthString
-                ? `${yearly.pricePerMonthString}/month`
-                : (yearly?.priceString ?? placeholder)}
-            </>
-          }
+          price={yearly ? `${yearly.priceString}/year` : placeholder}
           detail={
             yearly ? (
               <>
-                {yearly.priceString} a year
-                {yearlyCompareAt !== null && yearlyCompareAt > yearly.amount && (
-                  <span className="ml-1.5 line-through opacity-60">
-                    {formatPlusPrice(yearlyCompareAt, yearly.currency)}
-                  </span>
-                )}
-                {' · '}
+                {yearly.pricePerMonthString
+                  ? `Just ${yearly.pricePerMonthString}/month · `
+                  : ''}
                 {PLAN_DETAILS.yearly.trialDays} days free
               </>
             ) : (

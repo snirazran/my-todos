@@ -4,7 +4,7 @@ export const BENEFITS: { icon: IconName; title: string; body: string }[] = [
   {
     icon: 'lilyPad',
     title: 'Never lose a streak to one bad day',
-    body: 'Extra Lily Pads, plus a free one every month.',
+    body: 'Lily Pads cover a missed day. Hold more, get one free monthly.',
   },
   {
     icon: 'leap',

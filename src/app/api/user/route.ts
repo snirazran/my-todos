@@ -124,7 +124,6 @@ export async function POST(req: NextRequest) {
       isGuest: isAnonymous,
       name: name || 'Anonymous Frog',
       createdAt: now,
-      plusIntroEligible: true,
       wardrobe: {
         equipped: {},
         inventory: {},

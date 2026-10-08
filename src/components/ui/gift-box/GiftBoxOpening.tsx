@@ -22,7 +22,6 @@ import { GiftBox, GiftRive } from './GiftBox';
 import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
 import { PlusOfferButton, RewardCard } from './RewardCard';
 import { pickFunnySentence } from './funnySentences';
-import { queuePlusIntroOnce } from '@/lib/plusIntro';
 import { useAutoPopupHold } from '@/lib/popupGate';
 
 /** What the server says about a reveal beyond the prize itself. */
@@ -173,7 +172,6 @@ export default function GiftBoxOpening({
     }
     // Prize is already in inventory from the open-gift API call
     // Just close the modal
-    if (!showPlusOffer) queuePlusIntroOnce();
     onClose();
   };
 

@@ -23,6 +23,7 @@ import { resetBootstrapCache } from '@/lib/bootstrapFetcher';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 // Answers are drafted before sign-in, so they're persisted locally to survive the
 // email magic-link round trip (which reloads onto a fresh /onboarding). They are
 // dropped the moment the flow lands on an account that already finished onboarding.
@@ -55,6 +56,7 @@ export default function OnboardingPage() {
   const [direction, setDirection] = useState(1);
   const [subStep, setSubStep] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
   const arrivalCheckedRef = useRef(false);
 
@@ -168,6 +170,7 @@ export default function OnboardingPage() {
       setSaving(true);
       setCelebrating(true);
       const celebrationStart = Date.now();
+      let offerPlus = true;
       const focusAreaIds = selections.focusAreas ?? [];
       try {
         // Account creation is deferred until onboarding actually completes, so
@@ -194,6 +197,7 @@ export default function OnboardingPage() {
           const data = await res.json().catch(() => ({}));
           if (data?.alreadyOnboarded) {
             clearOnboardingDraft();
+            offerPlus = false;
             return;
           }
         }
@@ -273,7 +277,8 @@ export default function OnboardingPage() {
           undefined,
           { revalidate: false },
         );
-        router.push('/');
+        if (offerPlus) setPaywallOpen(true);
+        else router.push('/');
       }
     }
   };
@@ -371,6 +376,15 @@ export default function OnboardingPage() {
           humanName={selections.humanName?.[0]?.trim() || null}
         />
       )}
+      <PlusUpgradeModal
+        open={paywallOpen}
+        placement="onboarding"
+        frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
+        onClose={() => {
+          setPaywallOpen(false);
+          router.push('/');
+        }}
+      />
     </main>
   );
 }
