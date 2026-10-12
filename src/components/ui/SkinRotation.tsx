@@ -806,7 +806,8 @@ async function rotateOnce({
   auto = false,
   undo = false,
 }: { auto?: boolean; undo?: boolean } = {}): Promise<RotateResult> {
-  window.dispatchEvent(new Event('style-shuffle-start'));
+  let spinStarted = !auto;
+  if (spinStarted) window.dispatchEvent(new Event('style-shuffle-start'));
   beginEquipMutation();
   try {
     const res = await fetch(SHUFFLE_API, {
@@ -821,6 +822,10 @@ async function rotateOnce({
     };
     if (!data.shuffled) return { ok: true, shuffled: false, tryOn: null };
 
+    if (!spinStarted) {
+      spinStarted = true;
+      window.dispatchEvent(new Event('style-shuffle-start'));
+    }
     mutateInventoryCaches();
     mutateBackgrounds();
     window.dispatchEvent(new Event('wardrobe-refresh'));
@@ -833,7 +838,7 @@ async function rotateOnce({
     return { ok: false, shuffled: false, tryOn: null };
   } finally {
     endEquipMutation();
-    window.dispatchEvent(new Event('style-shuffle-end'));
+    if (spinStarted) window.dispatchEvent(new Event('style-shuffle-end'));
   }
 }
 
