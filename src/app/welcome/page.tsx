@@ -117,7 +117,7 @@ export default function WelcomePage() {
         </div>
 
         <p
-          className="auth-enter mb-2 max-w-xs text-center text-sm text-muted-foreground"
+          className="auth-enter mb-2 max-w-xs text-center text-[15px] font-medium text-muted-foreground"
           style={{ '--auth-i': 1 } as any}
         >
           Time{' '}
@@ -170,7 +170,7 @@ export default function WelcomePage() {
           <button
             onClick={handleHatch}
             disabled={loading}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-primary text-[16px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -181,7 +181,7 @@ export default function WelcomePage() {
 
           <Link
             href="/login"
-            className="flex h-12 w-full items-center justify-center rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98]"
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-card text-[15px] font-black text-foreground ring-1 ring-border shadow-[0_3px_0_0_hsl(var(--border))] transition-[transform,box-shadow,background-color] hover:bg-muted/40 active:translate-y-0.5 active:shadow-none"
           >
             I already have a frog
           </Link>

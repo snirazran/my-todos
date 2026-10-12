@@ -14,6 +14,8 @@ import {
   animate,
   motion,
   useMotionValue,
+  usePresence,
+  usePresenceData,
   useReducedMotion,
   useTransform,
 } from 'framer-motion';
@@ -136,26 +138,6 @@ export const TOAST_SURFACE_STYLE = {
 
 const RESUME_FLOOR_MS = 1500;
 
-const TOAST_RESTING = 'translateX(0%) translateY(0%) scale(1)';
-const TOAST_EXIT_TO = 'translateX(0%) translateY(35%) scale(0.96)';
-const linearJs = (t: number) => t;
-function hideOnExit() {
-  let node: HTMLElement | null = null;
-  return {
-    ref: (el: HTMLElement | null) => {
-      node = el;
-    },
-    onComplete: (definition: unknown) => {
-      const exited =
-        definition === 'exit' ||
-        (typeof definition === 'object' &&
-          (definition as { opacity?: number } | null)?.opacity === 0);
-      if (exited && node) node.style.visibility = 'hidden';
-    },
-  };
-}
-const easeInJs = (t: number) => t * t * t;
-const easeOutJs = (t: number) => 1 - Math.pow(1 - t, 3);
 
 function SwipeableToast({
   disabled,
@@ -198,6 +180,43 @@ function SwipeableToast({
   );
 }
 const SWIPE_DISMISS_PX = 72;
+
+const ToastPresence = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { toastId: number; reduceMotion: boolean }
+>(function ToastPresence({ toastId, reduceMotion, className, children, ...rest }, ref) {
+  const [isPresent, safeToRemove] = usePresence();
+  const swipe = usePresenceData() as { id: number; dir: number } | null | undefined;
+  useEffect(() => {
+    if (isPresent) return;
+    const timer = window.setTimeout(() => safeToRemove?.(), 260);
+    return () => window.clearTimeout(timer);
+  }, [isPresent, safeToRemove]);
+  const swipedAway = !isPresent && swipe?.id === toastId;
+  const stateClass = isPresent
+    ? reduceMotion
+      ? 'toast-enter-fade'
+      : 'toast-enter'
+    : swipedAway
+      ? 'toast-exit-swipe'
+      : reduceMotion
+        ? 'toast-exit-fade'
+        : 'toast-exit';
+  return (
+    <div
+      {...rest}
+      ref={ref}
+      className={`${className ?? ''} ${stateClass} ${isPresent ? '' : 'pointer-events-none'}`}
+      style={
+        swipedAway
+          ? ({ ['--swipe-dir' as string]: String(swipe?.dir ?? 1) } as React.CSSProperties)
+          : undefined
+      }
+    >
+      {children}
+    </div>
+  );
+});
 
 export function NotificationProvider({
   children,
@@ -351,7 +370,6 @@ export function NotificationProvider({
   };
 
   const renderCard = (n: NotificationItem) => {
-        const exitGuard = hideOnExit();
         const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
         const isMovedToTodayToast = n.content === 'Moved to Today';
         const isDuplicateToast =
@@ -361,39 +379,11 @@ export function NotificationProvider({
           isSavedTasksToast || isMovedToTodayToast || isDuplicateToast;
         const isUndoing = undoingId === n.id;
         return (
-          <motion.div
+          <ToastPresence
             key={n.id}
-            ref={(el) => {
-              exitGuard.ref(el);
-              measureSlot(el);
-            }}
-            onAnimationComplete={exitGuard.onComplete}
-            custom={swiped}
-            initial={false}
-            animate={{ opacity: 1, transform: TOAST_RESTING }}
-            variants={{
-              exit: (swipe: { id: number; dir: number } | null) =>
-                swipe?.id === n.id
-                  ? {
-                      opacity: 0,
-                      transform: `translateX(${swipe.dir * 110}%) translateY(0%) scale(1)`,
-                      transition: { duration: 0.24, ease: easeOutJs },
-                      transitionEnd: { visibility: 'hidden' },
-                    }
-                  : reduceMotion
-                    ? {
-                        opacity: 0,
-                        transition: { duration: 0.15, ease: linearJs },
-                        transitionEnd: { visibility: 'hidden' },
-                      }
-                    : {
-                        opacity: 0,
-                        transform: TOAST_EXIT_TO,
-                        transition: { duration: 0.18, ease: easeInJs },
-                        transitionEnd: { visibility: 'hidden' },
-                      },
-            }}
-            exit="exit"
+            toastId={n.id}
+            ref={measureSlot}
+            reduceMotion={!!reduceMotion}
             onPointerEnter={(e) => {
               if (e.pointerType === 'mouse') setHovered(true);
             }}
@@ -408,9 +398,7 @@ export function NotificationProvider({
                 setHovered(true);
             }}
             onBlurCapture={() => setHovered(false)}
-            className={`pointer-events-auto absolute inset-x-0 bottom-0 ${
-              reduceMotion ? 'toast-enter-fade' : 'toast-enter'
-            }`}
+            className="pointer-events-auto absolute inset-x-0 bottom-0"
           >
           <SwipeableToast
             disabled={isUndoing}
@@ -496,29 +484,17 @@ export function NotificationProvider({
               />
             )}
           </SwipeableToast>
-          </motion.div>
+          </ToastPresence>
         );
   };
 
-  const hintGuard = hideOnExit();
   const renderHint = (hint: React.ReactNode) => (
-    <motion.div
+    <ToastPresence
       key="slot-hint"
-      ref={(el) => {
-        hintGuard.ref(el);
-        measureSlot(el);
-      }}
-      onAnimationComplete={hintGuard.onComplete}
-      initial={false}
-      animate={{ opacity: 1, transform: TOAST_RESTING }}
-      exit={{
-        opacity: 0,
-        transition: { duration: 0.16, ease: linearJs },
-        transitionEnd: { visibility: 'hidden' },
-      }}
-      className={`pointer-events-none absolute inset-x-0 bottom-0 ${
-        reduceMotion ? 'toast-enter-fade' : 'toast-enter'
-      }`}
+      toastId={-1}
+      ref={measureSlot}
+      reduceMotion={!!reduceMotion}
+      className="pointer-events-none absolute inset-x-0 bottom-0"
     >
       <div
         style={TOAST_SURFACE_STYLE}
@@ -526,7 +502,7 @@ export function NotificationProvider({
       >
         {hint}
       </div>
-    </motion.div>
+    </ToastPresence>
   );
 
   return (

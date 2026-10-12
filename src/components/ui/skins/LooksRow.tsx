@@ -92,12 +92,14 @@ export function LooksRow({
   equippedBackgroundId,
   onNotify,
   onUpgrade,
+  action,
 }: {
   enabled: boolean;
   equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
   equippedBackgroundId: string | null | undefined;
   onNotify: (n: { msg: string; type: 'error' | 'success' }) => void;
   onUpgrade: () => void;
+  action?: React.ReactNode;
 }) {
   const { looks, max, isPremium, isFull, busy, apply, remove } =
     useLooks(enabled);
@@ -118,7 +120,21 @@ export function LooksRow({
     if (!looks.length) setRemoving(false);
   }, [looks.length]);
 
-  if (!enabled || !looks.length) return null;
+  if (!enabled) return null;
+  if (!looks.length) {
+    if (!action) return null;
+    return (
+      <div className="pb-3">
+        <div className="flex items-center gap-2 px-1">
+          <p className="text-[13px] font-black text-foreground">Saved looks</p>
+          {action}
+        </div>
+        <p className="mt-0.5 px-1 text-[12px] font-semibold text-muted-foreground">
+          Save your outfit to switch back to it in one tap.
+        </p>
+      </div>
+    );
+  }
 
   const handleApply = async (lookId: string, name: string) => {
     if (lookId === wearingId) return;
@@ -133,17 +149,19 @@ export function LooksRow({
   return (
     <div className="pb-2">
       <div className="mb-2 flex items-center gap-2 px-1">
-        <p className="text-[12px] font-black text-foreground">
+        <p className="text-[13px] font-black text-foreground">
           Saved looks
         </p>
-        <span className="text-[10px] font-bold tabular-nums text-muted-foreground">
+        <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
           {looks.length}/{max}
         </span>
+        {action}
         <button
           type="button"
           onClick={() => setRemoving((v) => !v)}
           className={cn(
-            'ml-auto rounded-full px-2 py-0.5 text-[12px] font-black tracking-wide transition-colors',
+            'rounded-full px-2 py-0.5 text-[12px] font-black tracking-wide transition-colors',
+            !action && 'ml-auto',
             removing
               ? 'bg-primary/10 text-primary'
               : 'text-muted-foreground hover:bg-muted',

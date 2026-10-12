@@ -11,11 +11,8 @@ import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  Lock,
   Shirt,
-  ShoppingBag,
   Check,
-  ChevronDown,
   Sparkles,
   Paintbrush,
   Crown,
@@ -30,25 +27,21 @@ import {
   isTradeOnlyRarity,
 } from '@/lib/skins/catalog';
 import { useTradeReadiness } from '@/hooks/useReadyTrades';
-import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
-import { GiftOddsButton, ItemCard } from './ItemCard';
+import { GiftOddsButton } from './ItemCard';
 import { PurchaseSheet, type PurchaseTarget } from './PurchaseSheet';
 import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
-import { motion, type DragControls } from 'framer-motion';
-import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { type DragControls } from 'framer-motion';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
-import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
+import { DailyDealsShelf } from './DailyDealsShelf';
 import { ShopGiftPopup } from '@/components/ui/shop/ShopGiftPopup';
 import { GiftBadge } from '@/components/ui/GiftBadge';
 import { WishlistButton } from './WishlistButton';
@@ -61,13 +54,13 @@ import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { BackgroundCard } from './BackgroundCard';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
 import {
   useBackgroundActions,
   backgroundPreview,
 } from '@/hooks/useBackgroundActions';
 import { useUIStore } from '@/lib/uiStore';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import { useWishlist } from '@/hooks/useWishlist';
 import {
   buildWishlistEntries,
@@ -82,6 +75,18 @@ import {
   takePlusOfferAfterAd,
 } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
+import {
+  CollectionBook,
+  DealTileRow,
+  RarityRail,
+  TryOnBar,
+  summarizeCloset,
+  type ClosetSlot,
+} from './DressingRoom';
+import {
+  useWardrobeTryOn,
+  WARDROBE_EQUIPPED_EVENT,
+} from '@/lib/wardrobeTryOnStore';
 
 type WardrobeCard =
   | {
@@ -99,161 +104,6 @@ type WardrobeCard =
       bg: BackgroundItem;
     };
 
-function mergeWardrobeCards(
-  items: ItemDef[],
-  backgrounds: BackgroundItem[],
-  sortBy: SortOrder,
-): WardrobeCard[] {
-  const itemCards: WardrobeCard[] = items.map((item) => ({
-    kind: 'item',
-    id: item.id,
-    rarity: item.rarity,
-    price: item.priceFlies ?? 0,
-    item,
-  }));
-  const bgCards: WardrobeCard[] = backgrounds.map((bg) => ({
-    kind: 'bg',
-    id: bg.id,
-    rarity: bg.rarity,
-    price: bg.priceFlies ?? 0,
-    bg,
-  }));
-  // 'latest' has no meaningful timestamp for backgrounds — keep items (already
-  // latest-sorted) first, then backgrounds. Other modes merge and re-sort; the
-  // stable sort keeps items ahead of backgrounds within an equal bucket.
-  if (sortBy === 'latest') return [...itemCards, ...bgCards];
-  const all = [...itemCards, ...bgCards];
-  all.sort((a, b) => {
-    switch (sortBy) {
-      case 'rarity_asc':
-        return rarityRank[a.rarity] - rarityRank[b.rarity];
-      case 'rarity_desc':
-        return rarityRank[b.rarity] - rarityRank[a.rarity];
-      case 'price_asc':
-        return a.price - b.price;
-      case 'price_desc':
-        return b.price - a.price;
-      default:
-        return 0;
-    }
-  });
-  return all;
-}
-
-function hashSeed(str: string) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed: number) {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function featuredShopOrder(
-  cards: WardrobeCard[],
-  seed: string,
-): WardrobeCard[] {
-  const shuffled = cards
-    .map((card) => ({ card, key: hashSeed(`${seed}|${card.kind}|${card.id}`) }))
-    .sort((a, b) => a.key - b.key)
-    .map((entry) => entry.card);
-
-  const hot: WardrobeCard[] = [];
-  const rest: WardrobeCard[] = [];
-  for (const card of shuffled) {
-    (rarityRank[card.rarity] >= rarityRank.rare ? hot : rest).push(card);
-  }
-  if (!hot.length || !rest.length) return interleaveByCategory(shuffled);
-
-  const hotOrdered = interleaveByCategory(hot);
-  const restOrdered = interleaveByCategory(rest);
-  const rand = mulberry32(hashSeed(seed) ^ cards.length);
-  const total = cards.length;
-  const out: (WardrobeCard | undefined)[] = new Array(total);
-  const stride = total / hotOrdered.length;
-  hotOrdered.forEach((card, i) => {
-    const width = Math.max(1, Math.floor(stride));
-    let slot = Math.floor(i * stride) + Math.floor(rand() * width);
-    if (i === 0) slot = Math.min(slot, 5);
-    slot = Math.min(slot, total - 1);
-    while (out[slot]) slot = (slot + 1) % total;
-    out[slot] = card;
-  });
-  let r = 0;
-  for (let i = 0; i < total; i++) if (!out[i]) out[i] = restOrdered[r++];
-  return out as WardrobeCard[];
-}
-
-function interleaveByCategory(cards: WardrobeCard[]): WardrobeCard[] {
-  const buckets = new Map<string, WardrobeCard[]>();
-  for (const card of cards) {
-    const key = card.kind === 'bg' ? 'background' : card.item.slot;
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(card);
-    else buckets.set(key, [card]);
-  }
-  if (buckets.size < 2) return cards;
-
-  const lanes = Array.from(buckets.values())
-    .sort((a, b) => b.length - a.length)
-    .map((laneCards) => ({ cards: laneCards, taken: 0 }));
-
-  const out: WardrobeCard[] = [];
-  while (out.length < cards.length) {
-    let best = -1;
-    let bestScore = Infinity;
-    for (let i = 0; i < lanes.length; i++) {
-      const lane = lanes[i];
-      if (lane.taken >= lane.cards.length) continue;
-      const score = (lane.taken + 0.5) / lane.cards.length;
-      if (score < bestScore - 1e-9) {
-        bestScore = score;
-        best = i;
-      }
-    }
-    if (best < 0) break;
-    const lane = lanes[best];
-    out.push(lane.cards[lane.taken++]);
-  }
-  return out;
-}
-
-function groupCardsByRarity(cards: WardrobeCard[]) {
-  const groups: { rarity: ItemDef['rarity']; cards: WardrobeCard[] }[] = [];
-  for (const card of cards) {
-    const last = groups[groups.length - 1];
-    if (last && last.rarity === card.rarity) last.cards.push(card);
-    else groups.push({ rarity: card.rarity, cards: [card] });
-  }
-  return groups;
-}
-
-function pinEquippedFirst(
-  cards: WardrobeCard[],
-  equipped: Partial<Record<WardrobeSlot, string | null>> | undefined,
-  equippedBgId: string | null | undefined,
-): WardrobeCard[] {
-  const isEquipped = (c: WardrobeCard) =>
-    c.kind === 'item'
-      ? equipped?.[c.item.slot] === c.item.id
-      : c.bg.id === equippedBgId;
-  const equippedCards: WardrobeCard[] = [];
-  const rest: WardrobeCard[] = [];
-  for (const c of cards) (isEquipped(c) ? equippedCards : rest).push(c);
-  return [...equippedCards, ...rest];
-}
-
 const SLOT_LABEL: Record<WardrobeSlot, string> = {
   skin: 'Skin',
   hat: 'Hat',
@@ -262,19 +112,9 @@ const SLOT_LABEL: Record<WardrobeSlot, string> = {
   container: 'Gift',
 };
 
-/* ---------------- Types & Data ---------------- */
-type ApiData = {
-  wardrobe: {
-    equipped: Partial<Record<WardrobeSlot, string | null>>;
-    inventory: Record<string, number>;
-    unseenItems?: string[];
-    inventoryHistory?: Record<string, string>;
-    flies: number;
-  };
-  catalog: ItemDef[];
-};
-
 /* ---------------- Main Panel ---------------- */
+const normalizeTab = (tab: string) => (tab === 'shop' ? 'inventory' : tab);
+
 /** The badge is one number for several tiers, so its tooltip names them. */
 function tradeReadyTitle(
   trades: number,
@@ -323,11 +163,15 @@ export function WardrobePageContent({
   defaultTab = 'inventory',
   focusItemId = null,
   focusItemKind = 'item',
+  stage,
+  stageBackground,
   onClose,
 }: {
   defaultTab?: 'inventory' | 'shop' | 'trade';
   focusItemId?: string | null;
   focusItemKind?: 'item' | 'background';
+  stage?: React.ReactNode;
+  stageBackground?: React.ReactNode;
   onClose: () => void;
 }) {
   return (
@@ -337,6 +181,8 @@ export function WardrobePageContent({
         defaultTab={defaultTab}
         focusItemId={focusItemId}
         focusItemKind={focusItemKind}
+        stage={stage}
+        stageBackground={stageBackground}
         embedded={true}
         onClose={onClose}
         isDesktop={true}
@@ -352,6 +198,8 @@ function WardrobeManagerContent({
   defaultTab,
   focusItemId = null,
   focusItemKind = 'item',
+  stage,
+  stageBackground,
   embedded,
   isDesktop,
   isDragging,
@@ -363,6 +211,8 @@ function WardrobeManagerContent({
   defaultTab: 'inventory' | 'shop' | 'trade';
   focusItemId?: string | null;
   focusItemKind?: 'item' | 'background';
+  stage?: React.ReactNode;
+  stageBackground?: React.ReactNode;
   embedded: boolean;
   isDesktop: boolean;
   isDragging: boolean;
@@ -376,9 +226,9 @@ function WardrobeManagerContent({
   const tradeReadiness = useTradeReadiness(!!user);
   const readyTrades = tradeReadiness.trades;
 
-  const [activeTab, setActiveTab] = useState<string>(defaultTab);
+  const [activeTab, setActiveTab] = useState<string>(normalizeTab(defaultTab));
   useEffect(() => {
-    setActiveTab(defaultTab);
+    setActiveTab(normalizeTab(defaultTab));
   }, [defaultTab]);
   useEffect(() => {
     setSortBy(
@@ -408,16 +258,14 @@ function WardrobeManagerContent({
     setPlusOpen(true);
   };
   const [sortBy, setSortBy] = useState<SortOrder>('latest');
-  const [notif, setNotif] = useState<{
-    msg: string;
-    type: 'error' | 'success';
-  } | null>(null);
-  const [shakeBalance, setShakeBalance] = useState(false);
+  const { showNotification } = useNotification();
+  const setNotif = React.useCallback(
+    (n: { msg: string; type: 'error' | 'success' } | null) => {
+      if (n) showNotification(n.msg);
+    },
+    [showNotification],
+  );
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
-  const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
-  const [shopHasScrolled, setShopHasScrolled] = useState(false);
-  const [gridInitialSize, setGridInitialSize] = useState(4);
-  const [gridBatchSize, setGridBatchSize] = useState(6);
 
   const bg = useBackgroundActions({
     isGuest: !user,
@@ -425,112 +273,6 @@ function WardrobeManagerContent({
     shopBalance: data?.wardrobe?.flies ?? 0,
     onSpend: () => refreshInventory(),
   });
-  const showBackgrounds =
-    activeFilter === 'all' || activeFilter === 'background';
-  const inventoryBackgrounds = showBackgrounds
-    ? bg.sortItems('inventory', sortBy)
-    : [];
-  const shopBackgrounds = showBackgrounds ? bg.sortItems('shop', sortBy) : [];
-
-  const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
-  const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
-
-  const threeCol = useMediaQuery('(min-width: 380px)');
-  const cardGridClass = cn(
-    'grid md:grid-cols-4 md:gap-4',
-    threeCol ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-3',
-  );
-  const today = new Date();
-  const featuredSeed = `${user?.uid ?? 'guest'}|${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-
-  const stickySentinelRef = React.useRef<HTMLDivElement | null>(null);
-  const [isStuck, setIsStuck] = React.useState(false);
-  const setWardrobeStuck = useUIStore((s) => s.setWardrobeStuck);
-  // Sticking changes the header's own height, so the toggle feeds back into
-  // what triggered it: at the page bottom the browser re-clamps scrollTop and
-  // the state flips straight back, forever. A dead band — stick at the
-  // sentinel, release only well after it's back in view — absorbs that, and
-  // measuring beats a 1px sentinel at `threshold: 0`, which can also chatter
-  // on sub-pixel scroll offsets.
-  React.useEffect(() => {
-    if (!embedded) return;
-    const sentinel = stickySentinelRef.current;
-    const root = document.getElementById('main-scroll');
-    if (!sentinel || !root) return;
-
-    // Releasing well after the sentinel comes back into view exists only for the
-    // page-bottom clamp: there, the header's own height change re-clamps
-    // scrollTop and flips the state straight back. Anywhere else that dead band
-    // is what made scrolling up hold the stuck header for another 120px and
-    // then snap — so it now applies only when the trigger really is within a
-    // screen of the bottom.
-    const BOTTOM_RELEASE_GAP = 120;
-    const NEAR_BOTTOM = 200;
-    const MIN_DWELL_MS = 200;
-    let stuck = false;
-    let triggerY = 0;
-    let lastFlip = 0;
-    let frame = 0;
-    let dwell = 0;
-
-    const measure = () => {
-      frame = 0;
-      // Nothing above the sentinel changes when the header sticks, so its
-      // position in scroll-content space is a fixed trigger line. Comparing
-      // scrollTop against a line cached while released keeps the header's own
-      // height out of the condition that toggles it — measuring live let the
-      // bottom-of-page scrollTop clamp flip the state straight back.
-      if (!stuck) {
-        triggerY =
-          sentinel.getBoundingClientRect().top -
-          root.getBoundingClientRect().top +
-          root.scrollTop;
-      }
-      const maxScroll = root.scrollHeight - root.clientHeight;
-      const releaseGap =
-        maxScroll - triggerY < NEAR_BOTTOM ? BOTTOM_RELEASE_GAP : 0;
-      const next = stuck
-        ? root.scrollTop >= triggerY - releaseGap
-        : root.scrollTop >= triggerY;
-      if (next === stuck) return;
-      const now = Date.now();
-      const waited = now - lastFlip;
-      if (waited < MIN_DWELL_MS) {
-        // Re-check once the dwell expires, or a flip requested mid-window
-        // would be dropped when the user stops scrolling.
-        if (!dwell) {
-          dwell = window.setTimeout(() => {
-            dwell = 0;
-            measure();
-          }, MIN_DWELL_MS - waited);
-        }
-        return;
-      }
-      lastFlip = now;
-      stuck = next;
-      setIsStuck(next);
-    };
-    const schedule = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(measure);
-    };
-
-    measure();
-    root.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      if (dwell) clearTimeout(dwell);
-      root.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-    };
-  }, [embedded]);
-  React.useEffect(() => {
-    if (!embedded) return;
-    setWardrobeStuck(isStuck);
-    return () => setWardrobeStuck(false);
-  }, [embedded, isStuck, setWardrobeStuck]);
-
   const setWardrobeTab = useUIStore((s) => s.setWardrobeTab);
   const setLastWardrobeTab = useUIStore((s) => s.setLastWardrobeTab);
   const openFlyShop = useUIStore((s) => s.openFlyShop);
@@ -541,19 +283,6 @@ function WardrobeManagerContent({
     return () => setWardrobeTab('inventory');
   }, [embedded, activeTab, setWardrobeTab, setLastWardrobeTab]);
 
-  const newItemCount =
-    activeTab === 'inventory'
-      ? 0
-      : unseenItems.length + unseenContainers.length;
-  const bestDealDiscount =
-    activeTab === 'shop'
-      ? 0
-      : Math.max(
-          0,
-          ...(data?.dailyDeals ?? [])
-            .filter((deal) => deal.onSale)
-            .map((deal) => deal.discountPercent),
-        );
   const shopGiftReady = activeTab !== 'shop' && !!data?.shopGift?.available;
   const tradeTabBadge = activeTab === 'trade' ? 0 : readyTrades;
 
@@ -571,22 +300,6 @@ function WardrobeManagerContent({
     () => new Set(data?.wardrobe?.unseenItems ?? []),
     [data?.wardrobe?.unseenItems],
   );
-
-  useEffect(() => {
-    setInventoryHasScrolled(false);
-    setShopHasScrolled(false);
-  }, [activeFilter, sortBy, activeTab, open]);
-
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 768px)');
-    const update = () => {
-      setGridInitialSize(query.matches ? 10 : 4);
-      setGridBatchSize(query.matches ? 10 : 6);
-    };
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
 
   // Handle Mark Seen on Close — call API directly since data is cleared when open→false
   const prevOpen = React.useRef(open);
@@ -697,61 +410,6 @@ function WardrobeManagerContent({
       ?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Shop and Trade open on a shelf of content, so the frog above it is just a
-  // screenful to scroll past. Landing on the line where the tab bar sticks puts
-  // the deals (or the trade board) at the top with the tabs still in reach.
-  // The Wardrobe tab keeps the frog — that tab is about looking at him.
-  const scrollPageToContent = () => {
-    if (!embedded) return;
-    const root = document.getElementById('main-scroll');
-    if (!root) return;
-    const sentinel = stickySentinelRef.current;
-    if (!sentinel) {
-      root.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    const top =
-      sentinel.getBoundingClientRect().top -
-      root.getBoundingClientRect().top +
-      root.scrollTop;
-    // A couple of pixels past the line, so it lands stuck rather than balanced
-    // on the threshold the sticky dead band flips at.
-    root.scrollTo({ top: Math.max(0, top + 2), behavior: 'smooth' });
-  };
-
-  // Arriving already on Shop or Trade — from the wardrobe popup, the header
-  // menu or a ?tab= link — should land on the content too, not just a tab tap.
-  // Runs on every switch into those tabs, so it covers both paths.
-  React.useEffect(() => {
-    if (!embedded) return;
-    if (activeTab !== 'shop' && activeTab !== 'trade') return;
-    const root = document.getElementById('main-scroll');
-    if (!root) return;
-    let frame = requestAnimationFrame(() => {
-      frame = 0;
-      scrollPageToContent();
-      // A grid still loading can be shorter than the target, and the browser
-      // clamps the scroll. One retry catches that without fighting a user who
-      // has since scrolled further down themselves.
-      retry = window.setTimeout(() => {
-        retry = 0;
-        const sentinel = stickySentinelRef.current;
-        if (!sentinel) return;
-        const target =
-          sentinel.getBoundingClientRect().top -
-          root.getBoundingClientRect().top +
-          root.scrollTop;
-        if (root.scrollTop < target - 4) scrollPageToContent();
-      }, 320);
-    });
-    let retry = 0;
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      if (retry) clearTimeout(retry);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embedded, activeTab]);
-
   // Filter change handler to mark category as visited
   const handleFilterChange = (cat: FilterCategory) => {
     setActiveFilter(cat);
@@ -789,103 +447,6 @@ function WardrobeManagerContent({
 
   const canRenderItems = !!data;
 
-  const pinSnapshotRef = React.useRef<{
-    key: string;
-    equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
-    bgEquipped: string | null;
-    unseenItems: string[];
-  } | null>(null);
-  const rotationResyncRef = React.useRef(false);
-  React.useEffect(() => {
-    const handler = () => {
-      rotationResyncRef.current = true;
-    };
-    window.addEventListener('wardrobe-refresh', handler);
-    return () => window.removeEventListener('wardrobe-refresh', handler);
-  }, []);
-  const equipSig = (
-    eq: Partial<Record<WardrobeSlot, string | null>> | undefined,
-    bgId: string | null | undefined,
-  ) =>
-    `${eq?.skin ?? ''}|${eq?.hat ?? ''}|${eq?.body ?? ''}|${eq?.hand_item ?? ''}|${bgId ?? ''}`;
-  const pinKey = `${activeTab}|${activeFilter}|${sortBy}|${canRenderItems}|${bg.isLoading}`;
-  if (pinSnapshotRef.current?.key !== pinKey) {
-    pinSnapshotRef.current = {
-      key: pinKey,
-      equipped: data?.wardrobe?.equipped,
-      bgEquipped: bg.equipped,
-      unseenItems: data?.wardrobe?.unseenItems ?? [],
-    };
-    rotationResyncRef.current = false;
-  } else if (
-    rotationResyncRef.current &&
-    equipSig(data?.wardrobe?.equipped, bg.equipped) !==
-      equipSig(pinSnapshotRef.current.equipped, pinSnapshotRef.current.bgEquipped)
-  ) {
-    pinSnapshotRef.current = {
-      key: pinKey,
-      equipped: data?.wardrobe?.equipped,
-      bgEquipped: bg.equipped,
-      unseenItems: data?.wardrobe?.unseenItems ?? [],
-    };
-    rotationResyncRef.current = false;
-  }
-  const pinSnapshot = pinSnapshotRef.current;
-
-  // --- Logic ---
-  const getFilteredItems = (items: ItemDef[]) => {
-    let result = items;
-    if (activeFilter !== 'all') {
-      if (activeFilter === 'skin') {
-        result = result.filter((i) => i.slot === 'skin');
-      } else if (activeFilter === 'held') {
-        result = result.filter((i) => i.slot === 'hand_item');
-      } else {
-        result = result.filter((i) => i.slot === activeFilter);
-      }
-    }
-    if (sortBy === 'latest') {
-      const history = data?.wardrobe?.inventoryHistory ?? {};
-      const unseenList = pinSnapshot.unseenItems;
-      const unseenOrder = new Map<string, number>();
-      unseenList.forEach((id, idx) => unseenOrder.set(id, idx));
-      const getTs = (id: string) => {
-        const iso = history[id];
-        if (iso) {
-          const t = new Date(iso).getTime();
-          if (Number.isFinite(t)) return t;
-        }
-        return -1;
-      };
-      return [...result].sort((a, b) => {
-        const aNew = unseenOrder.has(a.id);
-        const bNew = unseenOrder.has(b.id);
-        if (aNew !== bNew) return aNew ? -1 : 1;
-        if (aNew && bNew) {
-          return unseenOrder.get(b.id)! - unseenOrder.get(a.id)!;
-        }
-        const aTs = getTs(a.id);
-        const bTs = getTs(b.id);
-        if (aTs !== bTs) return bTs - aTs;
-        return rarityRank[b.rarity] - rarityRank[a.rarity];
-      });
-    }
-    return result.sort((a, b) => {
-      switch (sortBy) {
-        case 'rarity_asc':
-          return rarityRank[a.rarity] - rarityRank[b.rarity];
-        case 'rarity_desc':
-          return rarityRank[b.rarity] - rarityRank[a.rarity];
-        case 'price_asc':
-          return (a.priceFlies ?? 0) - (b.priceFlies ?? 0);
-        case 'price_desc':
-          return (b.priceFlies ?? 0) - (a.priceFlies ?? 0);
-        default:
-          return 0;
-      }
-    });
-  };
-
   const equipQueue = React.useRef<Promise<void>>(Promise.resolve());
 
   const sendEquip = (slot: WardrobeSlot, itemId: string | null) => {
@@ -914,7 +475,6 @@ function WardrobeManagerContent({
 
   const applyEquip = (slot: WardrobeSlot, itemId: string | null) => {
     if (!data?.wardrobe) return;
-    rotationResyncRef.current = false;
     mutate(
       (curr) =>
         curr?.wardrobe
@@ -976,6 +536,105 @@ function WardrobeManagerContent({
     }
   };
 
+  const setStageTryOn = useWardrobeTryOn((st) => st.setTryOn);
+  const [tryTarget, setTryTarget] = useState<
+    | { kind: 'item'; item: ItemDef; dealPrice: number | null }
+    | { kind: 'bg'; bg: BackgroundItem }
+    | null
+  >(null);
+  const clearTryOn = React.useCallback(() => {
+    setTryTarget(null);
+    setStageTryOn(null);
+  }, [setStageTryOn]);
+  useEffect(() => clearTryOn, [clearTryOn]);
+  useEffect(() => {
+    clearTryOn();
+  }, [activeTab, clearTryOn]);
+
+  const announceEquip = () =>
+    window.dispatchEvent(new Event(WARDROBE_EQUIPPED_EVENT));
+
+  const [tryBuying, setTryBuying] = useState(false);
+  const buyTriedOn = async () => {
+    if (!tryTarget || tryBuying) return;
+    setTryBuying(true);
+    try {
+      if (tryTarget.kind === 'item') {
+        const ok = await performItemPurchase(
+          tryTarget.item,
+          tryTarget.dealPrice ?? undefined,
+        );
+        if (ok) {
+          clearTryOn();
+          applyEquip(tryTarget.item.slot, tryTarget.item.id);
+          announceEquip();
+        }
+      } else {
+        const ok = await bg.buyNow(tryTarget.bg);
+        if (ok) {
+          clearTryOn();
+          await bg.handleEquip(tryTarget.bg);
+          announceEquip();
+        }
+      }
+    } finally {
+      setTryBuying(false);
+    }
+  };
+
+  const tapClosetItem = (item: ItemDef, dealPrice: number | null) => {
+    if (unseenInventorySet.has(item.id)) markItemSeen(item.id);
+    const owned = (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0;
+    if (owned) {
+      if (!user) {
+        setNotif({ msg: 'Sign in to equip items!', type: 'error' });
+        return;
+      }
+      clearTryOn();
+      const wearing = data?.wardrobe?.equipped?.[item.slot] === item.id;
+      toggleEquip(item.slot, item.id);
+      if (!wearing) announceEquip();
+      return;
+    }
+    if (tryTarget?.kind === 'item' && tryTarget.item.id === item.id) {
+      hapticTick();
+      clearTryOn();
+      return;
+    }
+    hapticSelect();
+    setTryTarget({ kind: 'item', item, dealPrice });
+    setStageTryOn({
+      kind: 'item',
+      id: item.id,
+      slot: item.slot,
+      riveIndex: item.riveIndex,
+      rarity: item.rarity,
+    });
+  };
+
+  const tapClosetBackground = (bgItem: BackgroundItem) => {
+    const owned = (bg.inventory[bgItem.id] ?? 0) > 0;
+    if (owned) {
+      clearTryOn();
+      if (bg.equipped !== bgItem.id) announceEquip();
+      void bg.handleEquip(bgItem);
+      return;
+    }
+    if (tryTarget?.kind === 'bg' && tryTarget.bg.id === bgItem.id) {
+      hapticTick();
+      clearTryOn();
+      return;
+    }
+    hapticSelect();
+    setTryTarget({ kind: 'bg', bg: bgItem });
+    setStageTryOn({
+      kind: 'bg',
+      id: bgItem.id,
+      images: bgItem.images,
+      rarity: bgItem.rarity as Rarity,
+    });
+  };
+
   const performItemPurchase = async (
     item: ItemDef,
     priceOverride?: number,
@@ -993,8 +652,6 @@ function WardrobeManagerContent({
     const price = priceOverride ?? item.priceFlies ?? 0;
     if (balance < price) {
       setNotif({ msg: 'Not enough flies!', type: 'error' });
-      setShakeBalance(true);
-      setTimeout(() => setShakeBalance(false), 500);
       return false;
     }
 
@@ -1040,154 +697,120 @@ function WardrobeManagerContent({
     }
   };
 
-  // How much of each rarity the collection actually holds, against everything
-  // that exists under the filter on screen. Counted from the whole catalog
-  // rather than the rendered groups: the grid pages in, pulls worn items and
-  // gifts into their own rows, and counts duplicates as one card — none of
-  // which should move the collection number.
-  const rarityProgress = useMemo(() => {
-    const rows: Record<Rarity, { owned: number; total: number }> = {
-      common: { owned: 0, total: 0 },
-      uncommon: { owned: 0, total: 0 },
-      rare: { owned: 0, total: 0 },
-      epic: { owned: 0, total: 0 },
-      legendary: { owned: 0, total: 0 },
+  const closetSlot: ClosetSlot =
+    activeFilter === 'held'
+      ? 'hand_item'
+      : activeFilter === 'skin' ||
+          activeFilter === 'hat' ||
+          activeFilter === 'body' ||
+          activeFilter === 'background'
+        ? activeFilter
+        : 'all';
+  const raritySummary = useMemo(
+    () =>
+      summarizeCloset(
+        closetSlot,
+        data?.catalog ?? [],
+        bg.catalog,
+        data?.wardrobe?.inventory ?? {},
+        bg.inventory,
+      ),
+    [closetSlot, data?.catalog, bg.catalog, data?.wardrobe?.inventory, bg.inventory],
+  );
+  const [activeShelf, setActiveShelf] = useState<Rarity | null>(null);
+  const stickyBottom = () => {
+    const group = document.querySelector<HTMLElement>('[data-wardrobe-sticky]');
+    if (!group) return 0;
+    const rect = group.getBoundingClientRect();
+    const stuckTop = window.matchMedia('(min-width: 768px)').matches ? -96 : -90;
+    return rect.top <= stuckTop + 1 ? rect.bottom : group.offsetHeight + stuckTop;
+  };
+  useEffect(() => {
+    if (!embedded || activeTab !== 'inventory') return;
+    const root = document.getElementById('main-scroll');
+    if (!root) return;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const line = stickyBottom() + 24;
+      let current: Rarity | null = null;
+      document
+        .querySelectorAll<HTMLElement>('[data-shelf]')
+        .forEach((shelf) => {
+          if (shelf.getBoundingClientRect().top <= line)
+            current = shelf.dataset.shelf as Rarity;
+        });
+      setActiveShelf((prev) => (prev === current ? prev : current));
     };
-    const owned = data?.wardrobe?.inventory ?? {};
-    if (activeFilter !== 'background') {
-      const slot =
-        activeFilter === 'all'
-          ? null
-          : activeFilter === 'held'
-            ? 'hand_item'
-            : activeFilter;
-      for (const item of data?.catalog ?? []) {
-        if (slot && item.slot !== slot) continue;
-        // Gift boxes are opened, not collected, and they get their own row
-        // above the rarity groups — counting them here would credit progress
-        // against things the groups never show.
-        if (!slot && item.slot === 'container') continue;
-        const row = rows[item.rarity];
-        if (!row) continue;
-        row.total += 1;
-        if ((owned[item.id] ?? 0) > 0) row.owned += 1;
-      }
-    }
-    if (showBackgrounds) {
-      for (const item of bg.catalog) {
-        const row = rows[item.rarity];
-        if (!row) continue;
-        row.total += 1;
-        if ((bg.inventory[item.id] ?? 0) > 0) row.owned += 1;
-      }
-    }
-    return rows;
-  }, [data?.catalog, data?.wardrobe?.inventory, activeFilter, showBackgrounds, bg.catalog, bg.inventory]);
-
-  const rarityHeading = (rarity: Rarity) => {
-    const { owned, total } = rarityProgress[rarity];
-    return (
-      <>
-        {RARITY_CONFIG[rarity].label}
-        {total > 0 && (
-          <span className="ml-1.5 font-bold tabular-nums text-muted-foreground">
-            {owned}/{total}
-          </span>
-        )}
-      </>
-    );
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      root.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [embedded, activeTab, activeFilter]);
+  const jumpToShelf = (rarity: Rarity) => {
+    const root = document.getElementById('main-scroll');
+    const shelf = document.querySelector<HTMLElement>(`[data-shelf="${rarity}"]`);
+    if (!root || !shelf) return;
+    hapticTick();
+    const top =
+      root.scrollTop +
+      shelf.getBoundingClientRect().top -
+      root.getBoundingClientRect().top -
+      stickyBottom() -
+      10;
+    root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   };
 
-  const inventoryItems = useMemo(() => {
-    if (!data?.wardrobe?.inventory) return [];
-    const ownedIds = Object.keys(data.wardrobe.inventory).filter(
-      (id) => (data.wardrobe.inventory[id] ?? 0) > 0,
-    );
-    const owned = (data.catalog || []).filter((i) => ownedIds.includes(i.id));
-    return getFilteredItems(owned);
-  }, [data, activeFilter, sortBy]);
-
-  const shopItems = useMemo(() => {
-    if (!data?.catalog) return [];
-    // Anything on today's shelf is excluded from the main grid — a second copy
-    // of the same item, at a price the shelf may have marked down, makes the
-    // deal look like a trick and the grid price look wrong. Only when the shelf
-    // is actually on screen, though: under a category filter it's hidden, and
-    // dropping the items there would make them disappear from the shop.
-    const dealsVisible =
-      activeFilter === 'all' && !!data.dailyDeals?.length;
-    const onDeal = dealsVisible
-      ? new Set(data.dailyDeals!.map((deal) => deal.itemId))
-      : null;
-    return getFilteredItems(
-      data.catalog.filter(
-        (i) => i.slot !== 'container' && !onDeal?.has(i.id),
+  const dealPrices = useMemo(
+    () =>
+      new Map(
+        (data?.dailyDeals ?? [])
+          .filter((deal) => deal.onSale)
+          .map((deal) => [deal.itemId, deal.dealPrice] as const),
       ),
-    );
-  }, [data, activeFilter, sortBy]);
-
-  const inventoryGrid = useInfiniteScroll(inventoryItems, {
-    initial: inventoryItems.length,
-    batch: inventoryItems.length || 1,
-    resetKey: `inv|${activeFilter}|${sortBy}|${inventoryItems.length}|${open ? 'open' : 'closed'}`,
-    rootRef: inventoryScrollRef,
-    enabled: false,
-  });
-  const shopGrid = useInfiniteScroll(shopItems, {
-    initial: shopItems.length,
-    batch: shopItems.length || 1,
-    resetKey: `shop|${activeFilter}|${sortBy}|${shopItems.length}|${open ? 'open' : 'closed'}`,
-    rootRef: shopScrollRef,
-    enabled: false,
-  });
-
-  useEffect(() => {
-    if (!open || gridInitialSize >= gridBatchSize) return;
-
-    let cancelIdleLoad: (() => void) | undefined;
-    const loadTimer = window.setTimeout(() => {
-      const loadMore =
-        activeTab === 'inventory'
-          ? inventoryGrid.hasMore
-            ? inventoryGrid.loadMore
-            : null
-          : activeTab === 'shop' && shopGrid.hasMore
-            ? shopGrid.loadMore
-            : null;
-      if (!loadMore) return;
-
-      if ('requestIdleCallback' in window) {
-        const idleId = window.requestIdleCallback(() => loadMore(), {
-          timeout: 700,
-        });
-        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
-      } else {
-        const fallbackTimer = globalThis.setTimeout(loadMore, 0);
-        cancelIdleLoad = () => globalThis.clearTimeout(fallbackTimer);
-      }
-    }, 900);
-
-    return () => {
-      window.clearTimeout(loadTimer);
-      cancelIdleLoad?.();
-    };
-  }, [
-    activeFilter,
-    activeTab,
-    gridBatchSize,
-    gridInitialSize,
-    inventoryGrid.hasMore,
-    inventoryGrid.loadMore,
-    open,
-    shopGrid.hasMore,
-    shopGrid.loadMore,
-    sortBy,
-  ]);
-
-  const isNearScrollEnd = (node: HTMLElement) =>
-    node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
-  const shouldLoadMoreFromWheel = (node: HTMLElement, deltaY: number) =>
-    deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
+    [data?.dailyDeals],
+  );
+  const ownedGiftCards = useMemo<WardrobeCard[]>(
+    () =>
+      (data?.catalog ?? [])
+        .filter(
+          (item) =>
+            item.slot === 'container' &&
+            (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0,
+        )
+        .sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity])
+        .map((item) => ({
+          kind: 'item' as const,
+          id: item.id,
+          rarity: item.rarity,
+          price: item.priceFlies ?? 0,
+          item,
+        })),
+    [data?.catalog, data?.wardrobe?.inventory],
+  );
+  const newOwnedCards = useMemo<WardrobeCard[]>(
+    () =>
+      (data?.catalog ?? [])
+        .filter(
+          (item) =>
+            item.slot !== 'container' &&
+            unseenInventorySet.has(item.id) &&
+            (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0,
+        )
+        .map((item) => ({
+          kind: 'item' as const,
+          id: item.id,
+          rarity: item.rarity,
+          price: item.priceFlies ?? 0,
+          item,
+        })),
+    [data?.catalog, data?.wardrobe?.inventory, unseenInventorySet],
+  );
 
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
@@ -1365,52 +988,29 @@ function WardrobeManagerContent({
     bg.catalog,
   ]);
 
-  const renderInventoryCard = (
-    card: WardrobeCard,
-    index: number,
-    hideRarity = false,
-  ) =>
-    card.kind === 'item' ? (
-      <ItemCard
-        key={card.item.id}
-        item={card.item}
-        mode="inventory"
-        hideRarity={hideRarity}
-        ownedCount={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
-        isEquipped={
-          data?.wardrobe?.equipped?.[card.item.slot] === card.item.id
+  const renderCollection = (slot: ClosetSlot) =>
+    data ? (
+      <CollectionBook
+        slot={slot}
+        catalog={data.catalog ?? []}
+        backgrounds={bg.catalog}
+        inventory={data.wardrobe?.inventory ?? {}}
+        bgInventory={bg.inventory}
+        equipped={data.wardrobe?.equipped ?? {}}
+        equippedBgId={bg.equipped}
+        dealPrices={dealPrices}
+        tryOnId={
+          tryTarget?.kind === 'item'
+            ? tryTarget.item.id
+            : tryTarget?.kind === 'bg'
+              ? tryTarget.bg.id
+              : null
         }
-        canAfford={true}
-        actionLoading={false}
-        onAction={() => handleItemAction(card.item)}
-        actionLabel={null}
-        isNew={unseenInventorySet.has(card.item.id)}
-        deferPreview
-        centerFrogPreview
-        compact
-        giftAnimation="box_shake"
-        pausePreview={
-          (card.item.slot !== 'container' && isDragging) ||
-          (card.item.slot !== 'container' &&
-            data?.wardrobe?.equipped?.[card.item.slot] !== card.item.id)
-        }
-        previewDelayMs={index * 20}
+        unseen={unseenInventorySet}
+        onTapItem={tapClosetItem}
+        onTapBackground={tapClosetBackground}
       />
-    ) : (
-      <BackgroundCard
-        key={`bg-${card.bg.id}`}
-        item={card.bg}
-        owned={(bg.inventory[card.bg.id] ?? 0) > 0}
-        ownedCount={bg.inventory[card.bg.id] ?? 0}
-        isEquipped={bg.equipped === card.bg.id}
-        canAfford={bg.balance >= card.bg.priceFlies}
-        mode="inventory"
-        compact
-        hideRarity={hideRarity}
-        actionLoading={bg.busyId === card.bg.id}
-        onAction={() => bg.handleEquip(card.bg)}
-      />
-    );
+    ) : null;
 
   const renderWornRowCard = (card: WardrobeCard) =>
     card.kind === 'item' ? (
@@ -1472,44 +1072,6 @@ function WardrobeManagerContent({
       </WardrobeRowCard>
     ) : null;
 
-  const renderShopCard = (
-    card: WardrobeCard,
-    index: number,
-    hideRarity = false,
-  ) =>
-    card.kind === 'item' ? (
-      <ItemCard
-        key={card.item.id}
-        item={card.item}
-        mode="shop"
-        hideRarity={hideRarity}
-        ownedCount={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
-        isEquipped={false}
-        canAfford={balance >= (card.item.priceFlies ?? 0) && !isGuest}
-        actionLoading={buyingId === card.item.id}
-        onAction={() => openItemPurchase(card.item)}
-        deferPreview
-        centerFrogPreview
-        compact
-        pausePreview={card.item.slot !== 'container'}
-        previewDelayMs={index * 20}
-      />
-    ) : (
-      <BackgroundCard
-        key={`bg-${card.bg.id}`}
-        item={card.bg}
-        owned={(bg.inventory[card.bg.id] ?? 0) > 0}
-        ownedCount={bg.inventory[card.bg.id] ?? 0}
-        isEquipped={bg.equipped === card.bg.id}
-        canAfford={bg.balance >= card.bg.priceFlies && !isGuest}
-        mode="shop"
-        compact
-        hideRarity={hideRarity}
-        actionLoading={bg.busyId === card.bg.id}
-        onAction={() => openBgPurchase(card.bg)}
-      />
-    );
-
   return (
     <div
       className={cn(
@@ -1558,39 +1120,35 @@ function WardrobeManagerContent({
           onValueChange={setActiveTab}
           className={cn('flex flex-col', embedded ? 'flex-1' : 'h-full')}
         >
-          {embedded && (
-            <div ref={stickySentinelRef} aria-hidden className="h-px -mb-px" />
-          )}
           <div
             data-wardrobe-sticky
             className={cn(
               'shrink-0',
               embedded
                 ? cn(
-                    'sticky top-0 z-50',
-                    isStuck
-                      ? '-mx-4 px-4 md:-mx-6 md:px-6 pt-[calc(env(safe-area-inset-top)+4.25rem)] md:pt-3 pb-3'
-                      : 'mt-[68px] pt-2 pb-0 md:mt-0',
+                    'z-40 -mx-4 px-4 md:-mx-6 md:px-6',
+                    activeTab === 'trade'
+                      ? 'relative'
+                      : 'sticky top-[-90px] md:top-[-96px]',
                   )
                 : 'relative z-40 space-y-2 px-4 pt-0 md:space-y-2 md:px-6 md:pt-2',
             )}
           >
             {embedded && (
-              <div
-                aria-hidden
-                className={cn(
-                  'pointer-events-none absolute left-1/2 top-0 bottom-0 -z-10 w-screen -translate-x-1/2',
-                  'border-b border-border/50 bg-background shadow-lg shadow-black/5 dark:shadow-black/20',
-                  'md:border-border/40 md:bg-background/90 md:shadow-sm md:shadow-black/[.03] md:backdrop-blur-xl',
-                  'transition-opacity duration-200',
-                  isStuck ? 'opacity-100' : 'opacity-0',
-                )}
-              />
+              <>
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 bottom-8 z-0 overflow-hidden"
+                >
+                  {stageBackground}
+                </div>
+                <div className="relative z-20">{stage}</div>
+              </>
             )}
             <div
               className={cn(
                 embedded
-                  ? 'flex'
+                  ? 'relative z-10 flex pt-[60px] md:pt-2'
                   : 'relative z-10 flex items-center justify-between gap-2 md:gap-4',
               )}
             >
@@ -1598,13 +1156,7 @@ function WardrobeManagerContent({
                 className={cn(
                   'p-1 rounded-[18px] border border-border/50 flex items-center gap-1',
                   embedded
-                    ? cn(
-                        'mx-auto w-full h-12 bg-muted',
-                        'transition-[transform,box-shadow,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
-                        isStuck
-                          ? 'translate-y-0 shadow-sm border-border/60'
-                          : '-translate-y-3.5 shadow-lg md:translate-y-16',
-                      )
+                    ? 'mx-auto h-12 w-full bg-muted shadow-lg md:translate-y-16'
                     : cn(
                         'h-10 md:h-11 flex-1 shadow-sm',
                         isDesktop
@@ -1623,36 +1175,15 @@ function WardrobeManagerContent({
                     name="wardrobe"
                     className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
                   />
-                  <span>Inventory</span>
-                  {newItemCount > 0 && (
-                    <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm">
-                      {newItemCount > 9 ? '9+' : newItemCount}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="shop"
-                  className={tabTriggerClass}
-                  onClick={scrollPageToContent}
-                  data-hint="wardrobe-shop-tab"
-                >
-                  <AppIcon
-                    name="store"
-                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
-                  />
-                  <span>Shop</span>
-                  {shopGiftReady ? (
+                  <span>Dress up</span>
+                  {shopGiftReady && (
                     <GiftBadge className="-my-1 h-[22px] w-[22px] shrink-0" />
-                  ) : bestDealDiscount > 0 && (
-                    <span className="flex h-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm">
-                      −{bestDealDiscount}%
-                    </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="trade"
                   className={tabTriggerClass}
-                  onClick={scrollPageToContent}
+                  onClick={scrollPageToTop}
                   data-hint="wardrobe-trade-tab"
                 >
                   <AppIcon
@@ -1683,8 +1214,8 @@ function WardrobeManagerContent({
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
-                    showLatest={activeTab === 'inventory'}
-                    showFeatured={activeTab === 'shop'}
+                    showLatest={false}
+                    showFeatured={false}
                   />
                 </div>
               )}
@@ -1692,122 +1223,66 @@ function WardrobeManagerContent({
 
             <div
               className={cn(
-                'relative z-10 flex items-center',
+                'relative z-10',
                 embedded
-                  ? cn(
-                      '-mx-4 px-4 md:-mx-6 md:px-6 bg-background',
-                      isStuck
-                        ? 'mt-2 rounded-t-none pt-0 md:bg-transparent'
-                        : 'mt-6 rounded-t-[24px] pt-3 md:mt-20',
-                    )
+                  ? '-mx-4 mt-3 rounded-t-[24px] border-b border-border/60 bg-background px-4 pb-1.5 pt-3 md:-mx-6 md:mt-20 md:px-6'
                   : 'mt-2 w-full min-w-0',
               )}
             >
+              <div className="flex items-center">
               <div className="flex-1 min-w-0">
                 <FilterBar
-                  active={
-                    activeFilter === 'container' && activeTab !== 'inventory'
-                      ? 'all'
-                      : activeFilter
-                  }
+                  active={activeFilter}
                   onChange={handleFilterChange}
                   badges={filterBadges}
                   options={
-                    activeTab !== 'inventory'
+                    activeTab === 'trade'
                       ? [
-                          {
-                            id: 'all',
-                            label: 'All',
-                            icon: <Sparkles className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'skin',
-                            label: 'Skins',
-                            icon: <Paintbrush className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'hat',
-                            label: 'Hats',
-                            icon: <Crown className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'body',
-                            label: 'Body',
-                            icon: <Shirt className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'held',
-                            label: 'Held',
-                            icon: <Hand className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'background',
-                            label: 'Backgrounds',
-                            icon: <ImageIcon className="w-5 h-5" />,
-                          },
+                          { id: 'all', label: 'All', icon: <Sparkles className="w-5 h-5" /> },
+                          { id: 'skin', label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
+                          { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
+                          { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
+                          { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
+                          { id: 'background', label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
                         ]
                       : [
                           {
                             id: 'all',
                             label: 'All',
                             icon: <Sparkles className="w-5 h-5" />,
+                            hint: 'wardrobe-shop-tab',
                           },
-                          {
-                            id: 'container',
-                            label: 'Gifts',
-                            icon: <Gift className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'skin',
-                            label: 'Skins',
-                            icon: <Paintbrush className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'hat',
-                            label: 'Hats',
-                            icon: <Crown className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'body',
-                            label: 'Body',
-                            icon: <Shirt className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'held',
-                            label: 'Held',
-                            icon: <Hand className="w-5 h-5" />,
-                          },
-                          {
-                            id: 'background',
-                            label: 'Backgrounds',
-                            icon: <ImageIcon className="w-5 h-5" />,
-                          },
+                          { id: 'skin', label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
+                          { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
+                          { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
+                          { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
+                          { id: 'background', label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
+                          { id: 'container', label: 'Gifts', icon: <Gift className="w-5 h-5" /> },
                         ]
                   }
                 />
               </div>
-              {embedded && (
-                <div
-                  className={cn(
-                    'relative z-10 flex shrink-0 items-center gap-1.5 self-stretch border-l border-border/40 pl-2.5',
-                    'bg-background md:border-l-0 md:bg-transparent md:pl-1',
-                  )}
-                >
-                  {!isGuest && (
-                    <WishlistButton
-                      count={wishlistEntries.length}
-                      readyCount={wishlistReadyCount}
-                      onClick={openWishlist}
-                    />
-                  )}
+              {embedded && activeTab === 'trade' && (
+                <div className="relative z-10 flex shrink-0 items-center gap-1.5 self-stretch border-l border-border/40 pl-2.5 md:border-l-0 md:pl-1">
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
-                    showLatest={activeTab === 'inventory'}
-                    showFeatured={activeTab === 'shop'}
+                    showLatest={false}
+                    showFeatured={false}
                   />
                 </div>
               )}
+              </div>
+              {embedded &&
+                activeTab === 'inventory' &&
+                activeFilter !== 'container' &&
+                canRenderItems && (
+                  <RarityRail
+                    rows={raritySummary}
+                    active={activeShelf}
+                    onJump={jumpToShelf}
+                  />
+                )}
             </div>
           </div>
 
@@ -1817,7 +1292,7 @@ function WardrobeManagerContent({
                 ? // No rounded top here: the filter-bar strip above is already
                   // the sheet's rounded edge, and a second one reads as a notch
                   // cut under the category chips on every tab.
-                  'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-5 pb-2 md:pt-3'
+                  'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-2 pb-2 md:pt-3'
                 : 'relative mt-4 flex-1 overflow-hidden rounded-t-[24px] border-t border-border/40',
               embedded &&
                 activeTab === 'trade' &&
@@ -1839,407 +1314,118 @@ function WardrobeManagerContent({
           >
             <TabsContent
               value="inventory"
-              ref={(node) => {
-                inventoryScrollRef.current = node;
-                bindScroll?.(node);
-              }}
-              onScroll={(event) => {
-                setInventoryHasScrolled(true);
-                if (
-                  inventoryGrid.hasMore &&
-                  isNearScrollEnd(event.currentTarget)
-                ) {
-                  inventoryGrid.loadMore();
-                }
-              }}
-              onWheel={(event) => {
-                setInventoryHasScrolled(true);
-                if (
-                  inventoryGrid.hasMore &&
-                  shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
-                ) {
-                  inventoryGrid.loadMore();
-                }
-              }}
+              ref={(node) => bindScroll?.(node)}
               className={cn(
                 embedded
-                  ? 'relative -mx-4 rounded-none border-x-0 md:mx-0 md:rounded-[20px] md:border-x'
-                  : 'absolute inset-0 overflow-y-auto overscroll-none rounded-[20px]',
-                'border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
+                  ? 'relative'
+                  : 'absolute inset-0 overflow-y-auto overscroll-none p-3',
+                'data-[state=inactive]:hidden',
               )}
             >
-              {!canRenderItems ? (
+              {!canRenderItems || !data ? (
                 <WardrobeGridSkeleton />
-              ) : activeTab === 'inventory' &&
-                inventoryItems.length === 0 &&
-                inventoryBackgrounds.length === 0 ? (
-                <WardrobeEmptyState
-                  icon={<Shirt className="h-8 w-8" />}
-                  title={
-                    activeFilter === 'all'
-                      ? 'Nothing in here yet'
-                      : 'Nothing of this kind yet'
-                  }
-                  description="Your flies are worth something — go pick out a look."
-                  action={{
-                    label: 'Browse the shop',
-                    icon: <ShoppingBag className="h-4 w-4" />,
-                    onClick: () => {
-                      hapticTick();
-                      setActiveTab('shop');
-                      scrollPageToTop();
-                    },
-                  }}
-                  footer={
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                      You have
-                      <Fly size={22} paused y={-4} />
-                      <span className="tabular-nums">
-                        {balance.toLocaleString()}
-                      </span>
-                      to spend
-                    </span>
-                  }
-                />
-              ) : activeTab === 'inventory' ? (
-                <>
-                  {(() => {
-                    const merged = mergeWardrobeCards(
-                      inventoryGrid.visibleItems,
-                      inventoryBackgrounds,
-                      sortBy,
-                    );
-                    let cardIndex = 0;
-                    const section = (
-                      key: string,
-                      label: React.ReactNode,
-                      labelClass: string,
-                      cards: WardrobeCard[],
-                      groupedByRarity = false,
-                    ) =>
-                      cards.length ? (
-                        <div key={key} className="pb-2 last:pb-4">
-                          <p
-                            className={cn(
-                              'mb-2 px-1 text-[12px] font-black',
-                              labelClass,
-                            )}
-                          >
-                            {label}
-                          </p>
-                          <div className={cardGridClass}>
-                            {cards.map((card) =>
-                              renderInventoryCard(
-                                card,
-                                cardIndex++,
-                                groupedByRarity,
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      ) : null;
-
-                    if (sortBy === 'price_asc' || sortBy === 'price_desc') {
-                      const cards = pinEquippedFirst(
-                        merged,
-                        pinSnapshot.equipped,
-                        pinSnapshot.bgEquipped,
-                      );
-                      return (
-                        <div className={cn(cardGridClass, 'pb-4')}>
-                          {cards.map((card, index) =>
-                            renderInventoryCard(card, index),
-                          )}
-                        </div>
-                      );
-                    }
-
-                    if (sortBy === 'rarity_asc' || sortBy === 'rarity_desc') {
-                      return groupCardsByRarity(merged).map((group) =>
-                        section(
-                          group.rarity,
-                          rarityHeading(group.rarity),
-                          RARITY_CONFIG[group.rarity].text,
-                          group.cards,
-                          true,
-                        ),
-                      );
-                    }
-
-                    const rowSection = (
-                      key: string,
-                      label: React.ReactNode,
-                      labelClass: string,
-                      cards: WardrobeCard[],
-                      renderCard: (card: WardrobeCard) => React.ReactNode,
-                      action?: React.ReactNode,
-                    ) =>
-                      cards.length ? (
-                        <div key={key} className="pb-2 last:pb-4">
-                          <div className="mb-2 flex items-center gap-2 px-1">
-                            <p
-                              className={cn(
-                                'text-[12px] font-black',
-                                labelClass,
-                              )}
-                            >
-                              {label}
-                            </p>
-                            {action}
-                          </div>
-                          <DragScrollRow>{cards.map(renderCard)}</DragScrollRow>
-                        </div>
-                      ) : null;
-
-                    const isWorn = (card: WardrobeCard) =>
-                      card.kind === 'item'
-                        ? data?.wardrobe?.equipped?.[card.item.slot] ===
-                          card.item.id
-                        : card.bg.id === bg.equipped;
-                    const giftsAsRow = activeFilter !== 'container';
-                    const worn: WardrobeCard[] = [];
-                    const gifts: WardrobeCard[] = [];
-                    const fresh: WardrobeCard[] = [];
-                    const rest: WardrobeCard[] = [];
-                    for (const card of merged) {
-                      if (
-                        giftsAsRow &&
-                        card.kind === 'item' &&
-                        card.item.slot === 'container'
-                      ) {
-                        gifts.push(card);
-                        continue;
-                      }
-                      if (isWorn(card)) worn.push(card);
-                      if (
-                        card.kind === 'item' &&
-                        pinSnapshot.unseenItems.includes(card.item.id)
-                      )
-                        fresh.push(card);
-                      else rest.push(card);
-                    }
-                    gifts.sort(
-                      (a, b) => rarityRank[b.rarity] - rarityRank[a.rarity],
-                    );
-                    rest.sort(
-                      (a, b) => rarityRank[b.rarity] - rarityRank[a.rarity],
-                    );
-                    return (
-                      <>
-                        {rowSection(
-                          'worn',
-                          'Currently wearing',
-                          'text-foreground',
-                          worn,
-                          renderWornRowCard,
-                          activeFilter === 'all' ? (
-                            <SaveFitButton
-                              enabled={!isGuest}
-                              equipped={data?.wardrobe?.equipped}
-                              equippedBackgroundId={bg.equipped}
-                              onNotify={setNotif}
-                              onUpgrade={() => openPlus('wardrobe_looks')}
-                            />
-                          ) : null,
-                        )}
-                        {activeFilter === 'all' && (
-                          <LooksRow
-                            enabled={!isGuest}
-                            equipped={data?.wardrobe?.equipped}
-                            equippedBackgroundId={bg.equipped}
-                            onNotify={setNotif}
-                            onUpgrade={() => openPlus('wardrobe_looks')}
-                          />
-                        )}
-                        {rowSection(
-                          'gifts',
-                          'Gifts',
-                          'text-foreground',
-                          gifts,
-                          renderGiftRowCard,
-                        )}
-                        {section('new', 'New', 'text-rose-500', fresh)}
-                        {groupCardsByRarity(rest).map((group) =>
-                          section(
-                            group.rarity,
-                            rarityHeading(group.rarity),
-                            RARITY_CONFIG[group.rarity].text,
-                            group.cards,
-                            true,
-                          ),
-                        )}
-                      </>
-                    );
-                  })()}
-                  {inventoryGrid.hasMore && (
-                    <div
-                      ref={inventoryGrid.sentinelRef}
-                      className="h-8"
-                      aria-hidden="true"
-                    />
+              ) : activeFilter === 'all' ? (
+                <div className="flex flex-col gap-1 pb-4">
+                  {ownedGiftCards.length > 0 && (
+                    <div className="pb-2">
+                      <p className="mb-2 px-1 text-[13px] font-black text-foreground">
+                        Gifts to open
+                      </p>
+                      <DragScrollRow>{ownedGiftCards.map(renderGiftRowCard)}</DragScrollRow>
+                    </div>
                   )}
-                  {activeFilter === 'all' && !!data?.dailyDeals?.length && (
-                    <DailyDealsTeaser
-                      endsAt={data.dailyDeals[0].endsAt}
-                      saleCount={
-                        data.dailyDeals.filter((deal) => deal.onSale).length
-                      }
-                      onClick={() => {
-                        setActiveTab('shop');
-                        scrollPageToTop();
-                      }}
-                    />
-                  )}
-                </>
-              ) : null}
-            </TabsContent>
-
-            <TabsContent
-              value="shop"
-              ref={(node) => {
-                shopScrollRef.current = node;
-                bindScroll?.(node);
-              }}
-              onScroll={(event) => {
-                setShopHasScrolled(true);
-                if (shopGrid.hasMore && isNearScrollEnd(event.currentTarget)) {
-                  shopGrid.loadMore();
-                }
-              }}
-              onWheel={(event) => {
-                setShopHasScrolled(true);
-                if (
-                  shopGrid.hasMore &&
-                  shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
-                ) {
-                  shopGrid.loadMore();
-                }
-              }}
-              className={cn(
-                embedded
-                  ? 'relative -mx-4 rounded-none border-x-0 md:mx-0 md:rounded-[20px] md:border-x'
-                  : 'absolute inset-0 overflow-y-auto overscroll-none rounded-[20px]',
-                'border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
-              )}
-            >
-              {!canRenderItems ? (
-                <WardrobeGridSkeleton showAction />
-              ) : activeTab === 'shop' ? (
-                <>
-                  {activeFilter === 'all' && !!data?.dailyDeals?.length && (
+                  {!!data.dailyDeals?.length && (
                     <DailyDealsShelf
                       deals={data.dailyDeals}
-                      catalog={data?.catalog ?? []}
+                      catalog={data.catalog ?? []}
                       isPremium={!!data.isPremium}
                       rerollsLeft={data.dealRerollsLeft ?? 0}
                       rerolling={rerolling}
                       wishlistedIds={wishlistedItemIds}
-                      onBuy={(item) => openItemPurchase(item)}
+                      onBuy={(item, dealPrice) => tapClosetItem(item, dealPrice)}
                       onReroll={() => void rerollDeals()}
                       onUpgrade={() => void rerollDeals()}
+                      renderEntries={(entries) => (
+                        <DealTileRow
+                          deals={entries.map(({ deal, item }) => ({
+                            item,
+                            dealPrice: deal.dealPrice,
+                            onSale: deal.onSale,
+                          }))}
+                          inventory={data.wardrobe?.inventory ?? {}}
+                          equipped={data.wardrobe?.equipped ?? {}}
+                          tryOnId={tryTarget?.kind === 'item' ? tryTarget.item.id : null}
+                          onTapItem={tapClosetItem}
+                        />
+                      )}
                     />
                   )}
-                  {activeFilter === 'all' && !isGuest && (
+                  {newOwnedCards.length > 0 && (
+                    <div className="pb-2">
+                      <p className="mb-2 px-1 text-[13px] font-black text-rose-500">
+                        New in your closet
+                      </p>
+                      <DragScrollRow>{newOwnedCards.map(renderWornRowCard)}</DragScrollRow>
+                    </div>
+                  )}
+                  {renderCollection('all')}
+                  {!isGuest && (
                     <WishlistShelf
                       entries={shelfWishlistEntries}
                       slots={wishlistSlots}
                       removing={wishlistBusy}
                       onOpen={openWishlistEntry}
                       onRemove={(entry) =>
-                        void removeFromWishlist(
-                          entry.view.itemId,
-                          entry.view.kind,
-                        )
+                        void removeFromWishlist(entry.view.itemId, entry.view.kind)
                       }
                       onSeeAll={openWishlist}
                     />
                   )}
-                  {activeFilter === 'all' && !isGuest && (
+                  {!isGuest && (
+                    <LooksRow
+                      enabled={!isGuest}
+                      equipped={data.wardrobe?.equipped}
+                      equippedBackgroundId={bg.equipped}
+                      onNotify={setNotif}
+                      onUpgrade={() => openPlus('wardrobe_looks')}
+                      action={
+                        <SaveFitButton
+                          enabled={!isGuest}
+                          equipped={data.wardrobe?.equipped}
+                          equippedBackgroundId={bg.equipped}
+                          onNotify={setNotif}
+                          onUpgrade={() => openPlus('wardrobe_looks')}
+                        />
+                      }
+                    />
+                  )}
+                  {!isGuest && (
                     <SeenOnFriendsRow
-                      enabled={activeTab === 'shop'}
-                      catalog={data?.catalog ?? []}
+                      enabled={activeTab === 'inventory' && activeFilter === 'all'}
+                      catalog={data.catalog ?? []}
                       backgrounds={bg.catalog}
-                      ownedItems={data?.wardrobe?.inventory ?? {}}
+                      ownedItems={data.wardrobe?.inventory ?? {}}
                       ownedBackgrounds={bg.inventory}
-                      onPickItem={(item) => openItemPurchase(item)}
-                      onPickBackground={openBgPurchase}
+                      onPickItem={(item) => tapClosetItem(item, null)}
+                      onPickBackground={tapClosetBackground}
                     />
                   )}
-                  {(() => {
-                    const cards = mergeWardrobeCards(
-                      shopGrid.visibleItems,
-                      shopBackgrounds,
-                      sortBy,
-                    );
-                    const sectionLabel =
-                      {
-                        all: 'All items',
-                        skin: 'Skins',
-                        hat: 'Hats',
-                        body: 'Body',
-                        held: 'Held',
-                        background: 'Backgrounds',
-                        container: 'Gifts',
-                      }[activeFilter] ?? 'All items';
-                    const sectionHeader = (
-                      <p className="mb-2 px-1 text-[12px] font-black text-muted-foreground">
-                        {sectionLabel}
-                      </p>
-                    );
-                    if (sortBy === 'featured') {
-                      return (
-                        <>
-                          {sectionHeader}
-                          <div className={cn(cardGridClass, 'pb-4')}>
-                            {featuredShopOrder(cards, featuredSeed).map(
-                              (card, index) => renderShopCard(card, index),
-                            )}
-                          </div>
-                        </>
-                      );
-                    }
-                    if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
-                      const ordered =
-                        sortBy === 'latest' ? interleaveByCategory(cards) : cards;
-                      return (
-                        <>
-                          {sectionHeader}
-                          <div className={cn(cardGridClass, 'pb-4')}>
-                            {ordered.map((card, index) =>
-                              renderShopCard(card, index),
-                            )}
-                          </div>
-                        </>
-                      );
-                    }
-                    let cardIndex = 0;
-                    return groupCardsByRarity(cards).map((group) => (
-                      <div key={group.rarity} className="pb-2 last:pb-4">
-                        <p
-                          className={cn(
-                            'mb-2 px-1 text-[12px] font-black',
-                            RARITY_CONFIG[group.rarity].text,
-                          )}
-                        >
-                          {RARITY_CONFIG[group.rarity].label}
-                        </p>
-                        <div className={cardGridClass}>
-                          {group.cards.map((card) =>
-                            renderShopCard(card, cardIndex++, true),
-                          )}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                  {shopGrid.hasMore && (
-                    <div
-                      ref={shopGrid.sentinelRef}
-                      className="h-8"
-                      aria-hidden="true"
-                    />
-                  )}
-                </>
-              ) : null}
+                </div>
+              ) : activeFilter === 'container' ? (
+                ownedGiftCards.length === 0 ? (
+                  <WardrobeEmptyState
+                    icon={<Gift className="h-8 w-8" />}
+                    title="No gifts to open"
+                    description="Finish quests and keep your streak to earn gifts. Every one can hold something rare."
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2 pb-4">
+                    {ownedGiftCards.map(renderGiftRowCard)}
+                  </div>
+                )
+              ) : (
+                renderCollection(closetSlot)
+              )}
             </TabsContent>
 
             <TabsContent
@@ -2279,10 +1465,6 @@ function WardrobeManagerContent({
               ) : null}
             </TabsContent>
 
-            {activeTab === 'inventory' && inventoryGrid.hasMore && (
-              <ScrollMoreCue />
-            )}
-            {activeTab === 'shop' && shopGrid.hasMore && <ScrollMoreCue />}
           </div>
         </Tabs>
       </div>
@@ -2297,13 +1479,23 @@ function WardrobeManagerContent({
       )}
 
       <ShopGiftPopup
-        active={open && activeTab === 'shop' && !isGuest}
+        active={open && activeTab === 'inventory' && activeFilter === 'all' && !isGuest}
         gift={data?.shopGift}
       />
 
       <PurchaseSheet
         open={!!purchaseCard}
         onClose={() => {
+          const boughtTried =
+            (purchaseItem &&
+              tryTarget?.kind === 'item' &&
+              tryTarget.item.id === purchaseItem.id &&
+              (data?.wardrobe?.inventory?.[purchaseItem.id] ?? 0) > 0) ||
+            (purchaseBg &&
+              tryTarget?.kind === 'bg' &&
+              tryTarget.bg.id === purchaseBg.id &&
+              (bg.inventory[purchaseBg.id] ?? 0) > 0);
+          if (boughtTried) clearTryOn();
           setPurchaseCard(null);
           setPurchaseDealPrice(null);
         }}
@@ -2326,8 +1518,10 @@ function WardrobeManagerContent({
           return false;
         }}
         onEquip={async () => {
+          clearTryOn();
           if (purchaseItem) await equipItemDirect(purchaseItem);
           else if (purchaseBg) await bg.handleEquip(purchaseBg);
+          announceEquip();
           setActiveTab('inventory');
           scrollPageToTop();
         }}
@@ -2336,6 +1530,36 @@ function WardrobeManagerContent({
           scrollPageToTop();
         }}
       />
+
+      {tryTarget && !purchaseCard && activeTab === 'inventory' && (() => {
+        const isItem = tryTarget.kind === 'item';
+        const rarity = (isItem ? tryTarget.item.rarity : tryTarget.bg.rarity) as Rarity;
+        const basePrice = isItem
+          ? (tryTarget.item.priceFlies ?? 0)
+          : tryTarget.bg.priceFlies ?? 0;
+        const price = isItem ? (tryTarget.dealPrice ?? basePrice) : basePrice;
+        return (
+          <TryOnBar
+            key={isItem ? tryTarget.item.id : tryTarget.bg.id}
+            name={isItem ? tryTarget.item.name : tryTarget.bg.name}
+            rarity={rarity}
+            price={price}
+            originalPrice={isItem && tryTarget.dealPrice != null ? basePrice : null}
+            locked={isTradeOnlyRarity(rarity) || !(basePrice > 0)}
+            balance={balance}
+            busy={tryBuying}
+            onBuy={() => void buyTriedOn()}
+            onGetFlies={(short) => openFlyShop(short)}
+            onTradeUp={() => {
+              clearTryOn();
+              setActiveTab('trade');
+              setActiveFilter('all');
+              scrollPageToTop();
+            }}
+            onClose={clearTryOn}
+          />
+        );
+      })()}
 
       <WishlistSheet
         open={wishlistOpen}
@@ -2489,17 +1713,6 @@ function WardrobeRowCard({
       {corner && (
         <div className="absolute bottom-2 right-2 z-30">{corner}</div>
       )}
-    </div>
-  );
-}
-
-function ScrollMoreCue() {
-  return (
-    <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center pt-10 pb-4 pointer-events-none bg-gradient-to-t from-background/95 via-background/60 to-transparent">
-      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-[12px] font-black text-muted-foreground shadow-sm backdrop-blur">
-        <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
-        <span>Scroll for more</span>
-      </div>
     </div>
   );
 }

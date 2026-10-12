@@ -2194,6 +2194,7 @@ export default function TaskBoard({
   };
 
   const showDock = !!drag?.active && !savedDropHidden;
+  const showTodayChip = !calendarOpen && !drag?.active && !todayInView;
   const overDropTile = dateZoneActive || isDragOverBacklog;
   const capsuleHidden =
     scrollLocked || selection.active || !!drag?.active;
@@ -2454,24 +2455,21 @@ export default function TaskBoard({
               expanded={calendarOpen}
               onToggle={() => setCalendarOpen((v) => !v)}
             />
-            <AnimatePresence initial={false}>
-              {!calendarOpen && !drag?.active && !todayInView && (
-                <motion.button
-                  key="today-chip"
-                  type="button"
-                  onClick={goToToday}
-                  aria-label="Go back to today"
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.85 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 34 }}
-                  className="flex h-9 items-center gap-1.5 rounded-xl bg-[#4f9149] px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
-                >
-                  <CalendarCheck className="h-4 w-4" strokeWidth={2.5} />
-                  Today
-                </motion.button>
-              )}
-            </AnimatePresence>
+            <button
+              type="button"
+              onClick={goToToday}
+              aria-label="Go back to today"
+              aria-hidden={!showTodayChip || undefined}
+              tabIndex={showTodayChip ? undefined : -1}
+              className={`flex h-9 items-center gap-1.5 rounded-xl bg-[#4f9149] px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-[opacity,transform,box-shadow] duration-200 ease-out active:translate-y-0.5 active:shadow-none ${
+                showTodayChip
+                  ? 'scale-100 opacity-100'
+                  : 'pointer-events-none scale-90 opacity-0'
+              }`}
+            >
+              <CalendarCheck className="h-4 w-4" strokeWidth={2.5} />
+              Today
+            </button>
           </div>
           {!calendarOpen && (
             <div className="mt-1.5">

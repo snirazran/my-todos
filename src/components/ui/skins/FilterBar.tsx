@@ -38,6 +38,7 @@ export interface FilterOption {
   id: string;
   label: string;
   icon: React.ReactNode;
+  hint?: string;
 }
 
 export function FilterBar({
@@ -174,6 +175,7 @@ export function FilterBar({
           'flex items-center gap-2 overflow-x-auto',
           // Mobile Layout (Full Bleed)
           '-mx-4 px-4 w-[calc(100%+2rem)] md:mx-0 md:px-0 md:w-full md:pr-8',
+          '[mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%-1.5rem),transparent)]',
           'md:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]',
           // Scroll & Interaction
           'pt-1 pb-2 touch-pan-x cursor-grab active:cursor-grabbing',
@@ -199,6 +201,7 @@ export function FilterBar({
           return (
             <button
               key={opt.id}
+              data-hint={opt.hint}
               data-active={isActive}
               // The Click Guard
               onClick={(e) => {

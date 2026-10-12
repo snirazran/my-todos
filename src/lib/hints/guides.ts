@@ -350,7 +350,7 @@ const GUIDES: Record<string, HintGuide> = {
       {
         href: '/wardrobe',
         anchor: 'wardrobe-shop-tab',
-        say: 'Open the Shop — buy any outfit or background you can afford',
+        say: 'Tap any outfit to try it on your frog, then buy the one you love',
       },
     ],
   },
@@ -361,7 +361,7 @@ const GUIDES: Record<string, HintGuide> = {
       {
         href: '/wardrobe',
         anchor: 'wardrobe-inventory-tab',
-        say: 'Tap an outfit or background you own to put it on',
+        say: 'Tap an outfit you own to put it on',
       },
     ],
   },

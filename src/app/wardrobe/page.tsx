@@ -2,21 +2,18 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { HomeFocusFlies } from '@/components/ui/HomeFocusFlies';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
 import { useIsFrogHungry } from '@/hooks/useFrogHunger';
-import { useBackgrounds } from '@/hooks/useBackgrounds';
-import { backgroundPreview } from '@/hooks/useBackgroundActions';
+import { DEFAULT_BACKGROUND_IMAGES, useBackgrounds } from '@/hooks/useBackgrounds';
+import { useWardrobeTryOn, WARDROBE_EQUIPPED_EVENT } from '@/lib/wardrobeTryOnStore';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 import { useUIStore } from '@/lib/uiStore';
 import { WardrobePageSkeleton } from '@/components/ui/Skeleton';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
-import { cn } from '@/lib/utils';
 
 function WardrobePageInner() {
   const router = useRouter();
@@ -27,21 +24,12 @@ function WardrobePageInner() {
   const { data } = useInventory(true);
   const isFrogHungry = useIsFrogHungry(true);
   const { data: bgData } = useBackgrounds(true);
-  const isStuck = useUIStore((s) => s.isWardrobeStuck);
-  const wardrobeTab = useUIStore((s) => s.wardrobeTab);
   const lastWardrobeTab = useUIStore((s) => s.lastWardrobeTab);
   const defaultTab = ((searchParams.get('tab') || lastWardrobeTab) ||
     'inventory') as 'inventory' | 'shop' | 'trade';
   const focusItemId = searchParams.get('item') || null;
   const focusItemKind =
     searchParams.get('kind') === 'background' ? 'background' : 'item';
-
-  const equippedBgImage = useMemo(() => {
-    const equippedId = bgData?.equipped;
-    if (!equippedId) return null;
-    const bgItem = (bgData?.catalog ?? []).find((b) => b.id === equippedId);
-    return bgItem ? backgroundPreview(bgItem) || null : null;
-  }, [bgData?.equipped, bgData?.catalog]);
 
   const previewIndices = useMemo(() => {
     const catalogById = Object.fromEntries(
@@ -64,107 +52,94 @@ function WardrobePageInner() {
     };
   }, [data?.catalog, data?.wardrobe?.equipped, isFrogHungry]);
 
-  const dockControls = useAnimationControls();
-  const indicesKey = useMemo(
-    () => JSON.stringify(previewIndices),
-    [previewIndices],
+  const tryOn = useWardrobeTryOn((s) => s.tryOn);
+  const setTryOn = useWardrobeTryOn((s) => s.setTryOn);
+  useEffect(() => () => setTryOn(null), [setTryOn]);
+
+  const stageIndices = useMemo(
+    () =>
+      tryOn?.kind === 'item'
+        ? { ...previewIndices, [tryOn.slot]: tryOn.riveIndex }
+        : previewIndices,
+    [previewIndices, tryOn],
   );
-  const prevIndicesKey = useRef(indicesKey);
+
+  const equippedBgImages = useMemo(() => {
+    const bgItem = (bgData?.catalog ?? []).find((b) => b.id === bgData?.equipped);
+    return bgItem?.images ?? DEFAULT_BACKGROUND_IMAGES;
+  }, [bgData?.equipped, bgData?.catalog]);
+  const stageImages = tryOn?.kind === 'bg' ? tryOn.images : equippedBgImages;
+
   useEffect(() => {
-    if (prevIndicesKey.current === indicesKey) return;
-    prevIndicesKey.current = indicesKey;
-    if (!isStuck) return;
-    dockControls.start({
-      scale: [1, 1.18, 1],
-      transition: { duration: 0.45, ease: [0.34, 1.56, 0.64, 1] },
-    });
-  }, [indicesKey, isStuck, dockControls]);
+    const onEquipped = () => frogRef.current?.fireEmote('love');
+    window.addEventListener(WARDROBE_EQUIPPED_EVENT, onEquipped);
+    return () => window.removeEventListener(WARDROBE_EQUIPPED_EVENT, onEquipped);
+  }, []);
+
+  const stage = (
+    <FlyCatchSwipeLauncher source="wardrobe" className="shrink-0">
+      <div
+        data-fly-hero
+        className="relative flex h-[calc(204px+env(safe-area-inset-top))] items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))]"
+      >
+        <div
+          ref={frogBoxRef}
+          className="relative translate-y-[73px] pointer-events-none md:translate-y-[5.21rem]"
+        >
+          <HomeFocusFlies
+            frogRef={frogRef}
+            frogBoxRef={frogBoxRef}
+            onGrabActive={setFrogMouthOpen}
+          />
+          <div data-fly-hero-frog>
+            <Frog
+              ref={frogRef}
+              mouthOpen={frogMouthOpen}
+              indices={stageIndices}
+              paused={false}
+            />
+          </div>
+          <PremiumFrogAura />
+        </div>
+      </div>
+    </FlyCatchSwipeLauncher>
+  );
+
+  const stageBackground = (
+    <div className="absolute inset-x-0 top-0 h-[calc(440px+env(safe-area-inset-top))] md:h-[480px]">
+      <picture key={tryOn?.kind === 'bg' ? tryOn.id : 'equipped'} className="block h-full w-full">
+        {stageImages.webLarge && (
+          <source media="(min-width: 1920px)" srcSet={stageImages.webLarge} />
+        )}
+        {stageImages.web && <source media="(min-width: 1280px)" srcSet={stageImages.web} />}
+        {stageImages.tablet && (
+          <source media="(min-width: 768px)" srcSet={stageImages.tablet} />
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={stageImages.mobile}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-cover object-top"
+        />
+      </picture>
+    </div>
+  );
 
   return (
     <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col overflow-x-clip">
       <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
-        <FlyCatchSwipeLauncher
-          source="wardrobe"
-          disabled={isStuck}
-          className={cn('shrink-0', isStuck ? 'z-[5]' : 'z-40')}
-        >
-          <div data-fly-hero className="relative flex h-[calc(204px+env(safe-area-inset-top))] items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))]">
-            <div
-              ref={frogBoxRef}
-              className={cn(
-                'relative z-50 translate-y-[73px] pointer-events-none md:translate-y-[5.21rem]',
-                'origin-bottom transition-[opacity,transform] duration-300 ease-out',
-                isStuck && 'opacity-0 scale-95',
-              )}
-            >
-              <HomeFocusFlies
-                frogRef={frogRef}
-                frogBoxRef={frogBoxRef}
-                onGrabActive={setFrogMouthOpen}
-              />
-              <div data-fly-hero-frog>
-                <Frog
-                  ref={frogRef}
-                  mouthOpen={frogMouthOpen}
-                  indices={previewIndices}
-                  paused={false}
-                />
-              </div>
-              <PremiumFrogAura />
-            </div>
-          </div>
-        </FlyCatchSwipeLauncher>
-
         <section data-fly-sheet className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
           <WardrobePageContent
             defaultTab={defaultTab}
             focusItemId={focusItemId}
             focusItemKind={focusItemKind}
+            stage={stage}
+            stageBackground={stageBackground}
             onClose={() => router.push('/')}
           />
         </section>
       </div>
-
-      <AnimatePresence>
-        {isStuck && wardrobeTab === 'inventory' && (
-          <motion.button
-            type="button"
-            aria-label="Scroll to your frog"
-            initial={{ opacity: 0, scale: 0.4, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.4, y: 24 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-            whileTap={{ scale: 0.92 }}
-            onClick={() =>
-              document
-                .getElementById('main-scroll')
-                ?.scrollTo({ top: 0, behavior: 'smooth' })
-            }
-            className="fixed right-4 md:right-[max(1rem,calc((100vw-48rem)/2-72px-0.75rem))] bottom-[calc(env(safe-area-inset-bottom)+76px+0.75rem)] md:bottom-6 z-[70] h-[72px] w-[72px] overflow-hidden rounded-full border-[3px] border-primary/40 bg-card shadow-xl"
-          >
-            {equippedBgImage && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={equippedBgImage}
-                alt=""
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-              />
-            )}
-            <motion.div
-              animate={dockControls}
-              className="relative flex h-full w-full items-end justify-center"
-            >
-              <FrogSnapshot
-                indices={previewIndices}
-                width={80}
-                height={80}
-                visualOffsetY={2}
-                className="pointer-events-none"
-              />
-            </motion.div>
-          </motion.button>
-        )}
-      </AnimatePresence>
     </main>
   );
 }

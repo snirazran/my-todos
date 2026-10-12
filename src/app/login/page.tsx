@@ -455,6 +455,15 @@ function LoginPageInner() {
           </svg>
         </div>
 
+        {isUpgrade && (
+          <p
+            className="auth-enter -mt-1 mb-1 max-w-xs text-center text-[14px] font-semibold text-muted-foreground"
+            style={{ '--auth-i': 1 } as any}
+          >
+            Save your frog so it&apos;s never lost.
+          </p>
+        )}
+
         {/* Frog mascot — sits on top of the email input, fly buzzing above. No container. */}
         <div
           className="auth-enter-frog relative z-10 w-full"
@@ -500,19 +509,6 @@ function LoginPageInner() {
         </div>
         </div>
 
-        {isUpgrade && (
-          <div
-            className="auth-enter mt-5 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10"
-            style={{ '--auth-i': 2 } as any}
-          >
-            <p className="text-sm font-black text-amber-900 dark:text-amber-200">
-              You&apos;re in Guest Mode
-            </p>
-            <p className="mt-0.5 text-xs font-medium text-amber-800/90 dark:text-amber-100/80">
-              Create an account to save your progress — your pet and data will be kept.
-            </p>
-          </div>
-        )}
 
         {/* Step content */}
         <div
@@ -533,7 +529,7 @@ function LoginPageInner() {
                 <button
                   onClick={handleGoogle}
                   disabled={loading}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-card text-[15px] font-black text-foreground ring-1 ring-border shadow-[0_3px_0_0_hsl(var(--border))] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -547,7 +543,7 @@ function LoginPageInner() {
                 <button
                   onClick={handleApple}
                   disabled={loading}
-                  className="mt-3 flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-3 flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-black text-[15px] font-black text-white shadow-[0_3px_0_0_#3f3f46] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black dark:shadow-[0_3px_0_0_#a1a1aa]"
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -581,7 +577,7 @@ function LoginPageInner() {
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
+                    className="h-12 rounded-2xl border-border bg-card px-4 text-base focus-visible:ring-primary/30"
                     required
                   />
                   {usePassword && (
@@ -593,7 +589,7 @@ function LoginPageInner() {
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
+                      className="h-12 rounded-2xl border-border bg-card px-4 text-base focus-visible:ring-primary/30"
                       required
                     />
                   )}
@@ -602,7 +598,7 @@ function LoginPageInner() {
                     disabled={
                       !email.trim() || (usePassword && !password) || loading
                     }
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,opacity] active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                   >
                     {loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

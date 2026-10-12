@@ -153,6 +153,18 @@ export function ShopGiftPopup({
     <AnimatePresence>
       {phase !== 'hidden' && (
         <motion.div
+          key="shop-gift-backdrop"
+          aria-hidden
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          onClick={phase === 'offer' ? close : undefined}
+          className="fixed inset-0 z-[79] bg-slate-950/45"
+        />
+      )}
+      {phase !== 'hidden' && (
+        <motion.div
           key="shop-gift"
           role="dialog"
           aria-label="Daily shop gift"

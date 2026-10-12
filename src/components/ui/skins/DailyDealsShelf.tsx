@@ -85,6 +85,7 @@ export function DailyDealsShelf({
   onBuy,
   onReroll,
   onUpgrade,
+  renderEntries,
 }: {
   deals: DailyDeal[];
   catalog: ItemDef[];
@@ -95,6 +96,9 @@ export function DailyDealsShelf({
   onBuy: (item: ItemDef, dealPrice: number) => void;
   onReroll: () => void;
   onUpgrade: () => void;
+  renderEntries?: (
+    entries: { deal: DailyDeal; item: ItemDef }[],
+  ) => React.ReactNode;
 }) {
   const countdown = useCountdown(deals[0]?.endsAt);
   const byId = React.useMemo(
@@ -172,6 +176,7 @@ export function DailyDealsShelf({
         </span>
       </div>
 
+      {renderEntries ? renderEntries(entries) : (
       <DragScrollRow>
         {entries.map(({ deal, item }) => {
           const config = RARITY_CONFIG[item.rarity];
@@ -237,6 +242,7 @@ export function DailyDealsShelf({
           );
         })}
       </DragScrollRow>
+      )}
 
       {wishlistHits > 0 && (
         <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
