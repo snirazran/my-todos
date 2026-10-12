@@ -163,7 +163,7 @@ body:has([data-public-home]) #main-scroll {
   }
 }
 html.dark {
-  --toast-surface: hsl(150 13% 17%);
+  --toast-surface: hsl(115 30% 29%);
 }
 @keyframes toast-countdown {
   from {

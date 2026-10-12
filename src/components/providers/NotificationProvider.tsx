@@ -9,7 +9,14 @@ import React, {
   useEffect,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from 'framer-motion';
 import { X, CalendarCheck, FolderOpen, CopyPlus } from 'lucide-react';
 import { useSheetStore } from '@/lib/sheetStore';
 
@@ -116,13 +123,63 @@ function readingTimeMs(text: string, hasAction: boolean): number {
   return Math.max(base, hasAction ? 5000 : 3500);
 }
 
-export const TOAST_SURFACE_STYLE: React.CSSProperties = {
-  backgroundColor: 'var(--toast-surface, hsl(150 16% 11%))',
+export const TOAST_SURFACE_STYLE = {
+  backgroundColor: 'var(--toast-surface, hsl(115 36% 36%))',
   boxShadow:
-    '0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 28px -18px rgb(0 0 0 / 0.6)',
-};
+    '0 0 0 1px rgb(255 255 255 / 0.08), 0 14px 28px -18px rgb(28 64 26 / 0.7)',
+  '--foreground': '0 0% 100%',
+  '--muted-foreground': '110 40% 88%',
+  '--primary': '0 0% 100%',
+} as React.CSSProperties;
 
 const RESUME_FLOOR_MS = 1500;
+
+const TOAST_EASE_OUT = [0.22, 1, 0.36, 1] as const;
+const TOAST_EASE_IN = [0.4, 0, 1, 1] as const;
+const TOAST_RESTING = 'translateX(0%) translateY(0%) scale(1)';
+const TOAST_ENTER_FROM = 'translateX(0%) translateY(70%) scale(0.94)';
+const TOAST_EXIT_TO = 'translateX(0%) translateY(35%) scale(0.96)';
+
+function SwipeableToast({
+  disabled,
+  onSwipe,
+  onDragSettled,
+  className,
+  style,
+  children,
+}: {
+  disabled: boolean;
+  onSwipe: (dir: number) => void;
+  onDragSettled: () => void;
+  className: string;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  const x = useMotionValue(0);
+  const opacity = useTransform(x, [-180, 0, 180], [0.3, 1, 0.3]);
+  return (
+    <motion.div
+      drag={disabled ? false : 'x'}
+      dragDirectionLock
+      dragMomentum={false}
+      onDragEnd={(_, info) => {
+        onDragSettled();
+        if (
+          Math.abs(info.offset.x) > SWIPE_DISMISS_PX ||
+          Math.abs(info.velocity.x) > 600
+        ) {
+          onSwipe(Math.sign(info.offset.x || info.velocity.x) || 1);
+          return;
+        }
+        animate(x, 0, { type: 'spring', stiffness: 600, damping: 40 });
+      }}
+      style={{ ...style, x, opacity, touchAction: 'pan-y' }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
 const SWIPE_DISMISS_PX = 72;
 
 export function NotificationProvider({
@@ -134,6 +191,7 @@ export function NotificationProvider({
   const [undoingId, setUndoingId] = useState<number | null>(null);
   const [stackHeight, setStackHeight] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const reduceMotion = useReducedMotion();
   const openSheets = useSheetStore((s) => s.count);
   const stackSuppressed = openSheets > 0;
   useEffect(() => setMounted(true), []);
@@ -261,39 +319,33 @@ export function NotificationProvider({
           <motion.div
             key={n.id}
             custom={swiped}
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: TOAST_ENTER_FROM }}
+            animate={{
+              opacity: 1,
+              transform: TOAST_RESTING,
+              transition: {
+                duration: 0.42,
+                ease: TOAST_EASE_OUT,
+                opacity: { duration: 0.2, ease: 'linear' },
+              },
+            }}
             variants={{
               exit: (swipe: { id: number; dir: number } | null) =>
                 swipe?.id === n.id
                   ? {
-                      x: swipe.dir * 420,
                       opacity: 0,
-                      transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] },
+                      transform: `translateX(${swipe.dir * 110}%) translateY(0%) scale(1)`,
+                      transition: { duration: 0.24, ease: TOAST_EASE_OUT },
                     }
-                  : {
-                      opacity: 0,
-                      y: 10,
-                      scale: 0.97,
-                      transition: { duration: 0.14, ease: 'easeIn' },
-                    },
+                  : reduceMotion
+                    ? { opacity: 0, transition: { duration: 0.15 } }
+                    : {
+                        opacity: 0,
+                        transform: TOAST_EXIT_TO,
+                        transition: { duration: 0.18, ease: TOAST_EASE_IN },
+                      },
             }}
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
             exit="exit"
-            transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-            drag={isUndoing ? false : 'x'}
-            dragDirectionLock
-            dragSnapToOrigin
-            dragElastic={0.5}
-            onDragEnd={(_, info) => {
-              setPressed(false);
-              if (
-                Math.abs(info.offset.x) > SWIPE_DISMISS_PX ||
-                Math.abs(info.velocity.x) > 600
-              ) {
-                setSwiped({ id: n.id, dir: Math.sign(info.offset.x) || 1 });
-                dismiss(n.id);
-              }
-            }}
             onPointerEnter={(e) => {
               if (e.pointerType === 'mouse') setHovered(true);
             }}
@@ -308,12 +360,18 @@ export function NotificationProvider({
                 setHovered(true);
             }}
             onBlurCapture={() => setHovered(false)}
-            style={{
-              ...TOAST_SURFACE_STYLE,
-              touchAction: 'pan-y',
-              willChange: 'transform, opacity',
+            style={{ willChange: 'transform, opacity' }}
+            className="pointer-events-auto relative w-full"
+          >
+          <SwipeableToast
+            disabled={isUndoing}
+            onDragSettled={() => setPressed(false)}
+            onSwipe={(dir) => {
+              setSwiped({ id: n.id, dir });
+              dismiss(n.id);
             }}
-            className="dark pointer-events-auto relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-[18px] px-3.5 py-2 text-foreground"
+            style={TOAST_SURFACE_STYLE}
+            className="dark relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-[18px] px-3.5 py-2 text-foreground"
           >
             {isMoveToast && (
               <span
@@ -338,7 +396,7 @@ export function NotificationProvider({
               <button
                 onClick={() => handleUndo(n)}
                 disabled={isUndoing}
-                className="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white/10 px-3.5 text-sm font-black text-primary transition-colors hover:bg-white/15 active:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white/20 px-3.5 text-sm font-black text-primary transition-colors hover:bg-white/25 active:bg-white/30 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isUndoing ? (
                   <>
@@ -388,6 +446,7 @@ export function NotificationProvider({
                 }}
               />
             )}
+          </SwipeableToast>
           </motion.div>
         );
   };

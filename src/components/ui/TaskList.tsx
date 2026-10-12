@@ -1835,7 +1835,7 @@ export default function TaskList({
     const id = flipped.id;
     showNotification(
       <span className="flex min-w-0 items-center gap-2.5">
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+        <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
         <span className="min-w-0 truncate font-semibold">{flipped.text}</span>
       </span>,
       () => {

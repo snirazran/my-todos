@@ -480,39 +480,11 @@ export const RewardCard = ({
 
               {/* === LAYER 1: CINEMATIC EFFECTS (Centered) === */}
               <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                {/* 1. Rotating God Rays */}
-                <motion.div
-                  key="rays"
-                  animate={
-                    showContent
-                      ? { opacity: 0, scale: 2, rotate: 180 }
-                      : { rotate: 360 }
-                  }
-                  transition={
-                    showContent
-                      ? { duration: 0.5, ease: 'easeIn' }
-                      : { duration: 20, repeat: Infinity, ease: 'linear' }
-                  }
-                  className={cn(
-                    'absolute w-[600px] h-[600px] opacity-40 mix-blend-plus-lighter',
-                    // Mapping rarity to TEXT colors so 'currentColor' works in the gradient
-                    {
-                      'text-slate-400': prize.rarity === 'common',
-                      'text-emerald-500': prize.rarity === 'uncommon',
-                      'text-sky-500': prize.rarity === 'rare',
-                      'text-violet-500': prize.rarity === 'epic',
-                      'text-amber-500': prize.rarity === 'legendary',
-                    }
+                <AnimatePresence>
+                  {!showContent && (
+                    <CardRays key="rays" rarity={prize.rarity} />
                   )}
-                  style={{
-                    background:
-                      'repeating-conic-gradient(from 0deg, transparent 0deg, transparent 15deg, currentColor 15deg, currentColor 20deg, transparent 20deg)',
-                    maskImage:
-                      'radial-gradient(circle, black 30%, transparent 70%)',
-                    WebkitMaskImage:
-                      'radial-gradient(circle, black 30%, transparent 70%)',
-                  }}
-                />
+                </AnimatePresence>
               </div>
 
               {/* === LAYER 2: ACTUAL CONTENT (Bottom Aligned for Gift, Centered for Frog) === */}
@@ -741,3 +713,134 @@ function QuantityBadge({
   );
 }
 
+const CARD_RAY_COLOR: Record<string, string> = {
+  common: 'text-slate-400',
+  uncommon: 'text-emerald-500',
+  rare: 'text-sky-500',
+  epic: 'text-violet-500',
+  legendary: 'text-amber-500',
+};
+
+const CARD_RAY_INTENSITY: Record<string, number> = {
+  common: 0.7,
+  uncommon: 0.8,
+  rare: 0.9,
+  epic: 1,
+  legendary: 1.1,
+};
+
+const CARD_RAYS_WIDE =
+  'repeating-conic-gradient(from 0deg, transparent 0deg, currentColor 8deg, transparent 16deg 30deg)';
+const CARD_RAYS_THIN =
+  'repeating-conic-gradient(from 7deg, transparent 0deg 7deg, rgb(255 255 255 / 0.9) 9deg 10deg, transparent 12deg 20deg)';
+const CARD_RAYS_MASK = 'radial-gradient(circle, black 18%, transparent 66%)';
+const CARD_CORE_GLOW =
+  'radial-gradient(circle, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0.45) 22%, transparent 58%)';
+
+const CARD_SPARKLES = [
+  { left: '16%', top: '22%', size: 14, delay: 0 },
+  { left: '80%', top: '18%', size: 10, delay: 0.7 },
+  { left: '86%', top: '70%', size: 12, delay: 1.4 },
+  { left: '12%', top: '74%', size: 9, delay: 2.1 },
+  { left: '54%', top: '9%', size: 8, delay: 2.8 },
+];
+
+function CardRays({ rarity }: { rarity?: string }) {
+  const reduceMotion = useReducedMotion();
+  const key = rarity && CARD_RAY_COLOR[rarity] ? rarity : 'common';
+  const intensity = CARD_RAY_INTENSITY[key];
+  const spin = (deg: number, duration: number) =>
+    reduceMotion
+      ? {}
+      : {
+          initial: { transform: 'rotate(0deg)' },
+          animate: { transform: `rotate(${deg}deg)` },
+          transition: { duration, repeat: Infinity, ease: 'linear' as const },
+        };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, transform: 'scale(0.85)' }}
+      animate={{ opacity: 1, transform: 'scale(1)' }}
+      exit={{
+        opacity: 0,
+        transform: 'scale(1.8)',
+        transition: { duration: 0.5, ease: [0.4, 0, 1, 1] },
+      }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className={cn('absolute inset-0 flex items-center justify-center', CARD_RAY_COLOR[key])}
+      style={{ willChange: 'transform, opacity' }}
+    >
+      <motion.div
+        {...spin(360, 32)}
+        className="absolute aspect-square w-[160%] max-w-[600px] rounded-full"
+        style={{
+          background: CARD_RAYS_WIDE,
+          maskImage: CARD_RAYS_MASK,
+          WebkitMaskImage: CARD_RAYS_MASK,
+          opacity: 0.55 * intensity,
+          willChange: 'transform',
+        }}
+      />
+      <motion.div
+        {...spin(-360, 20)}
+        className="absolute aspect-square w-[160%] max-w-[600px] rounded-full"
+        style={{
+          background: CARD_RAYS_THIN,
+          maskImage: CARD_RAYS_MASK,
+          WebkitMaskImage: CARD_RAYS_MASK,
+          opacity: 0.35 * intensity,
+          willChange: 'transform',
+        }}
+      />
+      <motion.div
+        initial={{ opacity: 0.55, transform: 'scale(0.92)' }}
+        animate={
+          reduceMotion
+            ? { opacity: 0.7, transform: 'scale(1)' }
+            : { opacity: 0.85, transform: 'scale(1.06)' }
+        }
+        transition={{
+          duration: 2.4,
+          repeat: Infinity,
+          repeatType: 'mirror',
+          ease: 'easeInOut',
+        }}
+        className="absolute aspect-square w-[85%] rounded-full"
+        style={{ background: CARD_CORE_GLOW, willChange: 'transform, opacity' }}
+      />
+      {!reduceMotion &&
+        CARD_SPARKLES.map((sparkle) => (
+          <motion.svg
+            key={`${sparkle.left}-${sparkle.top}`}
+            viewBox="0 0 24 24"
+            width={sparkle.size}
+            height={sparkle.size}
+            className="absolute text-white drop-shadow-[0_0_4px_rgba(255,255,255,0.8)]"
+            style={{ left: sparkle.left, top: sparkle.top, willChange: 'transform, opacity' }}
+            initial={{ opacity: 0, transform: 'scale(0) rotate(0deg)' }}
+            animate={{
+              opacity: [0, 1, 0],
+              transform: [
+                'scale(0) rotate(0deg)',
+                'scale(1) rotate(45deg)',
+                'scale(0) rotate(90deg)',
+              ],
+            }}
+            transition={{
+              duration: 1.6,
+              delay: sparkle.delay,
+              repeat: Infinity,
+              repeatDelay: 1.6,
+              ease: 'easeInOut',
+            }}
+          >
+            <path
+              d="M12 0C13 8 16 11 24 12C16 13 13 16 12 24C11 16 8 13 0 12C8 11 11 8 12 0Z"
+              fill="currentColor"
+            />
+          </motion.svg>
+        ))}
+    </motion.div>
+  );
+}

@@ -1611,12 +1611,19 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
       {portalTarget &&
         createPortal(
           <motion.div
-            layout
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            style={TOAST_SURFACE_STYLE}
+            initial={{ opacity: 0, transform: 'translateY(70%) scale(0.94)' }}
+            animate={{ opacity: 1, transform: 'translateY(0%) scale(1)' }}
+            exit={{
+              opacity: 0,
+              transform: 'translateY(35%) scale(0.96)',
+              transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
+            }}
+            transition={{
+              duration: 0.42,
+              ease: [0.22, 1, 0.36, 1],
+              opacity: { duration: 0.2, ease: 'linear' },
+            }}
+            style={{ ...TOAST_SURFACE_STYLE, willChange: 'transform, opacity' }}
             className="dark pointer-events-none flex min-h-12 w-full items-center gap-3 rounded-[18px] px-3.5 py-2 text-foreground md:w-[380px] md:self-end"
           >
             <span
