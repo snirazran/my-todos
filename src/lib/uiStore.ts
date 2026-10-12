@@ -40,7 +40,8 @@ interface UIState {
   flyShopNeed: number | null;
   /** Pack a campaign wants highlighted when the shop opens. */
   flyShopFocusPackId: string | null;
-  openFlyShop: (need?: number, focusPackId?: string) => void;
+  flyShopTarget: { name: string; price: number } | null;
+  openFlyShop: (need?: number, focusPackId?: string, target?: { name: string; price: number }) => void;
   closeFlyShop: () => void;
   setFlyShopOpen: (open: boolean) => void;
 
@@ -102,19 +103,21 @@ export const useUIStore = create<UIState>()(
       isFlyShopOpen: false,
       flyShopNeed: null,
       flyShopFocusPackId: null,
-      openFlyShop: (need?: number, focusPackId?: string) =>
+      flyShopTarget: null,
+      openFlyShop: (need, focusPackId, target) =>
         set({
           isFlyShopOpen: true,
           flyShopNeed: need && need > 0 ? need : null,
           flyShopFocusPackId: focusPackId ?? null,
+          flyShopTarget: target ?? null,
         }),
       closeFlyShop: () =>
-        set({ isFlyShopOpen: false, flyShopNeed: null, flyShopFocusPackId: null }),
+        set({ isFlyShopOpen: false, flyShopNeed: null, flyShopFocusPackId: null, flyShopTarget: null }),
       setFlyShopOpen: (open: boolean) =>
         set(
           open
             ? { isFlyShopOpen: true }
-            : { isFlyShopOpen: false, flyShopNeed: null, flyShopFocusPackId: null },
+            : { isFlyShopOpen: false, flyShopNeed: null, flyShopFocusPackId: null, flyShopTarget: null },
         ),
 
       isWardrobeStuck: false,

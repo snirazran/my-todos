@@ -524,7 +524,7 @@ export function PurchaseSheet({
                     {equipLabel}
                   </PrimaryButton>
                   <GhostButton
-                    onClick={canAfford ? handleBuy : () => openFlyShop(shortBy)}
+                    onClick={canAfford ? handleBuy : () => openFlyShop(shortBy, undefined, { name: target.name, price })}
                     disabled={busy || (isGuest && !canAfford)}
                   >
                     {canAfford ? (
@@ -601,7 +601,7 @@ export function PurchaseSheet({
                 <>
                   <PrimaryButton
                     ref={primaryRef}
-                    onClick={() => openFlyShop(shortBy)}
+                    onClick={() => openFlyShop(shortBy, undefined, { name: target.name, price })}
                     shine
                   >
                     <span className="inline-flex items-center gap-1.5">

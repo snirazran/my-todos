@@ -244,6 +244,14 @@ const RAIL_DOT: Record<Rarity, string> = {
   legendary: 'bg-amber-500',
 };
 
+const RAIL_TONE: Record<Rarity, string> = {
+  common: 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300',
+  uncommon: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
+  rare: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300',
+  epic: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300',
+  legendary: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
+};
+
 export function RarityRail({
   rows,
   active,
@@ -255,7 +263,7 @@ export function RarityRail({
 }) {
   if (rows.length < 2) return null;
   return (
-    <div className="-mx-4 flex gap-1 overflow-x-auto px-3 [mask-image:linear-gradient(to_right,transparent,#000_0.75rem,#000_calc(100%-1.25rem),transparent)] [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Collection rarities" className="-mx-4 flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
       {rows.map((row) => {
         const isActive = active === row.rarity;
         return (
@@ -264,22 +272,22 @@ export function RarityRail({
             type="button"
             onClick={() => onJump(row.rarity)}
             aria-current={isActive || undefined}
+            aria-label={`${RARITY_CONFIG[row.rarity].label}, ${row.owned} of ${row.total} collected`}
             className={cn(
-              'flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] font-black transition-colors duration-150',
-              isActive
-                ? cn('bg-foreground/[0.06]', RARITY_CONFIG[row.rarity].text)
-                : 'text-muted-foreground hover:text-foreground',
+              'flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold transition-shadow duration-150 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              RAIL_TONE[row.rarity],
+              isActive && 'ring-1 ring-current shadow-sm',
             )}
           >
             <span className={cn('h-2 w-2 shrink-0 rounded-full', RAIL_DOT[row.rarity])} />
             {RARITY_CONFIG[row.rarity].label}
-            <span className="font-bold tabular-nums opacity-70">
-              {row.owned}/{row.total}
+            <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] tabular-nums">
+              {row.owned}<span className="opacity-60">/{row.total}</span>
             </span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import {
@@ -14,6 +15,7 @@ import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { useUIStore } from '@/lib/uiStore';
 
 export function GlobalPageBackground() {
+  const pathname = usePathname();
   const isLoadingScreenVisible = useUIStore(
     (state) => state.isLoadingScreenVisible,
   );
@@ -51,7 +53,12 @@ export function GlobalPageBackground() {
     writeCachedBackground(next);
   }, [equippedBackground]);
 
-  if (isLoadingScreenVisible || shouldWaitForUserBackground) return null;
+  // The wardrobe owns a full-width, sticky backdrop, including try-on previews.
+  if (
+    pathname === '/wardrobe' ||
+    isLoadingScreenVisible ||
+    shouldWaitForUserBackground
+  ) return null;
 
   return (
     <div

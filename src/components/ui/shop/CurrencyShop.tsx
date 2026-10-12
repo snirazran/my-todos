@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR, { mutate as revalidateAll } from 'swr';
-import { Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -12,113 +12,27 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
-import {
-  rewardedAdFailureMessage,
-  rewardedAdsAvailable,
-  showRewardedAd,
-} from '@/lib/ads';
+import { rewardedAdFailureMessage, rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
-import { getFlyPack, type FlyPackId } from '@/lib/flyPacks';
+import { FLY_PACKS, type FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { prefetchStoreBundleBytes } from '@/lib/riveLoader';
 import { emitCampaignTrigger, markCampaignConverted } from '@/lib/campaigns/orchestrator';
-import { WishlistGoalCard } from './WishlistGoalCard';
 import { BundleArt } from './BundleArt';
 
-type Pack = {
-  id: string;
-  amount: number;
-  price: string;
-  /** How far this pack's flies-per-dollar beats the cheapest one. */
-  bonusPercent: number;
-  badge?: 'popular' | 'best';
-  flies: number[];
-  name: string;
-};
-
-const PACK_META: Omit<Pack, 'amount' | 'bonusPercent'>[] = [
-  { id: 'pinch', name: 'Pinch', price: '$1.99', flies: [30] },
-  { id: 'rare-jar', name: 'Jar', price: '$4.99', badge: 'popular', flies: [32, 22] },
-  { id: 'swarm', name: 'Swarm', price: '$9.99', flies: [36, 26] },
-  { id: 'epic-cloud', name: 'Cloud', price: '$19.99', flies: [36, 28, 20] },
-  { id: 'mega-swarm', name: 'Mega swarm', price: '$49.99', flies: [40, 30, 22] },
-  { id: 'legendary-vault', name: 'Vault', price: '$99.99', badge: 'best', flies: [44, 34, 26, 20] },
+const PACK_TONES = [
+  'from-slate-100/80 to-slate-50 dark:from-slate-800 dark:to-slate-900',
+  'from-lime-100/80 to-emerald-50 dark:from-emerald-950 dark:to-slate-900',
+  'from-teal-100/80 to-emerald-50 dark:from-teal-950 dark:to-slate-900',
+  'from-sky-100/80 to-sky-50 dark:from-sky-950 dark:to-slate-900',
+  'from-orange-100/80 to-amber-50 dark:from-orange-950 dark:to-slate-900',
+  'from-amber-100 to-yellow-50 dark:from-amber-950 dark:to-slate-900',
 ];
-
-// The ladder's entire argument is flies per dollar, so it is measured off the
-// catalog instead of being written down a second time and drifting.
-const PACKS: Pack[] = (() => {
-  const perDollarOf = (id: string) => {
-    const pack = getFlyPack(id);
-    return pack ? pack.amount / pack.priceUsd : 0;
-  };
-  const base = perDollarOf(PACK_META[0].id);
-  return PACK_META.map((meta) => {
-    const perDollar = perDollarOf(meta.id);
-    return {
-      ...meta,
-      amount: getFlyPack(meta.id)?.amount ?? 0,
-      bonusPercent: base ? Math.round((perDollar / base - 1) * 100) : 0,
-    };
-  });
-})();
-
-
-
-/**
- * A pond, one hour later per tier: dawn mist over the cheapest pack, golden
- * hour behind the biggest. Escalation lives in the artwork's own scene rather
- * than in the card chrome, so the ladder reads at a glance without six
- * competing borders — the only cards that get a coloured edge are the ones
- * actually being merchandised.
- *
- * `sky` is the wash behind the art, `sun` the glow it sits against, `water`
- * the band it stands on. Every pack is now a container resting on something —
- * bucket through chest — so they all get a contact shadow.
- */
-const TIER_SCENE = [
-  {
-    sky: 'from-slate-100 to-emerald-50 dark:from-slate-800 dark:to-slate-900',
-    sun: 'bg-emerald-200/40 dark:bg-emerald-400/10',
-    water: 'from-slate-300/40 dark:from-slate-950/50',
-  },
-  {
-    sky: 'from-emerald-100 to-lime-50 dark:from-emerald-900/60 dark:to-slate-900',
-    sun: 'bg-lime-300/40 dark:bg-emerald-400/15',
-    water: 'from-emerald-300/40 dark:from-emerald-950/60',
-  },
-  {
-    sky: 'from-teal-100 to-emerald-50 dark:from-teal-900/60 dark:to-slate-900',
-    sun: 'bg-teal-300/40 dark:bg-teal-400/15',
-    water: 'from-teal-300/40 dark:from-teal-950/60',
-  },
-  {
-    sky: 'from-sky-100 to-cyan-50 dark:from-sky-900/60 dark:to-slate-900',
-    sun: 'bg-sky-300/45 dark:bg-sky-400/15',
-    water: 'from-sky-300/45 dark:from-sky-950/60',
-  },
-  {
-    sky: 'from-orange-100 to-amber-50 dark:from-orange-900/50 dark:to-slate-900',
-    sun: 'bg-orange-300/45 dark:bg-orange-400/15',
-    water: 'from-orange-300/45 dark:from-orange-950/60',
-  },
-  {
-    sky: 'from-amber-200 to-yellow-50 dark:from-amber-900/60 dark:to-slate-900',
-    sun: 'bg-amber-300/60 dark:bg-amber-400/20',
-    water: 'from-amber-400/45 dark:from-amber-950/60',
-  },
-];
-
-/** Every pack's artwork is now an object standing in the scene. */
-const FIRST_GROUNDED_BUNDLE = 1;
-
-/** Which free-flies surface the sheet is showing: an ad round, the Plus
- *  upsell that replaces it off-device, or nothing at all for Plus members. */
+const PACK_NAMES = ['Pinch', 'Jar', 'Swarm', 'Cloud', 'Mega swarm', 'Vault'];
 type FreeMode = 'ads' | 'plus' | 'none';
-
 type AdFlyStatus = {
   reward: number;
   cap: number;
@@ -128,197 +42,186 @@ type AdFlyStatus = {
   available?: boolean;
   isPremium?: boolean;
 };
-
-/** BaseSheet's mobile slide-in runs 400ms; give it a frame of headroom. */
-const SHEET_SETTLE_MS = 440;
+type PurchaseStatus = { text: string; tone: 'muted' | 'success' | 'error' };
 
 export function CurrencyShop() {
-  const [mounted, setMounted] = useState(false);
-  const [storePrices, setStorePrices] = useState<Partial<Record<FlyPackId, string>>>({});
   const open = useUIStore((s) => s.isFlyShopOpen);
   const setOpen = useUIStore((s) => s.setFlyShopOpen);
   const need = useUIStore((s) => s.flyShopNeed);
+  const target = useUIStore((s) => s.flyShopTarget);
   const focusPackId = useUIStore((s) => s.flyShopFocusPackId);
   const { data: inventoryData } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
-  const [artReady, setArtReady] = useState(false);
+  const remaining = target ? Math.max(0, target.price - balance) : (need ?? 0);
+  const [storePrices, setStorePrices] = useState<Partial<Record<FlyPackId, string>>>({});
+  const [pricesLoading, setPricesLoading] = useState(true);
+  const [priceError, setPriceError] = useState(false);
+  const [priceAttempt, setPriceAttempt] = useState(0);
+  const [selectedId, setSelectedId] = useState<FlyPackId | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const [freeMode, setFreeMode] = useState<FreeMode>('none');
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<PurchaseStatus | null>(null);
   const openedRef = useRef(false);
   const boughtRef = useRef(false);
-  const packs = PACKS.map((pack) => ({
-    ...pack,
-    price: storePrices[pack.id as FlyPackId] ?? pack.price,
-  }));
-  // Arriving from a purchase they couldn't afford: point at the cheapest pack
-  // that actually closes the gap, so the shop answers the question they came
-  // with instead of restating the whole price ladder.
-  const coversId =
-    focusPackId ||
-    (need
-      ? (packs.find((pack) => pack.amount >= need) ?? packs[packs.length - 1]).id
-      : null);
+  const purchaseInFlight = useRef(false);
+  const sessionRef = useRef(0);
+  const priceFor = (id: FlyPackId) => storePrices[id] ?? null;
+  const availablePacks = FLY_PACKS.filter((pack) => pricesLoading || priceFor(pack.id));
+  const suggested = availablePacks.find((pack) => pack.amount >= remaining) ?? availablePacks[availablePacks.length - 1] ?? FLY_PACKS[0];
+  const defaultPack = availablePacks.find((pack) => pack.id === focusPackId) ?? suggested;
+  const selected = availablePacks.find((pack) => pack.id === selectedId) ?? defaultPack;
+  const focused = remaining > 0 && !showAll;
+  const visiblePacks = focused
+    ? [defaultPack, ...availablePacks.filter((pack) => pack.id !== defaultPack.id && pack.amount >= remaining)].slice(0, 2)
+    : FLY_PACKS;
+  const goalReached = !!target && !!inventoryData && remaining === 0;
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
+    sessionRef.current += 1;
     if (open) {
+      setSelectedId(null);
+      setShowAll(false);
+      setStatus(null);
       trackAnalyticsEvent('fly_shop_viewed');
       emitCampaignTrigger('shop_opened');
       boughtRef.current = false;
       openedRef.current = true;
+      void prefetchStoreBundleBytes().catch(() => {});
       return;
     }
-    // Left empty-handed: the one moment we know they considered spending and
-    // didn't. Fires on close so it can't collide with the sheet itself.
-    if (openedRef.current && !boughtRef.current) {
-      emitCampaignTrigger('shop_abandoned');
-    }
+    if (openedRef.current && !boughtRef.current) emitCampaignTrigger('shop_abandoned');
     openedRef.current = false;
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    void getFlyPackPrices().then(setStorePrices).catch(() => {});
-  }, [open]);
+    let cancelled = false;
+    setPricesLoading(true);
+    setPriceError(false);
+    void getFlyPackPrices().then((prices) => {
+      if (!cancelled) {
+        setStorePrices(prices);
+        setPriceError(Object.keys(prices).length === 0);
+      }
+    }).catch(() => {
+      if (!cancelled) setPriceError(true);
+    }).finally(() => {
+      if (!cancelled) setPricesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [open, priceAttempt]);
 
-  // The pack artwork is one shared Rive file, and parsing it blocks the main
-  // thread — enough to visibly chew through the sheet's slide-in. So the bytes
-  // start downloading on open (network only, off-thread) while the canvases
-  // stay unmounted until the sheet has landed, then fade in.
-  useEffect(() => {
-    if (!open) {
-      setArtReady(false);
-      return;
-    }
-    void prefetchStoreBundleBytes().catch(() => {});
-    const timer = window.setTimeout(() => setArtReady(true), SHEET_SETTLE_MS);
-    return () => window.clearTimeout(timer);
-  }, [open]);
-
-  if (!mounted) return null;
-
-  const handlePurchased = async (report: (info: string) => void) => {
-    boughtRef.current = true;
-    markCampaignConverted();
-    emitCampaignTrigger('purchase_completed');
-    const before = inventoryData?.wardrobe?.flies ?? 0;
-    const deadline = Date.now() + 60000;
-    let attempt = 0;
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      attempt += 1;
-      let seen: string | number = 'err';
-      try {
-        const res = await fetch(
-          `/api/skins/inventory?view=summary&t=${Date.now()}`,
-          { cache: 'no-store' },
-        );
-        const payload = await res.json();
-        const flies = payload?.wardrobe?.flies;
-        seen = typeof flies === 'number' ? flies : 'undef';
-        if (typeof flies === 'number' && flies > before) {
+  const buy = async () => {
+    if (purchaseInFlight.current || !priceFor(selected.id)) return;
+    purchaseInFlight.current = true;
+    const session = sessionRef.current;
+    const sameSession = () => session === sessionRef.current;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const result = await purchaseFlyPack(selected.id);
+      if (result !== 'purchased') return;
+      boughtRef.current = true;
+      markCampaignConverted();
+      emitCampaignTrigger('purchase_completed');
+      if (sameSession()) setStatus({text: 'Adding your flies…', tone: 'muted'});
+      const deadline = Date.now() + 60000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        try {
+          const res = await fetch(`/api/skins/inventory?view=summary&t=${Date.now()}`, {cache: 'no-store'});
+          const payload = await res.json();
+          const flies = payload?.wardrobe?.flies;
+          if (typeof flies !== 'number' || flies <= balance) continue;
           patchInventoryFlies(flies);
           void revalidateAll(() => true);
-          return true;
-        }
-      } catch (error) {
-        seen = error instanceof Error ? error.message : 'throw';
+          hapticSuccess();
+          if (sameSession()) {
+            if (target && flies >= target.price) setOpen(false);
+            else setStatus({text: `${selected.amount.toLocaleString()} flies added`, tone: 'success'});
+            confetti({particleCount: 50, spread: 65, origin: {y: 0.65}, zIndex: 99999, colors: ['#4ade80', '#22c55e', '#fbbf24']});
+          }
+          return;
+        } catch { /* Retry while the store receipt is being credited. */ }
       }
-      report(`#${attempt} base ${before} got ${seen}`);
+      if (sameSession()) setStatus({text: 'Payment received. Your flies are still processing—no need to buy again.', tone: 'muted'});
+    } catch (error) {
+      if (sameSession()) setStatus({text: error instanceof Error && error.message.includes('not configured') ? 'This pack is unavailable right now. Please try again later.' : 'Purchase didn’t go through. Please try again.', tone: 'error'});
+    } finally {
+      purchaseInFlight.current = false;
+      setBusy(false);
     }
-    return false;
-  };
-
-  const shared = {
-    showArt: artReady,
-    coversId,
-    onPurchased: handlePurchased,
   };
 
   return (
-    <BaseSheet
-      open={open}
-      onOpenChange={setOpen}
-      zIndex={1700}
-      backdropClassName="bg-black/70 backdrop-blur-sm"
-      className="max-h-[90vh] bg-popover sm:max-h-[85vh] sm:max-w-2xl"
-    >
-      {({ bindScroll }) => (
+    <BaseSheet open={open} onOpenChange={setOpen} zIndex={1700} backdropClassName="bg-black/50 backdrop-blur-sm" className="max-h-[90dvh] bg-background sm:max-h-[88dvh] sm:max-w-xl">
+      {({ bindScroll, entered }) => (
         <>
-          <div className="flex shrink-0 items-center justify-between gap-4 px-5 pb-3 pt-2 sm:px-6 sm:pt-6">
-            <div className="min-w-0">
-              <h2 className="text-2xl font-black leading-none tracking-tight text-foreground sm:text-[28px]">
-                Fly Shop
-              </h2>
-              <p className="mt-1.5 text-[12px] font-bold leading-none text-muted-foreground">
-                Stock up for outfits and gifts
+          <div className="shrink-0 px-5 pb-4 pt-1 sm:px-6 sm:pt-6">
+            <div className="flex items-center justify-between gap-3 pr-10">
+              <h2 className="text-2xl font-black tracking-tight">{target && remaining > 0 ? 'Finish your look' : 'Fly shop'}</h2>
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted/70 px-2.5 py-1" aria-label={`Your balance: ${balance.toLocaleString()} flies`}>
+                <Fly size={26} y={-4} paused interactive={false} />
+                <AnimatedNumber value={balance} className="text-xs font-black tabular-nums" />
+              </span>
+            </div>
+            {remaining > 0 && (
+              <p className="mt-2 text-sm font-semibold text-muted-foreground">
+                <span className="font-black tabular-nums text-primary">{remaining.toLocaleString()} more</span>
+                {target ? <> for <span className="text-foreground">{target.name}</span></> : ' to finish your purchase'}
               </p>
-            </div>
-            <div className="mr-9 flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 sm:mr-10">
-              <Fly size={26} y={-4} paused />
-              <AnimatedNumber
-                value={balance}
-                haptics
-                className="text-[13px] font-black tabular-nums text-foreground"
-              />
-            </div>
+            )}
           </div>
 
-          <div
-            ref={bindScroll}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6"
-          >
-            {need ? (
-              <div className="mt-1 flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-4 py-3 ring-1 ring-primary/25">
-                <span className="text-[13px] font-black text-foreground">
-                  You need
-                </span>
-                <span className="text-[13px] font-black tabular-nums text-foreground">
-                  {need.toLocaleString()}
-                </span>
-                <span className="text-[13px] font-black text-foreground">
-                  more flies
-                </span>
-                <Fly size={32} y={-4} paused />
+          <div ref={bindScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 sm:px-6">
+            <fieldset disabled={busy}>
+              <legend className="sr-only">Choose a fly pack</legend>
+              <div className={cn('grid grid-cols-2 gap-3', !focused && 'sm:grid-cols-3')}>
+                {visiblePacks.map((pack) => {
+                  const index = FLY_PACKS.findIndex((entry) => entry.id === pack.id);
+                  const checked = selected.id === pack.id;
+                  const covers = remaining > 0 && pack.id === suggested.id && pack.amount >= remaining;
+                  return (
+                    <label key={pack.id} className="relative min-w-0 cursor-pointer">
+                      <input type="radio" name="fly-pack" value={pack.id} checked={checked} disabled={!pricesLoading && !priceFor(pack.id)} onChange={() => {setSelectedId(pack.id); setStatus(null);}} className="peer sr-only" />
+                      <span className={cn('relative flex h-full flex-col items-center overflow-hidden rounded-[22px] border-2 bg-gradient-to-b px-2 pb-3 pt-5 transition-[border-color,box-shadow] peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background peer-disabled:opacity-60', PACK_TONES[index], checked ? 'border-primary shadow-[0_3px_0_0_hsl(var(--primary))]' : 'border-transparent hover:border-primary/30')}>
+                        {covers && <span className="absolute left-2.5 top-2.5 z-10 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-black text-primary">Covers it</span>}
+                        <span aria-hidden="true" className={cn('absolute right-2.5 top-2.5 z-10 grid h-5 w-5 place-items-center rounded-full border-2', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/15 bg-background/60')}>
+                          {checked && <Check className="h-3 w-3" strokeWidth={3} />}
+                        </span>
+                        <BundleArt bundle={index + 1} animate={entered && checked} className="h-32 w-full sm:h-36" />
+                        <span className="text-[26px] font-black leading-none tabular-nums tracking-tight">{pack.amount.toLocaleString()}</span>
+                        <span className="mt-1 text-[11px] font-bold text-muted-foreground">flies <span aria-hidden="true">·</span> {PACK_NAMES[index]}</span>
+                        <span className="mt-2 text-sm font-black tabular-nums text-primary">{priceFor(pack.id) ?? (pricesLoading ? 'Loading…' : 'Unavailable')}</span>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-            ) : (
-              <WishlistGoalCard open={open} onNavigate={() => setOpen(false)} />
+            </fieldset>
+            {priceError && (
+              <div role="status" className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-muted px-3 py-2 text-xs font-semibold">
+                <span>Prices couldn’t load.</span>
+                <button type="button" onClick={() => setPriceAttempt((attempt) => attempt + 1)} className="min-h-10 rounded-full px-3 font-black text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Retry</button>
+              </div>
             )}
-
+            {focused && visiblePacks.length < FLY_PACKS.length && (
+              <button type="button" onClick={() => setShowAll(true)} className="mx-auto mt-3 flex min-h-10 items-center gap-1 rounded-full px-4 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                See all {FLY_PACKS.length} packs <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+              </button>
+            )}
             <FreeFliesCard open={open} onMode={setFreeMode} />
+            {freeMode !== 'none' && !remaining && <PlusFliesCard />}
+          </div>
 
-            <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
-              Fly packs
-            </p>
-
-            {/* One shape for all six, so the only thing that differs between
-                them is the artwork and the number — which is what the shelf is
-                asking them to compare. Two up on a phone, three on a desktop:
-                every pack is auditable without hunting, and the scroll runs
-                along the sheet's long axis. */}
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {packs.map((pack, index) => (
-                <PackCard
-                  key={pack.id}
-                  pack={pack}
-                  bundle={index + 1}
-                  {...shared}
-                />
-              ))}
+          <div className="shrink-0 border-t border-border/60 bg-background px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+            <div aria-live="polite" className="mb-2 min-h-4 text-center text-xs font-semibold">
+              {status ? <span className={status.tone === 'error' ? 'text-destructive' : 'text-primary'}>{status.text}</span> : goalReached ? <span className="text-primary">You have enough for {target.name}</span> : remaining > 0 ? <span className="text-muted-foreground">{selected.amount >= remaining ? <><span className="font-black tabular-nums text-foreground">{(selected.amount - remaining).toLocaleString()}</span> flies left after your item</> : <>{(remaining - selected.amount).toLocaleString()} more still needed with this pack</>}</span> : <span className="text-muted-foreground">One-time purchase</span>}
             </div>
-
-            {/* The ad round opens the sheet; Plus closes it. Stacking both
-                above the shelf would put three competing calls to action in
-                front of the merchandise, so the upsell waits until they have
-                seen the prices it is measured against. */}
-            {freeMode !== 'none' && <PlusFliesCard />}
-
-            <p className="mx-auto mt-6 max-w-[17rem] text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
-              Built by a tiny team and one very hungry frog. Every pack keeps
-              Frogress hopping. 💚
-            </p>
+            <button type="button" onClick={goalReached ? () => setOpen(false) : () => void buy()} disabled={busy || (!goalReached && !priceFor(selected.id))} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-sm font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,opacity] active:translate-y-0.5 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+              {busy ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> {status?.text ?? 'Opening checkout…'}</> : goalReached ? 'Back to your item' : priceFor(selected.id) ? <>Get {selected.amount.toLocaleString()} flies <span className="opacity-60">·</span> {priceFor(selected.id)}</> : pricesLoading ? 'Loading prices…' : 'Packs unavailable'}
+            </button>
           </div>
         </>
       )}
@@ -326,283 +229,13 @@ export function CurrencyShop() {
   );
 }
 
-function PackStage({
-  bundle,
-  showArt,
-  fallback,
-  rays = false,
-  className,
-}: {
-  bundle: number;
-  showArt: boolean;
-  fallback: React.ReactNode;
-  rays?: boolean;
-  className?: string;
-}) {
-  const scene = TIER_SCENE[bundle - 1] ?? TIER_SCENE[0];
-  const grounded = bundle >= FIRST_GROUNDED_BUNDLE;
-  return (
-    <span
-      className={cn(
-        'relative flex items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-b ring-1 ring-inset ring-black/[0.07] dark:ring-white/[0.06]',
-        scene.sky,
-        className,
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute -top-1/4 left-1/2 h-[110%] w-[130%] -translate-x-1/2 rounded-full blur-2xl',
-          scene.sun,
-        )}
-      />
-      {rays && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[260%] w-[160%] -translate-x-1/2 -translate-y-1/2 animate-[spin_60s_linear_infinite] text-amber-500/20 will-change-transform dark:text-amber-300/15"
-          style={{
-            background:
-              'repeating-conic-gradient(from 0deg, transparent 0deg 13deg, currentColor 13deg 26deg)',
-            maskImage:
-              'radial-gradient(circle at center, black 10%, transparent 68%)',
-            WebkitMaskImage:
-              'radial-gradient(circle at center, black 10%, transparent 68%)',
-          }}
-        />
-      )}
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t to-transparent',
-          scene.water,
-        )}
-      />
-      {grounded && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute bottom-[13%] left-1/2 h-2 w-[42%] -translate-x-1/2 rounded-[50%] bg-black/20 blur-[5px] dark:bg-black/50"
-        />
-      )}
-      <span
-        className={cn(
-          'relative h-full w-full transition-opacity duration-300',
-          showArt ? 'opacity-100' : 'opacity-0',
-        )}
-      >
-        {showArt && (
-          <BundleArt bundle={bundle} className="h-full w-full" fallback={fallback} />
-        )}
-      </span>
-    </span>
-  );
-}
-
-function PackCard({
-  pack,
-  bundle,
-  coversId,
-  showArt,
-  onPurchased,
-}: {
-  pack: Pack;
-  bundle: number;
-  coversId: string | null;
-  showArt: boolean;
-  onPurchased: (report: (info: string) => void) => Promise<boolean>;
-}) {
-  const covers = pack.id === coversId;
-  const popular = !covers && pack.badge === 'popular';
-  const best = !covers && pack.badge === 'best';
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<{
-    text: string;
-    tone: 'muted' | 'success' | 'error';
-  } | null>(null);
-
-  const buy = async () => {
-    if (busy) return;
-    setBusy(true);
-    setStatus(null);
-    try {
-      const result = await purchaseFlyPack(pack.id as FlyPackId);
-      if (result === 'purchased') {
-        setStatus({ text: 'Adding flies…', tone: 'muted' });
-        const landed = await onPurchased(() => {});
-        if (landed) {
-          setStatus({
-            text: `+${pack.amount.toLocaleString()} flies added!`,
-            tone: 'success',
-          });
-          hapticSuccess();
-          confetti({
-            particleCount: 80,
-            spread: 80,
-            startVelocity: 36,
-            origin: { y: 0.45 },
-            zIndex: 99999,
-            colors: ['#4ade80', '#22c55e', '#fbbf24', '#bbf7d0'],
-          });
-          window.setTimeout(() => setStatus(null), 3000);
-        } else {
-          setStatus({
-            text: 'Still processing — flies will arrive shortly',
-            tone: 'muted',
-          });
-        }
-      }
-    } catch (error) {
-      setStatus({
-        text:
-          error instanceof Error && error.message.includes('not configured')
-            ? 'This pack isn’t available right now'
-            : 'Purchase didn’t go through — please try again',
-        tone: 'error',
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const flyCluster = (
-    <span className="flex h-full items-center justify-center">
-      {pack.flies.map((size, i) => (
-        <span
-          key={i}
-          className={cn(i > 0 && '-ml-2 sm:-ml-1.5')}
-          style={{ transform: `translateY(${i % 2 === 1 ? -8 : 0}px)` }}
-        >
-          <Fly size={size} y={-2} alwaysPlay />
-        </span>
-      ))}
-    </span>
-  );
-
-  // Artwork, amount and price are the only things drawn loud; the badge and
-  // the value chip stay deliberately small so six cards do not turn into
-  // twenty competing shouts.
-  return (
-    <button
-      type="button"
-      onClick={buy}
-      disabled={busy}
-      className={cn(
-        'group relative flex w-full flex-col gap-2 rounded-[22px] p-2.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-70',
-        covers || popular
-          ? 'bg-primary/[0.06] ring-2 ring-primary shadow-lg shadow-primary/15'
-          : best
-            ? 'bg-amber-400/[0.08] ring-2 ring-amber-400 shadow-lg shadow-amber-500/20'
-            : 'bg-card ring-1 ring-border/70 hover:ring-border',
-      )}
-    >
-      {(covers || popular || best) && (
-        <span
-          className={cn(
-            'absolute left-3 top-3 z-10 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black shadow-sm',
-            best
-              ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950'
-              : 'bg-primary text-primary-foreground',
-          )}
-        >
-          {covers ? '✓ Covers it' : popular ? '★ Popular' : '👑 Best value'}
-        </span>
-      )}
-
-      <PackStage
-        bundle={bundle}
-        showArt={showArt}
-        fallback={flyCluster}
-        rays={best}
-        className="h-24 w-full sm:h-28"
-      />
-
-      <span className="flex w-full flex-col items-start gap-1 px-0.5">
-        <span className="text-[11px] font-black leading-none text-muted-foreground">
-          {pack.name}
-        </span>
-        <span className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black leading-none tabular-nums text-foreground">
-              {pack.amount.toLocaleString()}
-            </span>
-            <span className="text-[11px] font-black text-muted-foreground">
-              Flies
-            </span>
-          </span>
-          {pack.bonusPercent > 0 && (
-            <span
-              className={cn(
-                'inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black leading-none',
-                best
-                  ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-              )}
-            >
-              +{pack.bonusPercent}% extra
-            </span>
-          )}
-        </span>
-        {status && (
-          <span
-            role="status"
-            className={cn(
-              'block text-[11px] font-black leading-tight',
-              status.tone === 'success'
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : status.tone === 'error'
-                  ? 'text-rose-600 dark:text-rose-400'
-                  : 'text-muted-foreground',
-            )}
-          >
-            {status.text}
-          </span>
-        )}
-      </span>
-
-      <span
-        className={cn(
-          'mt-auto flex h-11 w-full items-center justify-center rounded-2xl text-sm font-black tracking-wide text-white transition-all group-hover:-translate-y-0.5 group-active:translate-y-1 group-active:shadow-none',
-          best
-            ? 'bg-[#d99215] shadow-[0_4px_0_0_#96610a] group-hover:shadow-[0_5px_0_0_#96610a]'
-            : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] group-hover:shadow-[0_5px_0_0_#34631f]',
-        )}
-      >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
-      </span>
-    </button>
-  );
-}
-
 function PlusFliesCard() {
   const openPremium = useUIStore((s) => s.setPremiumModalOpen);
-  const open = () => openPremium(true, 'fly_shop_free_flies');
-
   return (
-    <button
-      type="button"
-      onClick={open}
-      className="group mt-5 flex w-full items-center gap-3 rounded-[22px] bg-[#6c6fce]/10 p-3 pl-2 text-left ring-1 ring-[#6c6fce]/30 transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:bg-[#6c6fce]/20"
-    >
-      <span className="-my-3 flex shrink-0 items-center">
-        <Icon
-          name="frogPlus"
-          label="Plus"
-          className="h-[64px] w-[64px] drop-shadow-[0_3px_5px_rgba(0,0,0,0.2)]"
-        />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="text-sm font-black tracking-tight text-foreground">
-            Or earn 2× flies with Plus
-          </span>
-        </span>
-        <span className="mt-0.5 block text-xs font-semibold text-muted-foreground">
-          Double flies from quests, streaks and leaps — every day, not just
-          once.
-        </span>
-      </span>
-      <span className="flex h-10 shrink-0 items-center rounded-xl bg-amber-500 px-3 text-xs font-black text-white shadow-[0_3px_0_0_#b45309] transition-all group-active:translate-y-0.5 group-active:shadow-none">
-        Get Plus
-      </span>
+    <button type="button" onClick={() => openPremium(true, 'fly_shop_free_flies')} className="mt-4 flex min-h-12 w-full items-center gap-2 rounded-2xl bg-primary/5 px-3 py-2 text-left transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <Icon name="frogPlus" label="Plus" className="h-9 w-9 shrink-0" />
+      <span className="flex-1 text-xs font-bold">Earn 2× flies with Plus</span>
+      <span className="text-xs font-black text-primary">Explore</span>
     </button>
   );
 }

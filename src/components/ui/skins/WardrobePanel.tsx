@@ -48,7 +48,8 @@ import { WishlistButton } from './WishlistButton';
 import { WishlistShelf } from './WishlistShelf';
 import { WishlistSheet } from './WishlistSheet';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
-import { LooksRow, SaveFitButton } from './LooksRow';
+import { SavedLooksButton } from './LooksRow';
+import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { WardrobeEmptyState } from './WardrobeEmptyState';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
@@ -1120,6 +1121,19 @@ function WardrobeManagerContent({
           onValueChange={setActiveTab}
           className={cn('flex flex-col', embedded ? 'flex-1' : 'h-full')}
         >
+          {embedded && !isGuest && activeTab === 'inventory' && data && (
+            <div className="relative z-50 h-0 shrink-0">
+              <div className="absolute right-0 top-[calc(80px+env(safe-area-inset-top))] md:top-6">
+                <SavedLooksButton
+                  enabled={open}
+                  equipped={data.wardrobe?.equipped}
+                  equippedBackgroundId={bg.equipped}
+                  onNotify={setNotif}
+                  onUpgrade={() => openPlus('wardrobe_looks')}
+                />
+              </div>
+            </div>
+          )}
           <div
             data-wardrobe-sticky
             className={cn(
@@ -1138,7 +1152,9 @@ function WardrobeManagerContent({
               <>
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 bottom-8 z-0 overflow-hidden"
+                  data-fly-page-bg
+                  style={backgroundFadeMaskStyle}
+                  className="pointer-events-none absolute left-[calc(50%-50vw)] top-0 bottom-0 z-0 w-screen overflow-hidden"
                 >
                   {stageBackground}
                 </div>
@@ -1204,6 +1220,15 @@ function WardrobeManagerContent({
 
               {!embedded && (
                 <div className="flex items-center gap-2">
+                  {!isGuest && data && (
+                    <SavedLooksButton
+                      enabled={open}
+                      equipped={data.wardrobe?.equipped}
+                      equippedBackgroundId={bg.equipped}
+                      onNotify={setNotif}
+                      onUpgrade={() => openPlus('wardrobe_looks')}
+                    />
+                  )}
                   {!isGuest && (
                     <WishlistButton
                       count={wishlistEntries.length}
@@ -1379,24 +1404,6 @@ function WardrobeManagerContent({
                         void removeFromWishlist(entry.view.itemId, entry.view.kind)
                       }
                       onSeeAll={openWishlist}
-                    />
-                  )}
-                  {!isGuest && (
-                    <LooksRow
-                      enabled={!isGuest}
-                      equipped={data.wardrobe?.equipped}
-                      equippedBackgroundId={bg.equipped}
-                      onNotify={setNotif}
-                      onUpgrade={() => openPlus('wardrobe_looks')}
-                      action={
-                        <SaveFitButton
-                          enabled={!isGuest}
-                          equipped={data.wardrobe?.equipped}
-                          equippedBackgroundId={bg.equipped}
-                          onNotify={setNotif}
-                          onUpgrade={() => openPlus('wardrobe_looks')}
-                        />
-                      }
                     />
                   )}
                   {!isGuest && (

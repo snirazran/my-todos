@@ -19,6 +19,7 @@ import {
 } from '@/lib/riveLoader';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
 import { cn } from '@/lib/utils';
+import { useReducedMotion } from 'framer-motion';
 
 const STATE_MACHINE = 'State Machine 1';
 const VIEW_MODEL = 'ViewModel1';
@@ -64,16 +65,46 @@ export function BundleArt({
   bundle,
   className,
   fallback = null,
+  animate = true,
 }: {
   /** 1-based pack position, mapped to the Bundle4…Bundle9 artboards. */
   bundle: number;
   className?: string;
   /** Rendered instead when the artboard is missing from the export. */
   fallback?: React.ReactNode;
+  animate?: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [ready, setReady] = useState(false);
+  const showAnimation = animate && !reduceMotion;
+  return (
+    <span aria-hidden="true" className={cn('relative block', className)}>
+      {/* A real frame is visible before the Rive runtime or file is ready. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/shop/fly-pack-${bundle}.webp`}
+        alt=""
+        width={512}
+        height={512}
+        draggable={false}
+        className={cn('absolute inset-0 h-full w-full object-contain', showAnimation && ready && 'invisible')}
+      />
+      {showAnimation && (
+        <AnimatedBundleArt bundle={bundle} fallback={fallback} onReady={setReady} />
+      )}
+    </span>
+  );
+}
+
+function AnimatedBundleArt({ bundle, fallback, onReady }: {
+  bundle: number;
+  fallback: React.ReactNode;
+  onReady: (ready: boolean) => void;
 }) {
   const [file, setFile] = useState<RiveFile | null>(() => getStoreBundleFile());
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [ready, setReady] = useState(false);
   const hostRef = useRef<HTMLSpanElement>(null);
   const idle = useRiveIdlePause((s) => s.idle);
   const active = visible && !idle;
@@ -125,6 +156,30 @@ export function BundleArt({
   flapRef.current = flap;
 
   useEffect(() => {
+    if (!rive || failed) return;
+    let frame = 0;
+    let attempts = 0;
+    // Runtime readiness precedes the first painted canvas. Keep the poster
+    // until the center of the container artwork actually has a rendered pixel.
+    const revealWhenPainted = () => {
+      const canvas = hostRef.current?.querySelector('canvas');
+      const context = canvas?.getContext('2d');
+      if (canvas && context && canvas.width > 0 && canvas.height > 0 &&
+        context.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height * 0.7), 1, 1).data[3] > 0) {
+        setReady(true);
+        onReady(true);
+      } else if (++attempts < 120) {
+        frame = requestAnimationFrame(revealWhenPainted);
+      }
+    };
+    frame = requestAnimationFrame(revealWhenPainted);
+    return () => {
+      cancelAnimationFrame(frame);
+      onReady(false);
+    };
+  }, [rive, failed, onReady]);
+
+  useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -150,7 +205,7 @@ export function BundleArt({
   if (failed) return <>{fallback}</>;
 
   return (
-    <span ref={hostRef} className={cn('block', className)}>
+    <span ref={hostRef} className={cn('absolute inset-0 block', ready ? 'opacity-100' : 'opacity-0')}>
       <RiveComponent className="h-full w-full" />
     </span>
   );

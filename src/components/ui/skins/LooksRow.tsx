@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { Bookmark, Check, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -9,6 +10,63 @@ import { Icon } from '@/components/ui/Icon';
 import { useLooks } from '@/hooks/useLooks';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import { LOOK_SLOTS, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
+import { CloseButton } from '@/components/ui/CloseButton';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { useWardrobeTryOn } from '@/lib/wardrobeTryOnStore';
+
+type LooksProps = {
+  enabled: boolean;
+  equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
+  equippedBackgroundId: string | null | undefined;
+  onNotify: (n: { msg: string; type: 'error' | 'success' }) => void;
+  onUpgrade: () => void;
+};
+
+export function SavedLooksButton(props: LooksProps) {
+  const [open, setOpen] = React.useState(false);
+  useRegisterOpenSheet(open);
+  const onUpgrade = () => {
+    setOpen(false);
+    props.onUpgrade();
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <button
+          type="button"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 text-xs font-bold text-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <Bookmark className="h-3.5 w-3.5 text-primary" />
+          Saved looks
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[1200] bg-black/30 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[1201] max-h-[80dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-3xl border border-border bg-background p-5 shadow-xl sm:p-6">
+          <CloseButton onClick={() => setOpen(false)} ariaLabel="Close saved looks" />
+          <Dialog.Title className="pr-10 text-xl font-black">Saved looks</Dialog.Title>
+          <Dialog.Description className="mt-1 pr-6 text-sm text-muted-foreground">
+            Keep your favorite outfits. Tap a look to wear it again.
+          </Dialog.Description>
+          <div className="mt-5">
+            <LooksRow
+              {...props}
+              onUpgrade={onUpgrade}
+              enabled={open && props.enabled}
+              inDialog
+              onApplied={() => {
+                useWardrobeTryOn.getState().setTryOn(null);
+                setOpen(false);
+              }}
+              action={<SaveFitButton {...props} onUpgrade={onUpgrade} enabled={open && props.enabled} />}
+            />
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
 
 export function SaveFitButton({
   enabled,
@@ -54,7 +112,7 @@ export function SaveFitButton({
       <button
         type="button"
         onClick={onUpgrade}
-        className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[12px] font-black tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+        className="ml-auto inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-100 px-3 text-[12px] font-black tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
       >
         <Icon name="frogPlus" label="Plus" className="h-3.5 w-3.5" />
         {SAVED_LOOKS_PLUS} look slots
@@ -71,7 +129,7 @@ export function SaveFitButton({
         if (result.ok) onNotify({ msg: 'Look saved!', type: 'success' });
         else if (result.error) onNotify({ msg: result.error, type: 'error' });
       }}
-      className="ml-auto inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[12px] font-black tracking-wide text-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+      className="ml-auto inline-flex min-h-9 items-center gap-1 rounded-full bg-primary/10 px-3 text-[12px] font-black tracking-wide text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
     >
       <Plus className="h-3 w-3" strokeWidth={3} />
       Save fit
@@ -93,13 +151,12 @@ export function LooksRow({
   onNotify,
   onUpgrade,
   action,
-}: {
-  enabled: boolean;
-  equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
-  equippedBackgroundId: string | null | undefined;
-  onNotify: (n: { msg: string; type: 'error' | 'success' }) => void;
-  onUpgrade: () => void;
+  inDialog = false,
+  onApplied,
+}: LooksProps & {
   action?: React.ReactNode;
+  inDialog?: boolean;
+  onApplied?: () => void;
 }) {
   const { looks, max, isPremium, isFull, busy, apply, remove } =
     useLooks(enabled);
@@ -126,7 +183,7 @@ export function LooksRow({
     return (
       <div className="pb-3">
         <div className="flex items-center gap-2 px-1">
-          <p className="text-[13px] font-black text-foreground">Saved looks</p>
+          <p className="text-[13px] font-black text-foreground">{inDialog ? 'Your first look' : 'Saved looks'}</p>
           {action}
         </div>
         <p className="mt-0.5 px-1 text-[12px] font-semibold text-muted-foreground">
@@ -137,20 +194,24 @@ export function LooksRow({
   }
 
   const handleApply = async (lookId: string, name: string) => {
-    if (lookId === wearingId) return;
+    if (lookId === wearingId) {
+      onApplied?.();
+      return;
+    }
     const ok = await apply(lookId);
     onNotify(
       ok
         ? { msg: `Wearing ${name}`, type: 'success' }
         : { msg: 'Could not wear that look.', type: 'error' },
     );
+    if (ok) onApplied?.();
   };
 
   return (
     <div className="pb-2">
       <div className="mb-2 flex items-center gap-2 px-1">
         <p className="text-[13px] font-black text-foreground">
-          Saved looks
+          {inDialog ? 'Your outfits' : 'Saved looks'}
         </p>
         <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
           {looks.length}/{max}
@@ -160,7 +221,7 @@ export function LooksRow({
           type="button"
           onClick={() => setRemoving((v) => !v)}
           className={cn(
-            'rounded-full px-2 py-0.5 text-[12px] font-black tracking-wide transition-colors',
+            'min-h-9 rounded-full px-2 text-[12px] font-black tracking-wide transition-colors',
             !action && 'ml-auto',
             removing
               ? 'bg-primary/10 text-primary'
@@ -171,7 +232,7 @@ export function LooksRow({
         </button>
       </div>
 
-      <DragScrollRow>
+      <LooksLayout grid={inDialog}>
         {looks.map((look) => {
           const isWearing = look.id === wearingId;
           return (
@@ -183,7 +244,8 @@ export function LooksRow({
                 title={look.name}
                 aria-label={`Wear ${look.name}`}
                 className={cn(
-                  'relative flex h-[104px] w-[84px] items-end justify-center overflow-hidden rounded-xl border-2 bg-muted/40 transition-transform active:scale-[0.97] disabled:opacity-90',
+                  'relative flex items-end justify-center overflow-hidden rounded-xl border-2 bg-muted/40 transition-transform active:scale-[0.97] disabled:opacity-90',
+                  inDialog ? 'aspect-square w-full' : 'h-[104px] w-[84px]',
                   isWearing ? 'border-[#4f9149]' : 'border-border/50',
                 )}
               >
@@ -199,8 +261,8 @@ export function LooksRow({
                 <FrogSnapshot
                   className="relative"
                   indices={look.indices}
-                  width={120}
-                  height={120}
+                  width={inDialog ? '124%' : 120}
+                  height={inDialog ? '124%' : 120}
                 />
                 {isWearing && !removing && (
                   <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[#4f9149] text-white shadow-sm">
@@ -208,6 +270,11 @@ export function LooksRow({
                   </span>
                 )}
               </button>
+              {inDialog && (
+                <p className="mt-1.5 truncate text-center text-xs font-bold text-muted-foreground">
+                  {isWearing ? 'Wearing' : look.name}
+                </p>
+              )}
 
               {removing && (
                 <button
@@ -229,7 +296,7 @@ export function LooksRow({
           <button
             type="button"
             onClick={onUpgrade}
-            className="flex h-[104px] w-[84px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/60 bg-amber-50 px-1 text-center text-amber-700 transition-transform active:scale-[0.97] dark:bg-amber-950/30 dark:text-amber-400"
+            className={cn('flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/60 bg-amber-50 px-1 text-center text-amber-700 transition-transform active:scale-[0.97] dark:bg-amber-950/30 dark:text-amber-400', inDialog ? 'aspect-square w-full' : 'h-[104px] w-[84px]')}
           >
             <Icon name="frogPlus" label="Plus" className="h-8 w-8" />
             <span className="text-[9px] font-black leading-tight">
@@ -239,7 +306,15 @@ export function LooksRow({
             </span>
           </button>
         )}
-      </DragScrollRow>
+      </LooksLayout>
     </div>
+  );
+}
+
+function LooksLayout({ grid, children }: { grid: boolean; children: React.ReactNode }) {
+  return grid ? (
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">{children}</div>
+  ) : (
+    <DragScrollRow>{children}</DragScrollRow>
   );
 }
