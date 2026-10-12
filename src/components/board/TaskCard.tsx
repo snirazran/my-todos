@@ -4,15 +4,10 @@ import React, { useRef, useCallback, useEffect } from 'react';
 import {
   CheckCircle2,
   Plus,
-  CalendarDays,
   EllipsisVertical,
-  Pen,
-  ListChecks,
-  Flame,
   Check,
 } from 'lucide-react';
-import { Icon } from '@/components/ui/Icon';
-import { TimeTag } from '@/components/ui/TimeTag';
+import { TaskMeta } from '@/components/ui/TaskMeta';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
@@ -376,8 +371,6 @@ export default function TaskCard({
     [innerRef],
   );
 
-  const hasMeta =
-    (task.tags && task.tags.length > 0) || task.startTime || task.reminder;
   const projectedStreak =
     isToday && isRepeating
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
@@ -498,68 +491,11 @@ export default function TaskCard({
         <div
           className={`flex-1 min-w-0 flex flex-col ${task.completed ? 'opacity-60' : ''}`}
         >
-          {hasMeta && (
-            <div
-              className={
-                compact
-                  ? 'mb-1 flex flex-wrap items-center gap-1'
-                  : 'mb-2 flex flex-wrap items-center gap-1.5'
-              }
-            >
-              <>
-                {task.startTime && (
-                  <TimeTag
-                    startTime={task.startTime}
-                    endTime={task.endTime}
-                    reminder={task.reminder}
-                    size="md"
-                    className="isolate"
-                  />
-                )}
-                {task.tags?.map((tagId) => {
-                  const tagDetails = getTagDetails(tagId);
-                  if (!tagDetails) return null;
-
-                  const color = tagDetails.color;
-                  const name = tagDetails.name;
-
-                  return (
-                    <span
-                      key={tagId}
-                      className="isolate inline-flex items-center gap-1 rounded-md border px-1.5 py-[4px] text-[12px] leading-[1] font-bold tracking-normal shadow-sm"
-                      style={
-                        color
-                          ? {
-                              backgroundColor: `${color}20`,
-                              color: color,
-                              borderColor: `${color}40`,
-                            }
-                          : undefined
-                      }
-                    >
-                      {!color && (
-                        <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50 pointer-events-none" />
-                      )}
-                      <span
-                        className={
-                          !color
-                            ? 'text-indigo-600 dark:text-indigo-200 z-10 relative'
-                            : ''
-                        }
-                      >
-                        {name}
-                      </span>
-                    </span>
-                  );
-                })}
-              </>
-            </div>
-          )}
           <div
             className={`whitespace-pre-wrap break-words transition-colors ${
               compact
                 ? 'text-sm font-semibold leading-snug'
-                : 'text-[15px] font-medium leading-[1.4]'
+                : 'text-[15px] font-semibold leading-[1.4]'
             } ${
               task.completed ? 'text-muted-foreground' : 'text-foreground'
             }`}
@@ -577,57 +513,31 @@ export default function TaskCard({
                   Practice
                 </span>
               )}
-              {isRepeating && (
-                <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
-              )}
-              {showStreak && isRepeating && (task.streak ?? 0) > 0 && (
-                <span
-                  className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500 no-underline"
-                  title={`${task.streak} in a row`}
-                >
-                  <Flame className="h-4 w-4" fill="currentColor" />
-                  <span className="text-[12px] font-black tabular-nums leading-none">
-                    ×{task.streak}
-                  </span>
-                </span>
-              )}
               <BuddyBadge taskId={task.id} date={occurrenceDate} />
-              {task.calendarEventId && (
-                <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-              )}
-              {(task.notes?.trim() ||
-                (task.checklist && task.checklist.length > 0)) && (
-                <span className="inline-flex flex-shrink-0 items-center gap-1.5 no-underline">
-                  {task.notes?.trim() && (
-                    <Pen
-                      aria-label="Has notes"
-                      className="h-4 w-4 text-muted-foreground/70"
-                    />
-                  )}
-                  {task.checklist &&
-                    task.checklist.length > 0 &&
-                    (() => {
-                      const done = task.checklist.filter((c) => c.done).length;
-                      const total = task.checklist.length;
-                      return (
-                        <span
-                          className={`inline-flex items-center gap-1 ${
-                            done === total
-                              ? 'text-primary'
-                              : 'text-muted-foreground/70'
-                          }`}
-                        >
-                          <ListChecks className="h-4 w-4" />
-                          <span className="text-[11px] font-bold tabular-nums no-underline">
-                            {done}/{total}
-                          </span>
-                        </span>
-                      );
-                    })()}
-                </span>
-              )}
             </div>
           </div>
+          <TaskMeta
+            compact={compact}
+            className={compact ? 'mt-0.5' : 'mt-1'}
+            startTime={task.startTime}
+            endTime={task.endTime}
+            reminder={task.reminder}
+            tags={(task.tags ?? [])
+              .map((tagId) => getTagDetails(tagId))
+              .filter((tag): tag is NonNullable<typeof tag> => !!tag)}
+            streak={showStreak && isRepeating ? task.streak : 0}
+            calendarEventId={task.calendarEventId}
+            hasNotes={!!task.notes?.trim()}
+            checklist={
+              task.checklist?.length
+                ? {
+                    done: task.checklist.filter((c) => c.done).length,
+                    total: task.checklist.length,
+                  }
+                : null
+            }
+            isDone={task.completed}
+          />
 
           {task.frogodoroSession && ((task.frogodoroSession.focusTime ?? 0) > 0 || (task.frogodoroSession.breakTime ?? 0) > 0) && (
             <div className="flex flex-wrap items-center gap-1 mt-0.5">

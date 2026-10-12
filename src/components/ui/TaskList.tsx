@@ -6,13 +6,8 @@ import {
   CalendarCheck,
   CalendarClock,
   Filter,
-  CalendarDays,
   Pencil,
   Plus,
-  Flame,
-  Bell,
-  Clock,
-  StickyNote,
   ListChecks,
   EyeOff,
   Eye,
@@ -20,6 +15,7 @@ import {
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
+import { TaskMeta } from '@/components/ui/TaskMeta';
 import {
   hapticGrab,
   hapticImpact,
@@ -270,84 +266,9 @@ const SortableTaskItem = React.forwardRef<
       [checklist],
     );
 
-    const metaItems: { key: string; node: React.ReactNode }[] = [];
-    if (task.startTime) {
-      const TimeIcon = task.reminder ? Bell : Clock;
-      metaItems.push({
-        key: 'time',
-        node: (
-          <span
-            className={`inline-flex items-center gap-1 tabular-nums ${
-              isNextTimed && !isDone ? 'text-primary' : ''
-            }`}
-          >
-            {isNextTimed && !isDone ? (
-              <span className="mr-0.5 text-[11px] font-black uppercase tracking-wide md:text-[12px]">
-                Next
-              </span>
-            ) : (
-              <TimeIcon className="h-3 w-3 flex-shrink-0 md:h-3.5 md:w-3.5" />
-            )}
-            {task.endTime && task.endTime !== task.startTime
-              ? `${task.startTime}–${task.endTime}`
-              : task.startTime}
-          </span>
-        ),
-      });
-    }
-    for (const tagId of task.tags ?? []) {
-      const tag = getTagDetails(tagId);
-      if (!tag) continue;
-      metaItems.push({
-        key: `tag-${tagId}`,
-        node: (
-          <span className="inline-flex min-w-0 items-center gap-1">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 flex-shrink-0 rounded-full"
-              style={{ backgroundColor: tag.color || '#6366f1' }}
-            />
-            <span className="truncate">{tag.name}</span>
-          </span>
-        ),
-      });
-    }
-    if (isWeekly && (task.streak ?? 0) > 0) {
-      metaItems.push({
-        key: 'streak',
-        node: (
-          <span
-            className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500"
-            title={
-              isDone
-                ? `${task.streak} in a row`
-                : `${task.streak} in a row — finish today to keep it`
-            }
-          >
-            <Flame className="h-3.5 w-3.5" fill="currentColor" />
-            <span className="font-black tabular-nums">{task.streak}</span>
-          </span>
-        ),
-      });
-    }
-    if (task.calendarEventId || task.notes?.trim()) {
-      metaItems.push({
-        key: 'icons',
-        node: (
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground/70">
-            {task.calendarEventId && (
-              <CalendarDays
-                aria-label="From your calendar"
-                className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
-              />
-            )}
-            {task.notes?.trim() && (
-              <StickyNote aria-label="Has notes" className="h-3.5 w-3.5" />
-            )}
-          </span>
-        ),
-      });
-    }
+    const metaTags = (task.tags ?? [])
+      .map((tagId) => getTagDetails(tagId))
+      .filter((tag): tag is NonNullable<typeof tag> => !!tag);
 
     /* Swipe Logic */
     const [openSide, setOpenSide] = useState<'timer' | 'secondary' | null>(null);
@@ -1037,20 +958,18 @@ const SortableTaskItem = React.forwardRef<
                   />
                 </span>
 
-                {metaItems.length > 0 && (
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] font-semibold leading-5 text-muted-foreground md:text-[13px]">
-                    {metaItems.map((item, i) => (
-                      <React.Fragment key={item.key}>
-                        {i > 0 && (
-                          <span aria-hidden="true" className="text-muted-foreground/40">
-                            ·
-                          </span>
-                        )}
-                        {item.node}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
+                <TaskMeta
+                  className="mt-0.5"
+                  startTime={task.startTime}
+                  endTime={task.endTime}
+                  reminder={task.reminder}
+                  tags={metaTags}
+                  streak={isWeekly ? task.streak : 0}
+                  calendarEventId={task.calendarEventId}
+                  hasNotes={!!task.notes?.trim()}
+                  isNext={isNextTimed}
+                  isDone={isDone}
+                />
 
                 {checklist.length > 0 && (
                   <StepsStrip

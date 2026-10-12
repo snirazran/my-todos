@@ -1,14 +1,8 @@
 'use client';
 import { motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
-import { Icon } from '@/components/ui/Icon';
-import {
-  CalendarDays,
-  EllipsisVertical,
-  Pen,
-  ListChecks,
-} from 'lucide-react';
-import { TimeTag } from '@/components/ui/TimeTag';
+import { EllipsisVertical } from 'lucide-react';
+import { TaskMeta } from '@/components/ui/TaskMeta';
 
 export default function DragOverlay({
   x,
@@ -121,79 +115,27 @@ export default function DragOverlay({
           <EllipsisVertical className="h-4 w-4" />
         </span>
         <div className="flex-1 min-w-0 flex flex-col">
-          {(tags && tags.length > 0 || startTime || reminder) && (
-            <div className="mb-1 flex flex-wrap items-center gap-1">
-              {startTime && (
-                <TimeTag
-                  startTime={startTime}
-                  endTime={endTime}
-                  reminder={reminder}
-                  size="md"
-                  className="isolate"
-                />
-              )}
-              {tags?.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="isolate inline-flex items-center gap-1 rounded-md border px-1.5 py-[4px] text-[12px] leading-[1] font-bold tracking-normal shadow-sm"
-                  style={
-                    tag.color
-                      ? {
-                          backgroundColor: `${tag.color}20`,
-                          color: tag.color,
-                          borderColor: `${tag.color}40`,
-                        }
-                      : undefined
-                  }
-                >
-                  <span className="relative z-10">{tag.name}</span>
-                </span>
-              ))}
-            </div>
-          )}
           <div className="text-sm font-semibold leading-snug text-foreground whitespace-pre-wrap break-words">
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className="min-w-0 whitespace-pre-wrap break-words">
-                {text}
-              </span>
-              {taskType === 'weekly' && (
-                <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
-              )}
-              {calendarEventId && (
-                <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-              )}
-              {(notes?.trim() || (checklist && checklist.length > 0)) && (
-                <span className="inline-flex flex-shrink-0 items-center gap-1.5 no-underline">
-                  {notes?.trim() && (
-                    <Pen
-                      aria-label="Has notes"
-                      className="h-4 w-4 text-muted-foreground/70"
-                    />
-                  )}
-                  {checklist &&
-                    checklist.length > 0 &&
-                    (() => {
-                      const done = checklist.filter((c) => c.done).length;
-                      const total = checklist.length;
-                      return (
-                        <span
-                          className={`inline-flex items-center gap-1 ${
-                            done === total
-                              ? 'text-primary'
-                              : 'text-muted-foreground/70'
-                          }`}
-                        >
-                          <ListChecks className="h-4 w-4" />
-                          <span className="text-[11px] font-bold tabular-nums no-underline">
-                            {done}/{total}
-                          </span>
-                        </span>
-                      );
-                    })()}
-                </span>
-              )}
-            </div>
+            {text}
           </div>
+          <TaskMeta
+            compact
+            className="mt-0.5"
+            startTime={startTime}
+            endTime={endTime}
+            reminder={reminder}
+            tags={tags}
+            calendarEventId={calendarEventId}
+            hasNotes={!!notes?.trim()}
+            checklist={
+              checklist?.length
+                ? {
+                    done: checklist.filter((c) => c.done).length,
+                    total: checklist.length,
+                  }
+                : null
+            }
+          />
           {frogodoroSession && ((frogodoroSession.focusTime ?? 0) > 0 || (frogodoroSession.breakTime ?? 0) > 0) && (() => {
             const fmt = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; };
             return (
