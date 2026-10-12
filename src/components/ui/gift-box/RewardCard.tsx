@@ -1,5 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion, Variants } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useReducedMotion,
+  Variants,
+} from 'framer-motion';
 import { ChevronRight, Loader2, Crown } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { Icon } from '@/components/ui/Icon';
@@ -8,6 +14,13 @@ import { takePlusOfferAfterAd } from '@/lib/ads';
 import { useRewardGate } from '@/hooks/useRewardGate';
 import { ItemDef } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
+import {
+  canFlyToInventory,
+  flyFliesToCounter,
+  flyItemToInventory,
+  holdFlyCounter,
+} from '@/lib/flyFlight';
+import { requestFrogStamp } from '@/lib/frogStampEngine';
 import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
 import { GiftRive } from './GiftBox';
@@ -36,6 +49,7 @@ type RewardCardProps = {
   doublePlacement?: string;
   upsell?: React.ReactNode;
   paused?: boolean;
+  flyCollectAmount?: number;
 };
 
 const GLOW_COLORS = {
@@ -75,7 +89,9 @@ export function GoldenRewardButton({
 export function PlusOfferButton({
   mode,
   visual,
+  badge,
   title,
+  anchor,
   busyLabel,
   busy,
   disabled,
@@ -83,20 +99,52 @@ export function PlusOfferButton({
 }: {
   mode: 'ad' | 'plus';
   visual: React.ReactNode;
-  title: string;
+  badge?: string;
+  title?: string;
+  anchor?: { from: number; to: number; unit: string; ready: boolean };
   busyLabel?: string;
   busy?: boolean;
   disabled?: boolean;
   onClick?: () => void;
 }) {
   const plus = mode === 'plus';
+  const reduceMotion = useReducedMotion();
+  const [shown, setShown] = useState(anchor?.from ?? 0);
+  const [landed, setLanded] = useState(false);
+  const anchorFrom = anchor?.from;
+  const anchorTo = anchor?.to;
+  const anchorReady = anchor?.ready ?? false;
+
+  useEffect(() => {
+    if (anchorFrom === undefined || anchorTo === undefined || !anchorReady) return;
+    if (reduceMotion) {
+      setShown(anchorTo);
+      setLanded(true);
+      return;
+    }
+    const controls = animate(anchorFrom, anchorTo, {
+      duration: 0.75,
+      delay: 0.3,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (value) => setShown(Math.round(value)),
+      onComplete: () => setLanded(true),
+    });
+    return () => controls.stop();
+  }, [anchorFrom, anchorTo, anchorReady, reduceMotion]);
+
+  const subline = plus ? 'Free with Plus trial' : 'Watch a short ad';
+  const label = anchor
+    ? `Get ${anchor.to} ${anchor.unit} instead of ${anchor.from}. ${subline}`
+    : `${title ?? ''}. ${subline}`;
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || busy}
+      aria-label={label}
       className={cn(
-        'group relative flex w-full items-center gap-3 rounded-2xl py-2.5 pl-2.5 pr-3 text-left transition-all active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-70',
+        'group relative flex w-full items-center gap-3 rounded-2xl py-2.5 pl-2.5 pr-3 text-left transition-[transform,box-shadow] duration-100 active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-70',
         plus
           ? 'bg-[linear-gradient(135deg,#2f7d50_0%,#1d5a3f_55%,#123a2a_100%)] text-white shadow-[0_4px_0_0_#0b271c,0_14px_28px_-10px_rgba(251,191,36,0.45)] ring-1 ring-inset ring-[#fbbf24]/50 active:shadow-[0_1px_0_0_#0b271c]'
           : 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-white shadow-[0_4px_0_0_#b45309,0_14px_28px_-10px_rgba(245,158,11,0.5)] active:shadow-[0_1px_0_0_#b45309]',
@@ -108,41 +156,78 @@ export function PlusOfferButton({
       >
         <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shine" />
       </span>
-      <span
-        className={cn(
-          'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl',
-          plus ? 'bg-white/10 ring-1 ring-inset ring-white/15' : 'bg-white/20',
-        )}
-      >
-        {visual}
-      </span>
-      <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate whitespace-nowrap text-[17px] font-black tracking-tight">
-          {busy ? busyLabel ?? 'Loading...' : title}
+
+      <span aria-hidden className="relative h-12 w-12 shrink-0">
+        <span className="grid h-full w-full place-items-center rounded-full bg-[#fff8dc] text-amber-900 shadow-[inset_0_-3px_0_rgba(180,83,9,0.22),0_2px_6px_rgba(0,0,0,0.25)] ring-2 ring-[#fbbf24]">
+          {visual}
         </span>
+        {badge && (
+          <motion.span
+            initial={false}
+            animate={landed ? { scale: [1, 1.35, 1], rotate: [-12, 6, -8] } : { scale: 1, rotate: -8 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="absolute -bottom-1 -right-2 rounded-lg bg-gradient-to-b from-amber-300 to-amber-500 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-950 shadow-[inset_0_-2px_0_rgba(146,64,14,0.45),0_2px_4px_rgba(0,0,0,0.3)]"
+          >
+            {badge}
+          </motion.span>
+        )}
+      </span>
+
+      <span aria-hidden className="relative flex min-w-0 flex-1 flex-col leading-tight">
+        {busy ? (
+          <span className="truncate text-[17px] font-black tracking-tight">
+            {busyLabel ?? 'Loading...'}
+          </span>
+        ) : anchor ? (
+          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span
+              className={cn(
+                'text-[14px] font-black tabular-nums line-through decoration-2',
+                plus ? 'text-white/50 decoration-[#fde68a]/80' : 'text-white/70 decoration-white/80',
+              )}
+            >
+              {anchor.from}
+            </span>
+            <motion.span
+              initial={false}
+              animate={landed ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className={cn(
+                'origin-left text-[24px] font-black tabular-nums leading-none tracking-tight',
+                plus && 'text-[#fde68a]',
+              )}
+            >
+              {shown}
+            </motion.span>
+            <span className="text-[14px] font-black">{anchor.unit}</span>
+          </span>
+        ) : (
+          <span className="truncate whitespace-nowrap text-[17px] font-black tracking-tight">
+            {title}
+          </span>
+        )}
         <span
           className={cn(
-            'mt-0.5 flex items-center gap-1 text-[12px] font-bold',
-            plus ? 'text-[#fde68a]' : 'text-white/90',
+            'mt-1 flex items-center gap-1 text-[12px] font-bold',
+            plus ? 'text-white/85' : 'text-white/90',
           )}
         >
           {plus ? (
-            <>
-              <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
-              Free with Plus trial
-            </>
+            <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
           ) : (
-            <>
-              <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
-              Watch a short ad
-            </>
+            <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
           )}
+          {subline}
         </span>
       </span>
+
       <span
+        aria-hidden
         className={cn(
-          'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          plus ? 'bg-[#fbbf24] text-[#3b2708]' : 'bg-white/25 text-white',
+          'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform duration-150 group-hover:translate-x-0.5',
+          plus
+            ? 'bg-[#fbbf24] text-[#3b2708] shadow-[inset_0_-2px_0_rgba(146,64,14,0.35)]'
+            : 'bg-white/25 text-white',
         )}
       >
         {busy ? (
@@ -155,11 +240,10 @@ export function PlusOfferButton({
   );
 }
 
-export function DoubleCoin() {
+function FlyGlyph() {
   return (
-    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-b from-amber-300 to-amber-500 text-[13px] font-black text-amber-950 shadow-[inset_0_-2px_0_rgba(146,64,14,0.45),0_2px_6px_rgba(0,0,0,0.25)]">
-      x2
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/widgets/Fly.svg" alt="" className="h-6 w-6" />
   );
 }
 
@@ -181,9 +265,17 @@ export const RewardCard = ({
   doublePlacement = 'double_reward',
   upsell,
   paused = false,
+  flyCollectAmount,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
+  const [launched, setLaunched] = useState(false);
+  const artRef = useRef<HTMLDivElement | null>(null);
+  const stampRef = useRef<HTMLCanvasElement | null>(null);
+  const releaseHoldRef = useRef<(() => void) | null>(null);
+  const collectsFlies = !!flyCollectAmount && flyCollectAmount > 0;
+  const itemFlight =
+    !customPreview && !(flyCollectAmount && flyCollectAmount > 0) && prize.slot !== 'container';
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
   const isSpare = !quantity && !!spareCount && spareCount > 1;
@@ -195,8 +287,65 @@ export const RewardCard = ({
     }
   }, [claiming]);
 
+  useEffect(() => {
+    if (!showContent || !itemFlight || prize.kind === 'background') return;
+    const canvas = document.createElement('canvas');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(120 * dpr);
+    canvas.height = Math.round(135 * dpr);
+    stampRef.current = canvas;
+    return requestFrogStamp(canvas, {
+      skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+      hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+      body: prize.slot === 'body' ? prize.riveIndex : 0,
+      hand_item: prize.slot === 'hand_item' ? prize.riveIndex : 0,
+    });
+  }, [showContent, itemFlight, prize.kind, prize.slot, prize.riveIndex]);
+
+  useEffect(() => {
+    if (!collectsFlies) return;
+    const release = holdFlyCounter();
+    releaseHoldRef.current = release;
+    return () => {
+      window.setTimeout(release, 1500);
+    };
+  }, [collectsFlies]);
+
+  const launchCollect = () => {
+    const from = artRef.current?.getBoundingClientRect();
+    if (!from || launched) return;
+    if (flyCollectAmount && flyCollectAmount > 0) {
+      setLaunched(true);
+      const release = releaseHoldRef.current;
+      flyFliesToCounter({
+        from,
+        count: flyCollectAmount,
+        onFirstLand: () => release?.(),
+      });
+      return;
+    }
+    if (!itemFlight || !canFlyToInventory()) return;
+    const visual = document.createElement('div');
+    if (prize.kind === 'background' && prize.imageUrl) {
+      const image = document.createElement('img');
+      image.src = prize.imageUrl;
+      image.alt = '';
+      image.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+      visual.appendChild(image);
+    } else if (stampRef.current) {
+      const canvas = stampRef.current;
+      canvas.style.cssText = 'position:absolute;left:0;top:4%;width:100%;height:112.5%;display:block';
+      visual.appendChild(canvas);
+    } else {
+      return;
+    }
+    setLaunched(true);
+    flyItemToInventory({ from, visual, rarity: prize.rarity });
+  };
+
   const handleClaimClick = () => {
     setLocalClaiming(true);
+    launchCollect();
     setTimeout(() => {
       onClaim();
     }, 200);
@@ -367,7 +516,13 @@ export const RewardCard = ({
               </div>
 
               {/* === LAYER 2: ACTUAL CONTENT (Bottom Aligned for Gift, Centered for Frog) === */}
-              <div className="absolute inset-0 z-30 flex justify-center pointer-events-none">
+              <div
+                ref={artRef}
+                className={cn(
+                  'absolute inset-0 z-30 flex justify-center pointer-events-none transition-opacity duration-150',
+                  launched && 'opacity-0',
+                )}
+              >
                 {showContent && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -458,8 +613,14 @@ export const RewardCard = ({
         {showDoubleUpsell && (
           <PlusOfferButton
             mode={canWatchAd ? 'ad' : 'plus'}
-            visual={<DoubleCoin />}
-            title={rewardAmount ? `Claim ${rewardAmount * 2} instead` : 'Double your reward'}
+            visual={<FlyGlyph />}
+            badge="×2"
+            title="Double your reward"
+            anchor={
+              rewardAmount
+                ? { from: rewardAmount, to: rewardAmount * 2, unit: 'flies', ready: showContent }
+                : undefined
+            }
             busy={watchingAd}
             busyLabel={canWatchAd ? 'Loading ad...' : 'Claiming...'}
             disabled={isProcessing || !showContent}

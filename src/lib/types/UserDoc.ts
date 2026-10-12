@@ -90,6 +90,7 @@ export type UserWardrobe = {
   wishlistItems?: WishlistPin[];
   /** Daily-deal rerolls spent today (Plus perk). */
   dealReroll?: DealReroll | null;
+  shopGift?: { dayKey: string; amount: number; lucky?: boolean; at?: Date | string };
   /** Outfits the user saved so a good combination isn't lost to a shuffle. */
   looks?: SavedLook[];
   /** Pebbles earned past the day's paying completions, and the gifts they buy. */
@@ -150,6 +151,7 @@ export type UserDoc = {
   passwordHash?: string;
   phoneNumber?: string;
   isGuest?: boolean;
+  excludeFromStats?: boolean;
   friendCode?: string;
   /** Legacy permanent dismissals — still honoured, no longer written to. */
   suggestionsDismissed?: string[];

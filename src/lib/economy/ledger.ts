@@ -20,6 +20,7 @@ export const FLY_SOURCES = [
   'invite',
   'rewarded_ad',
   'fly_game',
+  'shop_gift',
   'cross_gift',
   'campaign',
   'admin',

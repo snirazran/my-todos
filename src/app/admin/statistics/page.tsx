@@ -348,7 +348,7 @@ function StatisticsPageContent() {
                       Search, filter, and sort individual accounts. Click anyone to see where they came from and every step they took.
                     </p>
                   </header>
-                  <UsersExplorer range={range} onOpenUser={setJourneyUser} />
+                  <UsersExplorer range={range} onOpenUser={setJourneyUser} reloadKey={reloadKey} />
                 </div>
               ) : null}
               {view === 'reference' ? <Reference data={data} base={exportBase} /> : null}
@@ -373,7 +373,11 @@ function StatisticsPageContent() {
         </main>
       </div>
 
-      <JourneyDrawer userId={journeyUser} onClose={() => setJourneyUser(null)} />
+      <JourneyDrawer
+        userId={journeyUser}
+        onClose={() => setJourneyUser(null)}
+        onExclusionChange={reload}
+      />
     </div>
   );
 }

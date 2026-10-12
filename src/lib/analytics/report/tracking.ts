@@ -1,4 +1,4 @@
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import { StatsEventModel as AnalyticsEventModel } from '@/lib/analytics/statsExclusion';
 import { ANALYTICS_EVENTS, analyticsCategory } from '@/lib/analytics/events';
 import { EVENT_EMIT_SITES, WIRED_EVENTS } from '@/lib/generated/analyticsManifest';
 import type { StatSection } from '@/lib/analytics/catalog';

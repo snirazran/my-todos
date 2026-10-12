@@ -162,6 +162,17 @@ body:has([data-public-home]) #main-scroll {
     opacity: 1;
   }
 }
+html.dark {
+  --toast-surface: hsl(150 13% 17%);
+}
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
 @keyframes bar-shine {
   0% {
     transform: translateX(-130%) skewX(-14deg);
@@ -501,6 +512,9 @@ body:has([data-public-home]) #main-scroll {
    the class and everything resumes mid-cycle. */
 .app-idle .animate-shimmer,
 .app-idle .animate-shine,
+.app-idle .gift-rays,
+.app-idle .gift-float,
+.app-idle .gift-badge-wiggle,
 .app-idle .plus-name-shimmer,
 .app-idle .claim-wobble,
 .app-idle .animate-ping-ring,
@@ -677,6 +691,132 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-wiggle {
+    animation: none;
+  }
+}
+
+@keyframes settings-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.settings-stagger > * {
+  animation: settings-rise 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.settings-stagger > :nth-child(1) {
+  animation-delay: 55ms;
+}
+.settings-stagger > :nth-child(2) {
+  animation-delay: 90ms;
+}
+.settings-stagger > :nth-child(3) {
+  animation-delay: 125ms;
+}
+.settings-stagger > :nth-child(4) {
+  animation-delay: 160ms;
+}
+.settings-stagger > :nth-child(5) {
+  animation-delay: 195ms;
+}
+.settings-stagger > :nth-child(6) {
+  animation-delay: 230ms;
+}
+.settings-stagger > :nth-child(7) {
+  animation-delay: 265ms;
+}
+.settings-stagger > :nth-child(8) {
+  animation-delay: 300ms;
+}
+.settings-stagger > :nth-child(9) {
+  animation-delay: 335ms;
+}
+.settings-stagger > :nth-child(10) {
+  animation-delay: 370ms;
+}
+.settings-stagger > :nth-child(11) {
+  animation-delay: 405ms;
+}
+.settings-stagger > :nth-child(12) {
+  animation-delay: 440ms;
+}
+
+.ease-spring {
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes gift-rays-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gift-rays {
+  animation: gift-rays-spin 16s linear infinite;
+}
+
+@keyframes gift-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0) rotate(4deg);
+  }
+}
+
+.gift-float {
+  animation: gift-float 2.6s ease-in-out infinite;
+}
+
+@keyframes gift-badge-wiggle {
+  0%,
+  80%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  85% {
+    transform: rotate(-14deg) scale(1.12);
+  }
+  90% {
+    transform: rotate(10deg) scale(1.08);
+  }
+  95% {
+    transform: rotate(-5deg) scale(1.03);
+  }
+}
+
+.gift-badge-wiggle {
+  animation: gift-badge-wiggle 3.2s ease-out infinite;
+  transform-origin: 50% 80%;
+}
+
+@keyframes promo-shine {
+  0%,
+  72% {
+    transform: translate3d(-120%, 0, 0) skewX(-18deg);
+  }
+  100% {
+    transform: translate3d(320%, 0, 0) skewX(-18deg);
+  }
+}
+
+.animate-promo-shine {
+  animation: promo-shine 5s cubic-bezier(0.4, 0, 0.2, 1) 1.2s infinite backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-stagger > *,
+  .animate-promo-shine,
+  .gift-rays,
+  .gift-float,
+  .gift-badge-wiggle {
     animation: none;
   }
 }

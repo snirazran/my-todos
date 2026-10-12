@@ -19,7 +19,7 @@ async function guard() {
 export async function GET() {
   const denied = await guard();
   if (denied) return denied;
-  return NextResponse.json(appleAdsSyncStatus(), { headers: NO_STORE });
+  return NextResponse.json(await appleAdsSyncStatus(), { headers: NO_STORE });
 }
 
 export async function POST() {
@@ -27,10 +27,10 @@ export async function POST() {
   if (denied) return denied;
   try {
     const result = await syncAppleAdsSpend();
-    return NextResponse.json({ ok: true, result, status: appleAdsSyncStatus() }, { headers: NO_STORE });
+    return NextResponse.json({ ok: true, result, status: await appleAdsSyncStatus() }, { headers: NO_STORE });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Sync failed', status: appleAdsSyncStatus() },
+      { error: error instanceof Error ? error.message : 'Sync failed', status: await appleAdsSyncStatus().catch(() => null) },
       { status: 400, headers: NO_STORE },
     );
   }

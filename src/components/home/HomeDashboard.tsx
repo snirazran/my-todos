@@ -68,7 +68,10 @@ import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { HomePageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
-import { useNotification } from '@/components/providers/NotificationProvider';
+import {
+  TOAST_SURFACE_STYLE,
+  useNotification,
+} from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { cn } from '@/lib/utils';
 import {
@@ -1462,14 +1465,13 @@ export default function HomeDashboard() {
         }`}
         style={
           {
-            '--fab-bottom': `calc(env(safe-area-inset-bottom) + ${
-              notificationStackHeight > 0 ? 80 + notificationStackHeight : 88
-            }px)`,
-            '--fab-bottom-md': `calc(env(safe-area-inset-bottom) + ${
-              notificationStackHeight > 0 ? 28 + notificationStackHeight : 24
-            }px)`,
+            '--fab-bottom': 'calc(env(safe-area-inset-bottom) + 88px)',
+            '--fab-bottom-md': 'calc(env(safe-area-inset-bottom) + 24px)',
+            translate: `0 ${
+              notificationStackHeight > 0 ? -(notificationStackHeight - 4) : 0
+            }px`,
             transition:
-              'bottom 320ms cubic-bezier(0.22,1,0.36,1), transform 240ms cubic-bezier(0.32,0.72,0,1), opacity 180ms ease',
+              'translate 320ms cubic-bezier(0.22,1,0.36,1), transform 240ms cubic-bezier(0.32,0.72,0,1), opacity 180ms ease',
           } as React.CSSProperties
         }
       >
@@ -1554,13 +1556,22 @@ function waitForSheetsClosed() {
   });
 }
 
+const SPEED_HINT_KEY = 'frog:speedHintShown';
+const SPEED_HINT_LIMIT = 3;
+
 function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [active, setActive] = React.useState(false);
   const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
 
   React.useEffect(() => {
-    // Render into the shared notification stack so the hint rises and stacks
-    // exactly like the fly toast / Frogodoro pill (same container + motion).
+    let shown = 0;
+    try {
+      shown = Number(localStorage.getItem(SPEED_HINT_KEY)) || 0;
+      if (shown < SPEED_HINT_LIMIT) {
+        localStorage.setItem(SPEED_HINT_KEY, String(shown + 1));
+      }
+    } catch {}
+    if (shown >= SPEED_HINT_LIMIT) return;
     setPortalTarget(document.getElementById('frog-bottom-stack-bottom'));
   }, []);
 
@@ -1605,11 +1616,8 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            className={`pointer-events-none w-full md:w-[380px] md:self-end flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl transition-colors duration-200 ${
-              active
-                ? 'bg-card/90 text-foreground border-primary/40'
-                : 'bg-card/90 text-foreground border-border/50'
-            }`}
+            style={TOAST_SURFACE_STYLE}
+            className="dark pointer-events-none flex min-h-12 w-full items-center gap-3 rounded-[18px] px-3.5 py-2 text-foreground md:w-[380px] md:self-end"
           >
             <span
               className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 shrink-0"

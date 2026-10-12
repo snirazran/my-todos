@@ -49,6 +49,8 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
+import { ShopGiftPopup } from '@/components/ui/shop/ShopGiftPopup';
+import { GiftBadge } from '@/components/ui/GiftBadge';
 import { WishlistButton } from './WishlistButton';
 import { WishlistShelf } from './WishlistShelf';
 import { WishlistSheet } from './WishlistSheet';
@@ -552,6 +554,7 @@ function WardrobeManagerContent({
             .filter((deal) => deal.onSale)
             .map((deal) => deal.discountPercent),
         );
+  const shopGiftReady = activeTab !== 'shop' && !!data?.shopGift?.available;
   const tradeTabBadge = activeTab === 'trade' ? 0 : readyTrades;
 
   const tabTriggerClass = cn(
@@ -1638,7 +1641,9 @@ function WardrobeManagerContent({
                     className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
                   />
                   <span>Shop</span>
-                  {bestDealDiscount > 0 && (
+                  {shopGiftReady ? (
+                    <GiftBadge className="-my-1 h-[22px] w-[22px] shrink-0" />
+                  ) : bestDealDiscount > 0 && (
                     <span className="flex h-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm">
                       −{bestDealDiscount}%
                     </span>
@@ -2290,6 +2295,11 @@ function WardrobeManagerContent({
           paused={isDragging}
         />
       )}
+
+      <ShopGiftPopup
+        active={open && activeTab === 'shop' && !isGuest}
+        gift={data?.shopGift}
+      />
 
       <PurchaseSheet
         open={!!purchaseCard}

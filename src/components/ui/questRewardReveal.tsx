@@ -22,6 +22,7 @@ import { maybeRequestAppRating, type RatingMoment } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
 import { useAutoPopupHold } from '@/lib/popupGate';
+import { cn } from '@/lib/utils';
 
 export type QuestRewardSummary = {
   fliesGranted?: number;
@@ -71,6 +72,7 @@ type RevealHostState = {
     instance: number;
   } | null;
   flyGainToast: FlyGainToast | null;
+  interlude: boolean;
 };
 
 // One reveal pipeline for the whole app: any page enqueues claim summaries,
@@ -80,7 +82,20 @@ const revealStore = createStore<RevealHostState>(() => ({
   queue: [],
   giftOpening: null,
   flyGainToast: null,
+  interlude: false,
 }));
+
+const INTERLUDE_MS = 1100;
+let interludeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function startInterlude() {
+  if (interludeTimer) clearTimeout(interludeTimer);
+  revealStore.setState({ interlude: true });
+  interludeTimer = setTimeout(() => {
+    interludeTimer = null;
+    revealStore.setState({ interlude: false });
+  }, INTERLUDE_MS);
+}
 
 let revealIdCounter = 0;
 let toastIdCounter = 0;
@@ -258,6 +273,13 @@ function handleClaim(entry?: QuestRewardRevealEntry) {
     }
     mutateInventoryCaches();
   }
+  if (
+    entry &&
+    entry.item.slot !== 'container' &&
+    revealStore.getState().queue.length > 1
+  ) {
+    startInterlude();
+  }
   revealStore.setState((state) => ({ queue: state.queue.slice(1) }));
 }
 
@@ -344,7 +366,7 @@ function handleGiftBoxClosed() {
 }
 
 export function QuestRewardRevealHost() {
-  const { queue, giftOpening, flyGainToast } = useStore(revealStore);
+  const { queue, giftOpening, flyGainToast, interlude } = useStore(revealStore);
 
   // The reveal covers the page with a near-opaque backdrop, but it isn't a
   // sheet, so nothing paused the ambient Rives (home frog flies, card flies)
@@ -391,6 +413,7 @@ export function QuestRewardRevealHost() {
         onClaim={handleClaim}
         onOpenGift={handleOpenGift}
         onWatchAd={handleWatchAdDouble}
+        interlude={interlude}
         paused={false}
       />
       {giftOpening && (
@@ -414,12 +437,14 @@ function QuestRewardRevealOverlay({
   onClaim,
   onOpenGift,
   onWatchAd,
+  interlude = false,
   paused = false,
 }: {
   queue: QuestRewardRevealEntry[];
   onClaim: (entry: QuestRewardRevealEntry) => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
   onWatchAd: (entry: QuestRewardRevealEntry) => void | Promise<void>;
+  interlude?: boolean;
   paused?: boolean;
 }) {
   const entry = queue[0] ?? null;
@@ -443,16 +468,27 @@ function QuestRewardRevealOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto"
+          className={cn(
+            'fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden',
+            interlude ? 'pointer-events-none' : 'pointer-events-auto',
+          )}
         >
-          <div className="absolute inset-0 bg-slate-950/90" />
-          <div className="absolute inset-0 z-0 flex items-center justify-center">
-            <RotatingRays
-              colorClass={GIFT_RARITY_CONFIG[entry.item.rarity].rays}
-            />
-            <div className="absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80" />
-          </div>
+          <motion.div
+            className="absolute inset-0"
+            initial={false}
+            animate={{ opacity: interlude ? 0 : 1 }}
+            transition={{ duration: interlude ? 0.22 : 0.3, ease: 'easeOut' }}
+          >
+            <div className="absolute inset-0 bg-slate-950/90" />
+            <div className="absolute inset-0 z-0 flex items-center justify-center">
+              <RotatingRays
+                colorClass={GIFT_RARITY_CONFIG[entry.item.rarity].rays}
+              />
+              <div className="absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80" />
+            </div>
+          </motion.div>
           <AnimatePresence mode="wait">
+          {!interlude && (
           <motion.div
             key={entry.key}
             initial={{ opacity: 0 }}
@@ -511,8 +547,10 @@ function QuestRewardRevealOverlay({
                 ) : undefined
               }
               slotLabel={entry.fliesGranted ? 'currency' : undefined}
+              flyCollectAmount={entry.fliesGranted}
             />
           </motion.div>
+          )}
           </AnimatePresence>
         </motion.div>
       )}

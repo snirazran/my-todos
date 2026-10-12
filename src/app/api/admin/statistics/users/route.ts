@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { PipelineStage } from 'mongoose';
 import { requireAdmin } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import {
+  NOT_STATS_EXCLUDED,
+  StatsEventModel as AnalyticsEventModel,
+} from '@/lib/analytics/statsExclusion';
 import FriendshipModel from '@/lib/models/Friendship';
 import UserModel from '@/lib/models/User';
 import { addUtcDays, resolveRange, ymd } from '@/lib/analytics/report/context';
@@ -145,7 +148,8 @@ export async function GET(req: NextRequest) {
   await connectMongo();
 
   const now = new Date();
-  const userFilter: Record<string, unknown> = {};
+  const userFilter: Record<string, unknown> =
+    tier === 'excluded' ? { excludeFromStats: true } : { ...NOT_STATS_EXCLUDED };
   if (search) {
     userFilter.$or = [
       { name: { $regex: search, $options: 'i' } },

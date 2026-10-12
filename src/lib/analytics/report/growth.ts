@@ -1,4 +1,7 @@
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import {
+  NOT_STATS_EXCLUDED,
+  StatsEventModel as AnalyticsEventModel,
+} from '@/lib/analytics/statsExclusion';
 import UserModel from '@/lib/models/User';
 import type { StatSection, StatTable } from '@/lib/analytics/catalog';
 import {
@@ -26,7 +29,7 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
   const { range } = context;
   const today = startOfUtcDay(new Date());
 
-  const cohortUsers = await UserModel.find({ createdAt: context.window })
+  const cohortUsers = await UserModel.find({ createdAt: context.window, ...NOT_STATS_EXCLUDED })
     .select('_id createdAt')
     .limit(COHORT_LIMIT)
     .lean<CohortUser[]>();

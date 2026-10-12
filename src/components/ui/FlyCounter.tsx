@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { useSheetStore } from '@/lib/sheetStore';
 import { isFlyEarnActive } from '@/lib/flyEarn';
+import { isFlyCounterHeld, subscribeFlyCounterHold } from '@/lib/flyFlight';
 import { hapticTick } from '@/lib/haptics';
 import { useWishlist } from '@/hooks/useWishlist';
 import { HEADER_CONTROL_SURFACE } from '@/components/ui/MobileHeaderActions';
@@ -33,7 +34,7 @@ interface Props {
 }
 
 export function FlyCounter({
-  balance,
+  balance: liveBalance,
   variant = 'desktop',
   onClick,
   alwaysCelebrate = false,
@@ -41,6 +42,11 @@ export function FlyCounter({
 }: Props) {
   const { wishlist, progress } = useWishlist(showGoal);
   const goalReached = !!progress?.reached;
+  const held =
+    useSyncExternalStore(subscribeFlyCounterHold, isFlyCounterHeld, () => false) && showGoal;
+  const heldBalanceRef = useRef(liveBalance);
+  if (!held) heldBalanceRef.current = liveBalance;
+  const balance = held ? heldBalanceRef.current : liveBalance;
   // Held gains celebrate once the screen is clear again (read here, in the
   // leaf, rather than in the layout-level header — subscribing in the header
   // trips Next's dev HMR/PPR refresh loop).
@@ -136,6 +142,7 @@ export function FlyCounter({
     >
       <motion.div
         animate={flyControls}
+        data-fly-counter={showGoal ? '' : undefined}
         className="relative flex items-center"
       >
         {/* Static frame — a wallet icon doesn't earn a permanent 60fps render

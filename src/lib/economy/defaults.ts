@@ -100,6 +100,18 @@ export type FlyEconomyConfig = {
     shopRerollPerDay: number;
     tradeRerollPerDay: number;
   };
+  shopGift: {
+    enabled: boolean;
+    /** Balances at or below this get the full gift. */
+    fullBelowBalance: number;
+    /** Balances at or above this get the floor gift. */
+    floorFromBalance: number;
+    maxFlies: number;
+    minFlies: number;
+    luckyChancePercent: number;
+    luckyMultiplier: number;
+    plusMultiplier: number;
+  };
   circuitBreaker: {
     /** Flies from every source combined, per user per day. */
     dailyCap: number;
@@ -176,6 +188,16 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     shopRerollPerDay: 1,
     tradeRerollPerDay: 1,
   },
+  shopGift: {
+    enabled: true,
+    fullBelowBalance: 100,
+    floorFromBalance: 1500,
+    maxFlies: 12,
+    minFlies: 3,
+    luckyChancePercent: 10,
+    luckyMultiplier: 2,
+    plusMultiplier: 2,
+  },
   circuitBreaker: {
     dailyCap: 400,
   },
@@ -241,6 +263,15 @@ export const FLY_ECONOMY_LIMITS: Record<
     giftDoublePerDay: { min: 0, max: 50 },
     shopRerollPerDay: { min: 0, max: 50 },
     tradeRerollPerDay: { min: 0, max: 50 },
+  },
+  shopGift: {
+    fullBelowBalance: { min: 0, max: 100_000 },
+    floorFromBalance: { min: 1, max: 1_000_000 },
+    maxFlies: { min: 0, max: 200 },
+    minFlies: { min: 0, max: 200 },
+    luckyChancePercent: { min: 0, max: 100 },
+    luckyMultiplier: { min: 1, max: 5 },
+    plusMultiplier: { min: 1, max: 5 },
   },
   circuitBreaker: {
     dailyCap: { min: 1, max: 100_000 },

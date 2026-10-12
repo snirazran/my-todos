@@ -17,6 +17,7 @@ const ALREADY_LEDGERED = new Set([
   'invite_tier',
   'focus_session',
   'deep_focus',
+  'shop_gift',
 ]);
 
 /**

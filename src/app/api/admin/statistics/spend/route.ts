@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/adminAuth';
 import { parseSpendReport } from '@/lib/attribution/spendImport';
 import { deleteSpendImport, importSpend, listSpendImports } from '@/lib/attribution/spend';
 import { SPEND_CHANNELS } from '@/lib/attribution/classify';
+import { APPLE_ADS_SYNC_LABEL, appleAdsConfigured } from '@/lib/attribution/appleAdsApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,16 @@ export async function GET() {
   const denied = await guard();
   if (denied) return denied;
   const imports = await listSpendImports();
-  return NextResponse.json({ imports }, { headers: NO_STORE });
+  return NextResponse.json(
+    {
+      imports: imports.map((entry) => ({
+        ...entry,
+        auto: entry.channel === 'apple_ads' && entry.label === APPLE_ADS_SYNC_LABEL,
+      })),
+      appleAdsConnected: appleAdsConfigured(),
+    },
+    { headers: NO_STORE },
+  );
 }
 
 export async function POST(req: NextRequest) {

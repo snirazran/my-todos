@@ -15,6 +15,8 @@ import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { shopGiftStatus } from '@/lib/economy/shopGift';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, {
@@ -172,6 +174,7 @@ export async function GET(req: NextRequest) {
       .select('premiumUntil')
       .lean()) as { premiumUntil?: Date | null } | null;
     const isPremium = isPremiumActive(premiumUser?.premiumUntil);
+    const economy = await loadFlyEconomyConfig();
     if (isSummary) {
       const unseenIds = wardrobe.unseenItems ?? [];
       const containerIds = new Set(
@@ -228,6 +231,12 @@ export async function GET(req: NextRequest) {
         dailyDeals,
         dealRerollsLeft: rotation.rerollsLeft,
         dealRerollsAllowed: rotation.rerollsAllowed,
+        shopGift: shopGiftStatus(
+          wardrobe.shopGift?.dayKey,
+          rotation,
+          economy.shopGift.enabled,
+          { userId, premium: isPremium, config: economy.shopGift },
+        ),
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
           .length,
@@ -254,6 +263,12 @@ export async function GET(req: NextRequest) {
       dailyDeals: rotation.deals,
       dealRerollsLeft: rotation.rerollsLeft,
       dealRerollsAllowed: rotation.rerollsAllowed,
+      shopGift: shopGiftStatus(
+        wardrobe.shopGift?.dayKey,
+        rotation,
+        economy.shopGift.enabled,
+        { userId, premium: isPremium, config: economy.shopGift },
+      ),
       isPremium,
     });
   } catch {

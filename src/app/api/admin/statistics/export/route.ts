@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import { StatsEventModel as AnalyticsEventModel } from '@/lib/analytics/statsExclusion';
 import { buildSnapshot } from '@/lib/analytics/report';
 import { resolveRange, ymd } from '@/lib/analytics/report/context';
 import {

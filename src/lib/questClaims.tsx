@@ -262,6 +262,12 @@ export function primeQuestsPageCache(): void {
     .catch(() => {});
 }
 
+let questStripOnScreen = false;
+
+export function setQuestStripOnScreen(onScreen: boolean): void {
+  questStripOnScreen = onScreen;
+}
+
 export async function notifyQuestClaims(
   show: ShowNotification,
   opts?: {
@@ -278,6 +284,7 @@ export async function notifyQuestClaims(
   progressBaseline = toProgressMap(data.trackables);
   if (prev === null) return;
   if (useUIStore.getState().isFirstRunGuided) return;
+  if (questStripOnScreen) return;
   let claimToastShown = false;
   for (const c of data.claimables) {
     if (prev.has(c.id)) continue;

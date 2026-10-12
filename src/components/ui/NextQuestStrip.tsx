@@ -20,6 +20,7 @@ import {
   ratingMomentFor,
   refreshQuestHomeView,
   setQuestScrollTarget,
+  setQuestStripOnScreen,
   sweepClaimLabels,
   useCompletionReveal,
   type Claimable,
@@ -91,6 +92,7 @@ export function NextQuestStrip({
   const { showNotification } = useNotification();
   const { data: pactView, isLoading: pactLoading } = usePactView();
   const [claiming, setClaiming] = useState(false);
+  const [stripEl, setStripEl] = useState<HTMLDivElement | null>(null);
 
   const claimable =
     claimables?.find((c) => c.placement === 'onboarding') ?? claimables?.[0];
@@ -403,6 +405,8 @@ export function NextQuestStrip({
           ? `next:${displayNextUp.id}`
           : 'empty';
 
+  const showsQuest = !awaitingPact && !pactWins && (!!claimable || !!nextUp);
+
   const strip = awaitingPact ? (
     <div className="mx-1.5 mb-1.5 flex w-[calc(100%-0.75rem)] items-center gap-2.5 rounded-xl px-1 py-1 md:mx-4 md:mb-0 md:w-[calc(100%-2rem)] md:gap-3 md:px-4 md:py-1.5">
       <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
@@ -578,6 +582,7 @@ export function NextQuestStrip({
 
   return (
     <>
+    <QuestStripVisibility target={stripEl} covers={showsQuest} />
     {/* mode="wait" so the outgoing row finishes leaving before the next one
         arrives — two rows cross-fading in the same slot read as a glitch,
         one handing over to the other reads as a consequence. */}
@@ -585,6 +590,7 @@ export function NextQuestStrip({
       {strip && (
         <motion.div
           key={slotKey}
+          ref={setStripEl}
           {...slotMotion}
           style={{ willChange: 'transform, opacity' }}
         >
@@ -617,4 +623,26 @@ export function NextQuestStrip({
     </div>
     </>
   );
+}
+
+function QuestStripVisibility({
+  target,
+  covers,
+}: {
+  target: HTMLElement | null;
+  covers: boolean;
+}) {
+  useEffect(() => {
+    if (!target || !covers) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setQuestStripOnScreen(entry.intersectionRatio >= 0.6),
+      { threshold: [0, 0.6, 1] },
+    );
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+      setQuestStripOnScreen(false);
+    };
+  }, [target, covers]);
+  return null;
 }

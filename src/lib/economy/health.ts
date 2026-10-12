@@ -1,7 +1,11 @@
 import connectMongo from '@/lib/mongoose';
 import FlyLedgerModel from '@/lib/models/FlyLedger';
 import UserModel from '@/lib/models/User';
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import {
+  NOT_STATS_EXCLUDED,
+  StatsEventModel as AnalyticsEventModel,
+  statsExcludedUserIds,
+} from '@/lib/analytics/statsExclusion';
 import { CATALOG, rarityRank } from '@/lib/skins/catalog';
 import { daysAgoKey } from './guards';
 import { getZonedToday } from '@/lib/utils';
@@ -103,10 +107,11 @@ export async function readEconomyHealth(timezone = 'UTC') {
   const today = getZonedToday(timezone);
   const from = daysAgoKey(today, WINDOW_DAYS - 1);
   const range = { $gte: from, $lte: today };
+  const notExcludedUser = { userId: { $nin: await statsExcludedUserIds() } };
 
   const [flowRows, sourceRows, dauRows, breakerRows] = await Promise.all([
     FlyLedgerModel.aggregate<{ _id: 'in' | 'out'; total: number }>([
-      { $match: { dayKey: range } },
+      { $match: { dayKey: range, ...notExcludedUser } },
       {
         $group: {
           _id: { $cond: [{ $gt: ['$amount', 0] }, 'in', 'out'] },
@@ -115,12 +120,12 @@ export async function readEconomyHealth(timezone = 'UTC') {
       },
     ]),
     FlyLedgerModel.aggregate<{ _id: string; total: number }>([
-      { $match: { dayKey: range, amount: { $gt: 0 } } },
+      { $match: { dayKey: range, amount: { $gt: 0 }, ...notExcludedUser } },
       { $group: { _id: '$source', total: { $sum: '$amount' } } },
       { $sort: { total: -1 } },
     ]),
     FlyLedgerModel.aggregate<{ _id: string; users: number }>([
-      { $match: { dayKey: range, amount: { $gt: 0 } } },
+      { $match: { dayKey: range, amount: { $gt: 0 }, ...notExcludedUser } },
       { $group: { _id: '$dayKey', users: { $addToSet: '$userId' } } },
       { $project: { users: { $size: '$users' } } },
     ]),
@@ -151,16 +156,17 @@ export async function readEconomyHealth(timezone = 'UTC') {
   const [balances, premiumCount, activeCount, epicOwners, cohort] =
     await Promise.all([
       UserModel.aggregate<{ _id: null; values: number[] }>([
-        { $match: { 'wardrobe.flies': { $gt: 0 } } },
+        { $match: { 'wardrobe.flies': { $gt: 0 }, ...NOT_STATS_EXCLUDED } },
         { $group: { _id: null, values: { $push: '$wardrobe.flies' } } },
       ]),
-      UserModel.countDocuments({ premiumUntil: { $gt: new Date() } }),
-      UserModel.countDocuments({}),
+      UserModel.countDocuments({ premiumUntil: { $gt: new Date() }, ...NOT_STATS_EXCLUDED }),
+      UserModel.countDocuments(NOT_STATS_EXCLUDED),
       // "Owns an Epic" has to be read off the inventory keys, since rarity
       // lives in the catalog rather than on the user.
       EPIC_PLUS_IDS.length
         ? UserModel.countDocuments({
             createdAt: { $lte: new Date(Date.now() - 30 * 86_400_000) },
+            ...NOT_STATS_EXCLUDED,
             $or: EPIC_PLUS_IDS.map((id) => ({
               [`wardrobe.inventory.${id}`]: { $gt: 0 },
             })),
@@ -168,6 +174,7 @@ export async function readEconomyHealth(timezone = 'UTC') {
         : Promise.resolve(null),
       UserModel.countDocuments({
         createdAt: { $lte: new Date(Date.now() - 30 * 86_400_000) },
+        ...NOT_STATS_EXCLUDED,
       }).catch(() => 0),
     ]);
 

@@ -22,6 +22,7 @@ const UserSchema = new Schema<UserDoc>(
     passwordHash: { type: String, required: false },
     phoneNumber: { type: String, required: false, index: true, sparse: true },
     isGuest: { type: Boolean, default: false },
+    excludeFromStats: { type: Boolean, default: undefined },
     friendCode: { type: String, required: false, unique: true, index: true, sparse: true },
     suggestionsDismissed: { type: [String], default: [] },
     suggestionSnoozes: {

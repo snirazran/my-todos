@@ -129,7 +129,7 @@ const COST_COLUMNS: Column[] = [
   {
     key: 'spend',
     label: 'Spend',
-    hint: 'From imported ad reports.',
+    hint: 'Apple Ads syncs automatically; other networks come from imported reports.',
     group: 'cost',
     value: (m) => m.spend,
     render: (m) => <Money value={m.spend || null} />,
@@ -384,7 +384,7 @@ export function AcquisitionView({
             {children.length
               ? `${children.length} ${levelName?.toLowerCase() ?? 'row'}${children.length === 1 ? '' : 's'}. Click a row to go one level deeper. Percentages show the raw count underneath — with a handful of users, read the count, not the percent.`
               : 'This is the most specific level for this source.'}
-            {showCost && costUnknown ? ' Spend for this level has not been imported — import the matching report to fill the cost columns.' : ''}
+            {showCost && costUnknown ? ' Spend for this level is not available yet — for networks other than Apple Ads, import the matching report to fill the cost columns.' : ''}
           </p>
         </header>
 

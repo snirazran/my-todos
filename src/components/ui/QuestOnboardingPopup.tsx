@@ -24,7 +24,9 @@ export function QuestOnboardingPopup({
   isPremium,
   onCompleted,
   onClose,
+  zIndex = 1200,
 }: {
+  zIndex?: number;
   show: boolean;
   isCompleted?: boolean;
   initialSelectedCategoryIds: MacroCategoryId[];
@@ -171,7 +173,7 @@ export function QuestOnboardingPopup({
     <BaseSheet
       open={show}
       onOpenChange={(v) => !v && onClose()}
-      zIndex={1200}
+      zIndex={zIndex}
       backdropClassName="backdrop-blur-sm"
       className="h-[90vh] bg-popover sm:h-auto sm:max-h-[85vh] sm:max-w-3xl"
     >

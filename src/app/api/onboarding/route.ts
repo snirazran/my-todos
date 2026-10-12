@@ -5,6 +5,7 @@ import { requireUserId } from '@/lib/auth';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
 
 const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
 const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
     await connectMongo();
 
     const existing = await UserModel.findById(uid)
-      .select('onboardingCompleted')
+      .select('onboardingCompleted excludeFromStats')
       .lean();
     if (!existing) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -120,6 +121,9 @@ export async function POST(req: Request) {
         },
       },
     );
+    if (isStatsExcludedFrogName(frogName) && existing.excludeFromStats === undefined) {
+      await excludeUserFromStats(uid);
+    }
     await recordAnalyticsEvent({
       userId: uid,
       name: 'onboarding_completed',

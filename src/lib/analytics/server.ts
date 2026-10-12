@@ -7,6 +7,7 @@ import {
   type AnalyticsPlatform,
   type AnalyticsSource,
 } from '@/lib/analytics/events';
+import { isStatsExcludedUser } from '@/lib/analytics/statsExclusion';
 
 type RecordAnalyticsInput = {
   userId: string;
@@ -34,6 +35,7 @@ export async function recordAnalyticsEvent(input: RecordAnalyticsInput) {
       externalId: input.externalId?.slice(0, 160) || undefined,
       properties: sanitizeAnalyticsProperties(input.properties),
       occurredAt: input.occurredAt ?? new Date(),
+      ...((await isStatsExcludedUser(input.userId)) ? { excludeFromStats: true } : {}),
     };
 
     if (document.externalId) {

@@ -8,6 +8,7 @@ type WishlistSlots = WishlistState['slots'];
 import type { FocusFlyDaily } from '@/lib/types/UserDoc';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
+import type { ShopGiftStatus } from '@/lib/economy/shopGift';
 
 export const INVENTORY_KEY = '/api/skins/inventory';
 export const INVENTORY_SUMMARY_KEY = '/api/skins/inventory?view=summary';
@@ -67,8 +68,18 @@ type ApiData = {
   dailyDeals?: DailyDeal[];
   dealRerollsLeft?: number;
   dealRerollsAllowed?: number;
+  shopGift?: ShopGiftStatus;
   isPremium?: boolean;
 };
+
+export function patchInventoryShopGiftClaimed() {
+  const patch = (curr: any) =>
+    curr?.shopGift
+      ? { ...curr, shopGift: { ...curr.shopGift, available: false } }
+      : curr;
+  mutateGlobal(INVENTORY_KEY, patch, { revalidate: false });
+  mutateGlobal(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
+}
 
 export function patchInventoryWishlist(next: {
   wishlist: WishlistView | null;

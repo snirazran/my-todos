@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   await connectMongo();
   const user = await UserModel.findById(id)
-    .select('_id name email createdAt isGuest premiumUntil plusSubscription acquisition wardrobe.flies quests.loginStreak.count onboardingCompleted')
+    .select('_id name email createdAt isGuest premiumUntil plusSubscription acquisition wardrobe.flies quests.loginStreak.count onboardingCompleted excludeFromStats')
     .lean<{
       _id: unknown;
       name?: string;
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       wardrobe?: { flies?: number };
       quests?: { loginStreak?: { count?: number } };
       onboardingCompleted?: boolean;
+      excludeFromStats?: boolean;
     } | null>();
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
@@ -85,6 +86,7 @@ export async function GET(req: NextRequest) {
               : 'Plus'
             : 'Free',
         onboarded: !!user.onboardingCompleted,
+        excludedFromStats: !!user.excludeFromStats,
         flies: user.wardrobe?.flies ?? 0,
         streak: user.quests?.loginStreak?.count ?? 0,
         friends,

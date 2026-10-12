@@ -554,6 +554,7 @@ function FlyClaimRewardOverlay({
             slotLabel="currency"
             showDoubleUpsell={!doubledRef.current}
             rewardAmount={displayAmount}
+            flyCollectAmount={displayAmount}
             onWatchAd={handleWatchAd}
             doublePlacement="friend_reward_double"
             customPreview={

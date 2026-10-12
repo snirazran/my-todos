@@ -128,6 +128,7 @@ export function GiftRevealOverlay({
               slotLabel={
                 fliesAmount != null ? 'Flies' : prize.slot.replace('_', ' ')
               }
+              flyCollectAmount={fliesAmount ?? undefined}
               customPreview={
                 fliesAmount != null ? (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-2">

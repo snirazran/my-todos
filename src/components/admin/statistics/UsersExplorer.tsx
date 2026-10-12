@@ -30,6 +30,7 @@ const TIERS = [
   { id: 'free', label: 'Free' },
   { id: 'plus', label: 'Plus' },
   { id: 'guest', label: 'Guest' },
+  { id: 'excluded', label: 'Excluded from stats' },
 ];
 
 const PLATFORMS = [
@@ -64,9 +65,11 @@ const NUMERIC = new Set([
 export function UsersExplorer({
   range,
   onOpenUser,
+  reloadKey = 0,
 }: {
   range: { start: string; end: string };
   onOpenUser?: (userId: string) => void;
+  reloadKey?: number;
 }) {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -126,7 +129,7 @@ export function UsersExplorer({
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [query]);
+  }, [query, reloadKey]);
 
   const csvQuery = new URLSearchParams(query);
   csvQuery.set('format', 'csv');

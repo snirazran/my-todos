@@ -4,11 +4,15 @@ import ReferralModel from '@/lib/models/Referral';
 import TaskBondModel from '@/lib/models/TaskBond';
 import type { StatSection } from '@/lib/analytics/catalog';
 import { groupByProperties, kpi, rate, round, ymd, type ReportContext } from './context';
+import { statsExcludedUserIds } from '@/lib/analytics/statsExclusion';
 
 export async function buildSocial(context: ReportContext): Promise<StatSection> {
   const { range } = context;
   const dayFrom = ymd(range.start);
   const dayTo = ymd(range.endDay);
+  const excluded = { $nin: await statsExcludedUserIds() };
+  const friendshipMatch = { userA: excluded, userB: excluded };
+  const pairMatch = { fromUserId: excluded, toUserId: excluded };
 
   const [
     totalFriendships,
@@ -21,21 +25,23 @@ export async function buildSocial(context: ReportContext): Promise<StatSection> 
     shareRows,
     pondRows,
   ] = await Promise.all([
-    FriendshipModel.countDocuments({}),
+    FriendshipModel.countDocuments(friendshipMatch),
     FriendshipModel.aggregate<{ _id: null; count: number }>([
+      { $match: friendshipMatch },
       { $project: { users: ['$userA', '$userB'] } },
       { $unwind: '$users' },
       { $group: { _id: null, users: { $addToSet: '$users' } } },
       { $project: { count: { $size: '$users' } } },
     ]),
-    FriendshipModel.find({ createdAt: context.window }).select('source createdAt').lean(),
-    ReferralModel.find({ createdAt: context.window })
+    FriendshipModel.find({ createdAt: context.window, ...friendshipMatch }).select('source createdAt').lean(),
+    ReferralModel.find({ createdAt: context.window, inviterId: excluded, claimedByUserId: excluded })
       .select('inviterId giftOptionId buddyTask claimedByUserId createdAt')
       .lean(),
-    FriendRequestModel.find({ createdAt: context.window })
+    FriendRequestModel.find({ createdAt: context.window, ...pairMatch })
       .select('source status createdAt respondedAt')
       .lean(),
     TaskBondModel.find({
+      ...pairMatch,
       $or: [
         { createdAt: context.window },
         { bonusAwardedDates: { $elemMatch: { $gte: dayFrom, $lte: dayTo } } },
@@ -43,7 +49,7 @@ export async function buildSocial(context: ReportContext): Promise<StatSection> 
     })
       .select('status repeatLabel streak bonusAwardedDates createdAt')
       .lean(),
-    TaskBondModel.countDocuments({ status: 'active' }),
+    TaskBondModel.countDocuments({ status: 'active', ...pairMatch }),
     groupByProperties(
       { occurredAt: context.window, category: 'social' },
       { name: 'method', surface: 'share_surface' },

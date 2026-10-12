@@ -1,4 +1,7 @@
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import {
+  NOT_STATS_EXCLUDED,
+  StatsEventModel as AnalyticsEventModel,
+} from '@/lib/analytics/statsExclusion';
 import AdSpendImportModel from '@/lib/models/AdSpendImport';
 import UserModel from '@/lib/models/User';
 import type {
@@ -219,7 +222,7 @@ export async function buildAcquisition(
   const { range } = context;
   const today = startOfUtcDay(new Date());
 
-  const cohort = await UserModel.find({ createdAt: context.window })
+  const cohort = await UserModel.find({ createdAt: context.window, ...NOT_STATS_EXCLUDED })
     .select('_id createdAt isGuest acquisition')
     .sort({ createdAt: -1 })
     .limit(COHORT_LIMIT)

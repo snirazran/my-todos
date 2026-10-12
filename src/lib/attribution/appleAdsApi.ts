@@ -1,11 +1,16 @@
 import crypto from 'node:crypto';
+import connectMongo from '@/lib/mongoose';
+import AppleAdsSyncStateModel, { APPLE_ADS_SYNC_STATE_ID } from '@/lib/models/AppleAdsSyncState';
 import { importSpend } from './spend';
 import type { ParsedSpend, ParsedSpendRow, SpendLevel } from './spendImport';
 
 const API = 'https://api.ads.apple.com/v1';
 const TOKEN_URL = 'https://appleid.apple.com/auth/oauth2/token';
 const PAGE_SIZE = 1000;
-const SYNC_DAYS = 30;
+const ROLLING_DAYS = 90;
+const BACKFILL_DAYS = 365;
+const CHUNK_DAYS = 90;
+export const APPLE_ADS_SYNC_LABEL = 'Apple Ads API';
 const AUTO_SYNC_MS = 6 * 60 * 60 * 1000;
 
 type Credentials = { clientId: string; teamId: string; keyId: string; privateKey: string };
@@ -26,6 +31,7 @@ type ReportRow = {
 export type AppleAdsSyncResult = {
   start: string;
   end: string;
+  days: number;
   campaigns: number;
   rows: Record<SpendLevel, number>;
   spend: number;
@@ -34,10 +40,6 @@ export type AppleAdsSyncResult = {
 
 type SyncState = {
   running: boolean;
-  lastRunAt?: string;
-  lastOkAt?: string;
-  lastError?: string;
-  lastResult?: AppleAdsSyncResult;
   token?: { value: string; expiresAt: number };
   adAccountId?: string;
 };
@@ -257,80 +259,130 @@ function dayOffset(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
-export async function syncAppleAdsSpend(days = SYNC_DAYS): Promise<AppleAdsSyncResult> {
+async function collectWindow(
+  creds: Credentials,
+  adAccountId: string,
+  campaigns: Array<{ id: string; name: string }>,
+  start: string,
+  end: string,
+) {
+  const byLevel: Record<SpendLevel, ParsedSpendRow[]> = { campaign: [], adGroup: [], keyword: [] };
+  let currency: string | null = null;
+  for (const campaign of campaigns) {
+    const adGroupNames = new Map<string, string>();
+    for (const level of ['campaign', 'adGroup', 'keyword'] as const) {
+      const report = await fetchReport(creds, adAccountId, level, campaign.id, start, end);
+      for (const row of report) {
+        const spendRows = reportRowToSpend(level, campaign.name, row, adGroupNames);
+        byLevel[level].push(...spendRows.rows);
+        currency ??= spendRows.currency;
+      }
+    }
+  }
+  return { byLevel, currency };
+}
+
+async function loadSyncState() {
+  await connectMongo();
+  return AppleAdsSyncStateModel.findOne({ configId: APPLE_ADS_SYNC_STATE_ID }).lean();
+}
+
+async function saveSyncState(update: Partial<AppleAdsSyncStateFields>) {
+  await connectMongo();
+  await AppleAdsSyncStateModel.updateOne(
+    { configId: APPLE_ADS_SYNC_STATE_ID },
+    { $set: update },
+    { upsert: true },
+  );
+}
+
+type AppleAdsSyncStateFields = {
+  backfilledFrom: string;
+  lastRunAt: Date;
+  lastOkAt: Date;
+  lastError: string | null;
+  lastResult: AppleAdsSyncResult;
+};
+
+export async function syncAppleAdsSpend(days?: number): Promise<AppleAdsSyncResult> {
   const creds = readCredentials();
   if (!creds) throw new Error('Apple Ads API keys are not set');
   if (state.running) throw new Error('A sync is already running');
   state.running = true;
-  state.lastRunAt = new Date().toISOString();
 
   try {
+    await saveSyncState({ lastRunAt: new Date() });
+    const saved = await loadSyncState();
+    const span = days ?? (saved?.backfilledFrom ? ROLLING_DAYS : BACKFILL_DAYS);
     const adAccountId = await resolveAdAccountId(creds);
     const campaigns = await listCampaigns(creds, adAccountId);
-    const start = dayOffset(Math.min(89, Math.max(1, days) - 1));
     const end = dayOffset(0);
-    const byLevel: Record<SpendLevel, ParsedSpendRow[]> = { campaign: [], adGroup: [], keyword: [] };
+    const start = dayOffset(span - 1);
+    const rows: Record<SpendLevel, number> = { campaign: 0, adGroup: 0, keyword: 0 };
+    let spend = 0;
     let currency: string | null = null;
 
-    for (const campaign of campaigns) {
-      const adGroupNames = new Map<string, string>();
+    for (let offset = span - 1; offset >= 0; offset -= CHUNK_DAYS) {
+      const from = dayOffset(offset);
+      const to = dayOffset(Math.max(0, offset - CHUNK_DAYS + 1));
+      const window = await collectWindow(creds, adAccountId, campaigns, from, to);
+      currency ??= window.currency;
       for (const level of ['campaign', 'adGroup', 'keyword'] as const) {
-        const report = await fetchReport(creds, adAccountId, level, campaign.id, start, end);
-        for (const row of report) {
-          const spendRows = reportRowToSpend(level, campaign.name, row, adGroupNames);
-          byLevel[level].push(...spendRows.rows);
-          currency ??= spendRows.currency;
-        }
+        rows[level] += window.byLevel[level].length;
+        if (window.byLevel[level].length === 0) continue;
+        await importSpend({
+          channel: 'apple_ads',
+          parsed: toParsed(level, window.byLevel[level], from, to),
+          label: APPLE_ADS_SYNC_LABEL,
+        });
       }
-    }
-
-    for (const level of ['campaign', 'adGroup', 'keyword'] as const) {
-      if (byLevel[level].length === 0) continue;
-      await importSpend({
-        channel: 'apple_ads',
-        parsed: toParsed(level, byLevel[level], start, end),
-        label: 'Apple Ads API',
-      });
+      spend += window.byLevel.campaign.reduce((sum, row) => sum + row.spend, 0);
     }
 
     const result: AppleAdsSyncResult = {
       start,
       end,
+      days: span,
       campaigns: campaigns.length,
-      rows: {
-        campaign: byLevel.campaign.length,
-        adGroup: byLevel.adGroup.length,
-        keyword: byLevel.keyword.length,
-      },
-      spend: Math.round(byLevel.campaign.reduce((sum, row) => sum + row.spend, 0) * 100) / 100,
+      rows,
+      spend: Math.round(spend * 100) / 100,
       currency,
     };
-    state.lastOkAt = new Date().toISOString();
-    state.lastError = undefined;
-    state.lastResult = result;
+    await saveSyncState({
+      lastOkAt: new Date(),
+      lastError: null,
+      lastResult: result,
+      ...(saved?.backfilledFrom && saved.backfilledFrom <= start ? {} : { backfilledFrom: start }),
+    });
     return result;
   } catch (error) {
-    state.lastError = error instanceof Error ? error.message : 'Apple Ads sync failed';
+    await saveSyncState({
+      lastError: error instanceof Error ? error.message : 'Apple Ads sync failed',
+    }).catch(() => {});
     throw error;
   } finally {
     state.running = false;
   }
 }
 
-export function appleAdsSyncStatus() {
+export async function appleAdsSyncStatus() {
+  const saved = await loadSyncState();
+  const iso = (value?: Date | null) => (value ? new Date(value).toISOString() : null);
   return {
     configured: appleAdsConfigured(),
     running: state.running,
-    lastRunAt: state.lastRunAt ?? null,
-    lastOkAt: state.lastOkAt ?? null,
-    lastError: state.lastError ?? null,
-    lastResult: state.lastResult ?? null,
+    lastRunAt: iso(saved?.lastRunAt),
+    lastOkAt: iso(saved?.lastOkAt),
+    lastError: saved?.lastError ?? null,
+    lastResult: (saved?.lastResult as AppleAdsSyncResult | null) ?? null,
+    backfilledFrom: saved?.backfilledFrom ?? null,
   };
 }
 
 export async function runScheduledAppleAdsSync() {
   if (!appleAdsConfigured() || state.running) return;
-  const last = state.lastRunAt ? new Date(state.lastRunAt).getTime() : 0;
+  const saved = await loadSyncState();
+  const last = saved?.lastRunAt ? new Date(saved.lastRunAt).getTime() : 0;
   if (Date.now() - last < AUTO_SYNC_MS) return;
   await syncAppleAdsSpend().catch((error) => {
     console.error('Apple Ads sync failed:', error);

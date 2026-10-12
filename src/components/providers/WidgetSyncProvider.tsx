@@ -10,7 +10,7 @@ import { INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { todayTasksKey } from '@/hooks/useTaskData';
 import { streakKey } from '@/hooks/useLoginStreak';
 import { TASK_SYNC_EVENT } from '@/lib/taskSyncClient';
-import { getWidgetPinState } from '@/lib/widget/bridge';
+import { useWidgetPinStore } from '@/lib/widget/pinStore';
 import { requestQuickAdd } from '@/lib/widget/quickAdd';
 import {
   TASK_COMPLETED_EVENT,
@@ -25,7 +25,6 @@ import {
   syncWidget,
   todayKey,
 } from '@/lib/widget/sync';
-import type { WidgetPinState } from '@/lib/widget/types';
 import { WidgetPromptSheet } from '@/components/ui/WidgetPromptSheet';
 
 type TasksResponse = {
@@ -72,8 +71,13 @@ export function WidgetSyncProvider() {
     shared,
   );
 
-  const [pinState, setPinState] = useState<WidgetPinState>('unsupported');
+  const pinState = useWidgetPinStore((s) => s.pinState);
+  const setPinState = useWidgetPinStore((s) => s.setPinState);
+  const refreshPinState = useWidgetPinStore((s) => s.refreshPinState);
+  const promptRequested = useWidgetPinStore((s) => s.promptRequested);
+  const clearPromptRequest = useWidgetPinStore((s) => s.clearPromptRequest);
   const [promptOpen, setPromptOpen] = useState(false);
+  const [userInitiated, setUserInitiated] = useState(false);
   const wasSignedIn = useRef(false);
 
   const streak = streakData?.view?.count ?? 0;
@@ -120,7 +124,10 @@ export function WidgetSyncProvider() {
 
     let handle: PluginListenerHandle | undefined;
     void App.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) drain();
+      if (isActive) {
+        drain();
+        void refreshPinState();
+      }
     }).then((h) => {
       handle = h;
     });
@@ -128,7 +135,7 @@ export function WidgetSyncProvider() {
     return () => {
       void handle?.remove();
     };
-  }, [enabled, drain]);
+  }, [enabled, drain, refreshPinState]);
 
   // --- follow the app's own task-change broadcast ------------------------
   // Fires on every successful task mutation (add, tick, edit, delete) plus on
@@ -145,8 +152,16 @@ export function WidgetSyncProvider() {
   // --- the ask ----------------------------------------------------------
   useEffect(() => {
     if (!enabled) return;
-    void getWidgetPinState().then(setPinState);
-  }, [enabled]);
+    void refreshPinState();
+  }, [enabled, refreshPinState]);
+
+  useEffect(() => {
+    if (!promptRequested) return;
+    clearPromptRequest();
+    if (!enabled) return;
+    setUserInitiated(true);
+    setPromptOpen(true);
+  }, [promptRequested, clearPromptRequest, enabled]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -158,6 +173,7 @@ export function WidgetSyncProvider() {
           streak,
         })
       ) {
+        setUserInitiated(false);
         setPromptOpen(true);
       }
     };
@@ -172,6 +188,8 @@ export function WidgetSyncProvider() {
     <WidgetPromptSheet
       open={promptOpen}
       onOpenChange={setPromptOpen}
+      userInitiated={userInitiated}
+      zIndex={userInitiated ? 1360 : undefined}
       streak={streak}
       tasks={tasksData?.tasks ?? []}
       onPinned={() => setPinState('pinned')}

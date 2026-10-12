@@ -1,5 +1,8 @@
 import type { PipelineStage } from 'mongoose';
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import {
+  NOT_STATS_EXCLUDED,
+  StatsEventModel as AnalyticsEventModel,
+} from '@/lib/analytics/statsExclusion';
 import UserModel from '@/lib/models/User';
 import type { StatKpi } from '@/lib/analytics/catalog';
 
@@ -152,7 +155,7 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
         { $project: { users: { $size: '$userSet' }, sessions: { $size: '$sessionSet' } } },
       ]),
       UserModel.aggregate<{ _id: string; count: number }>([
-        { $match: { createdAt: window } },
+        { $match: { createdAt: window, ...NOT_STATS_EXCLUDED } },
         {
           $group: {
             _id: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d', timezone: 'UTC' } },
@@ -161,8 +164,8 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
         },
       ]),
       Promise.all([
-        UserModel.countDocuments({}),
-        UserModel.countDocuments({ premiumUntil: { $gt: new Date() } }),
+        UserModel.countDocuments(NOT_STATS_EXCLUDED),
+        UserModel.countDocuments({ premiumUntil: { $gt: new Date() }, ...NOT_STATS_EXCLUDED }),
       ]),
       AnalyticsEventModel.findOne({}).sort({ occurredAt: 1 }).select('occurredAt').lean<{
         occurredAt: Date;

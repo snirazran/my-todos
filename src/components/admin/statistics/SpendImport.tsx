@@ -30,6 +30,7 @@ type ImportRow = {
   taps: number;
   spread: boolean;
   label?: string;
+  auto?: boolean;
   createdAt: string;
 };
 
@@ -39,12 +40,16 @@ const CHANNEL_NAME = new Map<string, string>(SPEND_CHANNELS.map((channel) => [ch
 
 export function SpendImports({ onChanged, defaultRange }: { onChanged: () => void; defaultRange: { start: string; end: string } }) {
   const [imports, setImports] = useState<ImportRow[] | null>(null);
+  const [appleConnected, setAppleConnected] = useState(false);
   const [open, setOpen] = useState(false);
 
   const load = useCallback(() => {
     fetch('/api/admin/statistics/spend', { credentials: 'include' })
       .then((response) => (response.ok ? response.json() : { imports: [] }))
-      .then((body: { imports: ImportRow[] }) => setImports(body.imports))
+      .then((body: { imports: ImportRow[]; appleAdsConnected?: boolean }) => {
+        setImports(body.imports);
+        setAppleConnected(!!body.appleAdsConnected);
+      })
       .catch(() => setImports([]));
   }, []);
 
@@ -59,13 +64,18 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
     onChanged();
   };
 
+  const synced = (imports ?? []).filter((row) => row.auto);
+  const manual = (imports ?? []).filter((row) => !row.auto);
+
   return (
     <section className="rounded-lg border border-border bg-card">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold">Ad spend reports</h3>
+          <h3 className="text-sm font-bold">Ad spend</h3>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Import the report from Apple Ads (or Meta, TikTok) to turn installs into cost per account, cost per activated user, and ROAS.
+            {appleConnected
+              ? 'Apple Ads spend syncs automatically. Import reports from other networks (Meta, TikTok, Google) to fill their cost columns.'
+              : 'Import the report from Apple Ads (or Meta, TikTok) to turn installs into cost per account, cost per activated user, and ROAS.'}
           </p>
         </div>
         <button
@@ -87,13 +97,19 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
         <p className="px-4 py-4 text-[13px] text-muted-foreground">Loading…</p>
       ) : !imports.length ? (
         <div className="px-4 py-4 text-[13px] leading-relaxed text-muted-foreground">
-          <p className="font-semibold text-foreground">No reports imported yet.</p>
-          <p className="mt-1">
-            In Apple Ads, open Campaigns, pick the date range, and use the download button to export a CSV. Import the
-            Campaigns report first (it carries the true totals, including Search Match), then the Ad Groups and Keywords
-            reports for drill-down. Turn on a day-by-day breakdown if you can — otherwise totals are spread evenly over
-            the dates you pick.
-          </p>
+          {appleConnected ? (
+            <p>Nothing stored yet — the first Apple Ads sync fills this in.</p>
+          ) : (
+            <>
+              <p className="font-semibold text-foreground">No reports imported yet.</p>
+              <p className="mt-1">
+                In Apple Ads, open Campaigns, pick the date range, and use the download button to export a CSV. Import the
+                Campaigns report first (it carries the true totals, including Search Match), then the Ad Groups and Keywords
+                reports for drill-down. Turn on a day-by-day breakdown if you can — otherwise totals are spread evenly over
+                the dates you pick.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -101,16 +117,17 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
             <thead>
               <tr className="border-b border-border text-left text-[12px] text-muted-foreground">
                 <th className="px-4 py-2 font-semibold">Network</th>
-                <th className="px-3 py-2 font-semibold">Level</th>
+                <th className="px-3 py-2 font-semibold">Detail</th>
                 <th className="px-3 py-2 font-semibold">Dates</th>
                 <th className="px-3 py-2 text-right font-semibold">Spend</th>
                 <th className="px-3 py-2 text-right font-semibold">Installs</th>
-                <th className="px-3 py-2 font-semibold">Imported</th>
+                <th className="px-3 py-2 font-semibold">Updated</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
-              {imports.map((row) => (
+              {synced.length ? <SyncedRow rows={synced} /> : null}
+              {manual.map((row) => (
                 <tr key={row._id} className="border-b border-border/50 last:border-0">
                   <td className="px-4 py-2 font-semibold">
                     {CHANNEL_NAME.get(row.channel) ?? row.channel}
@@ -139,14 +156,19 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
               ))}
             </tbody>
           </table>
-          <p className="border-t border-border px-4 py-2 text-[12px] text-muted-foreground">
-            A new import only replaces earlier rows for the same network, level, dates, and campaigns — so per-campaign Ad Group and Keyword files sit side by side, and re-importing a file is safe.
-          </p>
+          {manual.length ? (
+            <p className="border-t border-border px-4 py-2 text-[12px] text-muted-foreground">
+              A new import only replaces earlier rows for the same network, level, dates, and campaigns — so per-campaign Ad
+              Group and Keyword files sit side by side, and re-importing a file is safe.
+              {synced.length ? ' Apple Ads rows you import by hand are overwritten by the next sync for the same campaigns and dates.' : ''}
+            </p>
+          ) : null}
         </div>
       )}
       {open ? (
         <ImportDialog
           defaultRange={defaultRange}
+          appleConnected={appleConnected}
           onClose={() => setOpen(false)}
           onImported={() => {
             setOpen(false);
@@ -159,16 +181,50 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
   );
 }
 
+function SyncedRow({ rows }: { rows: ImportRow[] }) {
+  const levels = (['campaign', 'adGroup', 'keyword'] as const).filter((level) => rows.some((row) => row.level === level));
+  const top = rows.filter((row) => row.level === levels[0]);
+  const start = rows.reduce((min, row) => (row.start < min ? row.start : min), rows[0].start);
+  const end = rows.reduce((max, row) => (row.end > max ? row.end : max), rows[0].end);
+  const updated = rows.reduce((max, row) => (row.createdAt > max ? row.createdAt : max), rows[0].createdAt);
+  const spend = top.reduce((sum, row) => sum + row.spend, 0);
+  const installs = top.reduce((sum, row) => sum + row.installs, 0);
+  const levelWords = { campaign: 'campaign', adGroup: 'ad group', keyword: 'keyword' };
+
+  return (
+    <tr className="border-b border-border/50 bg-emerald-500/[0.04]">
+      <td className="px-4 py-2 font-semibold">
+        Apple Ads
+        <span className="ml-1.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+          synced automatically
+        </span>
+      </td>
+      <td className="px-3 py-2 text-muted-foreground">
+        By {levels.map((level) => levelWords[level]).join(', ')}
+      </td>
+      <td className="px-3 py-2 tabular-nums text-muted-foreground">
+        {start} → {end}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">{money.format(spend)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{Math.round(installs * 10) / 10}</td>
+      <td className="px-3 py-2 text-muted-foreground">{updated.slice(0, 10)}</td>
+      <td className="px-3 py-2" />
+    </tr>
+  );
+}
+
 function ImportDialog({
   onClose,
   onImported,
   defaultRange,
+  appleConnected,
 }: {
   onClose: () => void;
   onImported: () => void;
   defaultRange: { start: string; end: string };
+  appleConnected: boolean;
 }) {
-  const [channel, setChannel] = useState('apple_ads');
+  const [channel, setChannel] = useState(appleConnected ? 'meta_ads' : 'apple_ads');
   const [text, setText] = useState('');
   const [label, setLabel] = useState('');
   const [start, setStart] = useState(defaultRange.start);
@@ -205,6 +261,14 @@ function ImportDialog({
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
@@ -248,6 +312,13 @@ function ImportDialog({
               />
             </label>
           </div>
+
+          {channel === 'apple_ads' && appleConnected ? (
+            <p className="rounded-md bg-amber-500/10 px-3 py-2 text-[12px] font-semibold text-amber-700 dark:text-amber-300">
+              Apple Ads already syncs automatically every 6 hours. A manual import for the same campaigns and dates is
+              overwritten by the next sync — only import Apple data the API can&apos;t provide.
+            </p>
+          ) : null}
 
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -365,7 +436,8 @@ type AppleAdsStatus = {
   lastRunAt: string | null;
   lastOkAt: string | null;
   lastError: string | null;
-  lastResult: { start: string; end: string; campaigns: number; spend: number; currency: string | null } | null;
+  lastResult: { start: string; end: string; days?: number; campaigns: number; spend: number; currency: string | null } | null;
+  backfilledFrom?: string | null;
 };
 
 function since(iso: string) {
@@ -379,7 +451,6 @@ function since(iso: string) {
 function AppleAdsSync({ onSynced }: { onSynced: () => void }) {
   const [status, setStatus] = useState<AppleAdsStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/statistics/spend/apple', { credentials: 'include' })
@@ -392,52 +463,66 @@ function AppleAdsSync({ onSynced }: { onSynced: () => void }) {
 
   const sync = async () => {
     setSyncing(true);
-    setError(null);
     try {
       const response = await fetch('/api/admin/statistics/spend/apple', { method: 'POST', credentials: 'include' });
       const body = await response.json().catch(() => ({}));
       if (body.status) setStatus(body.status);
-      if (!response.ok) throw new Error(body.error || 'Sync failed');
-      onSynced();
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Sync failed');
+      else if (!response.ok) setStatus((current) => (current ? { ...current, lastError: body.error ?? 'Sync failed' } : current));
+      if (response.ok) onSynced();
     } finally {
       setSyncing(false);
     }
   };
 
-  const problem = error ?? status.lastError;
+  const busy = syncing || status.running;
   const result = status.lastResult;
+  const failed = !!status.lastError && (!status.lastOkAt || (status.lastRunAt ?? '') > status.lastOkAt);
+  const days = result?.days ?? (result ? Math.round((Date.parse(result.end) - Date.parse(result.start)) / 86_400_000) + 1 : 0);
+  const currency = result?.currency && result.currency !== 'USD' ? ` ${result.currency}` : '';
+
+  let message: React.ReactNode;
+  if (!status.configured) {
+    message = <span className="text-muted-foreground">not connected — add the APPLE_ADS_* keys to sync spend automatically.</span>;
+  } else if (busy) {
+    message = (
+      <span className="text-muted-foreground">
+        {status.backfilledFrom ? 'syncing the last 90 days…' : 'syncing… the first sync backfills a full year and can take a minute.'}
+      </span>
+    );
+  } else if (failed) {
+    message = (
+      <span className="text-red-600 dark:text-red-400">
+        last sync failed{status.lastRunAt ? ` ${since(status.lastRunAt)}` : ''}: {status.lastError}
+        {status.lastOkAt ? <span className="text-muted-foreground"> · data is from {since(status.lastOkAt)}</span> : null}
+      </span>
+    );
+  } else if (status.lastOkAt && result) {
+    message = (
+      <span className="text-muted-foreground">
+        synced {since(status.lastOkAt)} · {money.format(result.spend)}
+        {currency} across {result.campaigns} campaign{result.campaigns === 1 ? '' : 's'} in the last {days} days · refreshes every 6 h
+      </span>
+    );
+  } else {
+    message = <span className="text-muted-foreground">connected · the first sync runs a minute after the server starts, or sync now.</span>;
+  }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[13px]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[13px]" aria-live="polite">
       <div className="min-w-0">
-        <span className="font-semibold">Apple Ads API</span>{' '}
-        {!status.configured ? (
-          <span className="text-muted-foreground">not connected — set the APPLE_ADS_* keys to sync spend automatically.</span>
-        ) : problem ? (
-          <span className="text-red-600 dark:text-red-400">{problem}</span>
-        ) : status.lastOkAt && result ? (
-          <span className="text-muted-foreground">
-            synced {since(status.lastOkAt)} · {result.campaigns} campaigns · {result.start} → {result.end} ·{' '}
-            {money.format(result.spend)}
-            {result.currency && result.currency !== 'USD' ? ` ${result.currency}` : ''} · refreshes every 6 h
-          </span>
-        ) : (
-          <span className="text-muted-foreground">connected · first sync runs within 15 min of a restart</span>
-        )}
+        <span className="font-semibold">Apple Ads API</span> {message}
       </div>
-      {status.configured && (
+      {status.configured ? (
         <button
           type="button"
           onClick={() => void sync()}
-          disabled={syncing || status.running}
+          disabled={busy}
           className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-[13px] font-bold hover:bg-muted disabled:opacity-50"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${syncing || status.running ? 'animate-spin' : ''}`} />
-          {syncing || status.running ? 'Syncing…' : 'Sync now'}
+          <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
+          {busy ? 'Syncing…' : failed ? 'Retry' : 'Sync now'}
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

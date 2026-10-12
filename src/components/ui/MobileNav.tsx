@@ -13,6 +13,7 @@ import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
+import { GiftBadge } from '@/components/ui/GiftBadge';
 
 const NAV_STUCK_MS = 5000;
 
@@ -20,7 +21,7 @@ export default function MobileNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const firstRunGuided = useUIStore((state) => state.isFirstRunGuided);
-  const { inventoryBadge } = useWardrobeBadges();
+  const { inventoryBadge, shopGiftReady } = useWardrobeBadges();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
@@ -151,7 +152,10 @@ export default function MobileNav() {
 
             const content = (
               <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
-                <div className={cn('relative', isPending && 'animate-pulse [animation-delay:250ms]')}>
+                <div
+                  data-inventory-target={item.label === 'Wardrobe' ? '' : undefined}
+                  className={cn('relative', isPending && 'animate-pulse [animation-delay:250ms]')}
+                >
                   <Icon
                     name={item.iconName}
                     label={item.label}
@@ -161,6 +165,8 @@ export default function MobileNav() {
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
                     </span>
+                  ) : item.label === 'Wardrobe' && shopGiftReady ? (
+                    <GiftBadge className="absolute -top-3 -right-3.5 animate-in zoom-in duration-300" />
                   ) : null}
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">

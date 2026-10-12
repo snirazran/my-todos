@@ -1,5 +1,5 @@
 import type { PipelineStage } from 'mongoose';
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import { StatsEventModel as AnalyticsEventModel } from '@/lib/analytics/statsExclusion';
 import type { StatTable } from '@/lib/analytics/catalog';
 import { rate, round } from './context';
 

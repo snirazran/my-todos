@@ -8,6 +8,11 @@ import {
   FLY_ECONOMY_DEFAULTS,
   type FlyEconomyConfig,
 } from '@/lib/economy/defaults';
+import {
+  SHOP_GIFT_MAX_FLIES,
+  SHOP_GIFT_MIN_FLIES,
+  SHOP_GIFT_STEP,
+} from '@/lib/economy/shopGift';
 
 type LedgerSummary = {
   from: string;
@@ -195,7 +200,12 @@ export function AdminEconomyManager() {
       Math.max(config.taskIncome.dailyCapFree, config.taskIncome.dailyCapPlus) +
       config.buddy.bonusFlies * config.buddy.dailyPayouts +
       Math.max(config.friendsPond.dailyCapFree, config.friendsPond.dailyCapPlus) +
-      config.rewardedAds.dailyCap * config.rewardedAds.reward
+      config.rewardedAds.dailyCap * config.rewardedAds.reward +
+      (config.shopGift.enabled
+        ? SHOP_GIFT_MAX_FLIES *
+          config.shopGift.luckyMultiplier *
+          config.shopGift.plusMultiplier
+        : 0)
     );
   }, [config]);
 
@@ -404,6 +414,41 @@ export function AdminEconomyManager() {
                 value={config.rewardedAds.cooldownSeconds}
                 onChange={(cooldownSeconds) =>
                   patch('rewardedAds', { cooldownSeconds })
+                }
+              />
+            </Group>
+
+            <Group
+              title="Daily shop gift"
+              subtitle={`Free flies for opening the Shop once a day; renews with the deals. A random ${SHOP_GIFT_MIN_FLIES}–${SHOP_GIFT_MAX_FLIES} in steps of ${SHOP_GIFT_STEP}, fixed per user per day.`}
+            >
+              <ToggleField
+                label="Gift enabled"
+                value={config.shopGift.enabled}
+                onChange={(enabled) => patch('shopGift', { enabled })}
+              />
+              <NumberField
+                label="Lucky chance"
+                suffix="%"
+                value={config.shopGift.luckyChancePercent}
+                onChange={(luckyChancePercent) =>
+                  patch('shopGift', { luckyChancePercent })
+                }
+              />
+              <NumberField
+                label="Lucky multiplier"
+                suffix="×"
+                value={config.shopGift.luckyMultiplier}
+                onChange={(luckyMultiplier) =>
+                  patch('shopGift', { luckyMultiplier })
+                }
+              />
+              <NumberField
+                label="Plus multiplier"
+                suffix="×"
+                value={config.shopGift.plusMultiplier}
+                onChange={(plusMultiplier) =>
+                  patch('shopGift', { plusMultiplier })
                 }
               />
             </Group>

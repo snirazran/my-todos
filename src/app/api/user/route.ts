@@ -14,6 +14,7 @@ import { normalizeWeekStart } from '@/lib/weekStart';
 import { v4 as uuid } from 'uuid';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 
 export async function GET(req: NextRequest) {
@@ -269,6 +270,13 @@ export async function PATCH(req: NextRequest) {
 
     if (!updatedUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (
+      isStatsExcludedFrogName(updates.frogName) &&
+      updatedUser.excludeFromStats === undefined
+    ) {
+      await excludeUserFromStats(uid);
     }
 
     return NextResponse.json({ ok: true, user: updatedUser });

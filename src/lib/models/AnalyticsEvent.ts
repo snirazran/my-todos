@@ -17,9 +17,10 @@ export interface AnalyticsEventDoc {
   properties: Record<string, string | number | boolean>;
   occurredAt: Date;
   createdAt: Date;
+  excludeFromStats?: boolean;
 }
 
-const AnalyticsEventSchema = new Schema<AnalyticsEventDoc>(
+export const AnalyticsEventSchema = new Schema<AnalyticsEventDoc>(
   {
     userId: { type: String, required: true, index: true },
     name: { type: String, required: true, index: true },
@@ -31,6 +32,7 @@ const AnalyticsEventSchema = new Schema<AnalyticsEventDoc>(
     externalId: { type: String, default: undefined },
     properties: { type: Schema.Types.Mixed, default: {} },
     occurredAt: { type: Date, required: true, default: Date.now, index: true },
+    excludeFromStats: { type: Boolean, default: undefined },
     createdAt: {
       type: Date,
       required: true,

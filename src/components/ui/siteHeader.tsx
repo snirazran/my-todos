@@ -34,7 +34,13 @@ import {
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  useAnimationControls,
+  useMotionValue,
+  useTransform,
+} from 'framer-motion';
 import { ChevronRight, CalendarDays, ShieldCheck } from 'lucide-react';
 import { openPrivacyOptions, privacyOptionsAvailable, subscribeAdConsent } from '@/lib/ads';
 import Fly from '@/components/ui/fly';
@@ -46,6 +52,12 @@ import {
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
+import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
+import type {
+  FocusCategoryTagMap,
+  MacroCategoryDefinition,
+  MacroCategoryId,
+} from '@/lib/quests/types';
 import { cn } from '@/lib/utils';
 
 export default function SiteHeader() {
@@ -63,6 +75,7 @@ export default function SiteHeader() {
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
+  const shopGiftReady = !!inventoryData?.shopGift?.available;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const { data: questsData } = useSWR<{
@@ -183,10 +196,12 @@ export default function SiteHeader() {
           {navItems.map((item) => {
             const href = item.protected && !user ? '/login' : item.href;
             const isActive = pendingHref ? pendingHref === item.href : pathname === item.href;
-            const badge =
+            const badge: { count: number; tone: string; gift?: boolean } | null =
               item.label === 'Wardrobe' && inventoryBadge > 0
                 ? { count: inventoryBadge, tone: 'bg-rose-500' }
-                : item.label === 'Quests' && questClaimableCount > 0
+                : item.label === 'Wardrobe' && shopGiftReady
+                  ? { count: 1, tone: 'bg-amber-500', gift: true }
+                  : item.label === 'Quests' && questClaimableCount > 0
                   ? { count: questClaimableCount, tone: 'bg-amber-500' }
                   : item.label === 'Friends' && friendAlerts > 0
                     ? { count: friendAlerts, tone: 'bg-rose-500' }
@@ -217,7 +232,10 @@ export default function SiteHeader() {
                     transition={{ type: 'spring', stiffness: 520, damping: 40 }}
                   />
                 ) : null}
-                <span className="relative">
+                <span
+                  className="relative"
+                  data-inventory-target={item.label === 'Wardrobe' ? '' : undefined}
+                >
                   <Icon
                     name={item.iconName}
                     label={item.label}
@@ -226,7 +244,9 @@ export default function SiteHeader() {
                       item.label === 'Friends' && 'scale-125 group-hover:scale-125',
                     )}
                   />
-                  {badge ? (
+                  {badge?.gift ? (
+                    <GiftBadge className="absolute -right-2.5 -top-2.5 h-[22px] w-[22px]" />
+                  ) : badge ? (
                     <span
                       className={cn(
                         'absolute -right-1.5 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none text-white ring-2 ring-background',
@@ -234,7 +254,11 @@ export default function SiteHeader() {
                       )}
                       aria-label={`${badge.count} new`}
                     >
-                      {badge.count > 9 ? '9+' : badge.count}
+                      {badge.count > 9 ? (
+                        '9+'
+                      ) : (
+                        badge.count
+                      )}
                     </span>
                   ) : null}
                 </span>
@@ -343,6 +367,8 @@ import { CommunityPanel } from '@/components/ui/CommunityModal';
 import { ProfilePanel } from '@/components/ui/ProfileModal';
 import { PlusMembershipSheet } from '@/components/ui/PlusMembershipSheet';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
+import { useWidgetPinStore } from '@/lib/widget/pinStore';
+import { GiftBadge } from '@/components/ui/GiftBadge';
 
 export function MobileMenuCluster({
   position = 'fixed',
@@ -393,7 +419,6 @@ function RightActions({
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const { openQuestOnboarding } = useUIStore();
   const { isAdmin } = useIsAdmin();
 
   // No click-outside listener needed — the settings sheet covers the entire viewport.
@@ -408,14 +433,6 @@ function RightActions({
     ]);
     await swrMutate(() => true, undefined, { revalidate: false });
     await onSignOut();
-  };
-
-  const handleOpenQuestOnboarding = () => {
-    openQuestOnboarding();
-    setIsOpen(false);
-    if (pathname !== '/') {
-      router.push('/');
-    }
   };
 
   const cycleTheme = () => {
@@ -534,7 +551,6 @@ function RightActions({
         theme={activeTheme}
         setTheme={setTheme}
         onSignIn={onSignIn}
-        onOpenQuestOnboarding={handleOpenQuestOnboarding}
         pathname={pathname}
         isAdmin={isAdmin}
       />
@@ -681,7 +697,6 @@ function MobileSheet({
   showAuth,
   theme,
   setTheme,
-  onOpenQuestOnboarding,
   pathname,
   isAdmin,
 }: any) {
@@ -699,12 +714,20 @@ function MobileSheet({
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [areasOpen, setAreasOpen] = useState(false);
   const [railGuestSignOut, setRailGuestSignOut] = useState(false);
   const openFocusLauncher = useFrogodoroUiStore((state) => state.openFocusLauncher);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, isWeb, enableOrConfigure, disable: disableNotifs, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
     userInfoFetcher,
+    { revalidateOnFocus: false },
+  );
+  const { data: questsData, mutate: mutateQuests } = useSWR<QuestAreasInfo>(
+    isOpen && showAuth && user
+      ? `/api/quests?view=home&timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`
+      : null,
+    (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
   const { connections } = useCalendarConnections();
@@ -725,10 +748,6 @@ function MobileSheet({
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  // Reset to main view whenever the sheet opens
-  useEffect(() => {
-    if (isOpen) setView('main');
-  }, [isOpen]);
 
   const timerSheetOpen = useFrogodoroUiStore((state) => state.openSheets > 0);
   useEffect(() => {
@@ -746,6 +765,19 @@ function MobileSheet({
 
   const sheetControls = useAnimationControls();
   const subviewControls = useAnimationControls();
+  const subviewX = useMotionValue(typeof window !== 'undefined' ? window.innerWidth : 390);
+  const pushProgress = (x: number) => {
+    const width = window.innerWidth || 1;
+    return Math.min(1, Math.max(0, 1 - x / width));
+  };
+  const mainParallaxX = useTransform(subviewX, (x) => -pushProgress(x) * window.innerWidth * 0.28);
+  const mainScrimOpacity = useTransform(subviewX, (x) => pushProgress(x) * 0.16);
+  // Reset to main view whenever the sheet opens
+  useEffect(() => {
+    if (!isOpen) return;
+    setView('main');
+    subviewX.set(window.innerWidth);
+  }, [isOpen, subviewX]);
   const sheetSwipeRef = useSwipeAxisLock(isMobile && view === 'main');
   const subviewSwipeRef = useSwipeAxisLock(isMobile);
   useEffect(() => {
@@ -790,7 +822,7 @@ function MobileSheet({
     main: 'Settings',
     preferences: 'Preferences',
     notifications: 'Notifications',
-    community: 'Join our frog community',
+    community: 'Community',
     profile: 'Profile',
     helpCenter: 'Help center',
     contact: 'Contact us',
@@ -816,10 +848,7 @@ function MobileSheet({
         onOpenPreferences={() => setView('preferences')}
         onOpenIntegrations={() => setView('integrations')}
         onOpenFocusTimer={openFocusLauncher}
-        onOpenQuestFocus={() => {
-          onOpenQuestOnboarding();
-          onClose();
-        }}
+        onOpenQuestFocus={() => setAreasOpen(true)}
         onInviteFriends={() => setInviteOpen(true)}
         onOpenCommunity={() => setView('community')}
         onOpenProfile={() => setView('profile')}
@@ -856,10 +885,7 @@ function MobileSheet({
       <PreferencesView
         theme={theme}
         setTheme={setTheme}
-        onOpenQuestOnboarding={() => {
-          onOpenQuestOnboarding();
-          onClose();
-        }}
+        onOpenQuestOnboarding={() => setAreasOpen(true)}
       />
     ) : view === 'notifications' ? (
       <NotificationsView
@@ -938,18 +964,41 @@ function MobileSheet({
     <>
       <AnimatePresence>
         {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className="fixed left-1/2 top-16 z-[1350] -translate-x-1/2 rounded-full bg-foreground text-background px-4 py-2 text-xs font-bold shadow-lg"
-          >
-            {toast}
-          </motion.div>
+          <div className="pointer-events-none fixed inset-x-0 top-16 z-[1350] flex justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+              role="status"
+              className="rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background shadow-lg"
+            >
+              {toast}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
       <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
       <PlusUpgradeModal open={plusOpen} placement="settings_menu" onClose={() => setPlusOpen(false)} />
+      {questsData?.onboarding && (
+        <QuestOnboardingPopup
+          show={areasOpen}
+          zIndex={1360}
+          isCompleted={!!questsData.onboarding.complete}
+          initialSelectedCategoryIds={questsData.onboarding.selectedCategoryIds ?? []}
+          initialCategoryTagMap={questsData.onboarding.categoryTagMap ?? []}
+          categories={questsData.macroCategories ?? []}
+          isPremium={!!questsData.isPremium}
+          onClose={() => setAreasOpen(false)}
+          onCompleted={() => {
+            setAreasOpen(false);
+            void mutateQuests();
+            void swrMutate(
+              (key: unknown) => typeof key === 'string' && key.startsWith('/api/tasks'),
+            );
+          }}
+        />
+      )}
       {railGuestSignOut && (
         <GuestSignOutConfirm
           onCancel={() => setRailGuestSignOut(false)}
@@ -1228,9 +1277,11 @@ function MobileSheet({
           }}
           className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-hidden bg-slate-100 dark:bg-background will-change-transform"
         >
-        <div className="absolute inset-0 overflow-y-auto">
+        <motion.div
+          className="absolute inset-0 overflow-y-auto"
+          style={{ x: mainParallaxX }}
+        >
         <div className="w-full">
-          {/* Top bar */}
           <div
             className="sticky top-0 z-10 bg-slate-100 dark:bg-background"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -1249,19 +1300,26 @@ function MobileSheet({
 
           <div className="px-5 pb-10 space-y-5">{mainContent}</div>
         </div>
-        </div>
+        </motion.div>
+
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-[15] bg-black"
+          style={{ opacity: mainScrimOpacity }}
+        />
 
         <AnimatePresence>
           {view !== 'main' && (
         <motion.div
           key="subview"
-          initial={{ x: '100%' }}
+          initial={{ x: window.innerWidth }}
           animate={subviewControls}
-          exit={{ x: '100%' }}
+          exit={{ x: window.innerWidth }}
           transition={sheetTransition}
           ref={subviewSwipeRef}
           drag={isMobile ? 'x' : false}
           {...swipeDragProps}
+          style={{ ...swipeDragProps.style, x: subviewX }}
           onDragEnd={(_e, info) => {
             if (shouldDismissSwipe(info.offset.x, info.velocity.x)) {
               const target = view === 'contact' ? contactBack : 'main';
@@ -1279,7 +1337,7 @@ function MobileSheet({
               subviewControls.start({ x: 0, transition: settleSpring(info.velocity.x) });
             }
           }}
-          className="absolute inset-0 z-20 overflow-y-auto bg-slate-100 dark:bg-background will-change-transform"
+          className="absolute inset-0 z-20 overflow-y-auto bg-slate-100 shadow-[-12px_0_32px_rgba(15,23,42,0.12)] dark:bg-background will-change-transform"
         >
         <div className="w-full">
           <div
@@ -1299,7 +1357,7 @@ function MobileSheet({
                   {
                     preferences: 'Preferences',
                     notifications: 'Notifications',
-                    community: 'Join our frog community',
+                    community: 'Community',
                     profile: 'Profile',
                     helpCenter: 'Help center',
                     contact: 'Contact us',
@@ -1324,6 +1382,16 @@ function MobileSheet({
     document.body,
   );
 }
+
+type QuestAreasInfo = {
+  isPremium?: boolean;
+  onboarding?: {
+    complete: boolean;
+    selectedCategoryIds: MacroCategoryId[];
+    categoryTagMap: FocusCategoryTagMap[];
+  };
+  macroCategories?: MacroCategoryDefinition[];
+};
 
 function MainView({
   displayName,
@@ -1396,44 +1464,74 @@ function MainView({
   const activeConnections = activeCalendars + aiConnections;
   const needsAttention = connections.some((c) => c.status !== 'active');
   const isDesktop = layout === 'desktop';
+  const widgetPinState = useWidgetPinStore((s) => s.pinState);
+  const refreshWidgetPinState = useWidgetPinStore((s) => s.refreshPinState);
+  const requestWidgetPrompt = useWidgetPinStore((s) => s.requestPrompt);
+
+  useEffect(() => {
+    if (isNative) void refreshWidgetPinState();
+  }, [isNative, refreshWidgetPinState]);
 
   return (
-    <div className="space-y-5">
-      {/* User card */}
+    <div className="settings-stagger space-y-5">
       {!isDesktop && (
-        <div className="rounded-2xl bg-card border border-border/50 px-5 py-4 shadow-sm">
-          <p className="text-xl font-black tracking-tight truncate">
-            <span>{displayName}</span>
-            <span className="text-muted-foreground mx-1.5">&amp;</span>
-            <span>{frogName}</span>
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          aria-label="Edit profile"
+          className="flex w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-5 py-4 text-left shadow-sm transition-[background-color,transform] hover:bg-accent/50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-xl font-black tracking-tight truncate">
+              <span>{displayName}</span>
+              <span className="text-muted-foreground mx-1.5">&amp;</span>
+              <span>{frogName}</span>
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+              {isPremium && (
+                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[11px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
+                  Plus
+                </span>
+              )}
+              Edit profile
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+        </button>
       )}
 
-      {/* Guest mode promo */}
       {isGuest && (
         <PromoCard
-          icon={<ShieldAlert className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
-          title="Your frog isn't backed up"
-          subtitle="Create a free account so your progress is safe on any device."
-          actionLabel="Save it"
+          icon={<ShieldAlert className="w-7 h-7 text-amber-200" strokeWidth={2.5} />}
+          title={`Keep ${frogName} safe`}
+          subtitle="Free account, so your frog and streak follow you to any device."
+          actionLabel="Back up"
           onAction={onCreateAccount}
         />
       )}
 
-      {/* Enable notifications promo (mobile + web, when not enabled) */}
+      {isNative && widgetPinState === 'available' && (
+        <PromoCard
+          icon={<WidgetPromoIcon />}
+          bareIcon
+          title="Add the widget"
+          subtitle={`Tap a fly to finish a task, with ${frogName} on your home screen.`}
+          actionLabel="Add"
+          onAction={requestWidgetPrompt}
+        />
+      )}
+
       {(isNative || isWeb) && canEnableNotifs && !notifsEnabled && (
         <PromoCard
-          icon={<Bell className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
-          title="Enable notifications"
-          subtitle={`Get reminded to check in on ${frogName}!`}
-          actionLabel={notifLoading ? 'Enabling…' : 'Enable'}
+          icon={<Bell className="w-7 h-7 text-amber-200" strokeWidth={2.5} />}
+          title="Turn on reminders"
+          subtitle={`A morning plan and an evening check-in from ${frogName}.`}
+          actionLabel={notifLoading ? 'Turning on…' : 'Turn on'}
           onAction={onEnableNotifs}
           disabled={notifLoading}
         />
       )}
 
-      {/* Quick action tiles */}
       <QuickTilesGrid
         theme={theme}
         setTheme={setTheme}
@@ -1450,18 +1548,17 @@ function MainView({
                   aiConnections > 0 ? 'AI assistant' : null,
                 ]
                   .filter(Boolean)
-                  .join(' ֲ· ')
-              : 'Calendar and AI'
+                  .join(' · ')
+              : 'Calendar & AI'
         }
       />
 
-      {/* Frogress Plus promo */}
       {!isPremium && (
         <button
           type="button"
           onClick={onOpenPlus}
           aria-label="Unlock Frogress Plus"
-          className="group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+          className="group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-primary"
         >
           <span
             aria-hidden
@@ -1481,88 +1578,84 @@ function MainView({
                 Plus
               </span>
             </p>
-            <p className="text-xs font-semibold text-emerald-900/75">All quests at once &amp; double rewards!</p>
+            <p className="mt-0.5 text-xs font-bold leading-snug text-emerald-900/80">
+              Double the rewards for every task you finish.
+            </p>
           </div>
           <span
             aria-hidden
-            className="hidden min-[380px]:inline-flex shrink-0 items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-[13px] font-black text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
+            className="relative inline-flex narrow:hidden shrink-0 items-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3.5 py-2 text-[13px] font-black text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_3px_0_0_rgba(20,83,45,0.55)] ring-1 ring-emerald-900/40 transition-[transform,box-shadow] duration-150 group-active:translate-y-0.5 group-active:shadow-none"
           >
-            Try 7 days free
+            <span className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-promo-shine" />
+            <span className="relative">Try Plus</span>
           </span>
         </button>
       )}
 
-      {/* Community */}
+      {!isDesktop && (
+        <MenuSection title="Settings">
+          {(isNative || isWeb) && (
+            <MenuRow
+              icon={<Bell className="w-7 h-7 text-amber-500" />}
+              label="Notifications"
+              description="Reminders and focus timer alerts"
+              trailing={
+                <span className="text-[11px] font-bold text-muted-foreground">
+                  {notifsEnabled ? 'On' : 'Off'}
+                </span>
+              }
+              onClick={onOpenNotifications}
+            />
+          )}
+          <MenuRow
+            icon={<SlidersHorizontal className="w-7 h-7 text-emerald-500" />}
+            label="Preferences"
+            description="Theme, week start, sounds & more"
+            onClick={onOpenPreferences}
+          />
+        </MenuSection>
+      )}
+
+      {isPremium && (
+        <MenuSection title="Membership">
+          <MenuRow
+            icon={<Icon name="frogPlus" className="w-9 h-9" />}
+            label="Frogress Plus"
+            description="Manage your membership"
+            trailing={
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+                Active
+              </span>
+            }
+            onClick={() => setPlusInfoOpen(true)}
+          />
+        </MenuSection>
+      )}
+
       <MenuSection title="Community">
         <MenuRow
           icon={<Icon name="inviteFriends" label="Invite friends" className="w-10 h-10" />}
           label="Invite friends"
+          description="Team up and keep each other going"
           onClick={onInviteFriends}
         />
         {!isDesktop && (
           <MenuRow
             icon={<Icon name="community" label="Community" className="w-10 h-10" />}
-            label="Join our frog community"
+            label="Join the frog community"
+            description="Tips, sneak peeks and fellow frogs"
             onClick={onOpenCommunity}
           />
         )}
-      </MenuSection>
-
-      {/* Account */}
-      {!isDesktop && (
-      <MenuSection title="Account">
-        {(isNative || isWeb) && (
-          <MenuRow
-            icon={<Bell className="w-7 h-7 text-amber-500" />}
-            label="Notifications"
-            trailing={
-              <span className="text-[11px] font-bold text-muted-foreground">
-                {notifsEnabled ? 'On' : 'Off'}
-              </span>
-            }
-            onClick={onOpenNotifications}
-          />
-        )}
         <MenuRow
-          icon={<User className="w-7 h-7 text-sky-500" />}
-          label="Profile"
-          onClick={onOpenProfile}
-        />
-        <MenuRow
-          icon={<Blocks className="w-7 h-7 text-emerald-500" />}
-          label="Integrations"
-          trailing={
-            needsAttention ? (
-              <span className="text-[11px] font-bold text-amber-600">Action needed</span>
-            ) : (
-              <span className="text-[11px] font-bold text-muted-foreground">
-                {activeConnections > 0 ? `${activeConnections} connected` : 'Off'}
-              </span>
-            )
+          icon={
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
+              <Fly size={28} interactive={false} alwaysPlay />
+            </span>
           }
-          onClick={onOpenIntegrations}
-        />
-        <MenuRow
-          icon={<SlidersHorizontal className="w-7 h-7 text-emerald-500" />}
-          label="Preferences"
-          onClick={onOpenPreferences}
-        />
-      </MenuSection>
-      )}
-
-      {/* Subscriptions */}
-      <MenuSection title="Subscriptions">
-        <MenuRow
-          icon={<Icon name="frogPlus" className="w-9 h-9" />}
-          label="Frogress Plus"
-          trailing={
-            isPremium ? (
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
-                Active
-              </span>
-            ) : undefined
-          }
-          onClick={isPremium ? () => setPlusInfoOpen(true) : onOpenPlus}
+          label="Fly Catch"
+          description="30 seconds. Beat your best score."
+          onClick={() => window.location.assign('/fly-catch')}
         />
       </MenuSection>
 
@@ -1572,35 +1665,23 @@ function MainView({
         fallbackUntil={premiumUntil}
       />
 
-      {/* Support */}
       {!isDesktop && (
         <MenuSection title="Support">
           <MenuRow
             icon={<HelpCircle className="w-7 h-7 text-sky-500" />}
             label="Help center"
+            description="Quick answers and how-tos"
             onClick={onHelpCenter}
           />
           <MenuRow
             icon={<AlertTriangle className="w-7 h-7 text-red-500" />}
-            label="Report an issue"
+            label="Report a problem"
+            description="We read every report"
             onClick={onReportIssue}
           />
         </MenuSection>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card">
-        <MenuRow
-          icon={
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
-              <Fly size={28} interactive={false} alwaysPlay />
-            </span>
-          }
-          label="Fly Catch"
-          onClick={() => window.location.assign('/fly-catch')}
-        />
-      </div>
-
-      {/* Admin */}
       {isAdmin && !isDesktop && (
         <MenuSection title="Admin">
           <MenuRow
@@ -1614,10 +1695,10 @@ function MainView({
       {!isDesktop && (
       <button
         onClick={isGuest ? () => setConfirmGuestSignOut(true) : onSignOut}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 font-black text-rose-600 shadow-sm transition-all hover:bg-rose-100 active:scale-[0.99] dark:border-rose-400/35 dark:bg-rose-500/15 dark:text-rose-300 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_rgba(0,0,0,0.12)] dark:hover:border-rose-400/50 dark:hover:bg-rose-500/25"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border/50 bg-card p-4 text-sm font-black text-rose-600 transition-[background-color,transform] hover:bg-rose-50 active:scale-[0.99] dark:text-rose-400 dark:hover:bg-rose-500/10"
       >
-        <LogOut className="h-6 w-6" strokeWidth={2.5} />
-        Sign Out
+        <LogOut className="h-5 w-5" strokeWidth={2.5} />
+        Sign out
       </button>
       )}
 
@@ -1709,20 +1790,14 @@ function PreferencesView({
         <motion.button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           whileTap={{ scale: 0.985 }}
-          animate={{
-            boxShadow:
-              theme === 'dark'
-                ? 'inset 0 0 0 1px rgba(74, 222, 128, 0.18)'
-                : 'inset 0 0 0 1px rgba(245, 158, 11, 0.14)',
-          }}
-          transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+          transition={{ type: 'spring', stiffness: 600, damping: 30, mass: 0.6 }}
           className="flex w-full items-center justify-between bg-card px-4 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-accent/50"
         >
           <span className="flex items-center gap-3">
             <div className="flex h-9 w-12 items-center justify-center">
               <AnimatedThemeIcon dark={theme === 'dark'} />
             </div>
-            <span className="font-bold text-sm">Color Mode</span>
+            <span className="font-bold text-sm">Color mode</span>
           </span>
           <span className="text-[11px] font-bold text-muted-foreground capitalize">
             {theme === 'dark' ? 'Dark' : 'Light'}
@@ -1741,8 +1816,9 @@ function PreferencesView({
 
       <MenuSection title="Quests">
         <MenuRow
-          icon={<Icon name="compass" label="Quest Focus" className="w-10 h-10" />}
-          label="Quest Focus"
+          icon={<Icon name="compass" label="Areas" className="w-10 h-10" />}
+          label="Areas"
+          description="Pick what your quests focus on"
           onClick={onOpenQuestOnboarding}
         />
       </MenuSection>
@@ -1868,7 +1944,7 @@ function HapticsToggleRow() {
         <div className="flex h-9 w-12 items-center justify-center">
           <Vibrate className="w-7 h-7 text-emerald-500" />
         </div>
-        <span className="font-bold text-sm">Haptic Vibrations</span>
+        <span className="font-bold text-sm">Haptics</span>
       </span>
       <span
         className={cn(
@@ -1878,7 +1954,7 @@ function HapticsToggleRow() {
       >
         <span
           className={cn(
-            'h-5 w-5 rounded-full bg-white shadow transition-transform',
+            'h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ease-spring',
             enabled ? 'translate-x-5' : 'translate-x-0',
           )}
         />
@@ -1908,7 +1984,7 @@ function CatchSoundsToggleRow() {
         <div className="flex h-9 w-12 items-center justify-center">
           <Volume2 className="w-7 h-7 text-emerald-500" />
         </div>
-        <span className="font-bold text-sm">Catch Sounds</span>
+        <span className="font-bold text-sm">Catch sounds</span>
       </span>
       <span
         className={cn(
@@ -1918,7 +1994,7 @@ function CatchSoundsToggleRow() {
       >
         <span
           className={cn(
-            'h-5 w-5 rounded-full bg-white shadow transition-transform',
+            'h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ease-spring',
             enabled ? 'translate-x-5' : 'translate-x-0',
           )}
         />
@@ -1976,7 +2052,7 @@ function NotificationsView({
           >
             <span
               className={cn(
-                'h-5 w-5 rounded-full bg-white shadow transition-transform',
+                'h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ease-spring',
                 notifsEnabled ? 'translate-x-5' : 'translate-x-0',
               )}
             />
@@ -2040,6 +2116,7 @@ function SignedOutView({ onSignIn, onClose }: { onSignIn: () => void; onClose: (
 
 function PromoCard({
   icon,
+  bareIcon,
   title,
   titleBadge,
   subtitle,
@@ -2048,6 +2125,7 @@ function PromoCard({
   disabled,
 }: {
   icon: React.ReactNode;
+  bareIcon?: boolean;
   title: string;
   titleBadge?: string;
   subtitle: string;
@@ -2060,33 +2138,69 @@ function PromoCard({
       type="button"
       onClick={onAction}
       disabled={disabled}
-      className="group relative isolate w-full overflow-hidden text-left rounded-2xl bg-[linear-gradient(125deg,#8b5cf6_0%,#7c3aed_55%,#6d28d9_100%)] text-white px-4 py-4 flex items-center gap-3 shadow-md ring-1 ring-white/15 transition-transform active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
+      className="group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#6fbf5f_0%,#4f9149_58%,#3f7a3a_100%)] px-4 py-3.5 text-left text-white shadow-[0_3px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-70 disabled:active:scale-100"
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-1/2 bg-gradient-to-b from-white/15 to-transparent"
       />
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-        {icon}
-      </div>
+      {bareIcon ? (
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center">{icon}</div>
+      ) : (
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+          {icon}
+        </div>
+      )}
       <div className="flex-1 min-w-0">
-        <p className="text-base font-black tracking-tight flex items-center gap-2">
+        <p className="text-base font-black tracking-tight flex items-center gap-2 drop-shadow-[0_1px_0_rgba(31,74,26,0.35)]">
           {title}
           {titleBadge && (
-            <span className="text-[10px] font-black tracking-wider bg-white/90 text-violet-700 rounded-md px-1.5 py-0.5">
+            <span className="text-[10px] font-black tracking-wider bg-white/90 text-[#3f7a3a] rounded-md px-1.5 py-0.5">
               {titleBadge}
             </span>
           )}
         </p>
-        <p className="text-xs font-semibold text-white/85">{subtitle}</p>
+        <p className="mt-0.5 text-xs font-bold leading-snug text-white/90">{subtitle}</p>
       </div>
       <span
         aria-hidden
-        className="shrink-0 rounded-xl bg-white px-3.5 py-2 text-xs font-black tracking-tight text-violet-700 shadow-[0_3px_0_0_rgba(76,29,149,0.6)] transition-all group-active:translate-y-0.5 group-active:shadow-none"
+        className="shrink-0 rounded-xl bg-white px-4 py-2 text-[13px] font-black tracking-tight text-[#3f7a3a] shadow-[0_3px_0_0_rgba(31,74,26,0.55)] transition-[transform,box-shadow] duration-150 group-active:translate-y-0.5 group-active:shadow-none"
       >
         {actionLabel}
       </span>
     </button>
+  );
+}
+
+function WidgetPromoIcon() {
+  return (
+    <span aria-hidden className="relative block h-12 w-12">
+      <span className="absolute inset-0 -rotate-6 overflow-hidden rounded-[14px] bg-white shadow-[0_3px_0_0_rgba(31,74,26,0.45)] ring-1 ring-black/5">
+        <img
+          src="/widgets/frog-laptop.svg"
+          alt=""
+          className="absolute -bottom-0.5 -left-1.5 h-[30px] w-[41px] max-w-none -scale-x-100"
+        />
+        <span className="absolute right-1.5 top-2 flex flex-col gap-1">
+          {[0, 1, 2].map((row) => (
+            <span key={row} className="flex items-center gap-0.5">
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  row === 0 ? 'bg-[#00A53C]' : 'border border-[#d9d9d9] bg-[#fafafa]',
+                )}
+              />
+              <span className="h-1 w-3 rounded-full bg-[#e5e5e5]" />
+            </span>
+          ))}
+        </span>
+      </span>
+      <img
+        src="/widgets/plus.svg"
+        alt=""
+        className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full ring-2 ring-white"
+      />
+    </span>
   );
 }
 
@@ -2107,12 +2221,10 @@ function QuickTile({
     <motion.button
       type="button"
       onClick={onClick}
-      initial={{ opacity: 0.9, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+      whileTap={{ scale: 0.96 }}
+      transition={{ type: 'spring', stiffness: 600, damping: 30, mass: 0.6 }}
       className={cn(
-        'flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-[background-color,border-color,box-shadow,transform] active:scale-[0.98] hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary max-[359px]:gap-2 max-[359px]:px-3',
+        'flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-colors duration-150 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary narrow:gap-2 narrow:px-3',
         className,
       )}
     >
@@ -2131,16 +2243,18 @@ function QuickTile({
 
 function AnimatedThemeIcon({ dark }: { dark: boolean }) {
   return (
-    <motion.span
+    <span
       aria-hidden
-      animate={{
-        backgroundColor: dark ? '#252a3d' : '#fef3c7',
-        borderColor: dark ? '#64748b' : '#fbbf24',
-      }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="relative block h-7 w-11 overflow-hidden rounded-full border shadow-inner"
+      className="relative block h-7 w-11 overflow-hidden rounded-full border border-amber-400 bg-amber-100 shadow-inner"
     >
       <motion.span
+        initial={false}
+        animate={{ opacity: dark ? 1 : 0 }}
+        transition={{ duration: 0.28, ease: 'easeOut' }}
+        className="absolute -inset-px rounded-full border border-slate-500 bg-[#252a3d]"
+      />
+      <motion.span
+        initial={false}
         animate={{ x: dark ? 16 : 0, rotate: dark ? 180 : 0 }}
         transition={{ type: 'spring', stiffness: 440, damping: 28 }}
         className="absolute left-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-white shadow-md"
@@ -2167,7 +2281,7 @@ function AnimatedThemeIcon({ dark }: { dark: boolean }) {
           )}
         </AnimatePresence>
       </motion.span>
-    </motion.span>
+    </span>
   );
 }
 
@@ -2193,28 +2307,16 @@ function QuickTilesGrid({
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      {/* Fly Catch now lives in the Support section.
-        <QuickTile
-          icon={
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500/12 ring-1 ring-emerald-500/20">
-              <Fly size={40} interactive={false} alwaysPlay />
-            </span>
-          }
-          title="Fly Catch"
-          subtitle="30 seconds ֲ· catch one more ֲ· climb the leaderboard"
-          onClick={() => window.location.assign('/fly-catch')}
-        />
-      */}
       <QuickTile
         icon={<Icon name="compass" label="Areas" className="h-[52px] w-[52px]" />}
         title="Areas"
-        subtitle="Tailor your quests"
+        subtitle="Pick your focus"
         onClick={onOpenQuestFocus}
       />
       <QuickTile
         icon={<Icon name="shuffle" label="Style Shuffle" className="h-[52px] w-[52px]" />}
         title="Style Shuffle"
-        subtitle={labelForInterval(rotation)}
+        subtitle={rotation === 'disabled' ? 'Auto-change outfits' : `New look ${labelForInterval(rotation).toLowerCase()}`}
         onClick={() => setRotationOpen(true)}
       />
       <QuickTile
@@ -2226,7 +2328,7 @@ function QuickTilesGrid({
       <QuickTile
         icon={<Icon name="clock" label="Focus timer" className="h-[52px] w-[52px]" />}
         title="Focus timer"
-        subtitle="Work in protected stretches"
+        subtitle="Focus to earn flies"
         onClick={onOpenFocusTimer}
       />
       <QuickTile
@@ -2236,7 +2338,6 @@ function QuickTilesGrid({
         onClick={onOpenIntegrations}
       />
       <QuickTile
-        key={`theme-${theme}`}
         icon={<AnimatedThemeIcon dark={theme === 'dark'} />}
         title="Color mode"
         subtitle={theme === 'dark' ? 'Dark' : 'Light'}
@@ -2266,23 +2367,33 @@ function MenuSection({ title, children }: { title: string; children: React.React
 function MenuRow({
   icon,
   label,
+  description,
   trailing,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  description?: string;
   trailing?: React.ReactNode;
   onClick: () => void;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-accent/50 transition-colors text-left"
+      className="w-full flex min-h-[60px] items-center gap-3 px-4 py-3 hover:bg-accent/50 active:bg-accent/70 transition-colors text-left focus-visible:outline-none focus-visible:bg-accent/60"
     >
       <div className="h-9 w-9 flex items-center justify-center shrink-0">
         {icon}
       </div>
-      <span className="min-w-0 flex-1 text-sm font-bold line-clamp-2 leading-tight">{label}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold line-clamp-2 leading-tight">{label}</span>
+        {description && (
+          <span className="mt-0.5 block truncate text-[12px] font-semibold text-muted-foreground">
+            {description}
+          </span>
+        )}
+      </span>
       {trailing && <span className="shrink-0">{trailing}</span>}
       <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
     </button>

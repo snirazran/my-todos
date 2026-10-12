@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { EyeOff, Loader2, X } from 'lucide-react';
 
 type Journey = {
   profile: {
@@ -11,6 +11,7 @@ type Journey = {
     createdAt: string | null;
     tier: string;
     onboarded: boolean;
+    excludedFromStats: boolean;
     flies: number;
     streak: number;
     friends: number;
@@ -159,15 +160,54 @@ function groupTimeline(timeline: Journey['timeline']) {
   return Array.from(days.entries());
 }
 
-export function JourneyDrawer({ userId, onClose }: { userId: string | null; onClose: () => void }) {
+export function JourneyDrawer({
+  userId,
+  onClose,
+  onExclusionChange,
+}: {
+  userId: string | null;
+  onClose: () => void;
+  onExclusionChange?: () => void;
+}) {
   const [data, setData] = useState<Journey | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmExclude, setConfirmExclude] = useState(false);
+  const [savingExclusion, setSavingExclusion] = useState(false);
+  const [exclusionError, setExclusionError] = useState<string | null>(null);
+
+  const setExcluded = async (exclude: boolean) => {
+    if (!userId || savingExclusion) return;
+    setSavingExclusion(true);
+    setExclusionError(null);
+    try {
+      const response = await fetch('/api/admin/statistics/exclude', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, exclude }),
+      });
+      if (!response.ok) throw new Error('Could not update this user');
+      setData((current) =>
+        current
+          ? { ...current, profile: { ...current.profile, excludedFromStats: exclude } }
+          : current,
+      );
+      setConfirmExclude(false);
+      onExclusionChange?.();
+    } catch (reason) {
+      setExclusionError(reason instanceof Error ? reason.message : 'Could not update this user');
+    } finally {
+      setSavingExclusion(false);
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
     const controller = new AbortController();
     setData(null);
     setError(null);
+    setConfirmExclude(false);
+    setExclusionError(null);
     fetch(`/api/admin/statistics/journey?id=${encodeURIComponent(userId)}`, {
       credentials: 'include',
       signal: controller.signal,
@@ -234,6 +274,74 @@ export function JourneyDrawer({ userId, onClose }: { userId: string | null; onCl
 
           {data ? (
             <div className="space-y-5">
+              <section
+                className={
+                  data.profile.excludedFromStats
+                    ? 'rounded-lg border border-amber-500/40 bg-amber-500/10 p-3.5'
+                    : 'rounded-lg border border-border p-3.5'
+                }
+              >
+                <div className="flex items-start gap-3">
+                  <EyeOff
+                    className={
+                      data.profile.excludedFromStats
+                        ? 'mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                        : 'mt-0.5 h-4 w-4 shrink-0 text-muted-foreground'
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold">
+                      {data.profile.excludedFromStats
+                        ? 'Excluded from statistics'
+                        : 'Counted in statistics'}
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {data.profile.excludedFromStats
+                        ? 'Hidden from every chart, count and export until you include it again. Find it under Tier › Excluded from stats.'
+                        : 'Exclude test or internal accounts so they stop skewing the numbers. Nothing is deleted.'}
+                    </p>
+                    {confirmExclude && !data.profile.excludedFromStats ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void setExcluded(true)}
+                          disabled={savingExclusion}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-amber-600 px-3 text-[13px] font-bold text-white hover:bg-amber-700 disabled:opacity-60"
+                        >
+                          {savingExclusion ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                          Yes, exclude
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmExclude(false)}
+                          disabled={savingExclusion}
+                          className="h-8 rounded-md border border-border px-3 text-[13px] font-semibold hover:bg-muted"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          data.profile.excludedFromStats
+                            ? void setExcluded(false)
+                            : setConfirmExclude(true)
+                        }
+                        disabled={savingExclusion}
+                        className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-[13px] font-bold hover:bg-muted disabled:opacity-60"
+                      >
+                        {savingExclusion ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        {data.profile.excludedFromStats ? 'Include in statistics' : 'Exclude from statistics'}
+                      </button>
+                    )}
+                    {exclusionError ? (
+                      <p className="mt-2 text-[12px] font-semibold text-red-600">{exclusionError}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+
               <section className="rounded-lg border border-border p-3.5">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Came from</p>
                 <p className="mt-1 text-sm font-bold">

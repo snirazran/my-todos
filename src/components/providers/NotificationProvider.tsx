@@ -116,6 +116,12 @@ function readingTimeMs(text: string, hasAction: boolean): number {
   return Math.max(base, hasAction ? 5000 : 3500);
 }
 
+export const TOAST_SURFACE_STYLE: React.CSSProperties = {
+  backgroundColor: 'var(--toast-surface, hsl(150 16% 11%))',
+  boxShadow:
+    '0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 28px -18px rgb(0 0 0 / 0.6)',
+};
+
 const RESUME_FLOOR_MS = 1500;
 const SWIPE_DISMISS_PX = 72;
 
@@ -140,13 +146,6 @@ export function NotificationProvider({
   );
   const remainingRef = useRef(new Map<number, number>());
   const stackRef = useRef<HTMLDivElement | null>(null);
-  const deckRef = useRef<HTMLDivElement | null>(null);
-  const [deckHeight, setDeckHeight] = useState(0);
-  const prevDeckHeightRef = useRef(0);
-  const deckGrowing = deckHeight >= prevDeckHeightRef.current;
-  useEffect(() => {
-    prevDeckHeightRef.current = deckHeight;
-  }, [deckHeight]);
 
   const dismiss = useCallback((id: number) => {
     remainingRef.current.delete(id);
@@ -200,7 +199,15 @@ export function NotificationProvider({
   const timerPaused =
     hovered || pressed || pageHidden || undoingId !== null || stackSuppressed;
 
-  useAutoDismiss(frontId, front?.durationMs ?? 0, timerPaused, dismiss, remainingRef);
+  const current = undoItem ?? front;
+
+  useAutoDismiss(
+    frontId,
+    front?.durationMs ?? 0,
+    timerPaused || undoId !== null,
+    dismiss,
+    remainingRef,
+  );
   useAutoDismiss(undoId, undoItem?.durationMs ?? 0, timerPaused, dismiss, remainingRef);
 
   useEffect(() => {
@@ -215,45 +222,6 @@ export function NotificationProvider({
     return () =>
       document.removeEventListener('visibilitychange', onVisibility);
   }, []);
-
-  // Measure the deck's natural (bottom-anchored) content height. Increases
-  // apply immediately; decreases settle briefly first so the transient dip
-  // while a toast exits and the next steps forward never reaches the layout —
-  // the deck renders at an explicitly animated height driven by this value,
-  // which is what the Frogodoro pill above it physically rests on.
-  useEffect(() => {
-    const el = deckRef.current;
-    if (!el) return;
-    let decreaseTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastApplied = -1;
-    const apply = (value: number) => {
-      lastApplied = value;
-      setDeckHeight(value);
-    };
-    const update = () => {
-      const next = el.offsetHeight;
-      if (next >= lastApplied) {
-        if (decreaseTimer) {
-          clearTimeout(decreaseTimer);
-          decreaseTimer = null;
-        }
-        if (next !== lastApplied) apply(next);
-        return;
-      }
-      if (decreaseTimer) return;
-      decreaseTimer = setTimeout(() => {
-        decreaseTimer = null;
-        apply(el.offsetHeight);
-      }, 220);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-      if (decreaseTimer) clearTimeout(decreaseTimer);
-    };
-  }, [mounted]);
 
   // Track the full rendered stack height so the FAB and friends can offset
   // cleanly; the deck's animated height already filters transient dips.
@@ -280,8 +248,7 @@ export function NotificationProvider({
     }
   };
 
-  const renderCard = (n: NotificationItem, depth: number) => {
-        const isFront = depth === 0;
+  const renderCard = (n: NotificationItem) => {
         const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
         const isMovedToTodayToast = n.content === 'Moved to Today';
         const isDuplicateToast =
@@ -300,32 +267,20 @@ export function NotificationProvider({
                   ? {
                       x: swipe.dir * 420,
                       opacity: 0,
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
                       transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] },
                     }
                   : {
                       opacity: 0,
-                      y: 8,
-                      scale: 0.96,
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      transition: { duration: 0.16, ease: 'easeIn' },
+                      y: 10,
+                      scale: 0.97,
+                      transition: { duration: 0.14, ease: 'easeIn' },
                     },
             }}
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{
-              opacity: depth > 2 ? 0 : 1,
-              y: depth * -10,
-              scale: 1 - depth * 0.05,
-            }}
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
             exit="exit"
-            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-            drag={isFront && !isUndoing ? 'x' : false}
+            transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+            drag={isUndoing ? false : 'x'}
             dragDirectionLock
             dragSnapToOrigin
             dragElastic={0.5}
@@ -339,43 +294,31 @@ export function NotificationProvider({
                 dismiss(n.id);
               }
             }}
-            onPointerEnter={
-              isFront
-                ? (e) => {
-                    if (e.pointerType === 'mouse') setHovered(true);
-                  }
-                : undefined
-            }
-            onPointerLeave={
-              isFront
-                ? (e) => {
-                    if (e.pointerType === 'mouse') setHovered(false);
-                  }
-                : undefined
-            }
-            onPointerDown={isFront ? () => setPressed(true) : undefined}
-            onPointerUp={isFront ? () => setPressed(false) : undefined}
-            onPointerCancel={isFront ? () => setPressed(false) : undefined}
-            onFocusCapture={
-              isFront
-                ? (e) => {
-                    if ((e.target as HTMLElement).matches?.(':focus-visible'))
-                      setHovered(true);
-                  }
-                : undefined
-            }
-            onBlurCapture={isFront ? () => setHovered(false) : undefined}
-            style={{ zIndex: 100 - depth, touchAction: 'pan-y' }}
-            className={`${
-              isFront
-                ? 'pointer-events-auto relative'
-                : 'pointer-events-none absolute inset-x-0 bottom-0'
-            } flex w-full items-center gap-3 px-4 py-3 rounded-[18px] border border-border/50 bg-card/90 text-foreground shadow-sm backdrop-blur-2xl`}
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'mouse') setHovered(true);
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === 'mouse') setHovered(false);
+            }}
+            onPointerDown={() => setPressed(true)}
+            onPointerUp={() => setPressed(false)}
+            onPointerCancel={() => setPressed(false)}
+            onFocusCapture={(e) => {
+              if ((e.target as HTMLElement).matches?.(':focus-visible'))
+                setHovered(true);
+            }}
+            onBlurCapture={() => setHovered(false)}
+            style={{
+              ...TOAST_SURFACE_STYLE,
+              touchAction: 'pan-y',
+              willChange: 'transform, opacity',
+            }}
+            className="dark pointer-events-auto relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-[18px] px-3.5 py-2 text-foreground"
           >
             {isMoveToast && (
               <span
                 aria-hidden
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 bg-background"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
               >
                 {isSavedTasksToast ? (
                   <FolderOpen size={14} />
@@ -395,7 +338,7 @@ export function NotificationProvider({
               <button
                 onClick={() => handleUndo(n)}
                 disabled={isUndoing}
-                className="-my-1.5 flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white/10 px-3.5 text-sm font-black text-primary transition-colors hover:bg-white/15 active:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isUndoing ? (
                   <>
@@ -429,11 +372,22 @@ export function NotificationProvider({
             <button
               onClick={() => dismiss(n.id)}
               disabled={isUndoing}
-              className="-my-1.5 -mr-2 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              className={`-my-1.5 -mr-2 ${n.undoAction ? 'hidden md:grid' : 'grid'} h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-50`}
               aria-label="Dismiss notification"
             >
               <X size={16} />
             </button>
+            {isUndoItem(n) && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] origin-left bg-primary/70"
+                style={{
+                  animation: `toast-countdown ${n.durationMs}ms linear forwards`,
+                  animationPlayState:
+                    timerPaused || isUndoing ? 'paused' : 'running',
+                }}
+              />
+            )}
           </motion.div>
         );
   };
@@ -460,57 +414,15 @@ export function NotificationProvider({
           >
         {/* Top slot: timer pill portals in here (above all toasts) */}
         <div id="frog-bottom-stack-top" className="contents" />
-        <AnimatePresence initial={false}>
-          {undoItem && (
-            <motion.div
-              key={undoItem.id}
-              role="status"
-              aria-live="polite"
-              className="w-full md:w-[380px] md:self-end"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {renderCard(undoItem, 0)}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {/* Deck stack: newest toast in front; older ones peek out behind it
-            and step forward as the front one leaves. The wrapper renders at an
-            explicitly animated height (measured with dip-filtering) so the
-            pill above never bounces during the exit/step-forward handoff; the
-            inner padding reserves room for the peeking cards. */}
-        <motion.div
-          className="relative w-full md:w-[380px] md:self-end"
-          initial={false}
-          animate={{ height: deckHeight }}
-          transition={
-            // Grow instantly so bottom-anchored toasts never poke above the
-            // wrapper into the pill; only shrinks (already dip-filtered) ease.
-            deckGrowing
-              ? { duration: 0 }
-              : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
-          }
-        >
         <div
-          ref={deckRef}
           role="status"
           aria-live="polite"
-          aria-atomic="false"
-          className="absolute inset-x-0 bottom-0"
-          style={{
-            paddingTop:
-              Math.min(Math.max(deckItems.length - 1, 0), 2) * 10,
-          }}
+          className="relative w-full md:w-[380px] md:self-end"
         >
-        <AnimatePresence initial={false} custom={swiped}>
-          {deckItems.map((n, index) =>
-            renderCard(n, deckItems.length - 1 - index),
-          )}
-        </AnimatePresence>
+          <AnimatePresence initial={false} mode="popLayout" custom={swiped}>
+            {current && renderCard(current)}
+          </AnimatePresence>
         </div>
-        </motion.div>
         {/* Bottom slot: cinematic skip hint portals in here (below all toasts) */}
         <div id="frog-bottom-stack-bottom" className="contents" />
           </div>,

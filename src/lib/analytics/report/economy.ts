@@ -3,6 +3,7 @@ import UserModel from '@/lib/models/User';
 import { readEconomyHealth } from '@/lib/economy/health';
 import type { StatSection, StatTable } from '@/lib/analytics/catalog';
 import { kpi, rate, round, ymd, type ReportContext } from './context';
+import { NOT_STATS_EXCLUDED, statsExcludedUserIds } from '@/lib/analytics/statsExclusion';
 
 type LedgerRow = { _id: string; total: number; entries: number; users: number };
 
@@ -17,10 +18,11 @@ const BALANCE_BUCKETS = [
 
 export async function buildEconomy(context: ReportContext): Promise<StatSection> {
   const dayRange = { $gte: ymd(context.range.start), $lte: ymd(context.range.endDay) };
+  const notExcludedUser = { userId: { $nin: await statsExcludedUserIds() } };
 
   const [faucetRows, sinkRows, dailyFlow, balanceRows, health] = await Promise.all([
     FlyLedgerModel.aggregate<LedgerRow>([
-      { $match: { dayKey: dayRange, amount: { $gt: 0 } } },
+      { $match: { dayKey: dayRange, amount: { $gt: 0 }, ...notExcludedUser } },
       {
         $group: {
           _id: '$source',
@@ -33,7 +35,7 @@ export async function buildEconomy(context: ReportContext): Promise<StatSection>
       { $sort: { total: -1 } },
     ]),
     FlyLedgerModel.aggregate<LedgerRow>([
-      { $match: { dayKey: dayRange, amount: { $lt: 0 } } },
+      { $match: { dayKey: dayRange, amount: { $lt: 0 }, ...notExcludedUser } },
       {
         $group: {
           _id: '$source',
@@ -46,7 +48,7 @@ export async function buildEconomy(context: ReportContext): Promise<StatSection>
       { $sort: { total: 1 } },
     ]),
     FlyLedgerModel.aggregate<{ _id: string; earned: number; spent: number }>([
-      { $match: { dayKey: dayRange } },
+      { $match: { dayKey: dayRange, ...notExcludedUser } },
       {
         $group: {
           _id: '$dayKey',
@@ -56,6 +58,7 @@ export async function buildEconomy(context: ReportContext): Promise<StatSection>
       },
     ]),
     UserModel.aggregate<{ _id: null; buckets: number[] }>([
+      { $match: NOT_STATS_EXCLUDED },
       { $project: { flies: { $ifNull: ['$wardrobe.flies', 0] } } },
       { $group: { _id: null, buckets: { $push: '$flies' } } },
     ]),

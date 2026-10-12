@@ -12,6 +12,8 @@ type PreviewTask = { id: string; text: string; completed: boolean };
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  userInitiated?: boolean;
+  zIndex?: number;
   streak: number;
   /** Today's real list. The preview is the pitch, so it shows their own work. */
   tasks: PreviewTask[];
@@ -28,6 +30,8 @@ const IOS_STEPS = [
 export function WidgetPromptSheet({
   open,
   onOpenChange,
+  userInitiated = false,
+  zIndex,
   streak,
   tasks,
   onPinned,
@@ -38,8 +42,8 @@ export function WidgetPromptSheet({
   const stepsRef = useRef<HTMLOListElement | null>(null);
 
   useEffect(() => {
-    if (open) recordPromptShown();
-  }, [open]);
+    if (open && !userInitiated) recordPromptShown();
+  }, [open, userInitiated]);
 
   // The steps open below the fold, so without this the only thing that visibly
   // happens is the button changing its label.
@@ -89,6 +93,7 @@ export function WidgetPromptSheet({
       onOpenChange={onOpenChange}
       className="max-h-[92dvh] max-w-md sm:max-h-[min(92dvh,780px)]"
       closeAriaLabel="Not now"
+      zIndex={zIndex}
     >
       {({ bindScroll }) => (
         <div className="flex min-h-0 w-full flex-1 flex-col">

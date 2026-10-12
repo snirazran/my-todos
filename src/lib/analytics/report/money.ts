@@ -1,4 +1,4 @@
-import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import { StatsEventModel as AnalyticsEventModel } from '@/lib/analytics/statsExclusion';
 import type { StatSection, StatTable } from '@/lib/analytics/catalog';
 import { groupByProperties, kpi, rate, round, type ReportContext } from './context';
 
