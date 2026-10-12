@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Trash2, Upload, X } from 'lucide-react';
+import { RefreshCw, Trash2, Upload, X } from 'lucide-react';
 import { SPEND_CHANNELS } from '@/lib/attribution/classify';
 import { money } from './primitives';
 
@@ -77,6 +77,12 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
           Import report
         </button>
       </header>
+      <AppleAdsSync
+        onSynced={() => {
+          load();
+          onChanged();
+        }}
+      />
       {imports === null ? (
         <p className="px-4 py-4 text-[13px] text-muted-foreground">Loading…</p>
       ) : !imports.length ? (
@@ -349,6 +355,89 @@ function ImportDialog({
           </button>
         </footer>
       </div>
+    </div>
+  );
+}
+
+type AppleAdsStatus = {
+  configured: boolean;
+  running: boolean;
+  lastRunAt: string | null;
+  lastOkAt: string | null;
+  lastError: string | null;
+  lastResult: { start: string; end: string; campaigns: number; spend: number; currency: string | null } | null;
+};
+
+function since(iso: string) {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
+}
+
+function AppleAdsSync({ onSynced }: { onSynced: () => void }) {
+  const [status, setStatus] = useState<AppleAdsStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/statistics/spend/apple', { credentials: 'include' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then(setStatus)
+      .catch(() => setStatus(null));
+  }, []);
+
+  if (!status) return null;
+
+  const sync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/admin/statistics/spend/apple', { method: 'POST', credentials: 'include' });
+      const body = await response.json().catch(() => ({}));
+      if (body.status) setStatus(body.status);
+      if (!response.ok) throw new Error(body.error || 'Sync failed');
+      onSynced();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const problem = error ?? status.lastError;
+  const result = status.lastResult;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[13px]">
+      <div className="min-w-0">
+        <span className="font-semibold">Apple Ads API</span>{' '}
+        {!status.configured ? (
+          <span className="text-muted-foreground">not connected — set the APPLE_ADS_* keys to sync spend automatically.</span>
+        ) : problem ? (
+          <span className="text-red-600 dark:text-red-400">{problem}</span>
+        ) : status.lastOkAt && result ? (
+          <span className="text-muted-foreground">
+            synced {since(status.lastOkAt)} · {result.campaigns} campaigns · {result.start} → {result.end} ·{' '}
+            {money.format(result.spend)}
+            {result.currency && result.currency !== 'USD' ? ` ${result.currency}` : ''} · refreshes every 6 h
+          </span>
+        ) : (
+          <span className="text-muted-foreground">connected · first sync runs within 15 min of a restart</span>
+        )}
+      </div>
+      {status.configured && (
+        <button
+          type="button"
+          onClick={() => void sync()}
+          disabled={syncing || status.running}
+          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-[13px] font-bold hover:bg-muted disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${syncing || status.running ? 'animate-spin' : ''}`} />
+          {syncing || status.running ? 'Syncing…' : 'Sync now'}
+        </button>
+      )}
     </div>
   );
 }

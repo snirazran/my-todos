@@ -18,6 +18,8 @@ export function startAttributionTicker() {
       await connectMongo();
       const { runAttributionResolver } = await import('@/lib/attribution/server');
       await runAttributionResolver();
+      const { runScheduledAppleAdsSync } = await import('@/lib/attribution/appleAdsApi');
+      await runScheduledAppleAdsSync();
     } catch (err) {
       console.error('Attribution ticker failed:', err);
     } finally {
