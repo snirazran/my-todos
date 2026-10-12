@@ -24,6 +24,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { useAutoPopupHold } from '@/lib/popupGate';
 // Answers are drafted before sign-in, so they're persisted locally to survive the
 // email magic-link round trip (which reloads onto a fresh /onboarding). They are
 // dropped the moment the flow lands on an account that already finished onboarding.
@@ -58,6 +59,8 @@ export default function OnboardingPage() {
   const [celebrating, setCelebrating] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
+  useAutoPopupHold('onboarding-celebration', celebrating);
   const arrivalCheckedRef = useRef(false);
 
   useEffect(() => {
@@ -168,15 +171,12 @@ export default function OnboardingPage() {
       goToStep(step + 1, 1);
     } else {
       setSaving(true);
-      setCelebrating(true);
-      const celebrationStart = Date.now();
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       let offerPlus = true;
-      const focusAreaIds = selections.focusAreas ?? [];
       try {
         // Account creation is deferred until onboarding actually completes, so
         // abandoning the flow never leaves a stranded account. If the user
         // hasn't attached an email mid-flow, create the anonymous account now.
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         if (!auth?.currentUser) {
           const cred = await signInAnonymously(auth);
           await establishSessionCookie(cred.user);
@@ -197,90 +197,109 @@ export default function OnboardingPage() {
           const data = await res.json().catch(() => ({}));
           if (data?.alreadyOnboarded) {
             clearOnboardingDraft();
-            offerPlus = false;
+            await finishOnboarding(Promise.resolve());
             return;
           }
         }
-        const starterPlanIds = selections.starterPlan ?? [];
-        let starterCategoryTagMap: Array<{ categoryId: string; tagIds: string[] }> = [];
-        if (focusAreaIds.length > 0 && starterPlanIds.length > 0) {
-          try {
-            const planRes = await fetch('/api/onboarding/starter-plan', {
-              signal: AbortSignal.timeout(15000),
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                itemIds: starterPlanIds,
-                selectedCategoryIds: focusAreaIds,
-                dayStart: selections.starterPlanDayStart?.[0],
-                timezone,
-              }),
-            });
-            const planData = await planRes.json().catch(() => null);
-            if (Array.isArray(planData?.categoryTagMap)) {
-              starterCategoryTagMap = planData.categoryTagMap;
-            }
-          } catch {}
-        }
-        const [onboardingRes] = await Promise.all([
-          fetch('/api/onboarding', {
+      } catch {
+        offerPlus = false;
+      }
+
+      savePromiseRef.current = saveOnboarding(timezone);
+      if (offerPlus) {
+        setPaywallOpen(true);
+        return;
+      }
+      await finishOnboarding(savePromiseRef.current);
+    }
+  };
+
+  const saveOnboarding = async (timezone: string) => {
+    const focusAreaIds = selections.focusAreas ?? [];
+    try {
+      const starterPlanIds = selections.starterPlan ?? [];
+      let starterCategoryTagMap: Array<{ categoryId: string; tagIds: string[] }> = [];
+      if (focusAreaIds.length > 0 && starterPlanIds.length > 0) {
+        try {
+          const planRes = await fetch('/api/onboarding/starter-plan', {
+            signal: AbortSignal.timeout(15000),
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              frogName: selections.frogName?.[0]?.trim() || 'Cookie',
-              humanName: selections.humanName?.[0]?.trim() || null,
-              ageRange: selections.age?.[0] ?? null,
-              aboutGender: selections.aboutGender?.[0] ?? null,
-              usedBefore: selections.usedBefore?.[0] ?? null,
-              onboardingResponses: selections,
+              itemIds: starterPlanIds,
+              selectedCategoryIds: focusAreaIds,
+              dayStart: selections.starterPlanDayStart?.[0],
+              timezone,
             }),
+          });
+          const planData = await planRes.json().catch(() => null);
+          if (Array.isArray(planData?.categoryTagMap)) {
+            starterCategoryTagMap = planData.categoryTagMap;
+          }
+        } catch {}
+      }
+      const [onboardingRes] = await Promise.all([
+        fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            frogName: selections.frogName?.[0]?.trim() || 'Cookie',
+            humanName: selections.humanName?.[0]?.trim() || null,
+            ageRange: selections.age?.[0] ?? null,
+            aboutGender: selections.aboutGender?.[0] ?? null,
+            usedBefore: selections.usedBefore?.[0] ?? null,
+            onboardingResponses: selections,
           }),
-          focusAreaIds.length > 0
-            ? fetch('/api/quests/onboarding', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  selectedCategoryIds: focusAreaIds,
-                  categoryTagMap: starterCategoryTagMap,
-                  createSuggestions: false,
-                  timezone,
-                }),
-              })
-            : Promise.resolve(),
-        ]);
-        // Only drop the local copy once the names are safely persisted; if the
-        // save failed (e.g. not yet authenticated), keep them for the retry after
-        // the magic-link sign-in.
-        if (onboardingRes.ok) {
-          clearOnboardingDraft();
-          resetBootstrapCache();
-          await mutate(
-            '/api/user',
-            (cur: Record<string, unknown> | undefined) =>
-              cur ? { ...cur, onboardingCompleted: true } : cur,
-            { revalidate: false },
-          );
-        }
-      } catch {
-        // best-effort
-      } finally {
-        prewarmStreakCheckIn();
-        const remaining = CELEBRATION_MS - (Date.now() - celebrationStart);
-        if (remaining > 0) {
-          await new Promise((resolve) => setTimeout(resolve, remaining));
-        }
-        // Drop any stale quests cache (e.g. a pre-onboarding `complete: false`)
-        // so the home page fetches fresh data instead of flashing the focus-areas
-        // popup before revalidating.
+        }),
+        focusAreaIds.length > 0
+          ? fetch('/api/quests/onboarding', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                selectedCategoryIds: focusAreaIds,
+                categoryTagMap: starterCategoryTagMap,
+                createSuggestions: false,
+                timezone,
+              }),
+            })
+          : Promise.resolve(),
+      ]);
+      // Only drop the local copy once the names are safely persisted; if the
+      // save failed (e.g. not yet authenticated), keep them for the retry after
+      // the magic-link sign-in.
+      if (onboardingRes.ok) {
+        clearOnboardingDraft();
+        resetBootstrapCache();
         await mutate(
-          (key) => typeof key === 'string' && key.startsWith('/api/quests'),
-          undefined,
+          '/api/user',
+          (cur: Record<string, unknown> | undefined) =>
+            cur ? { ...cur, onboardingCompleted: true } : cur,
           { revalidate: false },
         );
-        if (offerPlus) setPaywallOpen(true);
-        else router.push('/');
       }
+    } catch {
+      // best-effort
     }
+  };
+
+  const finishOnboarding = async (pendingSave: Promise<void>) => {
+    setCelebrating(true);
+    const celebrationStart = Date.now();
+    await pendingSave;
+    prewarmStreakCheckIn();
+    const remaining = CELEBRATION_MS - (Date.now() - celebrationStart);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+    // Drop any stale quests cache (e.g. a pre-onboarding `complete: false`)
+    // so the home page fetches fresh data instead of flashing the focus-areas
+    // popup before revalidating.
+    await mutate(
+      (key) => typeof key === 'string' && key.startsWith('/api/quests'),
+      undefined,
+      { revalidate: false },
+    );
+    router.push('/');
   };
 
   const handleBack = async () => {
@@ -382,7 +401,7 @@ export default function OnboardingPage() {
         frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
         onClose={() => {
           setPaywallOpen(false);
-          router.push('/');
+          void finishOnboarding(savePromiseRef.current ?? Promise.resolve());
         }}
       />
     </main>

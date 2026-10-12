@@ -144,6 +144,7 @@ export function ShopGiftPopup({
   if (!mounted) return null;
 
   const offerAmount = gift?.amount ?? 0;
+  const firstGift = !!gift?.first;
   const nextIn = reveal ? hoursUntil(reveal.endsAt) : null;
   const revealed = phase === 'revealed' && !!reveal;
   const golden = !!reveal?.lucky;
@@ -267,7 +268,7 @@ export function ShopGiftPopup({
                     className="mt-4 flex w-full flex-col items-center"
                   >
                     <p className="text-[13px] font-black uppercase tracking-wider text-[#4f9149] dark:text-emerald-400">
-                      Daily shop gift
+                      {firstGift ? 'Welcome gift' : 'Daily shop gift'}
                     </p>
                     <p className="mt-1 text-[26px] font-black leading-tight tracking-tight text-foreground">
                       {offerAmount > 0 ? `${offerAmount} free flies` : 'Free flies'}
@@ -278,7 +279,10 @@ export function ShopGiftPopup({
                         error ? 'text-rose-500' : 'text-muted-foreground',
                       )}
                     >
-                      {error ?? 'Waiting for you today.'}
+                      {error ??
+                        (firstGift
+                          ? 'A first-visit bonus. Come back daily for more.'
+                          : 'Waiting for you today.')}
                     </p>
                     <button
                       type="button"

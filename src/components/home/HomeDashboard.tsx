@@ -121,6 +121,9 @@ const demoTasks: Task[] = [
 
 const HOME_FILTER_BASE = { showCompleted: false };
 
+const FINALE_STRIP_SWAP_MS = 1100;
+const FINALE_TASKS_FALLBACK_MS = 3500;
+
 export default function HomeDashboard() {
   const { user, loading } = useAuth();
   const sessionLoading = loading;
@@ -608,17 +611,42 @@ export default function HomeDashboard() {
   const earnedChipsVisible =
     !guided || firstRun.phase === 'quest' || firstRun.phase === 'claiming';
   const flyCounterVisible = !guided || firstRun.phase === 'claiming';
+  const questIntroHeld =
+    guided && firstRun.phase !== 'quest' && firstRun.phase !== 'claiming';
+  const onboardingClaimPending = !!questsData?.claimables?.some(
+    (c) => c.placement === 'onboarding',
+  );
+  const [finaleTasksReady, setFinaleTasksReady] = useState(false);
+  useEffect(() => {
+    if (firstRun.phase !== 'finale') {
+      setFinaleTasksReady(false);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setFinaleTasksReady(true),
+      onboardingClaimPending ? FINALE_TASKS_FALLBACK_MS : FINALE_STRIP_SWAP_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [firstRun.phase, onboardingClaimPending]);
+  useEffect(() => {
+    if (firstRun.phase !== 'quest' || onboardingClaimPending) return;
+    void mutateQuests();
+    const retry = window.setTimeout(() => void mutateQuests(), 1500);
+    return () => window.clearTimeout(retry);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstRun.phase, onboardingClaimPending]);
   const taskListHidden =
-    guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off';
+    (guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off') ||
+    (firstRun.phase === 'finale' && !finaleTasksReady);
   const [finaleRevealCount, setFinaleRevealCount] = useState(0);
   useEffect(() => {
-    if (firstRun.phase !== 'finale') return;
+    if (firstRun.phase !== 'finale' || !finaleTasksReady) return;
     const timer = window.setInterval(
       () => setFinaleRevealCount((count) => count + 1),
       180,
     );
     return () => window.clearInterval(timer);
-  }, [firstRun.phase]);
+  }, [firstRun.phase, finaleTasksReady]);
   const listTasks = useMemo(() => {
     if (guided) return data.filter((t) => t.isStarter);
     if (firstRun.phase !== 'finale') return data;
@@ -879,7 +907,7 @@ export default function HomeDashboard() {
             <div className="flex w-full flex-col gap-2 md:gap-5">
               {!firstRun.active && <GuestAccountBanner />}
               {user && !firstRun.active && <PactCard />}
-              {user && earnedChipsVisible && (
+              {user && (
                 <motion.div
                   initial={firstRun.active ? { opacity: 0, y: -12 } : false}
                   animate={{ opacity: 1, y: 0 }}
@@ -891,6 +919,7 @@ export default function HomeDashboard() {
                     catalog={questsData?.claimablesRewardCatalog}
                     isPremium={isPremium}
                     introFill={guided}
+                    introHold={questIntroHeld}
                   />
                 </motion.div>
               )}

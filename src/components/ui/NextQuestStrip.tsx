@@ -79,12 +79,14 @@ export function NextQuestStrip({
   catalog,
   isPremium,
   introFill = false,
+  introHold = false,
 }: {
   claimables?: Claimable[];
   trackables?: Trackable[];
   catalog?: Record<string, QuestRewardCatalogItem>;
   isPremium?: boolean;
   introFill?: boolean;
+  introHold?: boolean;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -175,10 +177,10 @@ export function NextQuestStrip({
   const introClaimable =
     introFill && claimable?.kind === 'objective' ? claimable : null;
   useEffect(() => {
-    if (introStage === 'idle' && introClaimable) {
+    if (introStage === 'idle' && introClaimable && !introHold) {
       setIntroStage(reduceMotion ? 'done' : 'empty');
     }
-  }, [introStage, introClaimable, reduceMotion]);
+  }, [introStage, introClaimable, introHold, reduceMotion]);
   useEffect(() => {
     if (introStage !== 'empty' && introStage !== 'full') return;
     const timer = window.setTimeout(
@@ -188,7 +190,8 @@ export function NextQuestStrip({
     return () => window.clearTimeout(timer);
   }, [introStage]);
   const introTrackable: Trackable | null =
-    introClaimable && (introStage === 'empty' || introStage === 'full')
+    introClaimable &&
+    (introStage === 'empty' || introStage === 'full' || (introHold && introStage === 'idle'))
       ? {
           id: introClaimable.id,
           questId: introClaimable.questId,

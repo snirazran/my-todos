@@ -75,6 +75,7 @@ type PaywallContext = {
   accent: string;
   sub: string;
   lead?: IconName;
+  benefits?: typeof BENEFITS;
 };
 
 const DEFAULT_CONTEXT: PaywallContext = {
@@ -85,12 +86,12 @@ const DEFAULT_CONTEXT: PaywallContext = {
 
 function contextFor(placement: string, frogName?: string): PaywallContext {
   if (placement === 'onboarding') {
-    const name = frogName?.trim();
+    const name = frogName?.trim() || 'your frog';
     return {
-      headline: 'Fun makes habits stick.',
-      accent: 'Plus doubles your rewards.',
-      sub: `Watch ${name || 'your frog'} glow up with every task you finish.`,
-      lead: 'x2',
+      headline: `Start strong with ${name}.`,
+      accent: 'Plus helps you keep showing up.',
+      sub: 'Double quest rewards, plus a free streak saver every month.',
+      benefits: ONBOARDING_BENEFITS,
     };
   }
   if (placement === 'gift_double') {
@@ -134,6 +135,24 @@ function contextFor(placement: string, frogName?: string): PaywallContext {
   return DEFAULT_CONTEXT;
 }
 
+const ONBOARDING_BENEFITS: typeof BENEFITS = [
+  {
+    icon: 'x2',
+    title: 'Double rewards for showing up',
+    body: 'Every quest and gift pays twice.',
+  },
+  {
+    icon: 'lilyPad',
+    title: 'A free streak saver every month',
+    body: 'Take a day off. Your streak stays.',
+  },
+  {
+    icon: 'leap',
+    title: 'Weekly goals that flex with you',
+    body: 'Move a session when your week changes.',
+  },
+];
+
 function benefitsFor(lead?: IconName) {
   if (!lead) return BENEFITS;
   return [
@@ -174,8 +193,8 @@ function useIsShortScreen() {
   );
 }
 
-const PERCH_FROG = { width: 160, height: 180 };
-const PERCH_FROG_SHORT = { width: 128, height: 144 };
+const PERCH_FROG = { width: 220, height: 248 };
+const PERCH_FROG_SHORT = { width: 156, height: 176 };
 const PERCH_FEET_RATIO = 0.205;
 
 const PREMIUM_CONFIRM_LATE_MS = 10 * 60 * 1000;
@@ -438,10 +457,10 @@ export function PlusUpgradeModal({
             className="fixed inset-0 z-[10008] bg-black/60 md:backdrop-blur-sm"
           />
           <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
+            initial={{ transform: 'translateY(100%)' }}
+            animate={{ transform: 'translateY(0%)' }}
             exit={{
-              y: '100%',
+              transform: 'translateY(100%)',
               transition: { type: 'spring', damping: 34, stiffness: 380 },
             }}
             transition={{
@@ -455,7 +474,7 @@ export function PlusUpgradeModal({
           >
             <div className="plus-sheet pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden text-white md:h-[min(640px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,56rem)] md:flex-row md:rounded-[32px] md:shadow-2xl">
               <div aria-hidden className="plus-glow pointer-events-none absolute inset-0" />
-              {isDesktop && <DesktopRail />}
+              {isDesktop && <DesktopRail ready={sheetReady} />}
 
               <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
                 <div className="relative z-20 flex h-14 shrink-0 items-center justify-between px-4 pt-[env(safe-area-inset-top)] box-content md:box-border md:h-16 md:px-6 md:pt-0">
@@ -503,7 +522,7 @@ export function PlusUpgradeModal({
                         <WhyPlusStep
                           compact={compact}
                           context={paywallContext}
-                          benefits={benefitsFor(paywallContext.lead)}
+                          benefits={paywallContext.benefits ?? benefitsFor(paywallContext.lead)}
                           ready={sheetReady}
                           onCompare={() => setView('compare')}
                         />
@@ -546,43 +565,45 @@ export function PlusUpgradeModal({
                         height={perchFrog.height}
                         visualOffsetY={0}
                         glow={false}
+                        ready={sheetReady}
                       />
                     </div>
                   )}
-                  {(view === 0 || view === 'compare') && (
-                    <>
-                      <PrimaryButton onClick={() => goToStep(1)}>
-                        Try Plus free
-                      </PrimaryButton>
-                      <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs font-bold text-white/70">
+                  {view === 2 ? (
+                    <PrimaryButton onClick={startPurchase} disabled={purchasing}>
+                      {purchasing ? 'Processing…' : `Start my ${trialDays}-day free trial`}
+                    </PrimaryButton>
+                  ) : (
+                    <PrimaryButton onClick={() => goToStep(view === 1 ? 2 : 1)}>
+                      {view === 1 ? 'Continue' : 'Try Plus free'}
+                    </PrimaryButton>
+                  )}
+                  <div className="mt-2.5 grid">
+                    <FooterSlot active={view !== 2}>
+                      <p className="flex items-center justify-center gap-1.5 text-center text-xs font-bold text-white/70">
                         <Check className="h-3.5 w-3.5 text-[color:var(--plus-gold)]" strokeWidth={3.5} />
                         No charge today · Cancel anytime
                       </p>
-                      {view === 0 && (
-                        <button
-                          type="button"
-                          onClick={onClose}
-                          className={`w-full text-center text-sm font-bold text-white/60 transition-colors hover:text-white ${compact ? 'h-9' : 'mt-1 h-10'}`}
-                        >
-                          Not now
-                        </button>
-                      )}
-                    </>
-                  )}
-                  {view === 1 && (
-                    <PrimaryButton onClick={() => goToStep(2)}>Continue</PrimaryButton>
-                  )}
-                  {view === 2 && (
-                    <PlanFooter
-                      plan={plan}
-                      trialDays={trialDays}
-                      selected={pricing?.[plan]}
-                      busy={purchasing}
-                      error={purchaseError}
-                      onStart={startPurchase}
-                      onRestore={restorePurchases}
-                    />
-                  )}
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        tabIndex={view === 0 ? undefined : -1}
+                        className={`w-full text-center text-sm font-bold text-white/60 transition-colors hover:text-white ${compact ? 'h-9' : 'mt-1 h-10'} ${view === 0 ? '' : 'invisible'}`}
+                      >
+                        Not now
+                      </button>
+                    </FooterSlot>
+                    <FooterSlot active={view === 2}>
+                      <PlanFooter
+                        plan={plan}
+                        trialDays={trialDays}
+                        selected={pricing?.[plan]}
+                        busy={purchasing}
+                        error={purchaseError}
+                        onRestore={restorePurchases}
+                      />
+                    </FooterSlot>
+                  </div>
                 </div>
               </div>
 
@@ -816,14 +837,16 @@ function PlusFrog({
   height,
   visualOffsetY,
   glow = true,
+  ready = true,
 }: {
   width: number;
   height: number;
   visualOffsetY?: number;
   glow?: boolean;
+  ready?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
-  const settled = useSettled();
+  const settled = useSettled() && ready;
   const [dressed, setDressed] = useState(false);
   const companionReady = useSettledAfter(dressed, 180);
 
@@ -937,13 +960,13 @@ function useSettledAfter(trigger: boolean, delayMs: number) {
   return settled;
 }
 
-function DesktopRail() {
+function DesktopRail({ ready }: { ready: boolean }) {
   return (
     <aside
       aria-hidden
       className="relative flex w-[42%] shrink-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(90%_70%_at_50%_40%,#1d5a3f_0%,#123a2a_55%,#0b271c_100%)]"
     >
-      <PlusFrog width={250} height={282} />
+      <PlusFrog width={250} height={282} ready={ready} />
       <div className="absolute inset-x-0 bottom-0 p-8">
         <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[color:var(--plus-gold)]">
           Frogress Plus
@@ -1070,8 +1093,8 @@ function WhyPlusStep({
           <motion.li
             key={benefit.title}
             className={`flex items-center ${compact ? 'gap-3' : 'gap-3.5'}`}
-            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={ready ? { opacity: 1, y: 0 } : undefined}
+            initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(14px)' }}
+            animate={ready ? { opacity: 1, transform: 'translateY(0px)' } : undefined}
             transition={{
               type: 'spring',
               stiffness: 320,
@@ -1083,8 +1106,8 @@ function WhyPlusStep({
               className={`flex shrink-0 items-center justify-center bg-white/[0.08] ring-1 ring-inset ring-white/10 ${
                 compact ? 'h-10 w-10 rounded-xl' : 'h-12 w-12 rounded-2xl'
               }`}
-              initial={reduceMotion ? false : { scale: 0.4, rotate: -12 }}
-              animate={ready ? { scale: 1, rotate: 0 } : undefined}
+              initial={reduceMotion ? false : { transform: 'scale(0.4) rotate(-12deg)' }}
+              animate={ready ? { transform: 'scale(1) rotate(0deg)' } : undefined}
               transition={{
                 type: 'spring',
                 stiffness: 420,
@@ -1304,13 +1327,29 @@ function PlanStep({
   );
 }
 
+function FooterSlot({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      aria-hidden={active ? undefined : true}
+      className={`[grid-area:1/1] ${active ? '' : 'invisible'}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 function PlanFooter({
   plan,
   trialDays,
   selected,
   busy,
   error,
-  onStart,
   onRestore,
 }: {
   plan: PlanId;
@@ -1318,7 +1357,6 @@ function PlanFooter({
   selected: PlusPriceInfo | undefined;
   busy: boolean;
   error: string | null;
-  onStart: () => void | Promise<void>;
   onRestore: () => void | Promise<void>;
 }) {
   const isNative = Capacitor.isNativePlatform();
@@ -1328,9 +1366,6 @@ function PlanFooter({
   const period = plan === 'yearly' ? 'year' : 'month';
   return (
     <div className="space-y-2.5 text-center">
-      <PrimaryButton onClick={onStart} disabled={busy}>
-        {busy ? 'Processing…' : `Start my ${trialDays}-day free trial`}
-      </PrimaryButton>
       {error && (
         <p className="text-xs font-bold text-rose-200" role="alert">
           {error}

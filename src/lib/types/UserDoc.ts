@@ -90,7 +90,7 @@ export type UserWardrobe = {
   wishlistItems?: WishlistPin[];
   /** Daily-deal rerolls spent today (Plus perk). */
   dealReroll?: DealReroll | null;
-  shopGift?: { dayKey: string; amount: number; lucky?: boolean; at?: Date | string };
+  shopGift?: { dayKey: string; amount: number; lucky?: boolean; first?: boolean; at?: Date | string };
   /** Outfits the user saved so a good combination isn't lost to a shuffle. */
   looks?: SavedLook[];
   /** Pebbles earned past the day's paying completions, and the gifts they buy. */

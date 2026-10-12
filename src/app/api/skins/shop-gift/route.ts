@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
 
     const premium = isPremiumActive(user.premiumUntil);
     const balanceBefore = user.wardrobe?.flies ?? 0;
-    const roll = rollShopGift(userId, shop.dayKey, premium, config.shopGift);
+    const first = !user.wardrobe?.shopGift?.dayKey;
+    const roll = rollShopGift(userId, shop.dayKey, premium, config.shopGift, first);
 
     const ledgerDay = economyDayKey(tz);
     const grantedToday = await fliesGrantedOnDay(userId, ledgerDay);
@@ -71,13 +72,19 @@ export async function POST(req: NextRequest) {
     }
 
     const updated = await UserModel.findOneAndUpdate(
-      { _id: userId, 'wardrobe.shopGift.dayKey': { $ne: shop.dayKey } },
+      {
+        _id: userId,
+        'wardrobe.shopGift.dayKey': first
+          ? { $exists: false }
+          : { $ne: shop.dayKey },
+      },
       {
         $set: {
           'wardrobe.shopGift': {
             dayKey: shop.dayKey,
             amount,
             lucky: roll.lucky,
+            first,
             at: new Date(),
           },
         },
@@ -99,7 +106,7 @@ export async function POST(req: NextRequest) {
       dayKey: ledgerDay,
       amount,
       balanceAfter: balance,
-      meta: { base: roll.base, lucky: roll.lucky, plus: premium, balanceBefore },
+      meta: { base: roll.base, lucky: roll.lucky, plus: premium, first, balanceBefore },
     });
     await Promise.all([
       recordAnalyticsEvent({
@@ -119,6 +126,7 @@ export async function POST(req: NextRequest) {
           fly_amount: amount,
           base_amount: roll.base,
           lucky: roll.lucky,
+          first,
           balance_before: balanceBefore,
           is_premium: premium,
         },
@@ -131,7 +139,8 @@ export async function POST(req: NextRequest) {
       base: roll.base,
       lucky: roll.lucky,
       luckyMultiplier: config.shopGift.luckyMultiplier,
-      plus: premium,
+      plus: roll.plus,
+      first,
       plusMultiplier: config.shopGift.plusMultiplier,
       balance,
       endsAt: shop.endsAt,

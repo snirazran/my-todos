@@ -24,7 +24,7 @@ export const FIRST_RUN_HOLD = 'first-run';
 const FIRST_RUN_HOLD_MS = 30 * 60_000;
 const STREAK_WAIT_MS = 6000;
 const AFTER_STREAK_MS = 450;
-const MISSING_CLAIM_MS = 4000;
+const MISSING_CLAIM_MS = 8000;
 const FINALE_MS = 7000;
 const RELEASE_GRACE_MS = 2500;
 

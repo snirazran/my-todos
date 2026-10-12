@@ -1832,6 +1832,7 @@ export default function TaskList({
     );
     if (!flipped) return;
     emitCampaignTrigger('task_completed');
+    if (flipped.isStarter) return;
     const id = flipped.id;
     showNotification(
       <span className="flex min-w-0 items-center gap-2.5">
