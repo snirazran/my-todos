@@ -2184,6 +2184,52 @@ export default function TaskList({
     };
   }, []);
 
+  const seenStartTimesRef = useRef<Map<string, string> | null>(null);
+  useEffect(() => {
+    const prev = seenStartTimesRef.current;
+    seenStartTimesRef.current = new Map(
+      tasks.map((t) => [t.id, t.startTime ?? '']),
+    );
+    if (!prev || !onReorder || isFrozen) return;
+    const changed = tasks
+      .filter(
+        (t) =>
+          !t.completed &&
+          clockMinutes(t.startTime) !== null &&
+          prev.get(t.id) !== t.startTime,
+      )
+      .sort(
+        (a, b) => (clockMinutes(a.startTime) ?? 0) - (clockMinutes(b.startTime) ?? 0),
+      );
+    if (changed.length === 0) return;
+
+    const ordered = [...tasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const before = ordered.map((t) => t.id).join('|');
+    for (const task of changed) {
+      const from = ordered.findIndex((t) => t.id === task.id);
+      if (from === -1) continue;
+      const [moving] = ordered.splice(from, 1);
+      const start = clockMinutes(moving.startTime)!;
+      const section = moving.sectionId ?? null;
+      const peers = ordered
+        .map((t, index) => ({ t, index }))
+        .filter(
+          ({ t }) =>
+            !t.completed &&
+            (t.sectionId ?? null) === section &&
+            clockMinutes(t.startTime) !== null,
+        );
+      const later = peers.find(({ t }) => clockMinutes(t.startTime)! > start);
+      const to = later
+        ? later.index
+        : peers.length > 0
+          ? peers[peers.length - 1].index + 1
+          : from;
+      ordered.splice(to, 0, moving);
+    }
+    if (ordered.map((t) => t.id).join('|') !== before) onReorder(ordered);
+  }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Determine visible tasks
   const visibleTasks = tasks.filter((t) => {
     const isTemporarilyVisible = delayedCompleted.has(t.id);
@@ -2790,10 +2836,7 @@ export default function TaskList({
                           handleTaskToggle={handleTaskToggle}
                           onMenuOpen={openMenu}
                           getTagDetails={getTagDetails}
-                          isDragDisabled={
-                            isCompleted ||
-                            (filters.sort !== 'manual' && filters.sort !== 'time')
-                          }
+                          isDragDisabled={isCompleted || filters.sort !== 'manual'}
                           isWeekly={taskKind(task) === 'weekly'}
                           isGlowActive={isCompleted ? false : isGlowActive}
                           disableLayout={isCompleted ? true : isAnyDragging}

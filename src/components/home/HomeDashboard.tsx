@@ -119,7 +119,7 @@ const demoTasks: Task[] = [
   { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
 ];
 
-const HOME_FILTER_BASE = { showCompleted: false, sort: 'time' as const };
+const HOME_FILTER_BASE = { showCompleted: false };
 
 const FINALE_STRIP_SWAP_MS = 1100;
 const FINALE_TASKS_FALLBACK_MS = 3500;
@@ -226,7 +226,7 @@ export default function HomeDashboard() {
     deletePreset,
     isActive: filtersActive,
     activeCount: activeFilterCount,
-  } = useTaskFilters('today', HOME_FILTER_BASE);
+  } = useTaskFilters('home', HOME_FILTER_BASE);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const [stripOpen, setStripOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
