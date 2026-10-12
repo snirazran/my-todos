@@ -417,11 +417,6 @@ export default function StarterPlanStep({
                       <span className="block text-[15px] font-semibold leading-snug text-foreground md:text-[17px]">
                         {item.text}
                       </span>
-                      {item.anchor ? (
-                        <span className="mt-0.5 block truncate text-[13px] font-medium leading-snug text-muted-foreground">
-                          {item.anchor}
-                        </span>
-                      ) : null}
                     </span>
 
                     <span

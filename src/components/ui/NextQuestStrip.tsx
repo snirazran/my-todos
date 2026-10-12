@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Tags } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
-import { hapticTick } from '@/lib/haptics';
+import { QuestTrack } from '@/components/ui/QuestTrack';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
   enqueueQuestRewardReveal,
@@ -209,6 +209,7 @@ export function NextQuestStrip({
 
   const displayNextUp = introTrackable ?? fillingTrackable ?? nextUp;
   const showClaimable = !!claimable && !fillingTrackable && !introTrackable;
+  const readyClaim = showClaimable ? claimable ?? null : null;
 
   // One slot, one winner. Rewards outrank work, so a finished pact week comes
   // first and a quest claimable second; below that the pact holds the slot for
@@ -404,9 +405,9 @@ export function NextQuestStrip({
     : pactWins
       ? 'pact'
       : showClaimable && claimable
-        ? `claim:${claimable.id}`
+        ? `quest:${claimable.id}`
         : displayNextUp
-          ? `next:${displayNextUp.id}`
+          ? `quest:${displayNextUp.id}`
           : 'empty';
 
   const showsQuest = !awaitingPact && !pactWins && (!!claimable || !!nextUp);
@@ -427,92 +428,54 @@ export function NextQuestStrip({
       tabIndex={0}
       onClick={goToQuests}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           goToQuests();
         }
       }}
-      className={`group relative mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 md:mx-4 md:w-[calc(100%-2rem)] ${
-        showClaimable
-          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm md:mb-3 md:p-3.5 ${
-              goldenClaim
-                ? 'border-amber-400/70 bg-amber-100/80 hover:bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15 dark:hover:bg-amber-500/20'
-                : `${objectiveCardTone(true)} hover:bg-lime-100 dark:hover:bg-lime-500/20`
-            }`
-          : 'mb-2 gap-3 rounded-2xl border border-primary/15 bg-primary/[0.06] px-3 py-2.5 transition-[border-color,background-color,transform] active:scale-[0.99] dark:bg-primary/[0.09] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary/[0.09] md:mb-3 md:px-4 md:py-3'
+      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-[border-color,background-color,transform] duration-500 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 md:mx-4 md:mb-3 md:w-[calc(100%-2rem)] md:px-4 md:py-3 ${
+        readyClaim
+          ? goldenClaim
+            ? 'border-amber-400/70 bg-amber-100/80 dark:border-amber-400/40 dark:bg-amber-500/15 [@media(hover:hover)]:hover:bg-amber-100 dark:[@media(hover:hover)]:hover:bg-amber-500/20'
+            : `${objectiveCardTone(true)} [@media(hover:hover)]:hover:bg-lime-100 dark:[@media(hover:hover)]:hover:bg-lime-500/20`
+          : 'border-primary/15 bg-primary/[0.06] dark:bg-primary/[0.09] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary/[0.09]'
       }`}
     >
-      {showClaimable && claimable ? (
-        <>
-          <div className="shrink-0 animate-[reward-pop_0.4s_ease-out_both] motion-reduce:animate-none">
-            <div className="animate-quest-pulse">
-              <QuestRewardTileBadge
-                reward={claimable.reward}
-                rewards={claimable.rewards}
-                catalog={resolvedCatalog}
-                isPremium={!!isPremium}
-              />
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden leading-tight animate-[reward-pop_0.4s_ease-out_0.07s_both] motion-reduce:animate-none">
-            <span
-              className={`text-[12px] font-black ${
- goldenClaim
- ? 'text-amber-700 dark:text-amber-400'
- : 'text-lime-700 dark:text-lime-400'
- }`}
-            >
-              {claimable.kind === 'sweep'
-                ? sweepClaimLabels(claimable).eyebrow
-                : claimableCount > 1
-                  ? `${claimableCount} rewards ready`
-                  : 'Reward ready'}
-            </span>
-            <span className="mt-0.5 block min-w-0 truncate text-[13px] font-black text-foreground">
-              {claimable.kind === 'season' ? (
-                <span className="block truncate">
-                  {claimable.seasonName
-                    ? `${claimable.seasonName} · Tier ${claimable.tier}`
-                    : `Season tier ${claimable.tier}`}
-                </span>
-              ) : claimable.kind === 'sweep' ? (
-                <span className="block truncate">
-                  {sweepClaimLabels(claimable).title}
-                </span>
-              ) : (
-                <ObjectiveLabel label={claimable.objectiveLabel} />
-              )}
-            </span>
-          </div>
-          <span
-            className="inline-flex shrink-0 animate-[reward-pop_0.45s_ease-out_0.14s_both] motion-reduce:animate-none"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <span className={claiming ? 'inline-flex' : 'claim-wobble inline-flex'}>
-              <button
-                type="button"
-                disabled={claiming}
-                onClick={() => void handleClaim(claimable)}
-                className="inline-flex h-9 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[380px]:min-w-[7rem] min-[380px]:px-4"
-              >
-                {claiming
-                  ? claimable.kind === 'sweep'
-                    ? 'Opening…'
-                    : 'Claiming…'
-                  : claimable.kind === 'sweep'
-                    ? sweepClaimLabels(claimable).action
-                    : 'Claim'}
-              </button>
-            </span>
-          </span>
-        </>
-      ) : displayNextUp ? (
+      {readyClaim || displayNextUp ? (
         <>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-primary">
+            <span
+              className={`flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide transition-colors duration-500 ${
+                readyClaim
+                  ? goldenClaim
+                    ? 'text-amber-700 dark:text-amber-400'
+                    : 'text-lime-700 dark:text-lime-400'
+                  : 'text-primary'
+              }`}
+            >
               <Icon name="quests" className="h-4 w-4 shrink-0" />
-              <span className="shrink-0">Quest</span>
-              {!displayNextUp.needsFocusTags &&
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={readyClaim ? 'ready' : 'quest'}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+                  className="shrink-0"
+                >
+                  {readyClaim
+                    ? readyClaim.kind === 'sweep'
+                      ? sweepClaimLabels(readyClaim).eyebrow
+                      : claimableCount > 1
+                        ? `${claimableCount} rewards ready`
+                        : 'Reward ready'
+                    : 'Quest'}
+                </motion.span>
+              </AnimatePresence>
+              {!readyClaim &&
+              displayNextUp &&
+              !displayNextUp.needsFocusTags &&
               !fillingTrackable &&
               !introTrackable &&
               (nextUpReasonLabel || nextUpResetLabel) ? (
@@ -520,7 +483,9 @@ export function NextQuestStrip({
                   · {nextUpReasonLabel ?? nextUpResetLabel}
                 </span>
               ) : null}
-              {displayNextUp.hint && !displayNextUp.needsFocusTags ? (
+              {!readyClaim &&
+              displayNextUp?.hint &&
+              !displayNextUp.needsFocusTags ? (
                 <span
                   className="-my-1 ml-auto shrink-0"
                   onClick={(event) => event.stopPropagation()}
@@ -542,7 +507,7 @@ export function NextQuestStrip({
                 </span>
               ) : null}
             </span>
-            {displayNextUp.needsFocusTags ? (
+            {!readyClaim && displayNextUp?.needsFocusTags ? (
               <span className="flex min-w-0 items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-[14px] font-black leading-tight text-foreground md:text-[15px]">
                   Pick a tag to start
@@ -556,27 +521,58 @@ export function NextQuestStrip({
               <>
                 <span className="min-w-0 text-[14px] font-black leading-tight text-foreground md:text-[15px]">
                   <span className="line-clamp-2 md:line-clamp-1">
-                    <ObjectiveLabel
-                      label={displayNextUp.remainingLabel}
-                      tags={displayNextUp.tags}
-                      maxTags={1}
-                    />
+                    {readyClaim ? (
+                      readyClaim.kind === 'season' ? (
+                        readyClaim.seasonName
+                          ? `${readyClaim.seasonName} · Tier ${readyClaim.tier}`
+                          : `Season tier ${readyClaim.tier}`
+                      ) : readyClaim.kind === 'sweep' ? (
+                        sweepClaimLabels(readyClaim).title
+                      ) : (
+                        <ObjectiveLabel label={readyClaim.objectiveLabel} />
+                      )
+                    ) : displayNextUp ? (
+                      <ObjectiveLabel
+                        label={displayNextUp.remainingLabel}
+                        tags={displayNextUp.tags}
+                        maxTags={1}
+                      />
+                    ) : null}
                   </span>
                 </span>
                 <QuestTrack
-                  progress={displayNextUp.progress}
-                  target={displayNextUp.target}
+                  progress={displayNextUp?.progress ?? 1}
+                  target={displayNextUp?.target ?? 1}
+                  action={
+                    readyClaim
+                      ? {
+                          label: claiming
+                            ? readyClaim.kind === 'sweep'
+                              ? 'Opening…'
+                              : 'Claiming…'
+                            : readyClaim.kind === 'sweep'
+                              ? sweepClaimLabels(readyClaim).action
+                              : 'Claim',
+                          disabled: claiming,
+                          onPress: () => void handleClaim(readyClaim),
+                        }
+                      : null
+                  }
                 />
               </>
             )}
           </div>
-          <QuestRewardTileBadge
-            reward={displayNextUp.reward}
-            rewards={displayNextUp.rewards}
-            catalog={resolvedCatalog}
-            isPremium={!!isPremium}
-            small
-          />
+          <span
+            className={`shrink-0 ${readyClaim && !claiming ? 'animate-quest-pulse motion-reduce:animate-none' : ''}`}
+          >
+            <QuestRewardTileBadge
+              reward={(readyClaim ?? displayNextUp)?.reward}
+              rewards={(readyClaim ?? displayNextUp)?.rewards}
+              catalog={resolvedCatalog}
+              isPremium={!!isPremium}
+              small
+            />
+          </span>
         </>
       ) : null}
     </div>
@@ -624,42 +620,6 @@ export function NextQuestStrip({
       />
     </div>
     </>
-  );
-}
-
-function QuestTrack({ progress, target }: { progress: number; target: number }) {
-  const safeTarget = Math.max(1, target);
-  const shown = Math.min(Math.max(0, progress), safeTarget);
-  const pct = (shown / safeTarget) * 100;
-  const done = shown >= safeTarget;
-  const prevProgress = useRef(progress);
-  useEffect(() => {
-    const prev = prevProgress.current;
-    prevProgress.current = progress;
-    if (progress > prev) hapticTick();
-  }, [progress]);
-  return (
-    <span className="mt-0.5 flex items-center gap-2">
-      <span
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={safeTarget}
-        aria-valuenow={shown}
-        className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-primary/15"
-      >
-        <span
-          className={`absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-500 ${
-            done ? 'bg-lime-600' : 'bg-amber-400'
-          }`}
-          style={{ width: `${Math.max(pct, 8)}%` }}
-        />
-      </span>
-      {safeTarget > 1 && (
-        <span className="shrink-0 text-[11px] font-black tabular-nums text-muted-foreground">
-          {shown}/{safeTarget}
-        </span>
-      )}
-    </span>
   );
 }
 

@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Flame } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   HintButton,
-  ObjectiveProgressBar,
   QuestRewardTileBadge,
   objectiveCardTone,
 } from '@/lib/questClaims';
+import { Icon } from '@/components/ui/Icon';
+import { QuestTrack } from '@/components/ui/QuestTrack';
 import { useUIStore } from '@/lib/uiStore';
 import { usePactView } from './PactCard';
 import { pactWeekRewardTiles } from '@/lib/pact/format';
@@ -55,131 +57,129 @@ export function PactStripRow({ view }: { view: PactView }) {
     }
   };
 
+  const hint = (
+    <HintButton
+      compact
+      text={
+        sessionToday
+          ? `Today's is on your list, tagged ${active.categoryName}. Finish all ${active.target} days this week.`
+          : active.nextTaskLabel
+            ? `Next up: ${active.nextTaskLabel}. ${active.progress} of ${active.target} days done this week.`
+            : `No days left. ${active.progress} of ${active.target} done this week.`
+      }
+      onShowMe={
+        sessionToday
+          ? () =>
+              startHintGuide(
+                'pact-session',
+                active.tagId ? { tagIds: [active.tagId] } : undefined,
+              )
+          : undefined
+      }
+    />
+  );
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={() => router.push('/quests#pact')}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           router.push('/quests#pact');
         }
       }}
       className={cn(
-        'group relative mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:mx-4 md:w-[calc(100%-2rem)]',
+        'group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-[border-color,background-color,transform] duration-500 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:mx-4 md:mb-3 md:w-[calc(100%-2rem)] md:px-4 md:py-3',
         ready
-          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm md:mb-3 md:p-3.5 ${objectiveCardTone(true)}`
-          : 'mb-1.5 gap-2.5 rounded-xl px-1 py-1 hover:bg-muted/30 md:mb-0 md:gap-3 md:px-4 md:py-1.5',
+          ? `${objectiveCardTone(true)} [@media(hover:hover)]:hover:bg-lime-100 dark:[@media(hover:hover)]:hover:bg-lime-500/20`
+          : 'border-primary/15 bg-primary/[0.06] dark:bg-primary/[0.09] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary/[0.09]',
       )}
     >
-      {/* Same leading slot as a quest row: what the week pays. The area art
-          said where the work happens, which the commitment text already says
-          — the reward is the thing this slot exists to answer. */}
-      <QuestRewardTileBadge
-        rewards={pactWeekRewardTiles(active)}
-        catalog={view.rewardCatalog as never}
-        isPremium={view.isPremium}
-        small={!ready}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col gap-1 leading-tight md:gap-1.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span
           className={cn(
-            'flex items-center gap-1.5 text-[11px] font-black',
-            ready
-              ? 'text-lime-700 dark:text-lime-400'
-              : 'text-muted-foreground',
+            'flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide transition-colors duration-500',
+            ready ? 'text-lime-700 dark:text-lime-400' : 'text-primary',
           )}
         >
-          {ready ? (
-            'Week finished'
-          ) : (
+          <Icon name="leap" className="h-4 w-4 shrink-0" />
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={ready ? 'ready' : 'leap'}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+              className="shrink-0"
+            >
+              {ready ? 'Week finished' : 'Leap'}
+            </motion.span>
+          </AnimatePresence>
+          {view.streak.weeks > 0 && (
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-amber-600 dark:text-amber-400">
+              <Flame className="h-3 w-3" strokeWidth={2.75} />
+              {view.streak.weeks}
+            </span>
+          )}
+          {!ready && (
             <>
               <span
-                aria-hidden="true"
-                className="h-1.5 w-1.5 rounded-full bg-primary"
-              />
-              This week
-              {view.streak.weeks > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
-                  <Flame className="h-3 w-3" strokeWidth={2.75} />
-                  {view.streak.weeks}
-                </span>
-              )}
+                className={cn(
+                  'min-w-0 truncate font-bold normal-case tracking-normal',
+                  view.streak.atRisk
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-muted-foreground',
+                )}
+              >
+                ·{' '}
+                {view.streak.atRisk
+                  ? 'Streak at risk!'
+                  : `${active.daysLeft}d left`}
+              </span>
+              <span
+                className="-my-1 ml-auto shrink-0"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {hint}
+              </span>
             </>
           )}
         </span>
-
-        <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-black leading-tight text-foreground md:text-[13px]">
-          <span className="min-w-0 flex-1 truncate">
+        <span className="min-w-0 text-[14px] font-black leading-tight text-foreground md:text-[15px]">
+          <span className="line-clamp-2 md:line-clamp-1">
             {active.commitmentText}
           </span>
-          {!ready && (
-            <span
-              className={cn(
-                'hidden shrink-0 whitespace-nowrap text-[10px] font-bold min-[400px]:inline',
-                view.streak.atRisk
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-muted-foreground',
-              )}
-            >
-              {view.streak.atRisk
-                ? 'Streak at risk!'
-                : `${active.daysLeft}d left`}
-            </span>
-          )}
         </span>
-
-        {!ready && (
-          <ObjectiveProgressBar
-            heightClassName="h-4 md:h-3.5"
-            progress={active.progress}
-            target={active.target}
-          />
-        )}
+        <QuestTrack
+          progress={active.progress}
+          target={active.target}
+          action={
+            ready
+              ? {
+                  label: claiming ? 'Claiming…' : 'Claim',
+                  disabled: claiming,
+                  onPress: () => void claim(),
+                }
+              : null
+          }
+        />
       </div>
-
-      {ready ? (
-        <span
-          className="inline-flex shrink-0"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <span
-            className={claiming ? 'inline-flex' : 'claim-wobble inline-flex'}
-          >
-            <button
-              type="button"
-              disabled={claiming}
-              onClick={claim}
-              className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {claiming ? 'Claiming…' : 'Claim'}
-            </button>
-          </span>
-        </span>
-      ) : (
-        <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
-          <HintButton
-            text={
-              sessionToday
-                ? `Today's is on your list, tagged ${active.categoryName}. Finish all ${active.target} days this week.`
-                : active.nextTaskLabel
-                  ? `Next up: ${active.nextTaskLabel}. ${active.progress} of ${active.target} days done this week.`
-                  : `No days left. ${active.progress} of ${active.target} done this week.`
-            }
-            onShowMe={
-              sessionToday
-                ? () =>
-                    startHintGuide(
-                      'pact-session',
-                      active.tagId ? { tagIds: [active.tagId] } : undefined,
-                    )
-                : undefined
-            }
-          />
-        </span>
-      )}
+      <span
+        className={cn(
+          'shrink-0',
+          ready && !claiming && 'animate-quest-pulse motion-reduce:animate-none',
+        )}
+      >
+        <QuestRewardTileBadge
+          rewards={pactWeekRewardTiles(active)}
+          catalog={view.rewardCatalog as never}
+          isPremium={view.isPremium}
+          small
+        />
+      </span>
     </div>
   );
 }

@@ -1313,7 +1313,7 @@ function StepsStrip({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -8, opacity: 0 }}
               transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-              className={`block truncate text-[13px] font-semibold leading-none md:text-[14px] ${
+              className={`block truncate text-[13px] font-semibold leading-[1.35] md:text-[14px] ${
                 allDone ? 'text-primary' : 'text-foreground/75'
               }`}
             >

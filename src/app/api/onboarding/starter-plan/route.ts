@@ -197,7 +197,6 @@ export async function POST(req: NextRequest) {
           days: item.days,
           ...(item.startTime ? { startTime: item.startTime } : {}),
           ...(item.reminder ? { reminder: item.reminder } : {}),
-          ...(item.anchor ? { notes: item.anchor } : {}),
           ...(tagId ? { tags: [tagId] } : {}),
         },
         timezone,
