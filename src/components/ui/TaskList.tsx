@@ -183,6 +183,8 @@ const SWIPE_SPRING = { type: 'spring' as const, stiffness: 900, damping: 80, mas
 const SWIPE_MAX_RELEASE_VELOCITY = 1500;
 const LIST_ROW_DIVIDER =
   'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden md:before:ml-4';
+const LIST_GROUP_DIVIDER =
+  'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:h-px before:bg-border/60 first:before:hidden';
 
 const SORT_TRANSITION = {
   duration: 260,
@@ -1406,7 +1408,7 @@ function SortableSectionHeader({
       }}
       data-is-active="true"
       data-section-header="true"
-      className={`relative w-full select-none bg-muted/40 ${LIST_ROW_DIVIDER} ${
+      className={`relative w-full select-none bg-muted/40 ${LIST_GROUP_DIVIDER} ${
         isDragging ? 'opacity-90 before:hidden' : ''
       }`}
     >
@@ -2685,7 +2687,7 @@ export default function TaskList({
                         return (
                           <div
                             key="completed-divider"
-                            className={`relative flex items-center gap-2 bg-muted/40 px-3.5 py-2 md:px-4 ${LIST_ROW_DIVIDER}`}
+                            className={`relative flex items-center gap-2 bg-muted/40 px-3.5 py-2 md:px-4 ${LIST_GROUP_DIVIDER}`}
                           >
                             <span className="text-[13px] font-black text-muted-foreground/70">
                               Completed

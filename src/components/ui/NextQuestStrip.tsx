@@ -442,7 +442,7 @@ export function NextQuestStrip({
       {readyClaim || displayNextUp ? (
         <>
           <span
-            className={`shrink-0 ${readyClaim && !claiming ? 'animate-quest-pulse motion-reduce:animate-none' : ''}`}
+            className={`min-h-11 min-w-11 shrink-0 ${readyClaim && !claiming ? 'animate-quest-pulse motion-reduce:animate-none' : ''}`}
           >
             <QuestRewardTileBadge
               reward={(readyClaim ?? displayNextUp)?.reward}

@@ -93,7 +93,7 @@ export function PactStripRow({ view }: { view: PactView }) {
     >
       <span
         className={cn(
-          'shrink-0',
+          'min-h-11 min-w-11 shrink-0',
           ready && !claiming && 'animate-quest-pulse motion-reduce:animate-none',
         )}
       >
