@@ -41,7 +41,7 @@ function WishlistThumb({ wishlist }: { wishlist: WishlistView }) {
   return (
     <span
       className={cn(
-        'flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-br',
+        'flex h-12 w-12 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-br',
         RARITY_CONFIG[wishlist.rarity].gradient,
       )}
     >
@@ -55,8 +55,8 @@ function WishlistThumb({ wishlist }: { wishlist: WishlistView }) {
       ) : (
         <span className="shrink-0">
           <Frog
-            width={84}
-            height={84}
+            width={63}
+            height={63}
             visualOffsetY={0}
             paused
             indices={{ [wishlist.slot ?? 'hat']: wishlist.riveIndex }}
@@ -169,7 +169,29 @@ export function HomeShopRail() {
   };
 
   return (
-    <div ref={rootRef} className="mx-1.5 mt-4 md:mx-4 md:mt-8">
+    <section ref={rootRef} className="mx-1.5 mt-7 md:mx-4 md:mt-10">
+      <div className="mb-2 flex min-h-9 items-center justify-between gap-2 pl-3.5 pr-1 md:pl-4">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h2 className="text-[19px] font-black tracking-tight text-foreground md:text-[21px]">
+            Shop deals
+          </h2>
+          {countdown && (
+            <span className="inline-flex items-center gap-1 text-[13px] font-bold tabular-nums text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 self-center" strokeWidth={2.5} />
+              {countdown}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => open('header')}
+          className="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-full px-2.5 text-[13px] font-black text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/10"
+        >
+          See all
+          <ChevronRight className="h-4 w-4" strokeWidth={2.75} />
+        </button>
+      </div>
+
       {focus && (
         <button
           type="button"
@@ -180,85 +202,54 @@ export function HomeShopRail() {
               focus.view.kind,
             )
           }
-          className={cn(
-            'mb-3 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors',
-            focus.affordable
-              ? 'border-emerald-500/40 bg-emerald-500/[0.06] hover:bg-emerald-500/10'
-              : 'border-border/40 bg-card/60 hover:bg-muted/40',
-          )}
+          className="mb-2.5 flex w-full items-center gap-3 rounded-[20px] border border-border/60 bg-card py-2 pl-2 pr-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-colors active:bg-muted/50 [@media(hover:hover)]:hover:bg-muted/40"
         >
           <WishlistThumb wishlist={focus.view} />
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <Bookmark
-                  className="h-3 w-3 shrink-0 text-muted-foreground/70"
-                  strokeWidth={3}
-                  fill="currentColor"
-                />
-                <span className="truncate text-[11px] font-black text-muted-foreground">
-                  Wishlist
-                  {savedCount > 1 && !focus.onDeal
-                    ? ` · ${savedCount} saved`
-                    : ''}
-                </span>
-                {focus.onDeal && (
-                  <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/15 px-1.5 py-px text-[11px] font-black text-amber-700 dark:text-amber-400">
-                    {focus.discountPercent}% off
-                  </span>
-                )}
+          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Bookmark
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70"
+                strokeWidth={3}
+                fill="currentColor"
+              />
+              <span className="truncate text-[14px] font-bold text-foreground">
+                {focus.affordable ? 'Ready to buy' : 'Wishlist'}
               </span>
-              {focus.affordable ? (
-                <span className="shrink-0 whitespace-nowrap text-[12px] font-black text-emerald-600 dark:text-emerald-400">
-                  Ready to buy
-                </span>
-              ) : (
-                <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-black tabular-nums text-muted-foreground">
-                  <Fly size={26} paused y={-5} x={3} />
-                  {focus.remaining.toLocaleString()} to go
+              {focus.onDeal && (
+                <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-px text-[11px] font-black text-amber-700 dark:text-amber-400">
+                  -{focus.discountPercent}%
                 </span>
               )}
             </span>
-            <span className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
-              <span
-                className={cn(
-                  'block h-full rounded-full transition-[width] duration-700 ease-out',
-                  focus.affordable
-                    ? 'bg-emerald-500'
-                    : focus.onDeal
-                      ? 'bg-amber-500'
-                      : 'bg-primary',
-                )}
-                style={{
-                  width: `${Math.max(3, Math.round(focus.ratio * 100))}%`,
-                }}
-              />
+            <span className="flex items-center gap-2">
+              <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)]">
+                <span
+                  className={cn(
+                    'absolute inset-y-0 left-0 rounded-full bg-gradient-to-b transition-[width] duration-700 ease-out',
+                    focus.affordable
+                      ? 'from-emerald-400 to-emerald-500'
+                      : 'from-amber-300 to-amber-400',
+                  )}
+                  style={{
+                    width: `${Math.max(6, Math.round(focus.ratio * 100))}%`,
+                  }}
+                >
+                  <span className="absolute inset-x-[3px] top-px h-[35%] rounded-full bg-white/50" />
+                </span>
+              </span>
+              {!focus.affordable && (
+                <span className="inline-flex shrink-0 items-center text-[11px] font-black tabular-nums text-muted-foreground">
+                  <Fly size={20} paused y={-3} x={2} />
+                  {focus.remaining.toLocaleString()}
+                </span>
+              )}
             </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={() => open('header')}
-        className="mb-2 flex w-full items-center gap-2 px-1 text-left"
-      >
-        <span className="text-[12px] font-black text-muted-foreground">
-          Today at the shop
-        </span>
-        {countdown && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-black tabular-nums text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {countdown}
-          </span>
-        )}
-        <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
-      </button>
-
-      {/* Same card as the shop's daily-deals shelf — corner rarity ribbon,
-          rarity gradient, struck original, effective discount. */}
-      <DragScrollRow>
+      <DragScrollRow className="-mx-3 snap-x snap-mandatory scroll-px-3 gap-2.5 px-3 pb-2 md:mx-0 md:px-0 md:scroll-px-0">
         {picks.map(({ item, price, wasPrice, discountPercent, onSale }) => {
           const config = RARITY_CONFIG[item.rarity];
           return (
@@ -266,54 +257,50 @@ export function HomeShopRail() {
               key={item.id}
               type="button"
               onClick={() => open('card', item.id, 'item')}
-              className={cn(
-                'relative flex w-[148px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-gradient-to-br p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
-                config.border,
-                config.gradient,
-              )}
+              className="relative flex w-[136px] shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card p-1.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-transform active:scale-[0.97]"
             >
-              <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
-                <span
-                  className={cn(
-                    'block rounded-br-2xl border-b border-r px-2 py-1 text-[11px] font-black',
-                    config.bg,
-                    config.text,
-                    config.border,
-                  )}
-                >
-                  {config.label}
-                </span>
-              </span>
-
-              <span className="relative flex h-24 items-end justify-center overflow-hidden rounded-lg bg-background/50">
+              <span
+                className={cn(
+                  'relative flex h-[104px] items-end justify-center overflow-hidden rounded-[14px] bg-gradient-to-br',
+                  config.gradient,
+                )}
+              >
                 <FrogSnapshot
                   className="h-[120%] w-[120%] object-contain"
                   indices={{ [item.slot]: item.riveIndex }}
                   width={170}
                   height={170}
                 />
-              </span>
-
-              <span className="mt-1.5 flex items-center justify-center gap-1.5">
+                <span
+                  className={cn(
+                    'absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ring-1 ring-inset ring-black/5',
+                    config.bg,
+                    config.text,
+                  )}
+                >
+                  {config.label}
+                </span>
                 {onSale && (
-                  <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">
+                  <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+                    -{discountPercent}%
+                  </span>
+                )}
+              </span>
+              <span className="flex items-center justify-between gap-1 px-1 pb-0.5 pt-1.5">
+                <span className="inline-flex items-center text-[14px] font-black tabular-nums text-foreground">
+                  <Fly size={22} paused y={-2} />
+                  {price.toLocaleString()}
+                </span>
+                {onSale && (
+                  <span className="text-[11px] font-bold tabular-nums text-muted-foreground/70 line-through">
                     {wasPrice.toLocaleString()}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-foreground">
-                  <Fly size={26} paused y={-2} />
-                  {price.toLocaleString()}
-                </span>
-              </span>
-
-              <span className="mt-0.5 text-center text-[12px] font-black text-emerald-600 dark:text-emerald-400">
-                {onSale ? `${discountPercent}% off today` : ' '}
               </span>
             </button>
           );
         })}
       </DragScrollRow>
-
-    </div>
+    </section>
   );
 }

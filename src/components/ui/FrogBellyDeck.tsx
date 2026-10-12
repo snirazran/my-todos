@@ -28,12 +28,14 @@ export function FrogBellyDeck({
   maxHunger,
   animateHunger = true,
   onPress,
+  bare = false,
   className,
 }: {
   hunger?: number;
   maxHunger?: number;
   animateHunger?: boolean;
   onPress?: () => void;
+  bare?: boolean;
   className?: string;
 }) {
   const reduceMotion = useReducedMotion();
@@ -95,7 +97,9 @@ export function FrogBellyDeck({
       <div
         data-fly-hero-card
         className={cn(
-          'relative z-10 h-[54px] w-[340px] max-w-[min(94vw,100%)] rounded-[18px] border border-border/50 bg-card/80 shadow-sm backdrop-blur-2xl',
+          bare
+            ? 'relative h-12 w-full'
+            : 'relative z-10 h-[54px] w-[340px] max-w-[min(94vw,100%)] rounded-[18px] border border-border/50 bg-card/80 shadow-sm backdrop-blur-2xl',
           className,
         )}
       />
@@ -134,10 +138,22 @@ export function FrogBellyDeck({
   const title = feedActive && feed ? `Yum! +${gainHours}h` : tone.label;
   const subtitle =
     feedActive && feed && feed.to >= 97 ? 'Belly full!' : hint;
+  const caption =
+    feedActive && feed ? (feed.to >= 97 ? 'Belly full!' : title) : hint;
 
   const content = (
-    <div className="relative flex h-full w-full items-center gap-2.5 px-3">
-      <div className="relative h-[30px] w-[92px] shrink-0 overflow-hidden">
+    <div
+      className={cn(
+        'relative flex h-full w-full items-center',
+        bare ? 'gap-3 px-3.5' : 'gap-2.5 px-3',
+      )}
+    >
+      <div
+        className={cn(
+          'relative shrink-0 overflow-hidden',
+          bare ? 'h-5' : 'h-[30px] w-[92px]',
+        )}
+      >
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={feedActive && feed ? `feed-${feed.id}` : 'state'}
@@ -145,7 +161,10 @@ export function FrogBellyDeck({
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -14 }}
             transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-            className="absolute inset-0 flex flex-col justify-center text-left"
+            className={cn(
+              'flex flex-col justify-center text-left',
+              bare ? 'h-full' : 'absolute inset-0',
+            )}
           >
             <span
               className={cn(
@@ -153,11 +172,13 @@ export function FrogBellyDeck({
                 feedActive ? 'text-emerald-600 dark:text-emerald-400' : tone.text,
               )}
             >
-              {title}
+              {bare ? caption : title}
             </span>
-            <span className="mt-[5px] whitespace-nowrap text-[11px] font-bold leading-none text-muted-foreground">
-              {subtitle}
-            </span>
+            {!bare && (
+              <span className="mt-[5px] whitespace-nowrap text-[11px] font-bold leading-none text-muted-foreground">
+                {subtitle}
+              </span>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -169,7 +190,10 @@ export function FrogBellyDeck({
         aria-valuenow={Math.round(percent)}
         aria-valuetext={`${tone.label}, ${hint}`}
         aria-label="Frog belly"
-        className="relative flex flex-1 items-center gap-1.5"
+        className={cn(
+          'relative flex flex-1 items-center',
+          bare ? 'gap-1' : 'gap-1.5',
+        )}
       >
         {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => {
           const delay = pipDelay(i);
@@ -189,7 +213,7 @@ export function FrogBellyDeck({
                     ? `belly-pip-pop-${feed!.id % 2} 460ms cubic-bezier(0.34,1.56,0.64,1) ${popAt}ms both`
                     : undefined
                 }
-                className="h-[18px] w-full"
+                className={bare ? 'h-3.5 w-full' : 'h-[18px] w-full'}
               />
               {pop && (
                 <span
@@ -221,7 +245,9 @@ export function FrogBellyDeck({
   );
 
   const shell = cn(
-    'relative z-10 flex h-[54px] w-[340px] max-w-[min(94vw,100%)] items-center justify-center rounded-[18px] border border-border/50 bg-card/80 px-2 shadow-sm backdrop-blur-2xl',
+    bare
+      ? 'relative flex h-12 w-full items-center text-left'
+      : 'relative z-10 flex h-[54px] w-[340px] max-w-[min(94vw,100%)] items-center justify-center rounded-[18px] border border-border/50 bg-card/80 px-2 shadow-sm backdrop-blur-2xl',
     className,
   );
 
@@ -239,10 +265,12 @@ export function FrogBellyDeck({
         aria-label={`Belly: ${tone.label}. ${hint}. How feeding works`}
         className={cn(
           shell,
-          'transition-transform duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+          bare
+            ? 'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50 active:bg-foreground/[0.04] [@media(hover:hover)]:hover:bg-foreground/[0.025]'
+            : 'transition-transform duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         )}
       >
-        {highlight}
+        {!bare && highlight}
         {content}
       </button>
     );
@@ -250,7 +278,7 @@ export function FrogBellyDeck({
 
   return (
     <div data-fly-hero-card data-hint="hunger-bar" className={shell}>
-      {highlight}
+      {!bare && highlight}
       {content}
     </div>
   );

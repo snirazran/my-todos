@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Icon } from '@/components/ui/Icon';
 import { format } from 'date-fns';
 import {
   Calendar,
@@ -64,6 +63,8 @@ import {
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { FrogBellyDeck } from '@/components/ui/FrogBellyDeck';
+import { StatusDock } from '@/components/home/StatusDock';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { HomePageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
@@ -795,6 +796,69 @@ export default function HomeDashboard() {
       </div>
     ) : null;
 
+  const showListHeader =
+    !guided && !((dayCleared || data.length === 0) && !filtersActive);
+
+  const renderListHeader = (inCard: boolean) => (
+    <>
+      {showListHeader && (
+        <div
+          className={cn(
+            'flex min-h-9 items-center justify-between gap-2',
+            inCard
+              ? 'border-b border-border/60 py-2 pl-4 pr-3'
+              : 'mb-2 pl-5 pr-3',
+          )}
+        >
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+            <h2
+              className={cn(
+                'font-black tracking-tight text-foreground',
+                inCard ? 'text-[18px]' : 'text-[19px]',
+              )}
+            >
+              Today
+            </h2>
+            <span className="text-[13px] font-bold tabular-nums text-muted-foreground">
+              {dayCleared ? 'All done' : `${openTaskCount} left`}
+            </span>
+
+            {filtersActive && (
+              <FilterStatusLine
+                tasks={data}
+                filters={filters}
+                onClearAll={resetFilters}
+              />
+            )}
+          </div>
+
+          <FilterTriggerButton
+            compact
+            size="md"
+            triggerRef={headerMenuBtnRef}
+            onClick={() => setStripOpen((v) => !v)}
+            activeCount={activeFilterCount}
+            open={stripOpen}
+          />
+        </div>
+      )}
+      {(stripOpen || filtersActive) && (
+        <FilterChipStrip
+          filters={filters}
+          base={baseFilters}
+          tags={tags || []}
+          tasks={data}
+          onChange={setFilters}
+          onClearAll={resetFilters}
+          onOpenMore={() => setIsHeaderMenuOpen(true)}
+          className={
+            inCard ? 'border-b border-border/60 px-4 py-2' : 'mb-2 px-2'
+          }
+        />
+      )}
+    </>
+  );
+
   if (sessionLoading || (user && isLoading && tasks.length === 0)) {
     return <HomePageSkeleton />;
   }
@@ -838,7 +902,7 @@ export default function HomeDashboard() {
         <div className="relative flex flex-col items-stretch gap-2">
           <FlyCatchSwipeLauncher
             source="home"
-            className="relative z-10"
+            className="relative z-30"
             shouldStart={(x, y) => frogRef.current?.hitTest(x, y) !== false}
           >
             <div className="flex flex-col gap-2 lg:gap-4">
@@ -887,42 +951,54 @@ export default function HomeDashboard() {
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
               paused={isAnyPanelOpen}
-              onBellyPress={user ? () => setBellyIntroOpen(true) : undefined}
               fixedSpeech={firstRun.speech}
+              hideDeck
             />
             </div>
           </FlyCatchSwipeLauncher>
 
+          <StatusDock className="-mt-2">
+            <FrogBellyDeck
+              bare
+              hunger={user ? hungerStatus.hunger : 1000}
+              maxHunger={user ? hungerStatus.maxHunger : 10000}
+              animateHunger={!!user}
+              onPress={user ? () => setBellyIntroOpen(true) : undefined}
+              className="rounded-[19px] md:h-auto md:min-h-12 md:w-[300px] md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
+            />
+            {user && (
+              <motion.div
+                className="min-w-0 md:flex-1"
+                initial={firstRun.active ? { opacity: 0, y: -12 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <NextQuestStrip
+                  claimables={questsData?.claimables}
+                  trackables={questsData?.trackables}
+                  catalog={questsData?.claimablesRewardCatalog}
+                  isPremium={isPremium}
+                  introFill={guided}
+                  introHold={questIntroHeld}
+                />
+              </motion.div>
+            )}
+          </StatusDock>
+
           {user && !guided && !isAnyPanelOpen && !cinematic && !taskCinematic && (
-            <div className="pointer-events-none relative z-30 -mt-1 flex justify-center">
+            <div className="pointer-events-none relative z-30 flex justify-center empty:hidden">
               <TryOnPill />
             </div>
           )}
 
           <div
             data-fly-sheet
-            className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-3xl md:rounded-none md:bg-transparent md:px-8 md:pb-8 md:pt-7 xl:px-10"
+            className="relative z-20 -mx-3 -mt-12 flex flex-col gap-2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pb-8 md:pt-5 xl:px-10"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div className="flex w-full flex-col gap-2 md:gap-5">
               {!firstRun.active && <GuestAccountBanner />}
               {user && !firstRun.active && <PactCard />}
-              {user && (
-                <motion.div
-                  initial={firstRun.active ? { opacity: 0, y: -12 } : false}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <NextQuestStrip
-                    claimables={questsData?.claimables}
-                    trackables={questsData?.trackables}
-                    catalog={questsData?.claimablesRewardCatalog}
-                    isPremium={isPremium}
-                    introFill={guided}
-                    introHold={questIntroHeld}
-                  />
-                </motion.div>
-              )}
               <div
                 className={taskListHidden ? 'pb-16 md:pb-4' : 'min-h-[360px] pb-16 md:pb-4'}
                 ref={taskListRef}
@@ -931,38 +1007,7 @@ export default function HomeDashboard() {
                 {/* A cleared day says it better on the card, and an empty day
                     has nothing to count or filter — either way the header
                     steps aside, unless filters are on and must stay reachable. */}
-                {!guided && !((dayCleared || data.length === 0) && !filtersActive) && (
-                  <div className="mb-2 flex items-center justify-between gap-2 px-2 md:mb-4 md:px-4">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:gap-x-2.5">
-                      <Icon
-                        name="planner"
-                        className="w-7 h-7 shrink-0 md:w-8 md:h-8"
-                      />
-                      <span className="text-sm font-black tracking-tight text-foreground md:text-base">
-                        {dayCleared
-                          ? 'All done for today!'
-                          : `${openTaskCount} to do today`}
-                      </span>
-
-                      {filtersActive && (
-                        <FilterStatusLine
-                          tasks={data}
-                          filters={filters}
-                          onClearAll={resetFilters}
-                        />
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <FilterTriggerButton
-                        triggerRef={headerMenuBtnRef}
-                        onClick={() => setStripOpen((v) => !v)}
-                        activeCount={activeFilterCount}
-                        open={stripOpen}
-                      />
-                    </div>
-                  </div>
-                )}
+                <div className="md:hidden">{renderListHeader(false)}</div>
                 <TaskFilterSheet
                   open={isHeaderMenuOpen}
                   onOpenChange={setIsHeaderMenuOpen}
@@ -979,18 +1024,6 @@ export default function HomeDashboard() {
                   showCompletedToggle={false}
                   title="More filters"
                 />
-                {(stripOpen || filtersActive) && (
-                  <FilterChipStrip
-                    filters={filters}
-                    base={baseFilters}
-                    tags={tags || []}
-                    tasks={data}
-                    onChange={setFilters}
-                    onClearAll={resetFilters}
-                    onOpenMore={() => setIsHeaderMenuOpen(true)}
-                    className="mb-2 px-2 md:mb-3 md:px-4"
-                  />
-                )}
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
                 <AnimatePresence initial={false}>
                 {!taskListHidden && (
@@ -1003,6 +1036,11 @@ export default function HomeDashboard() {
                 >
                 <TaskList
                   tasks={listTasks}
+                  header={
+                    <div className="hidden md:block">
+                      {renderListHeader(true)}
+                    </div>
+                  }
                   hideAddControls={guided}
                   toggle={handleToggle}
                   showConfetti={rate === 100}
@@ -1015,7 +1053,7 @@ export default function HomeDashboard() {
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="relative flex items-center justify-center w-11 h-11 border-2 rounded-full bg-muted border-muted-foreground/20 shrink-0 md:h-12 md:w-12"
+                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] md:h-12 md:w-12"
                         data-hint="task-fly"
                         data-tag-ids={task.tags?.join(',') || undefined}
                       >
@@ -1460,32 +1498,9 @@ export default function HomeDashboard() {
         }}
       />
 
-      <FocusFabSatellite
-        bottom={`calc(env(safe-area-inset-bottom) + ${
-          notificationStackHeight > 0 ? 148 + notificationStackHeight : 156
-        }px)`}
-        bottomMd={`calc(env(safe-area-inset-bottom) + ${
-          notificationStackHeight > 0 ? 96 + notificationStackHeight : 92
-        }px)`}
-        concealed={fabsConcealed || guided}
-      />
-
-      {/* Floating Add Task FAB */}
-      <button
-        type="button"
-        aria-label="Add task"
+      <div
         aria-hidden={fabsConcealed || guided || undefined}
-        tabIndex={fabsConcealed || guided ? -1 : undefined}
-        data-hint="add-task"
-        onClick={() => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          setQuickText('');
-          setShowQuickAdd(true);
-        }}
-        className={`fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_4px_10px_-2px_rgba(0,0,0,0.25)] hover:brightness-105 active:scale-95 active:shadow-[0_2px_6px_-2px_rgba(0,0,0,0.25)] bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
+        className={`fixed right-4 z-[40] flex items-center gap-1 rounded-full bg-card/95 p-1 shadow-[0_10px_28px_-10px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/60 backdrop-blur-xl bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
           fabsConcealed || guided ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
         }`}
         style={
@@ -1500,14 +1515,31 @@ export default function HomeDashboard() {
           } as React.CSSProperties
         }
       >
-        {firstRun.phase === 'finale' && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -inset-1 rounded-full ring-[3px] ring-primary animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
-          />
-        )}
-        <Plus className="h-6 w-6 stroke-[3]" />
-      </button>
+        <FocusFabSatellite concealed={fabsConcealed || guided} />
+        <button
+          type="button"
+          aria-label="Add task"
+          tabIndex={fabsConcealed || guided ? -1 : undefined}
+          data-hint="add-task"
+          onClick={() => {
+            if (!user) {
+              router.push('/login');
+              return;
+            }
+            setQuickText('');
+            setShowQuickAdd(true);
+          }}
+          className="relative grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-transform hover:brightness-105 active:scale-95"
+        >
+          {firstRun.phase === 'finale' && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -inset-1 rounded-full ring-[3px] ring-primary animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
+            />
+          )}
+          <Plus className="h-6 w-6 stroke-[3]" />
+        </button>
+      </div>
 
       <BellyFullIntroSheet
         open={bellyIntroOpen}

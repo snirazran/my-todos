@@ -65,15 +65,19 @@ export function QuestTrack({
                   ? 'opacity-60'
                   : 'hover:-translate-y-px hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none'
               }`
-            : 'h-2.5 rounded-full bg-primary/15'
+            : 'h-2.5 rounded-full bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)]'
         }`}
       >
         <span
-          className={`absolute inset-y-0 left-0 rounded-full transition-[width,background-color,opacity] duration-500 ${
-            done && !action ? 'bg-lime-600' : 'bg-amber-400'
+          className={`absolute inset-y-0 left-0 overflow-hidden rounded-full bg-gradient-to-b transition-[width,opacity] duration-500 ${
+            done && !action
+              ? 'from-lime-400 to-lime-500'
+              : 'from-amber-300 to-amber-400'
           } ${action ? 'opacity-0' : 'opacity-100'}`}
           style={{ width: `${Math.max(pct, 8)}%` }}
-        />
+        >
+          <span className="absolute inset-x-[3px] top-px h-[35%] rounded-full bg-white/50" />
+        </span>
         <span
           aria-hidden={!action}
           className={`relative text-[13px] font-black text-white transition-[opacity,transform] duration-200 ${

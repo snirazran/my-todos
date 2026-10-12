@@ -46,6 +46,7 @@ type Props = {
   // the fact-driven speech engine.
   fixedSpeech?: string | null;
   onBellyPress?: () => void;
+  hideDeck?: boolean;
 };
 
 export function FrogDisplay({
@@ -75,6 +76,7 @@ export function FrogDisplay({
   showSpeechBubble = true,
   fixedSpeech = null,
   onBellyPress,
+  hideDeck = false,
 }: Props) {
   const router = useRouter();
   const { unseenCount, unseenContainerCount } = useInventory(
@@ -153,16 +155,23 @@ export function FrogDisplay({
 
     <div
       data-fly-hero
-      className={`${className} flex flex-col items-center mb-2 md:mb-2 relative md:-translate-y-6`}
+      className={cn(
+        className,
+        'relative flex flex-col items-center md:-translate-y-6',
+        hideDeck ? 'mb-0' : 'mb-2 md:mb-2',
+      )}
     >
       <div
         ref={frogBoxRef}
-        className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none -translate-y-9 md:mb-6 md:scale-100 md:translate-y-3"
+        className={cn(
+          'relative z-50 transition-transform duration-500 origin-top scale-100 pointer-events-none -translate-y-9 md:scale-100 md:translate-y-3',
+          hideDeck ? '-mb-12 md:-mb-6' : '-mb-6 md:mb-6',
+        )}
       >
         <div
           ref={tapAreaRef}
           data-fly-hero-frog
-          className="pointer-events-auto"
+          className="pointer-events-auto [&_*]:pointer-events-none"
           onPointerMove={trackHover}
           onPointerLeave={() => {
             hoverPointRef.current = { x: -1, y: -1 };
@@ -223,13 +232,15 @@ export function FrogDisplay({
 
             */}
 
-      <FrogBellyDeck
-        hunger={hunger}
-        maxHunger={maxHunger}
-        animateHunger={animateHunger}
-        onPress={onBellyPress}
-        className="-mt-6"
-      />
+      {!hideDeck && (
+        <FrogBellyDeck
+          hunger={hunger}
+          maxHunger={maxHunger}
+          animateHunger={animateHunger}
+          onPress={onBellyPress}
+          className="-mt-6"
+        />
+      )}
     </div>
   );
 }

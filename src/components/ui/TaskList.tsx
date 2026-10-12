@@ -181,6 +181,8 @@ const SWIPE_SNAP_THRESHOLD = 32;
 const SWIPE_COMMIT_X = SWIPE_ACTION_WIDTH + 40;
 const SWIPE_SPRING = { type: 'spring' as const, stiffness: 900, damping: 80, mass: 1 };
 const SWIPE_MAX_RELEASE_VELOCITY = 1500;
+const LIST_ROW_DIVIDER =
+  'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden md:before:ml-4';
 
 const SORT_TRANSITION = {
   duration: 260,
@@ -747,7 +749,7 @@ const SortableTaskItem = React.forwardRef<
         // box-shadow on a clipped child is invisible no matter how it's
         // styled. This layer's *own* shadow isn't affected by its own
         // overflow setting, only its children's are.
-        className={`relative mb-1.5 w-full rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 border border-primary/30' : 'z-auto'} ${hintRowGlow ? 'hint-row-glow' : ''}`}
+        className={`relative w-full ${LIST_ROW_DIVIDER} ${isDragging ? 'z-30 rounded-2xl shadow-[0_18px_36px_-14px_rgba(0,0,0,0.35)] before:hidden dark:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.7)]' : isMenuOpen ? 'z-50' : 'z-auto'} ${hintRowGlow ? 'hint-row-glow' : ''}`}
         data-is-active={!isDone}
         data-hint={isDone ? undefined : 'task-row'}
         data-tag-ids={isDone ? undefined : task.tags?.join(',') || undefined}
@@ -774,7 +776,7 @@ const SortableTaskItem = React.forwardRef<
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
             opacity: { duration: 0.2, ease: 'easeOut', delay: 0.15 },
           }}
-          className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative w-full ${isDragging ? 'overflow-visible rounded-2xl shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe actions stay behind the row until the drag snaps open. A
               swipe never performs an action by itself. */}
@@ -787,7 +789,7 @@ const SortableTaskItem = React.forwardRef<
               onPointerDown={(event) => event.stopPropagation()}
               onClick={handleTimerAction}
               style={{ width: timerTrayWidth }}
-              className="absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden rounded-l-xl bg-emerald-600 text-white"
+              className="absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden bg-emerald-600 text-white"
             >
               <motion.span
                 className="flex w-[88px] shrink-0 flex-col items-center justify-center gap-0.5"
@@ -814,7 +816,7 @@ const SortableTaskItem = React.forwardRef<
               onPointerDown={(event) => event.stopPropagation()}
               onClick={handleSecondaryAction}
               style={{ width: secondaryTrayWidth }}
-              className={`absolute inset-y-0 right-0 flex items-center justify-center overflow-hidden rounded-r-xl text-white ${
+              className={`absolute inset-y-0 right-0 flex items-center justify-center overflow-hidden text-white ${
                 isRepeating ? 'bg-slate-500' : 'bg-amber-500'
               }`}
             >
@@ -885,28 +887,27 @@ const SortableTaskItem = React.forwardRef<
                 : SWIPE_SPRING
             }
             className={`
-              relative flex w-full flex-col px-2.5 py-2.5 md:px-3.5 md:py-3.5
-              transition-[border-color,box-shadow,background-color] duration-200 rounded-xl
-              bg-card dark:bg-muted
-              border shadow-none
+              relative flex w-full flex-col py-3 pl-3.5 pr-2.5 md:py-3.5 md:pl-4 md:pr-3
+              transition-[box-shadow,background-color] duration-200
+              bg-card
               ${
                 timerPhase && !isDone
                   ? timerPhase === 'break'
-                    ? 'border-sky-500/70 dark:border-sky-400/70'
-                    : 'border-primary/70 dark:border-primary/80'
-                  : 'border-transparent'
+                    ? 'shadow-[inset_3px_0_0_0_rgb(14_165_233)]'
+                    : 'shadow-[inset_3px_0_0_0_hsl(var(--primary))]'
+                  : 'shadow-none'
               }
-              ${isHovered && isDesktop && !isDone && !timerPhase ? 'border-primary/35 shadow-[0_8px_20px_-12px_rgba(0,0,0,0.28)]' : ''}
+              ${isHovered && isDesktop && !isDone ? 'bg-muted/40' : ''}
               ${
                 isGlowActive && !isDone
-                  ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]'
+                  ? 'ring-2 ring-inset ring-primary'
                   : ''
               }
 
-              select-none [@media(hover:hover)]:active:border-primary/40 [@media(hover:hover)]:active:bg-muted
-              [@media(hover:hover)]:has-[[data-completion-target]:active]:border-transparent [@media(hover:hover)]:has-[[data-completion-target]:active]:bg-card dark:[@media(hover:hover)]:has-[[data-completion-target]:active]:bg-muted
-              ${isDragging ? 'z-[100] opacity-100 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.35)] ring-2 ring-primary/40 dark:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.7)]' : ''}
-              ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''}
+              select-none active:bg-muted/50
+              has-[[data-completion-target]:active]:bg-card
+              ${isDragging ? 'z-[100] rounded-2xl opacity-100 ring-2 ring-primary/40' : ''}
+              ${isDone && !isDragging && isHovered && isDesktop ? 'bg-muted/40' : ''}
               cursor-pointer
             `}
             // Note: We are using 'style' prop for x motion value to avoid re-renders
@@ -924,14 +925,14 @@ const SortableTaskItem = React.forwardRef<
               />
             )}
 
-            <div className="relative z-10 flex w-full items-center gap-1">
+            <div className="relative z-10 flex w-full items-center gap-3">
             {/* Visual grab affordance. The full row remains the sortable
                 activator so vertical movement is measured correctly. */}
             <div
               aria-hidden="true"
-              className={`relative z-10 -ml-1 flex w-5 flex-shrink-0 items-center justify-center self-stretch transition-colors ${isDone ? 'text-muted-foreground/20' : isDragging ? 'text-primary' : 'text-muted-foreground/40 md:group-hover:text-primary/70'}`}
+              className={`pointer-events-none absolute -left-3.5 top-0 bottom-0 z-10 hidden w-3.5 items-center justify-center transition-opacity md:-left-4 md:flex md:w-4 ${isDragging ? 'text-primary opacity-100' : 'text-muted-foreground/50 opacity-0 md:group-hover:opacity-100'}`}
             >
-              <EllipsisVertical className="h-4 w-4 md:h-[18px] md:w-[18px]" />
+              <EllipsisVertical className="h-4 w-4" />
             </div>
 
             {/* Content — clicking the row toggles completion */}
@@ -940,7 +941,7 @@ const SortableTaskItem = React.forwardRef<
             >
                 <span className="flex flex-wrap items-center gap-1.5">
                   <motion.span
-                    className={`text-[15px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17px] ${
+                    className={`text-[15px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[16px] ${
                       isDone
                         ? 'text-muted-foreground decoration-current'
                         : 'text-foreground decoration-transparent'
@@ -1362,7 +1363,6 @@ function SortableSectionHeader({
   section,
   count,
   doneCount,
-  isFirst,
   onToggleCollapsed,
   onEdit,
   onAddTask,
@@ -1370,7 +1370,6 @@ function SortableSectionHeader({
   section: TaskListSection;
   count: number;
   doneCount: number;
-  isFirst: boolean;
   onToggleCollapsed: () => void;
   onEdit: () => void;
   onAddTask?: () => void;
@@ -1407,16 +1406,16 @@ function SortableSectionHeader({
       }}
       data-is-active="true"
       data-section-header="true"
-      className={`relative w-full select-none ${isFirst ? 'mt-1' : 'mt-3'} mb-1.5 ${
-        isDragging ? 'opacity-90' : ''
+      className={`relative w-full select-none bg-muted/40 ${LIST_ROW_DIVIDER} ${
+        isDragging ? 'opacity-90 before:hidden' : ''
       }`}
     >
       <div
         {...attributes}
         {...listeners}
         onClick={onToggleCollapsed}
-        className={`group flex min-h-[40px] cursor-pointer items-center gap-1 rounded-xl px-2.5 py-1 transition-colors md:px-3.5 ${
-          isDragging ? 'bg-popover shadow-md ring-1 ring-border/70' : ''
+        className={`group flex min-h-[40px] cursor-pointer items-center gap-1 py-1 pl-2.5 pr-2 transition-colors md:pl-3 ${
+          isDragging ? 'rounded-xl bg-popover shadow-md ring-1 ring-border/70' : ''
         }`}
       >
         <motion.span
@@ -1428,7 +1427,7 @@ function SortableSectionHeader({
           <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
         </motion.span>
 
-        <span className="min-w-0 flex-1 truncate text-[14px] font-black text-foreground/80 md:text-[15px]">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-black text-foreground/70 md:text-[14px]">
           {section.name}
         </span>
 
@@ -1484,7 +1483,7 @@ function SortableSectionHeader({
             onAddTask?.();
           }}
           disabled={!onAddTask}
-          className="mt-1 flex w-full items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 px-3 py-3 text-[13px] font-semibold text-muted-foreground/70 transition-colors disabled:pointer-events-none [@media(hover:hover)]:hover:bg-card/60"
+          className="flex w-full items-center bg-card px-3.5 py-3 text-left text-[13px] font-semibold text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-4 [@media(hover:hover)]:hover:text-foreground"
         >
           No tasks yet · tap to add, or drag one in
         </button>
@@ -1505,16 +1504,10 @@ function AddSectionRow({
       type="button"
       onClick={onOpen}
       disabled={disabled}
-      className="group mt-2 flex min-h-[44px] w-full items-center gap-1 rounded-xl px-2.5 text-[14px] font-black text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-3.5 [@media(hover:hover)]:hover:text-primary"
+      className="group mt-1 flex min-h-[40px] items-center gap-1 rounded-xl px-3.5 text-[13px] font-bold text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-4 [@media(hover:hover)]:hover:text-primary"
     >
-      <span className="-ml-1 grid h-7 w-5 shrink-0 place-items-center">
-        <Plus className="h-4 w-4" strokeWidth={2.75} />
-      </span>
+      <Plus className="-ml-0.5 h-4 w-4" strokeWidth={2.75} />
       <span className="shrink-0">New section</span>
-      <span
-        aria-hidden
-        className="ml-2 h-px flex-1 bg-border transition-colors [@media(hover:hover)]:group-hover:bg-primary/40"
-      />
     </button>
   );
 }
@@ -1533,22 +1526,18 @@ function EmptyAddRow({
       initial={{ opacity: 0 }}
       animate={{ opacity: quickAddOpen ? 0 : 1 }}
       transition={{ duration: quickAddOpen ? 0 : 0.5 }}
-      className="mb-2"
     >
       <button
         onClick={onClick}
-        className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
+        className="group flex w-full cursor-pointer items-center gap-3 py-2 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 disabled:pointer-events-none md:pl-4 md:pr-3 [@media(hover:hover)]:hover:bg-muted/40"
         disabled={quickAddOpen}
       >
-        <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
-          <Plus
-            className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6"
-            strokeWidth={2.5}
-          />
-        </div>
-        <p className="text-[15px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
+        <p className="min-w-0 flex-1 text-[15px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground md:text-[16px]">
           {label}
         </p>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </span>
       </button>
     </motion.div>
   );
@@ -1586,6 +1575,7 @@ export default function TaskList({
   quickAddOpen = false,
   paused = false,
   hideAddControls = false,
+  header,
   sections = [],
   onCreateSection,
   onUpdateSection,
@@ -1659,6 +1649,7 @@ export default function TaskList({
   quickAddOpen?: boolean;
   paused?: boolean;
   hideAddControls?: boolean;
+  header?: React.ReactNode;
   sections?: TaskListSection[];
   onCreateSection?: (name: string, tagIds: string[]) => void;
   onUpdateSection?: (
@@ -2593,11 +2584,12 @@ export default function TaskList({
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
         <div
-          className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-[hsl(150_12%_94%)] shadow-sm dark:bg-background md:border-border/35 md:bg-muted/40 md:shadow-none"
+          className="w-full overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
           data-hint="task-list"
         >
+        {header}
         <div
-          className={`p-1.5 pb-0 space-y-0 overflow-y-visible md:p-2 md:pb-0 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`space-y-0 overflow-y-visible ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (
@@ -2631,7 +2623,7 @@ export default function TaskList({
                     {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} done
                   </p>
                 )}
-                <div className={hideAddControls ? 'hidden' : 'mt-3 w-full'}>
+                <div className={hideAddControls ? 'hidden' : 'mt-4 w-full border-t border-border/60'}>
                   <EmptyAddRow
                     label="Add another task"
                     quickAddOpen={quickAddOpen}
@@ -2693,15 +2685,14 @@ export default function TaskList({
                         return (
                           <div
                             key="completed-divider"
-                            className="flex items-center gap-2 px-1.5 pb-1.5 pt-3"
+                            className={`relative flex items-center gap-2 bg-muted/40 px-3.5 py-2 md:px-4 ${LIST_ROW_DIVIDER}`}
                           >
-                            <span className="text-[13px] font-black text-muted-foreground/60">
+                            <span className="text-[13px] font-black text-muted-foreground/70">
                               Completed
                             </span>
-                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">
+                            <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">
                               {completedTasks.length}
                             </span>
-                            <span className="h-px flex-1 bg-border/60" />
                           </div>
                         );
                       }
@@ -2713,7 +2704,6 @@ export default function TaskList({
                             section={s}
                             count={row.count}
                             doneCount={row.doneCount}
-                            isFirst={rows[0] === row}
                             onToggleCollapsed={() => {
                               hapticTick();
                               onSetSectionCollapsed?.(s.id, !s.collapsed);
@@ -2807,30 +2797,32 @@ export default function TaskList({
         {!hideAddControls &&
           (exitAction ||
           (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-          <div className="p-1.5 pt-2 bg-card/40 md:p-2 md:pt-2.5">
+          <div className="border-t border-border/60">
             <button
               onClick={() => onAddRequested('', null, { preselectToday: true })}
               disabled={quickAddOpen}
-              className="group relative flex w-full items-center gap-1 px-2.5 py-2.5 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0 md:px-3.5 md:py-3.5"
+              className="group relative flex w-full items-center gap-3 py-2 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 disabled:pointer-events-none disabled:opacity-0 md:pl-4 md:pr-3 [@media(hover:hover)]:hover:bg-muted/40"
             >
-              {/* Spacer matching the task grip column so the label lines up with task text */}
-              <span aria-hidden className="flex-shrink-0 w-2.5 md:w-3" />
-              <span className="flex-1 min-w-0 text-left text-[15px] font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
+              <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-muted-foreground transition-colors group-hover:text-foreground md:text-[16px]">
                 Add a task
               </span>
-              <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
-                <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors md:h-6 md:w-6" strokeWidth={2.5} />
-              </div>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
+                <Plus className="h-5 w-5" strokeWidth={2.5} />
+              </span>
             </button>
-            {onCreateSection && sections.length < 10 && (
-              <AddSectionRow
-                onOpen={() => setSectionEditor({ mode: 'create' })}
-                disabled={quickAddOpen}
-              />
-            )}
           </div>
         )}
         </div>
+        {!hideAddControls &&
+          onCreateSection &&
+          sections.length < 10 &&
+          (exitAction ||
+            (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
+            <AddSectionRow
+              onOpen={() => setSectionEditor({ mode: 'create' })}
+              disabled={quickAddOpen}
+            />
+          )}
       </div>
 
       <TaskMenu

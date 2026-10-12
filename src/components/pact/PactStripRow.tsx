@@ -3,19 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Flame } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import {
-  HintButton,
-  QuestRewardTileBadge,
-  objectiveCardTone,
-} from '@/lib/questClaims';
+import { HintButton, QuestRewardTileBadge } from '@/lib/questClaims';
 import { Icon } from '@/components/ui/Icon';
 import { QuestTrack } from '@/components/ui/QuestTrack';
 import { useUIStore } from '@/lib/uiStore';
 import { usePactView } from './PactCard';
 import { pactWeekRewardTiles } from '@/lib/pact/format';
 import type { PactView } from '@/lib/pact/types';
+import { statusDockRowClass } from '@/components/home/StatusDock';
 
 /**
  * The active pact, wearing the home strip's clothes.
@@ -59,7 +55,8 @@ export function PactStripRow({ view }: { view: PactView }) {
 
   const hint = (
     <HintButton
-      compact
+      iconOnly
+      placement="bottom"
       text={
         sessionToday
           ? `Today's is on your list, tagged ${active.categoryName}. Finish all ${active.target} days this week.`
@@ -83,6 +80,7 @@ export function PactStripRow({ view }: { view: PactView }) {
     <div
       role="button"
       tabIndex={0}
+      data-dock-row
       onClick={() => router.push('/quests#pact')}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -91,67 +89,40 @@ export function PactStripRow({ view }: { view: PactView }) {
           router.push('/quests#pact');
         }
       }}
-      className={cn(
-        'group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-[border-color,background-color,transform] duration-500 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:mx-4 md:mb-3 md:w-[calc(100%-2rem)] md:px-4 md:py-3',
-        ready
-          ? `${objectiveCardTone(true)} [@media(hover:hover)]:hover:bg-lime-100 dark:[@media(hover:hover)]:hover:bg-lime-500/20`
-          : 'border-primary/15 bg-primary/[0.06] dark:bg-primary/[0.09] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary/[0.09]',
-      )}
+      className={statusDockRowClass(ready ? 'ready' : 'idle')}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span
-          className={cn(
-            'flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide transition-colors duration-500',
-            ready ? 'text-lime-700 dark:text-lime-400' : 'text-primary',
-          )}
-        >
+      <span
+        className={cn(
+          'shrink-0',
+          ready && !claiming && 'animate-quest-pulse motion-reduce:animate-none',
+        )}
+      >
+        <QuestRewardTileBadge
+          rewards={pactWeekRewardTiles(active)}
+          catalog={view.rewardCatalog as never}
+          isPremium={view.isPremium}
+          small
+        />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
           <Icon name="leap" className="h-4 w-4 shrink-0" />
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={ready ? 'ready' : 'leap'}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-              className="shrink-0"
-            >
-              {ready ? 'Week finished' : 'Leap'}
-            </motion.span>
-          </AnimatePresence>
+          <span className="min-w-0 truncate text-[14px] font-bold leading-tight text-foreground">
+            {active.commitmentText}
+          </span>
           {view.streak.weeks > 0 && (
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-amber-600 dark:text-amber-400">
+            <span
+              className={cn(
+                'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[11px] font-black tabular-nums',
+                view.streak.atRisk && !ready
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                  : 'text-amber-600 dark:text-amber-400',
+              )}
+            >
               <Flame className="h-3 w-3" strokeWidth={2.75} />
               {view.streak.weeks}
             </span>
           )}
-          {!ready && (
-            <>
-              <span
-                className={cn(
-                  'min-w-0 truncate font-bold normal-case tracking-normal',
-                  view.streak.atRisk
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-muted-foreground',
-                )}
-              >
-                ·{' '}
-                {view.streak.atRisk
-                  ? 'Streak at risk!'
-                  : `${active.daysLeft}d left`}
-              </span>
-              <span
-                className="-my-1 ml-auto shrink-0"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {hint}
-              </span>
-            </>
-          )}
-        </span>
-        <span className="min-w-0 text-[14px] font-black leading-tight text-foreground md:text-[15px]">
-          <span className="line-clamp-2 md:line-clamp-1">
-            {active.commitmentText}
-          </span>
         </span>
         <QuestTrack
           progress={active.progress}
@@ -167,19 +138,14 @@ export function PactStripRow({ view }: { view: PactView }) {
           }
         />
       </div>
-      <span
-        className={cn(
-          'shrink-0',
-          ready && !claiming && 'animate-quest-pulse motion-reduce:animate-none',
-        )}
-      >
-        <QuestRewardTileBadge
-          rewards={pactWeekRewardTiles(active)}
-          catalog={view.rewardCatalog as never}
-          isPremium={view.isPremium}
-          small
-        />
-      </span>
+      {!ready && (
+        <span
+          className="-mr-1.5 shrink-0 self-center"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {hint}
+        </span>
+      )}
     </div>
   );
 }

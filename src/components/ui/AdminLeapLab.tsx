@@ -392,7 +392,9 @@ export function AdminLeapLab() {
                     the daily quests is part of what is on screen: a Leap that
                     loses the slot is a state worth seeing too. */}
                 <Stage title="Home strip (Next up)" width={420}>
-                  <NextQuestStrip />
+                  <div className="overflow-hidden rounded-[22px] border border-border/60 bg-card [&_[data-dock-row]]:border-t-0">
+                    <NextQuestStrip />
+                  </div>
                 </Stage>
               </div>
             </SWRConfig>

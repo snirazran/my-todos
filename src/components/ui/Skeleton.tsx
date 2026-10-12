@@ -56,27 +56,50 @@ export function HomePageSkeleton() {
       className="min-h-screen overflow-x-hidden pb-20 md:pb-8"
     >
       <div className="mx-auto max-w-4xl px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 md:px-6 md:pt-12">
-        <div className="flex flex-col items-center">
-          <div className="h-[226px] md:h-[254px]" />
-          <Skeleton className="h-[50px] w-[340px] max-w-[94vw] rounded-[18px]" />
+        <div className="h-[226px] md:h-[254px]" />
+        <div className="relative z-10 w-full overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-sm md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
+          <div className="flex flex-col md:flex-row">
+            <div className="flex h-12 items-center gap-3 px-3.5 md:w-[300px] md:shrink-0">
+              <Skeleton className="h-3.5 w-[104px] shrink-0 rounded-full" />
+              <div className="flex flex-1 gap-1">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-3.5 flex-1 rounded-full" />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 border-t border-border/50 px-3 py-2.5 md:flex-1 md:border-l md:border-t-0">
+              <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <Skeleton className="h-4 w-2/3 rounded-md" />
+                <Skeleton className="h-2.5 w-full rounded-full" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="-mx-3 mt-[30px] rounded-t-[24px] bg-background px-3 pt-5 md:mx-auto md:mt-24 md:w-full md:max-w-2xl md:px-8">
-          <div className="flex items-center justify-between px-2 md:px-0">
-            <div className="flex items-center gap-2.5 pl-3">
-              <Skeleton className="h-7 w-7 rounded-xl md:h-8 md:w-8" />
-              <Skeleton className="h-4 w-40 rounded-full" />
+        <div className="relative -mx-3 -mt-10 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-3 pt-14 md:mx-auto md:mt-4 md:w-full md:max-w-2xl md:bg-none md:px-8 md:pt-5">
+          <div className="flex min-h-9 items-center justify-between pl-3.5 pr-1.5 md:pl-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-3.5 w-12 rounded-full" />
             </div>
-            <Skeleton className="h-8 w-20 rounded-full" />
+            <Skeleton className="h-9 w-9 rounded-xl" />
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 pb-16">
+          <div className="mb-16 mt-2 overflow-hidden rounded-[20px] border border-border/60 bg-card">
             {['w-2/5', 'w-1/4', 'w-1/3', 'w-2/5', 'w-1/4'].map((w, i) => (
-              <TaskRowSkeleton
+              <div
                 key={i}
-                width={w}
-                circleClassName="h-11 w-11 md:h-12 md:w-12"
-              />
+                className={cn(
+                  'flex items-center gap-3 py-3 pl-3.5 pr-2.5 md:pl-4 md:pr-3',
+                  i > 0 && 'border-t border-border/50',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <Skeleton className={cn('h-3.5 rounded-full', w)} />
+                </div>
+                <Skeleton className="h-11 w-11 shrink-0 rounded-full md:h-12 md:w-12" />
+              </div>
             ))}
           </div>
         </div>

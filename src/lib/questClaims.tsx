@@ -557,11 +557,15 @@ export function HintButton({
   tags,
   onShowMe,
   compact = false,
+  iconOnly = false,
+  placement = 'top',
 }: {
   text: string;
   tags?: ObjectiveTagChip[];
   onShowMe?: () => void;
   compact?: boolean;
+  iconOnly?: boolean;
+  placement?: 'top' | 'bottom';
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement | null>(null);
@@ -591,20 +595,29 @@ export function HintButton({
           setOpen((v) => !v);
         }}
         className={
-          compact
-            ? 'inline-flex h-6 items-center gap-1 rounded-lg px-1.5 text-[11px] font-black normal-case tracking-normal text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground'
-            : 'inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[12px] font-black text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5'
+          iconOnly
+            ? 'grid h-9 w-9 place-items-center rounded-full text-amber-500 transition-colors hover:bg-amber-500/10'
+            : compact
+              ? 'inline-flex h-6 items-center gap-1 rounded-lg px-1.5 text-[11px] font-black normal-case tracking-normal text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground'
+              : 'inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[12px] font-black text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5'
         }
       >
-        {compact && (
-          <Lightbulb className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
+        {(compact || iconOnly) && (
+          <Lightbulb
+            className={
+              iconOnly ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5 text-amber-500'
+            }
+            strokeWidth={2.75}
+          />
         )}
-        Hint
+        {!iconOnly && 'Hint'}
       </button>
       {open && (
         <span
           role="dialog"
-          className="absolute bottom-full right-0 z-30 mb-2.5 flex w-[17rem] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border border-border bg-popover p-3.5 text-left normal-case tracking-normal text-popover-foreground shadow-xl ring-1 ring-black/5"
+          className={`absolute right-0 z-30 flex w-[17rem] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border border-border bg-popover p-3.5 text-left normal-case tracking-normal text-popover-foreground shadow-xl ring-1 ring-black/5 ${
+            placement === 'bottom' ? 'top-full mt-1.5' : 'bottom-full mb-2.5'
+          }`}
           onClick={(event) => event.stopPropagation()}
         >
           <span className="flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">

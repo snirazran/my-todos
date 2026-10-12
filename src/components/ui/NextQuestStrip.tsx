@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Tags } from 'lucide-react';
-import { Icon } from '@/components/ui/Icon';
 import { QuestTrack } from '@/components/ui/QuestTrack';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
@@ -16,7 +15,6 @@ import {
   ObjectiveLabel,
   QuestRewardTileBadge,
   claimRequestFor,
-  objectiveCardTone,
   primeQuestsPageCache,
   ratingMomentFor,
   refreshQuestHomeView,
@@ -28,11 +26,9 @@ import {
   type Trackable,
 } from '@/lib/questClaims';
 import {
-  priorityReasonLabel,
   rankByQuestPriority,
   scoreQuestPriority,
   WEEK_WINDOW_HOURS,
-  resetCountdownLabel,
 } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -40,6 +36,10 @@ import { usePactView } from '@/components/pact/PactCard';
 import { PactStripRow } from '@/components/pact/PactStripRow';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/lib/uiStore';
+import {
+  statusDockRowClass,
+  type StatusDockRowState,
+} from '@/components/home/StatusDock';
 
 /**
  * The bar's fill runs 500ms, so the hold has to clear that plus a beat to
@@ -144,13 +144,6 @@ export function NextQuestStrip({
   }, [trackables]);
   const rankedNextUp = ranked[0] ?? null;
   const nextUp = rankedNextUp?.item ?? null;
-  const nextUpReasonLabel = rankedNextUp
-    ? priorityReasonLabel(rankedNextUp.result)
-    : null;
-  const nextUpHoursLeft = rankedNextUp?.result.hoursUntilReset ?? null;
-  const nextUpResetLabel = nextUpReasonLabel
-    ? null
-    : resetCountdownLabel(nextUpHoursLeft);
 
   // Hold the just-finished trackable on screen so its progress bar visibly
   // fills before the card swaps to the "Reward ready" state.
@@ -412,12 +405,21 @@ export function NextQuestStrip({
 
   const showsQuest = !awaitingPact && !pactWins && (!!claimable || !!nextUp);
 
+  const rowState: StatusDockRowState = readyClaim
+    ? goldenClaim
+      ? 'golden'
+      : 'ready'
+    : 'idle';
+
   const strip = awaitingPact ? (
-    <div className="mx-1.5 mb-1.5 flex w-[calc(100%-0.75rem)] items-center gap-2.5 rounded-xl px-1 py-1 md:mx-4 md:mb-0 md:w-[calc(100%-2rem)] md:gap-3 md:px-4 md:py-1.5">
+    <div
+      data-dock-row
+      className={statusDockRowClass('idle', false)}
+    >
       <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <Skeleton className="h-3 w-24 rounded-md" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
         <Skeleton className="h-4 w-2/3 rounded-md" />
+        <Skeleton className="h-2.5 w-full rounded-full" />
       </div>
     </div>
   ) : pactWins && livePact ? (
@@ -426,6 +428,7 @@ export function NextQuestStrip({
     <div
       role="button"
       tabIndex={0}
+      data-dock-row
       onClick={goToQuests}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -434,82 +437,25 @@ export function NextQuestStrip({
           goToQuests();
         }
       }}
-      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-[border-color,background-color,transform] duration-500 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 md:mx-4 md:mb-3 md:w-[calc(100%-2rem)] md:px-4 md:py-3 ${
-        readyClaim
-          ? goldenClaim
-            ? 'border-amber-400/70 bg-amber-100/80 dark:border-amber-400/40 dark:bg-amber-500/15 [@media(hover:hover)]:hover:bg-amber-100 dark:[@media(hover:hover)]:hover:bg-amber-500/20'
-            : `${objectiveCardTone(true)} [@media(hover:hover)]:hover:bg-lime-100 dark:[@media(hover:hover)]:hover:bg-lime-500/20`
-          : 'border-primary/15 bg-primary/[0.06] dark:bg-primary/[0.09] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary/[0.09]'
-      }`}
+      className={statusDockRowClass(rowState)}
     >
       {readyClaim || displayNextUp ? (
         <>
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span
-              className={`flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide transition-colors duration-500 ${
-                readyClaim
-                  ? goldenClaim
-                    ? 'text-amber-700 dark:text-amber-400'
-                    : 'text-lime-700 dark:text-lime-400'
-                  : 'text-primary'
-              }`}
-            >
-              <Icon name="quests" className="h-4 w-4 shrink-0" />
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={readyClaim ? 'ready' : 'quest'}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-                  className="shrink-0"
-                >
-                  {readyClaim
-                    ? readyClaim.kind === 'sweep'
-                      ? sweepClaimLabels(readyClaim).eyebrow
-                      : claimableCount > 1
-                        ? `${claimableCount} rewards ready`
-                        : 'Reward ready'
-                    : 'Quest'}
-                </motion.span>
-              </AnimatePresence>
-              {!readyClaim &&
-              displayNextUp &&
-              !displayNextUp.needsFocusTags &&
-              !fillingTrackable &&
-              !introTrackable &&
-              (nextUpReasonLabel || nextUpResetLabel) ? (
-                <span className="min-w-0 truncate font-bold normal-case tracking-normal text-muted-foreground">
-                  · {nextUpReasonLabel ?? nextUpResetLabel}
-                </span>
-              ) : null}
-              {!readyClaim &&
-              displayNextUp?.hint &&
-              !displayNextUp.needsFocusTags ? (
-                <span
-                  className="-my-1 ml-auto shrink-0"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <HintButton
-                    compact
-                    text={displayNextUp.hint}
-                    tags={displayNextUp.tags}
-                    onShowMe={
-                      displayNextUp.guideId
-                        ? () =>
-                            startHintGuide(displayNextUp.guideId!, {
-                              ...displayNextUp.guideContext,
-                              tags: displayNextUp.tags,
-                            })
-                        : undefined
-                    }
-                  />
-                </span>
-              ) : null}
-            </span>
+          <span
+            className={`shrink-0 ${readyClaim && !claiming ? 'animate-quest-pulse motion-reduce:animate-none' : ''}`}
+          >
+            <QuestRewardTileBadge
+              reward={(readyClaim ?? displayNextUp)?.reward}
+              rewards={(readyClaim ?? displayNextUp)?.rewards}
+              catalog={resolvedCatalog}
+              isPremium={!!isPremium}
+              small
+            />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             {!readyClaim && displayNextUp?.needsFocusTags ? (
               <span className="flex min-w-0 items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-[14px] font-black leading-tight text-foreground md:text-[15px]">
+                <span className="min-w-0 flex-1 truncate text-[14px] font-bold leading-tight text-foreground">
                   Pick a tag to start
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-background/70 px-2 py-0.5 text-[12px] font-black text-primary">
@@ -519,26 +465,24 @@ export function NextQuestStrip({
               </span>
             ) : (
               <>
-                <span className="min-w-0 text-[14px] font-black leading-tight text-foreground md:text-[15px]">
-                  <span className="line-clamp-2 md:line-clamp-1">
-                    {readyClaim ? (
-                      readyClaim.kind === 'season' ? (
-                        readyClaim.seasonName
-                          ? `${readyClaim.seasonName} · Tier ${readyClaim.tier}`
-                          : `Season tier ${readyClaim.tier}`
-                      ) : readyClaim.kind === 'sweep' ? (
-                        sweepClaimLabels(readyClaim).title
-                      ) : (
-                        <ObjectiveLabel label={readyClaim.objectiveLabel} />
-                      )
-                    ) : displayNextUp ? (
-                      <ObjectiveLabel
-                        label={displayNextUp.remainingLabel}
-                        tags={displayNextUp.tags}
-                        maxTags={1}
-                      />
-                    ) : null}
-                  </span>
+                <span className="min-w-0 truncate text-[14px] font-bold leading-tight text-foreground">
+                  {readyClaim ? (
+                    readyClaim.kind === 'season' ? (
+                      readyClaim.seasonName
+                        ? `${readyClaim.seasonName} · Tier ${readyClaim.tier}`
+                        : `Season tier ${readyClaim.tier}`
+                    ) : readyClaim.kind === 'sweep' ? (
+                      sweepClaimLabels(readyClaim).title
+                    ) : (
+                      <ObjectiveLabel label={readyClaim.objectiveLabel} />
+                    )
+                  ) : displayNextUp ? (
+                    <ObjectiveLabel
+                      label={displayNextUp.remainingLabel}
+                      tags={displayNextUp.tags}
+                      maxTags={1}
+                    />
+                  ) : null}
                 </span>
                 <QuestTrack
                   progress={displayNextUp?.progress ?? 1}
@@ -552,7 +496,9 @@ export function NextQuestStrip({
                               : 'Claiming…'
                             : readyClaim.kind === 'sweep'
                               ? sweepClaimLabels(readyClaim).action
-                              : 'Claim',
+                              : claimableCount > 1
+                                ? `Claim · ${claimableCount} ready`
+                                : 'Claim',
                           disabled: claiming,
                           onPress: () => void handleClaim(readyClaim),
                         }
@@ -562,17 +508,30 @@ export function NextQuestStrip({
               </>
             )}
           </div>
-          <span
-            className={`shrink-0 ${readyClaim && !claiming ? 'animate-quest-pulse motion-reduce:animate-none' : ''}`}
-          >
-            <QuestRewardTileBadge
-              reward={(readyClaim ?? displayNextUp)?.reward}
-              rewards={(readyClaim ?? displayNextUp)?.rewards}
-              catalog={resolvedCatalog}
-              isPremium={!!isPremium}
-              small
-            />
-          </span>
+          {!readyClaim &&
+          displayNextUp?.hint &&
+          !displayNextUp.needsFocusTags ? (
+            <span
+              className="-mr-1.5 shrink-0 self-center"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <HintButton
+                iconOnly
+                placement="bottom"
+                text={displayNextUp.hint}
+                tags={displayNextUp.tags}
+                onShowMe={
+                  displayNextUp.guideId
+                    ? () =>
+                        startHintGuide(displayNextUp.guideId!, {
+                          ...displayNextUp.guideContext,
+                          tags: displayNextUp.tags,
+                        })
+                    : undefined
+                }
+              />
+            </span>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -590,13 +549,14 @@ export function NextQuestStrip({
           key={slotKey}
           ref={setStripEl}
           {...slotMotion}
+          className="md:h-full"
           style={{ willChange: 'transform, opacity' }}
         >
           {strip}
         </motion.div>
       )}
     </AnimatePresence>
-    <div className="mx-1.5 mb-2 w-[calc(100%-0.75rem)] empty:hidden md:mx-4 md:w-[calc(100%-2rem)]">
+    <div className="w-full border-t border-border/50 p-2 empty:hidden">
       <QuestPriorityDebug
         title="home next-up"
         entries={ranked.map(({ item, result }) => ({
