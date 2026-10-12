@@ -269,7 +269,7 @@ export function ChecklistCheckbox({
 const rowTransition = { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const };
 
 const TEXT_CLASS =
-  'min-w-0 flex-1 resize-none overflow-hidden break-words bg-transparent py-[11px] text-[16px] leading-[22px] focus:outline-none sm:text-[15px]';
+  'min-w-0 flex-1 resize-none overflow-hidden break-words bg-transparent py-[9px] text-[16px] leading-[22px] focus:outline-none sm:text-[15px]';
 
 function autoSize(el: HTMLTextAreaElement | null) {
   if (!el) return;
@@ -469,8 +469,8 @@ export function ChecklistEditor({
       </Reorder.Group>
 
       {!atCap && (
-        <div className="flex min-h-[44px] items-start gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
-          <span className="mt-[10px] grid h-[23px] w-[23px] shrink-0 place-items-center text-muted-foreground/50">
+        <div className="flex min-h-[40px] items-start gap-3 rounded-xl px-2 transition-colors focus-within:bg-background/80">
+          <span className="mt-[9px] grid h-[22px] w-[21px] shrink-0 place-items-center text-muted-foreground/50">
             <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
           </span>
           <textarea
@@ -563,14 +563,14 @@ function ChecklistRow({
       className={`${dragging ? 'z-10' : 'overflow-hidden'}`}
     >
       <div
-        className={`group flex min-h-[44px] items-start gap-3 rounded-xl px-2 transition-colors ${
+        className={`group flex min-h-[40px] items-start gap-3 rounded-xl px-2 transition-colors ${
           dragging
             ? 'bg-popover shadow-lg ring-1 ring-border/80'
-            : 'focus-within:bg-muted/40 [@media(hover:hover)]:hover:bg-muted/25'
+            : 'focus-within:bg-background/80 [@media(hover:hover)]:hover:bg-background/50'
         }`}
       >
-        <span className="grid h-11 shrink-0 place-items-center">
-          <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={23} />
+        <span className="grid h-10 shrink-0 place-items-center">
+          <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={21} />
         </span>
         <textarea
           ref={(el) => {
@@ -619,7 +619,7 @@ function ChecklistRow({
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => onRemove(false)}
           aria-label="Remove step"
-          className="mt-2 shrink-0 rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:text-rose-500 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
+          className="mt-1.5 shrink-0 rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:text-rose-500 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
         >
           <X className="h-4 w-4" />
         </button>
@@ -632,7 +632,7 @@ function ChecklistRow({
               e.preventDefault();
               dragControls.start(e);
             }}
-            className={`mt-2 shrink-0 touch-none rounded-lg p-1.5 transition-colors cursor-grab active:cursor-grabbing ${
+            className={`mt-1.5 shrink-0 touch-none rounded-lg p-1.5 transition-colors cursor-grab active:cursor-grabbing ${
               dragging
                 ? 'text-foreground'
                 : 'text-muted-foreground/25 [@media(hover:hover)]:hover:text-muted-foreground'

@@ -184,7 +184,7 @@ async function openLink(href: string) {
   window.open(href, '_blank', 'noopener,noreferrer');
 }
 
-const NOTES_CLAMP_PX = 132;
+const NOTES_CLAMP_PX = 76;
 
 export function NotesView({
   value,

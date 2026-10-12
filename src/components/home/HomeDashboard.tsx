@@ -107,18 +107,10 @@ const FLY_PX = 40;
 type HomeTab = 'all' | 'today';
 
 const demoTasks: Task[] = [
-  {
-    id: 'g6',
-    text: 'Check there is no monster under the bed',
-    completed: false,
-    order: 1,
-  },
-  { id: 'g1', text: 'Meditation', completed: true, order: 2 },
-  { id: 'g2', text: 'Read a book', completed: true, order: 3 },
-  { id: 'g3', text: 'Walk 5,000 steps', completed: true, order: 4 },
-  { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 5 },
-  { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
+  { id: 'g1', text: 'Take 10 slow breaths', completed: false, order: 1, startTime: '08:00', reminder: true, tags: ['t1'] } as any,
+  { id: 'g2', text: 'Morning run', completed: false, order: 2, startTime: '23:12', tags: ['t2', 't1'], streak: 4, repeatMode: 'daily', notes: '<p>asdasd</p><p>asdasd</p><p>asd</p><p>sadasdsad</p>', checklist: [{ id: 'c1', text: 'Stretch', done: true }, { id: 'c2', text: 'Run 3km', done: false }] } as any,
 ];
+const DEMO_TAGS = [{ id: 't1', name: 'Mindfulness', color: '#ec4899' }, { id: 't2', name: 'Fitness and health', color: '#22c55e' }];
 
 const HOME_FILTER_BASE = { showCompleted: false };
 
@@ -1202,7 +1194,7 @@ export default function HomeDashboard() {
                     duplicateTask(id, when);
                   }}
                   isGuest={!user}
-                  tags={tags}
+                  tags={user ? tags : (DEMO_TAGS as any)}
                   filters={filters}
                   onClearFilters={resetFilters}
                   filtersActive={filtersActive}

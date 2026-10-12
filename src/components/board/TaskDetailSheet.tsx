@@ -3,16 +3,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
+  FileText,
+  ListChecks,
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
-  ChevronRight,
-  EyeOff,
   Flame,
-  Pen,
   Pencil,
   Repeat,
   RotateCcw,
+  SkipForward,
   Tag,
   Trash2,
   Users,
@@ -131,6 +131,7 @@ export default function TaskDetailSheet({
   const [notes, setNotes] = useState('');
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [editingNotes, setEditingNotes] = useState(false);
+  const [addingSteps, setAddingSteps] = useState(false);
   const [showRepeat, setShowRepeat] = useState(false);
 
   const { inset: kbInset, height: vvHeight } = useKeyboardInset(open);
@@ -145,6 +146,7 @@ export default function TaskDetailSheet({
       setNotes(task.notes ?? '');
       setChecklist(task.checklist ?? []);
       setEditingNotes(false);
+      setAddingSteps(false);
       setShowRepeat(false);
       setInputFocused(false);
     }
@@ -323,6 +325,8 @@ export default function TaskDetailSheet({
     (isRepeating && streak > 0) ||
     (minimal &&
       (!!buddy || isRepeating || !!displayTask.startTime || taskTags.length > 0));
+  const buddyFirstName =
+    buddy?.partnerName?.trim().split(/\s+/)[0] || 'your buddy';
   const buddyDoneToday =
     !!buddy &&
     buddy.status === 'active' &&
@@ -354,13 +358,13 @@ export default function TaskDetailSheet({
             aria-label={displayTask.text}
             onFocusCapture={handleFocusCapture}
             onBlurCapture={handleBlurCapture}
-            className={`flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 sm:gap-2.5 sm:rounded-[32px] sm:bg-popover sm:p-3 sm:shadow-[0_24px_64px_-16px_rgba(0,0,0,0.45)] sm:ring-1 sm:ring-border/70 ${
+            className={`flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 sm:px-1.5 ${
               keyboardActive
                 ? 'pb-2'
-                : 'pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-2'
+                : 'pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-3'
             }`}
           >
-            <div className="relative flex min-h-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:rounded-[24px] sm:shadow-none sm:ring-0">
+            <div className="relative flex min-h-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:shadow-[0_3px_0_0_rgba(0,0,0,0.18),0_24px_56px_-18px_rgba(0,0,0,0.45)]">
               <div
                 onPointerDown={(e) => dragControls.start(e)}
                 className="flex h-7 shrink-0 items-center justify-center touch-none cursor-grab active:cursor-grabbing sm:hidden"
@@ -395,20 +399,20 @@ export default function TaskDetailSheet({
                       onClick={onEdit}
                       className="group w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
-                      <span className="text-[22px] font-black leading-[28px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
+                      <span className="text-[22px] font-black leading-[28px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px] short:text-[19px] short:leading-[24px] narrow:text-[19px] narrow:leading-[24px]">
                         {displayTask.text}
                         <Pencil className="mb-1 ml-2 inline-block h-3.5 w-3.5 text-muted-foreground/35 transition-colors group-hover:text-muted-foreground" />
                       </span>
                     </button>
                   ) : (
-                    <span className="block text-[22px] font-black leading-[28px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
+                    <span className="block text-[22px] font-black leading-[28px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px] short:text-[19px] short:leading-[24px] narrow:text-[19px] narrow:leading-[24px]">
                       {displayTask.text}
                     </span>
                   )}
                 </div>
 
                 {hasMeta && (
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px] font-black">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px] font-black short:mt-1.5">
                     {isCompleted && (
                       <span className="inline-flex h-7 items-center gap-1 rounded-full bg-green-500/10 px-2.5 text-green-600 dark:text-green-400">
                         <CheckCircle2 className="h-4 w-4" />
@@ -468,174 +472,205 @@ export default function TaskDetailSheet({
                           ? { maxHeight: Math.max(150, vvHeight - 200) }
                           : undefined
                       }
-                      className="-mx-2 mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 pb-1"
+                      className="-mx-2 mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 pb-1 [scrollbar-color:hsl(var(--border))_transparent] [scrollbar-width:thin] short:mt-2"
                     >
-                      {(editingNotes || notesText) && (
-                        <SectionLabel>Notes</SectionLabel>
-                      )}
-                      {editingNotes ? (
-                        <RichNotesEditor
-                          value={notes}
-                          onChange={setNotes}
-                          autoFocus
-                          onBlur={() => {
-                            commitNotes();
-                            setEditingNotes(false);
-                          }}
-                        />
-                      ) : notesText ? (
-                        <div className="rounded-2xl bg-muted/45 py-0.5">
-                          <NotesView
-                            value={notes}
-                            onEdit={() => setEditingNotes(true)}
-                          />
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setEditingNotes(true)}
-                          className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:bg-muted/40"
-                        >
-                          <span className="grid h-[23px] w-[23px] shrink-0 place-items-center">
-                            <Pen className="h-4 w-4" />
-                          </span>
-                          Add notes
-                        </button>
-                      )}
+                      {(() => {
+                        const notesShown = editingNotes || !!notesText;
+                        const stepsShown = checklist.length > 0 || addingSteps;
+                        const emptyTiles = [
+                          !stepsShown && (
+                            <PropertyTile
+                              key="steps"
+                              tint="teal"
+                              icon={<ListChecks className="h-4 w-4" strokeWidth={2.5} />}
+                              placeholder
+                              onClick={() => setAddingSteps(true)}
+                            >
+                              Add steps
+                            </PropertyTile>
+                          ),
+                          !notesShown && (
+                            <PropertyTile
+                              key="notes"
+                              tint="sky"
+                              icon={<FileText className="h-4 w-4" strokeWidth={2.5} />}
+                              placeholder
+                              onClick={() => setEditingNotes(true)}
+                            >
+                              Add notes
+                            </PropertyTile>
+                          ),
+                        ].filter(Boolean);
+                        return (
+                          <div className="flex flex-col gap-2">
+                            {stepsShown && (
+                              <SectionCard
+                                tint="teal"
+                                icon={<ListChecks className="h-3.5 w-3.5" strokeWidth={2.75} />}
+                                title="Steps"
+                                aside={
+                                  checklist.length > 0 ? (
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-[12px] font-bold tabular-nums text-muted-foreground">
+                                        {stepsDone}/{rewardItems.length}
+                                      </span>
+                                      <StepPips items={rewardItems} done={stepsDone} />
+                                    </span>
+                                  ) : null
+                                }
+                              >
+                                <ChecklistEditor
+                                  hideRewardTrack
+                                  autoFocus={checklist.length === 0 ? 'new' : null}
+                                  items={checklist}
+                                  onChange={(next, { persist: persistNow }) => {
+                                    setChecklist(next);
+                                    if (persistNow) persist({ checklist: next });
+                                  }}
+                                />
+                                {rewardHint && (
+                                  <p className="flex min-w-0 items-center gap-1.5 px-2 pb-1 pt-0.5 text-[12px] font-semibold text-muted-foreground">
+                                    <span className="grid h-4 w-4 shrink-0 place-items-center">
+                                      <Fly size={18} x={-1} y={-2} interactive={false} paused />
+                                    </span>
+                                    <span className="min-w-0 truncate">{rewardHint}</span>
+                                  </p>
+                                )}
+                              </SectionCard>
+                            )}
 
-                      {checklist.length > 0 && (
-                        <SectionLabel
-                          aside={
-                          <span className="flex items-center gap-2">
-                            <span className="text-[12px] font-bold tabular-nums text-muted-foreground">
-                              {stepsDone}/{rewardItems.length}
-                            </span>
-                            <StepPips items={rewardItems} done={stepsDone} />
-                          </span>
-                          }
-                        >
-                          Steps
-                        </SectionLabel>
-                      )}
+                            {notesShown && (
+                              <SectionCard
+                                tint="sky"
+                                icon={<FileText className="h-3.5 w-3.5" strokeWidth={2.75} />}
+                                title="Notes"
+                              >
+                                {editingNotes ? (
+                                  <RichNotesEditor
+                                    value={notes}
+                                    onChange={setNotes}
+                                    autoFocus
+                                    onBlur={() => {
+                                      commitNotes();
+                                      setEditingNotes(false);
+                                    }}
+                                  />
+                                ) : (
+                                  <NotesView
+                                    value={notes}
+                                    onEdit={() => setEditingNotes(true)}
+                                  />
+                                )}
+                              </SectionCard>
+                            )}
 
-                      <ChecklistEditor
-                        hideRewardTrack
-                        items={checklist}
-                        onChange={(next, { persist: persistNow }) => {
-                          setChecklist(next);
-                          if (persistNow) persist({ checklist: next });
-                        }}
-                      />
+                            {emptyTiles.length > 0 && (
+                              <div
+                                className={`grid gap-2 ${emptyTiles.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+                              >
+                                {emptyTiles}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
-                      {rewardHint && (
-                        <p className="flex items-center gap-1.5 px-2 pb-1 pt-1 text-[12px] font-semibold text-muted-foreground">
-                          <span className="grid h-4 w-4 place-items-center">
-                            <Fly size={18} x={-1} y={-2} interactive={false} paused />
-                          </span>
-                          {rewardHint}
-                        </p>
-                      )}
+                    </div>
 
                     {!keyboardActive &&
                       (onSetRepeat || onSchedule || onAddTags || canShareWithBuddy) && (
-                        <>
-                        <SectionLabel>Details</SectionLabel>
-                        <div className="overflow-hidden rounded-2xl bg-muted/45">
+                        <div className="mt-3 grid shrink-0 grid-cols-2 gap-2 short:mt-2 short:gap-1.5 narrow:gap-1.5">
                           {onSetRepeat && (
-                            <PropertyRow
+                            <PropertyTile
                               dataHint="repeat-button"
                               tint="green"
                               icon={<Repeat className="h-4 w-4" strokeWidth={2.5} />}
-                              label="Repeat"
+                              placeholder={!isRepeating}
                               onClick={() => setShowRepeat(true)}
                             >
-                              {isRepeating ? repeatLabel : 'Never'}
-                            </PropertyRow>
+                              {isRepeating ? repeatChipLabel : 'Repeat'}
+                            </PropertyTile>
                           )}
                           {onSchedule && (
-                            <PropertyRow
+                            <PropertyTile
                               tint="amber"
                               icon={<Bell className="h-4 w-4" strokeWidth={2.5} />}
-                              label="Time"
+                              placeholder={!displayTask.startTime}
                               onClick={onSchedule}
                             >
                               {displayTask.startTime ? (
-                                <span className="tabular-nums">
+                                <span className="min-w-0 truncate tabular-nums">
                                   {displayTask.endTime &&
                                   displayTask.endTime !== displayTask.startTime
                                     ? `${displayTask.startTime}–${displayTask.endTime}`
                                     : displayTask.startTime}
-                                  {displayTask.reminder ? ' · Reminder' : ''}
                                 </span>
                               ) : (
-                                'None'
+                                'Remind me'
                               )}
-                            </PropertyRow>
+                            </PropertyTile>
                           )}
                           {onAddTags && (
-                            <PropertyRow
+                            <PropertyTile
                               dataHint="task-tags-button"
                               dataTagIds={taskTags.join(',') || undefined}
                               tint="violet"
                               icon={<Tag className="h-4 w-4" strokeWidth={2.5} />}
-                              label="Tags"
+                              placeholder={!taskTags.some((id) => tagDetails(id))}
                               onClick={onAddTags}
                             >
-                              {taskTags.some((id) => tagDetails(id)) ? (
-                                <span className="flex min-w-0 items-center justify-end gap-2.5">
-                                  {taskTags.map((tagId) => {
-                                    const t = tagDetails(tagId);
-                                    if (!t) return null;
-                                    return (
-                                      <span
-                                        key={tagId}
-                                        className="inline-flex min-w-0 items-center gap-1"
-                                      >
-                                        <span
-                                          aria-hidden
-                                          className="h-2 w-2 shrink-0 rounded-full"
-                                          style={{ backgroundColor: t.color }}
-                                        />
-                                        <span className="truncate">{t.name}</span>
+                              {(() => {
+                                const shown = taskTags
+                                  .map((id) => tagDetails(id))
+                                  .filter((t): t is NonNullable<typeof t> => !!t);
+                                if (shown.length === 0) return 'Add tag';
+                                return (
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span
+                                      aria-hidden
+                                      className="h-2 w-2 shrink-0 rounded-full"
+                                      style={{ backgroundColor: shown[0].color }}
+                                    />
+                                    <span className="min-w-0 truncate">{shown[0].name}</span>
+                                    {shown.length > 1 && (
+                                      <span className="shrink-0 text-muted-foreground">
+                                        +{shown.length - 1}
                                       </span>
-                                    );
-                                  })}
-                                </span>
-                              ) : (
-                                'None'
-                              )}
-                            </PropertyRow>
+                                    )}
+                                  </span>
+                                );
+                              })()}
+                            </PropertyTile>
                           )}
                           {canShareWithBuddy && (
-                            <PropertyRow
+                            <PropertyTile
                               tint="buddy"
-                              icon={<Users className="h-4 w-4" strokeWidth={2.5} />}
-                              label="Buddy"
+                              icon={
+                                buddy ? (
+                                  <BuddyFrogFace
+                                    indices={buddy.partnerIndices}
+                                    size={28}
+                                  />
+                                ) : (
+                                  <Users className="h-4 w-4" strokeWidth={2.5} />
+                                )
+                              }
+                              bareIcon={!!buddy}
+                              placeholder={!buddy}
                               onClick={
                                 buddy ? undefined : () => setShowBuddyInvite(true)
                               }
                             >
-                              {buddy ? (
-                                <span className="inline-flex min-w-0 items-center gap-1.5">
-                                  <BuddyFrogFace
-                                    indices={buddy.partnerIndices}
-                                    size={20}
-                                  />
-                                  <span className="truncate">
-                                    {buddy.status === 'pending'
-                                      ? `Waiting for ${buddy.partnerName}`
-                                      : buddyDoneToday
-                                        ? `${buddy.partnerName} · done`
-                                        : buddy.partnerName}
-                                  </span>
-                                </span>
-                              ) : (
-                                'Do it with a friend'
-                              )}
-                            </PropertyRow>
+                              {buddy
+                                ? buddy.status === 'pending'
+                                  ? `Waiting for ${buddyFirstName}`
+                                  : buddyDoneToday
+                                    ? `${buddyFirstName} · done`
+                                    : `With ${buddyFirstName}`
+                                : 'With a friend'}
+                            </PropertyTile>
                           )}
                         </div>
-                        </>
                       )}
 
                     {!keyboardActive &&
@@ -661,7 +696,6 @@ export default function TaskDetailSheet({
                           Cancel invite to {buddy.partnerName}
                         </button>
                       )}
-                    </div>
                   </>
                 )}
               </div>
@@ -708,7 +742,7 @@ export default function TaskDetailSheet({
                 </button>
               )
             ) : (
-              <div className="flex shrink-0 items-stretch gap-2.5">
+              <div className="flex shrink-0 items-stretch gap-2">
                 {!minimal && onStartTimer && (
                   <TaskFocusButton
                     taskId={displayTask?.id ?? ''}
@@ -719,7 +753,7 @@ export default function TaskDetailSheet({
                   onClick={runAndClose(onComplete)}
                   disabled={!onComplete}
                   className={[
-                    'group relative h-14 min-w-0 flex-1 overflow-hidden rounded-[28px] text-[17px] font-black transition-all',
+                    'group relative h-14 min-w-0 flex-1 overflow-hidden rounded-[22px] text-[17px] font-black transition-all short:h-12 narrow:text-[15px] short:text-[15px]',
                     'bg-[#4f9149] text-white',
                     'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
@@ -728,7 +762,7 @@ export default function TaskDetailSheet({
                   ].join(' ')}
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-full bg-white/90 shadow-sm">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/90 shadow-sm short:h-8 short:w-8 narrow:h-8 narrow:w-8">
                       <Fly size={30} y={-2} interactive={false} />
                     </span>
                     <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
@@ -742,35 +776,30 @@ export default function TaskDetailSheet({
                     )}
                   </span>
                 </button>
+                {!minimal && ((isRepeating && onSkipToday) || onDoLater) && (
+                  <button
+                    type="button"
+                    onClick={runAndClose(
+                      isRepeating && onSkipToday ? onSkipToday : onDoLater,
+                    )}
+                    data-hint={
+                      isRepeating && onSkipToday ? undefined : 'save-later-button'
+                    }
+                    aria-label={isRepeating && onSkipToday ? 'Skip today' : 'Save for later'}
+                    className={SIDE_ACTION_CLASS}
+                  >
+                    <span className="grid h-6 place-items-center">
+                      {isRepeating && onSkipToday ? (
+                        <SkipForward className="h-5 w-5 text-muted-foreground" strokeWidth={2.5} />
+                      ) : (
+                        <AppIcon name="saved" className="h-6 w-6" />
+                      )}
+                    </span>
+                    {isRepeating && onSkipToday ? 'Skip' : 'Later'}
+                  </button>
+                )}
               </div>
             )}
-
-            {!minimal &&
-              !keyboardActive &&
-              ((isRepeating && onSkipToday) || onDoLater) && (
-                <button
-                  type="button"
-                  onClick={runAndClose(
-                    isRepeating && onSkipToday ? onSkipToday : onDoLater,
-                  )}
-                  data-hint={
-                    isRepeating && onSkipToday ? undefined : 'save-later-button'
-                  }
-                  className="inline-flex h-10 shrink-0 items-center gap-1.5 self-center rounded-full bg-popover px-4 text-[13px] font-bold text-muted-foreground ring-1 ring-border/70 shadow-[0_2px_0_0_rgba(0,0,0,0.12)] transition-colors active:translate-y-px [@media(hover:hover)]:hover:text-foreground"
-                >
-                  {isRepeating && onSkipToday ? (
-                    <>
-                      <EyeOff className="h-4 w-4" />
-                      Skip today
-                    </>
-                  ) : (
-                    <>
-                      <AppIcon name="saved" className="h-5 w-5" />
-                      Save for later
-                    </>
-                  )}
-                </button>
-              )}
           </div>
         )}
       </BaseSheet>
@@ -802,45 +831,64 @@ export default function TaskDetailSheet({
   );
 }
 
-function SectionLabel({
-  children,
+function SectionCard({
+  icon,
+  tint,
+  title,
   aside,
+  children,
 }: {
-  children: React.ReactNode;
+  icon: React.ReactNode;
+  tint: keyof typeof PROPERTY_TINT;
+  title: string;
   aside?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="mb-1 mt-4 flex items-center justify-between gap-3 px-2 first:mt-1">
-      <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
-        {children}
-      </span>
-      {aside}
-    </div>
+    <section className="rounded-2xl bg-muted/50 p-1.5">
+      <div className="flex h-9 items-center gap-2 pl-1 pr-2">
+        <span
+          className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${PROPERTY_TINT[tint]}`}
+        >
+          {icon}
+        </span>
+        <span className="text-[14px] font-black text-foreground">{title}</span>
+        {aside && <span className="ml-auto">{aside}</span>}
+      </div>
+      {children}
+    </section>
   );
 }
 
+const SIDE_ACTION_CLASS =
+  'flex h-14 w-[60px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[22px] bg-popover text-[11px] font-black leading-none text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 short:h-12 narrow:w-[54px]';
+
 const PROPERTY_TINT = {
+  sky: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+  teal: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
   green: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
   amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   violet: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
   buddy: 'bg-[#4f9149]/15 text-[#4f9149] dark:text-emerald-400',
 } as const;
 
-function PropertyRow({
+function PropertyTile({
   icon,
   tint,
-  label,
   onClick,
   dataHint,
   dataTagIds,
+  placeholder = false,
+  bareIcon = false,
   children,
 }: {
   icon: React.ReactNode;
   tint: keyof typeof PROPERTY_TINT;
-  label: string;
   onClick?: () => void;
   dataHint?: string;
   dataTagIds?: string;
+  placeholder?: boolean;
+  bareIcon?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -850,22 +898,26 @@ function PropertyRow({
       data-tag-ids={dataTagIds}
       onClick={onClick}
       disabled={!onClick}
-      className="flex min-h-[50px] w-full items-center gap-3 border-border/50 px-3.5 text-left transition-colors disabled:cursor-default [&:not(:first-child)]:border-t enabled:active:bg-muted [@media(hover:hover)]:enabled:hover:bg-muted/70"
+      className="flex h-12 min-w-0 items-center gap-2 rounded-2xl bg-muted/50 pl-1.5 pr-3 text-left text-[13.5px] font-bold transition-colors disabled:cursor-default enabled:active:bg-muted [@media(hover:hover)]:enabled:hover:bg-muted short:h-11 narrow:h-11 narrow:gap-1.5 narrow:pr-2.5 narrow:text-[13px]"
     >
       <span
-        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[10px] ${PROPERTY_TINT[tint]}`}
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl short:h-8 short:w-8 narrow:h-8 narrow:w-8 ${
+          bareIcon ? '' : PROPERTY_TINT[tint]
+        }`}
       >
         {icon}
       </span>
-      <span className="shrink-0 text-[15px] font-semibold text-foreground">
-        {label}
+      <span
+        className={`flex min-w-0 flex-1 items-center ${
+          placeholder ? 'text-muted-foreground' : 'text-foreground'
+        }`}
+      >
+        {typeof children === 'string' ? (
+          <span className="min-w-0 truncate">{children}</span>
+        ) : (
+          children
+        )}
       </span>
-      <span className="ml-auto flex min-w-0 items-center justify-end text-right text-[14px] font-semibold text-muted-foreground">
-        <span className="min-w-0 truncate">{children}</span>
-      </span>
-      {onClick && (
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-      )}
     </button>
   );
 }
@@ -905,24 +957,24 @@ function TaskFocusButton({
       data-hint="focus-button"
       aria-label={isFocusing ? 'Open focus timer' : 'Focus timer'}
       title="Focus timer"
-      className={`flex h-14 shrink-0 items-center justify-center gap-1.5 rounded-[28px] text-[14px] font-black ring-1 transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 ${
-        isFocusing ? 'px-4' : 'w-14'
-      } ${
-        isFocusing && phase === 'focus'
-          ? 'bg-[#4f9149] text-white ring-[#34631f]/50 shadow-[0_3px_0_0_#34631f]'
-          : isFocusing
-            ? 'bg-sky-500 text-white ring-sky-700/50 shadow-[0_3px_0_0_#0369a1] dark:bg-sky-700'
-            : 'bg-popover text-foreground ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]'
-      }`}
+      className={
+        isFocusing
+          ? `flex h-14 w-[60px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[22px] text-[11px] font-black leading-none tabular-nums text-white ring-1 transition-all active:translate-y-0.5 active:shadow-none short:h-12 narrow:w-[54px] ${
+              phase === 'focus'
+                ? 'bg-[#4f9149] ring-[#34631f]/50 shadow-[0_3px_0_0_#34631f]'
+                : 'bg-sky-500 ring-sky-700/50 shadow-[0_3px_0_0_#0369a1] dark:bg-sky-700'
+            }`
+          : SIDE_ACTION_CLASS
+      }
     >
-      {isFocusing ? (
-        <>
-          <TimerClockIcon running={isRunning} className="h-7 w-7" />
-          <span className="tabular-nums">{formatTimer(timeLeft)}</span>
-        </>
-      ) : (
-        <AppIcon name="clock" label="Focus timer" className="h-8 w-8" />
-      )}
+      <span className="grid h-6 place-items-center">
+        {isFocusing ? (
+          <TimerClockIcon running={isRunning} className="h-6 w-6" />
+        ) : (
+          <AppIcon name="clock" label="Focus timer" className="h-6 w-6" />
+        )}
+      </span>
+      {isFocusing ? formatTimer(timeLeft) : 'Focus'}
     </button>
   );
 }

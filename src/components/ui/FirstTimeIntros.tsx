@@ -12,6 +12,7 @@ import { Check, Clock, Plus } from 'lucide-react';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import {
@@ -47,7 +48,7 @@ function IntroShell({
   zIndex?: number;
   /** The scroll container the tongue needs, to place its origin correctly. */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
-  children: React.ReactNode;
+  children: React.ReactNode | ((entered: boolean) => React.ReactNode);
 }) {
   return (
     <BaseSheet
@@ -58,12 +59,12 @@ function IntroShell({
       zIndex={zIndex}
       className="md:max-w-md"
     >
-      {() => (
+      {({ entered }) => (
         <div
           ref={scrollRef}
           className="max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2"
         >
-          {children}
+          {typeof children === 'function' ? children(entered) : children}
         </div>
       )}
     </BaseSheet>
@@ -233,11 +234,13 @@ const BELLY_FLY_BUZZ = {
  */
 function BellyStage({
   open,
+  live,
   beat,
   cycle,
   scrollRef,
 }: {
   open: boolean;
+  live: boolean;
   beat: number;
   /** Which time round the loop this is; the first pass waits longer. */
   cycle: number;
@@ -279,6 +282,10 @@ function BellyStage({
 
   const [flyOut, setFlyOut] = useState(true);
   const [emerging, setEmerging] = useState(false);
+  const [frogDressed, setFrogDressed] = useState(false);
+  useEffect(() => {
+    if (!open) setFrogDressed(false);
+  }, [open]);
 
   // `triggerTongue` re-identifies as soon as a grab starts (it closes over
   // `grab`), so keeping it in the effect deps restarted the beat mid-flight and
@@ -384,12 +391,22 @@ function BellyStage({
                   flyRefs.current[BELLY_FLY_KEY] = el;
                 }}
               >
-                <Fly
-                  size={BELLY_FLY_PX}
-                  alwaysPlay
-                  interactive={false}
-                  oversample={1.5}
-                />
+                {live ? (
+                  <Fly
+                    size={BELLY_FLY_PX}
+                    alwaysPlay
+                    interactive={false}
+                    oversample={1.5}
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src="/fly.svg"
+                    alt=""
+                    draggable={false}
+                    style={{ width: BELLY_FLY_PX, height: BELLY_FLY_PX }}
+                  />
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -400,15 +417,27 @@ function BellyStage({
           className="relative z-10"
           style={{ marginTop: -FROG_DEAD_SPACE, marginBottom: FROG_BAR_GAP }}
         >
-          <Frog
-            ref={frogRef}
-            width={FROG_W}
-            height={FROG_H}
-            indices={frogIndices}
-            paused={!open}
-            mouthOpen={!!grab}
-            mouthOffset={FROG_TONGUE_MOUTH_OFFSET}
-          />
+          {live && (
+            <Frog
+              ref={frogRef}
+              width={FROG_W}
+              height={FROG_H}
+              indices={frogIndices}
+              paused={!open}
+              mouthOpen={!!grab}
+              mouthOffset={FROG_TONGUE_MOUTH_OFFSET}
+              onDressed={() => setFrogDressed(true)}
+            />
+          )}
+          {!frogDressed && (
+            <div className={live ? 'pointer-events-none absolute inset-0' : ''}>
+              <FrogSnapshot
+                indices={frogIndices}
+                width={FROG_W}
+                height={FROG_H}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -537,14 +566,37 @@ export function BellyFullIntroSheet({
 
   return (
     <IntroShell open={open} onClose={onClose} scrollRef={scrollRef}>
-      <h2 className="mt-2 text-xl font-black text-center text-foreground">
-        Full belly. Happy me.
-      </h2>
-      <BellyStage open={open} beat={beat} cycle={cycle} scrollRef={scrollRef} />
-      <div className="mt-3">
-        <IntroRows rows={rows} activeIndex={beat} />
-      </div>
-      <IntroCta label="Got it" onClick={onClose} />
+      {(entered) => (
+        <>
+          <h2 className="mt-2 text-xl font-black text-center text-foreground">
+            Full belly. Happy me.
+          </h2>
+          <BellyStage
+            open={open}
+            live={entered}
+            beat={beat}
+            cycle={cycle}
+            scrollRef={scrollRef}
+          />
+          <div className="mt-3">
+            <IntroRows
+              rows={rows.map((row, i) =>
+                i === 2 && !entered
+                  ? {
+                      ...row,
+                      icon: (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src="/fly.svg" alt="" draggable={false} className="h-6 w-6" />
+                      ),
+                    }
+                  : row,
+              )}
+              activeIndex={beat}
+            />
+          </div>
+          <IntroCta label="Got it" onClick={onClose} />
+        </>
+      )}
     </IntroShell>
   );
 }
