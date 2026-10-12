@@ -1566,6 +1566,11 @@ function QuestSeasonEventOverlay({
     !!onSkipTier;
   const canAffordSkip = season.flyBalance >= season.tierSkipCost;
   const previewTier = Math.min(season.tierCount, focusTier + 10);
+  const waitingPlusTiers = season.rewardsByTier.filter((entry) =>
+    entry.tier <= season.tier &&
+    entry.premiumRewards.length > 0 &&
+    !season.claimedPlusTiers.includes(entry.tier)
+  ).length;
 
   return createPortal(
     <div
@@ -1629,29 +1634,17 @@ function QuestSeasonEventOverlay({
             <button
               type="button"
               onClick={onUpgrade}
-              aria-label="Unlock Frog Plus"
-              className="group pointer-events-auto relative isolate inline-flex h-12 min-w-0 items-center gap-1.5 rounded-2xl pl-2 pr-2 text-emerald-950 shadow-[0_12px_32px_-6px_rgba(217,119,6,0.55)] ring-2 ring-amber-200/80 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] [@media(min-width:400px)]:gap-2.5 [@media(min-width:400px)]:pl-3"
+              aria-label={`Unlock the season Plus reward track. ${waitingPlusTiers > 0 ? `Plus rewards at ${waitingPlusTiers} reached tiers are ready to claim after upgrading.` : 'Earn extra rewards as you complete tasks and reach tiers.'}`}
+              className="plus-upgrade-button pointer-events-auto inline-flex min-h-12 min-w-0 max-w-[240px] items-center gap-2 rounded-2xl border border-amber-200 bg-gradient-to-b from-[#ffdf83] to-[#f3bd48] px-3 py-2 text-left text-[#49320f] shadow-[0_3px_0_#c58c31] transition-[transform,box-shadow] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100 focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-900"
             >
-              <span
-                aria-hidden
-                className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-              />
-              <span
-                aria-hidden
-                className="animate-shimmer absolute inset-0 -z-10 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] mix-blend-overlay motion-reduce:hidden"
-              />
-              <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
-              <span className="-my-8 -ml-2 -translate-y-2 inline-flex shrink-0">
-                <Icon
-                  name="frogPlus"
-                  className="h-16 w-16 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle motion-reduce:animate-none [@media(min-width:400px)]:h-20 [@media(min-width:400px)]:w-20"
-                />
-              </span>
-              <span className="hidden text-[13px] font-black text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline [@media(min-width:400px)]:tracking-[0.22em]">
-                Unlock
-              </span>
-              <span className="ml-0.5 inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[13px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
-                Plus
+              <Icon name="frogPlus" className="hidden h-9 w-9 shrink-0 min-[400px]:block" />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-black leading-tight sm:text-sm">Unlock Plus rewards</span>
+                <span className="mt-0.5 block text-[10px] font-semibold leading-tight sm:text-xs">
+                  {waitingPlusTiers > 0
+                    ? `${waitingPlusTiers} reached ${waitingPlusTiers === 1 ? 'tier' : 'tiers'} ready to claim`
+                    : 'More to collect at every tier'}
+                </span>
               </span>
             </button>
           )}
@@ -1758,8 +1751,8 @@ function QuestSeasonEventOverlay({
               type="button"
               onClick={isPremium ? undefined : onUpgrade}
               disabled={isPremium}
-              aria-label={isPremium ? 'Frog Plus active' : 'Unlock Frog Plus'}
-              className="group relative isolate flex flex-col items-center gap-1 rounded-xl px-2.5 py-2 text-[12px] font-black text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
+              aria-label={isPremium ? 'Plus reward track active' : 'Unlock the Plus reward track'}
+              className="plus-upgrade-button group relative isolate flex flex-col items-center gap-1 rounded-xl px-2.5 py-2 text-[12px] font-black text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
             >
               <span
                 aria-hidden
@@ -1767,7 +1760,7 @@ function QuestSeasonEventOverlay({
               />
               <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
               <Icon name="frogPlus" className="h-9 w-9 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
-              <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Plus</span>
+              <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">{isPremium ? 'Plus' : 'Unlock'}</span>
             </button>
           </div>
         </div>
@@ -1793,8 +1786,8 @@ function QuestSeasonEventOverlay({
                       type="button"
                       onClick={isPremium ? undefined : onUpgrade}
                       disabled={isPremium}
-                      aria-label={isPremium ? 'Frog Plus active' : 'Unlock Frog Plus'}
-                      className="group relative isolate flex h-11 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl px-2.5 text-[13px] font-black text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:active:scale-[0.98] disabled:cursor-default focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+                      aria-label={isPremium ? 'Plus reward track active' : 'Unlock the Plus reward track'}
+                      className="plus-upgrade-button group relative isolate flex h-11 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl px-2.5 text-[13px] font-black text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:active:scale-[0.98] disabled:cursor-default focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
                     >
                       <span
                         aria-hidden
@@ -1803,7 +1796,7 @@ function QuestSeasonEventOverlay({
                       <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
                       <Icon name="frogPlus" className="-my-4 h-9 w-9 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
                       <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-                        Plus
+                        {isPremium ? 'Plus rewards' : 'Unlock rewards'}
                       </span>
                     </button>
                   </div>
@@ -1963,6 +1956,7 @@ function QuestSeasonEventOverlay({
           <LockedPlusPreview
             key="locked-plus-preview"
             tier={lockedPreview.tier}
+            reached={lockedPreview.tier <= season.tier}
             rewards={lockedPreview.rewards}
             rewardCatalog={rewardCatalog}
             wardrobeIndices={wardrobeIndices}
@@ -1981,6 +1975,7 @@ function QuestSeasonEventOverlay({
 
 function LockedPlusPreview({
   tier,
+  reached,
   rewards,
   rewardCatalog,
   wardrobeIndices,
@@ -1988,6 +1983,7 @@ function LockedPlusPreview({
   onUpgrade,
 }: {
   tier: number;
+  reached: boolean;
   rewards: QuestReward[];
   rewardCatalog: Record<string, ItemDef>;
   wardrobeIndices: Partial<Record<string, number>>;
@@ -2168,7 +2164,7 @@ function LockedPlusPreview({
             {itemName}
           </h3>
           <p className="mt-1 text-sm font-semibold text-muted-foreground">
-            Unlock Tier {tier} with Plus
+            {reached ? `You’ve reached tier ${tier}. Get Plus to claim this reward.` : `Included on the Plus track. Reach tier ${tier} to claim it.`}
           </p>
         </div>
 
@@ -2176,8 +2172,8 @@ function LockedPlusPreview({
           <button
             type="button"
             onClick={onUpgrade}
-            aria-label="Unlock Frog Plus"
-            className="group relative isolate mt-5 flex h-14 w-full touch-manipulation items-center justify-center gap-2.5 rounded-2xl px-4 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+            aria-label="Get the Plus season reward track"
+            className="plus-upgrade-button group relative isolate mt-5 flex h-14 w-full touch-manipulation items-center justify-center gap-2.5 rounded-2xl px-4 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
           >
             <span
               aria-hidden
@@ -2189,7 +2185,7 @@ function LockedPlusPreview({
               className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
             />
             <span className="text-sm font-black text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-              Frogress
+              Get season rewards
             </span>
             <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[13px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
               Plus

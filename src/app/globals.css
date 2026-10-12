@@ -1298,6 +1298,34 @@ body.dragging {
   --pond-glow: rgba(108, 187, 95, 0.16);
 }
 
+.plus-paywall :is(button, a):focus-visible {
+  outline: 2px solid #648b4c;
+  outline-offset: 3px;
+}
+
+/* The same solid, raised edge as our account-backup card, shared by Plus CTAs. */
+.plus-upgrade-button:not(:disabled) {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000), 0 4px 0 var(--plus-button-base, #a97627);
+  transition-property: transform, box-shadow, filter, background-color;
+  transition-duration: 150ms;
+}
+
+.plus-upgrade-button:not(:disabled):active {
+  transform: translateY(3px);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000), 0 1px 0 var(--plus-button-base, #a97627);
+}
+
+.plus-upgrade-button:focus-visible {
+  outline: 2px solid #648b4c;
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plus-upgrade-button { transition: none; }
+}
+
 .plus-sheet {
   --plus-field: #123a2a;
   --plus-field-deep: #0b271c;

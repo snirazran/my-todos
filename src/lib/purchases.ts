@@ -5,6 +5,7 @@ import { auth } from '@/lib/firebase';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { FLY_PACKS, getFlyPack, type FlyPackId } from '@/lib/flyPacks';
 import { markNegativeMoment } from '@/lib/rateApp';
+import { formatTrialDuration } from '@/lib/plusPaywall';
 
 export type PlusPlan = 'yearly' | 'monthly';
 export type PurchaseOutcome = 'purchased' | 'cancelled';
@@ -436,6 +437,10 @@ export type PlusPriceInfo = {
   amount: number;
   currency: string;
   pricePerMonthString: string | null;
+  /** Only populated when the store returns an eligible free introductory offer. */
+  trialDuration: string | null;
+  /** A paid introductory phase can follow a free trial. Checkout shows its terms. */
+  hasIntroPrice: boolean;
 };
 
 function formatMoney(amount: number, currency: string): string {
@@ -462,11 +467,24 @@ export async function getPlusPricing(): Promise<
   if (Capacitor.isNativePlatform()) {
     const { Purchases } = await getNativePurchases(uid);
     const offering = (await Purchases.getOfferings()).current;
+    const packages = [offering?.annual, offering?.monthly].filter((pkg) => !!pkg);
+    const { INTRO_ELIGIBILITY_STATUS } = await import('@revenuecat/purchases-capacitor');
+    // Unknown eligibility must not be presented as a guaranteed free trial.
+    const eligibility = Capacitor.getPlatform() === 'ios'
+      ? await Purchases.checkTrialOrIntroductoryPriceEligibility({
+          productIdentifiers: packages.map((pkg) => pkg.product.identifier),
+        }).catch(() => ({} as Awaited<ReturnType<typeof Purchases.checkTrialOrIntroductoryPriceEligibility>>))
+      : null;
     for (const [plan, pkg] of [
       ['yearly', offering?.annual],
       ['monthly', offering?.monthly],
     ] as const) {
       if (!pkg) continue;
+      const intro = pkg.product.introPrice;
+      const eligible = eligibility?.[pkg.product.identifier]?.status ===
+        INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+      const option = pkg.product.defaultOption;
+      const freePhase = option?.freePhase;
       prices[plan] = {
         priceString: pkg.product.priceString,
         amount: pkg.product.price,
@@ -476,6 +494,16 @@ export async function getPlusPricing(): Promise<
           (typeof pkg.product.pricePerMonth === 'number'
             ? formatMoney(pkg.product.pricePerMonth, pkg.product.currencyCode)
             : null),
+        trialDuration: Capacitor.getPlatform() === 'ios'
+          ? eligible && intro?.price === 0
+            ? formatTrialDuration(intro.period, intro.cycles)
+            : null
+          : freePhase
+            ? formatTrialDuration(freePhase.billingPeriod.iso8601, freePhase.billingCycleCount || 1)
+            : null,
+        hasIntroPrice: Capacitor.getPlatform() === 'ios'
+          ? eligible && !!intro && intro.price > 0
+          : !!option?.introPhase,
       };
     }
     return prices;
@@ -490,12 +518,18 @@ export async function getPlusPricing(): Promise<
     if (!pkg) continue;
     const price = pkg.webBillingProduct.price;
     const amount = price.amountMicros / 1_000_000;
+    // getOfferings returns customer-eligible options, matching purchasePlusWeb.
+    const option = pkg.webBillingProduct.defaultSubscriptionOption;
     prices[plan] = {
       priceString: price.formattedPrice,
       amount,
       currency: price.currency,
       pricePerMonthString:
         plan === 'yearly' ? formatMoney(amount / 12, price.currency) : null,
+      trialDuration: option?.trial
+        ? formatTrialDuration(option.trial.periodDuration, option.trial.cycleCount || 1)
+        : null,
+      hasIntroPrice: !!option?.introPrice,
     };
   }
   return prices;

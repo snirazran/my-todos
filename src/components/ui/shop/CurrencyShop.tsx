@@ -232,10 +232,10 @@ export function CurrencyShop() {
 function PlusFliesCard() {
   const openPremium = useUIStore((s) => s.setPremiumModalOpen);
   return (
-    <button type="button" onClick={() => openPremium(true, 'fly_shop_free_flies')} className="mt-4 flex min-h-12 w-full items-center gap-2 rounded-2xl bg-primary/5 px-3 py-2 text-left transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-      <Icon name="frogPlus" label="Plus" className="h-9 w-9 shrink-0" />
-      <span className="flex-1 text-xs font-bold">Earn 2× flies with Plus</span>
-      <span className="text-xs font-black text-primary">Explore</span>
+    <button type="button" onClick={() => openPremium(true, 'fly_shop_free_flies')} className="plus-upgrade-button group mb-1 mt-4 flex min-h-16 w-full items-center gap-3 rounded-2xl border border-amber-200 bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)] px-4 py-3 text-left text-emerald-950 hover:brightness-105">
+      <Icon name="frogPlus" className="h-12 w-12 shrink-0 animate-wiggle drop-shadow-[0_2px_0_rgba(31,98,28,0.3)] motion-reduce:animate-none" />
+      <span className="min-w-0 flex-1"><span className="block text-sm font-black">Make each quest more rewarding</span><span className="mt-0.5 block text-xs font-semibold text-emerald-900">Earn 2× flies from daily quests with Plus.</span></span>
+      <span className="shrink-0 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-xs font-black text-amber-100 shadow-[0_3px_0_#14532d]">See Plus</span>
     </button>
   );
 }

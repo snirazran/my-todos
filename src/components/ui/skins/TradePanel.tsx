@@ -1510,7 +1510,7 @@ export function TradePanel({
                   hapticSelect();
                   onUpgrade?.();
                 }}
-                className="mx-auto mb-1.5 flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-50 py-1 pl-1.5 pr-2.5 transition-colors hover:bg-amber-100 active:scale-[0.98] dark:border-amber-500/30 dark:bg-amber-950/30"
+                className="plus-upgrade-button mx-auto mb-1.5 flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-50 py-1 pl-1.5 pr-2.5 transition-colors hover:bg-amber-100 active:scale-[0.98] dark:border-amber-500/30 dark:bg-amber-950/30"
               >
                 <AppIcon
                   name="frogPlus"

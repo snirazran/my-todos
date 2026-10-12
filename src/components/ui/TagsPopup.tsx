@@ -264,7 +264,7 @@ function FocusTagLimitDialog({
               type="button"
               onClick={onUpgrade}
               aria-label="Unlock multiple focus tags with Frog Plus"
-              className="group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+              className="plus-upgrade-button group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
             >
               <span
                 aria-hidden

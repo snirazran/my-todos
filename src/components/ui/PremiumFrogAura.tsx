@@ -27,6 +27,7 @@ export function PremiumFrogAura({
   compact = false,
   flySize,
   alwaysPlay = false,
+  paused = false,
   className,
 }: {
   /** Overrides the self premium check (e.g. viewing a friend's frog). */
@@ -38,6 +39,8 @@ export function PremiumFrogAura({
   /** Keep animating while a sheet/scroll holds the global Rive pause (for
    *  auras rendered inside an open sheet). The idle pause still applies. */
   alwaysPlay?: boolean;
+  /** Pause the companion and its orbit with an in-sheet preview control. */
+  paused?: boolean;
   className?: string;
 }) {
   const isSelf = show === undefined;
@@ -51,7 +54,7 @@ export function PremiumFrogAura({
   const active = isSelf ? !!data?.isPremium : show;
   const pauseHeld = useRiveInteractionPause((s) => s.count > 0);
   const idle = useRiveIdlePause((s) => s.idle);
-  const frozen = (pauseHeld && !alwaysPlay) || idle;
+  const frozen = paused || (pauseHeld && !alwaysPlay) || idle;
 
   const phase = React.useMemo(() => {
     const t = Date.now() / 1000;
@@ -83,6 +86,7 @@ export function PremiumFrogAura({
                 size={flySize ?? (compact ? 26 : 46)}
                 interactive={false}
                 alwaysPlay={alwaysPlay}
+                paused={paused}
                 premium
               />
             </div>

@@ -193,7 +193,7 @@ export function WishlistSheet({
                   <button
                     type="button"
                     onClick={onUpgrade}
-                    className="mt-2 flex w-full items-center gap-2 rounded-2xl border border-amber-400/60 bg-amber-50 px-4 py-3 text-left transition-colors hover:bg-amber-100 dark:bg-amber-950/30"
+                    className="plus-upgrade-button mt-2 flex w-full items-center gap-2 rounded-2xl border border-amber-400/60 bg-amber-50 px-4 py-3 text-left transition-colors hover:bg-amber-100 dark:bg-amber-950/30"
                   >
                     <Icon
                       name="frogPlus"

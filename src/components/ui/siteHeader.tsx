@@ -1558,7 +1558,7 @@ function MainView({
           type="button"
           onClick={onOpenPlus}
           aria-label="Unlock Frogress Plus"
-          className="group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-primary"
+          className="plus-upgrade-button group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-primary"
         >
           <span
             aria-hidden
@@ -1579,7 +1579,7 @@ function MainView({
               </span>
             </p>
             <p className="mt-0.5 text-xs font-bold leading-snug text-emerald-900/80">
-              Double the rewards for every task you finish.
+              More outfits. More gift prizes. More reasons to keep going.
             </p>
           </div>
           <span

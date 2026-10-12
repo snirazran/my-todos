@@ -208,7 +208,7 @@ function LockedPreview({
         onClick={onUpgrade}
         aria-label="Unlock Frogress Plus"
         className={cn(
-          'group relative isolate mx-auto mt-5 flex w-full max-w-md items-center gap-2 rounded-2xl py-3 pl-2 pr-4',
+          'plus-upgrade-button group relative isolate mx-auto mt-5 flex w-full max-w-md items-center gap-2 rounded-2xl py-3 pl-2 pr-4',
           'text-left ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]',
         )}
       >
