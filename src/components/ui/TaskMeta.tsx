@@ -172,6 +172,7 @@ export function TaskTrailingMeta({
   isNext = false,
   isDone = false,
   activePhase = null,
+  showTag = true,
   className,
 }: {
   startTime?: string;
@@ -181,9 +182,10 @@ export function TaskTrailingMeta({
   isNext?: boolean;
   isDone?: boolean;
   activePhase?: 'focus' | 'break' | null;
+  showTag?: boolean;
   className?: string;
 }) {
-  const tag = tags?.[0];
+  const tag = showTag ? tags?.[0] : undefined;
   if (!startTime && !tag && !activePhase) return null;
   const highlight = isNext && !isDone;
 

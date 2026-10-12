@@ -6,13 +6,13 @@ import {
   useReducedMotion,
   Variants,
 } from 'framer-motion';
-import { ChevronRight, Loader2, Crown } from 'lucide-react';
+import { ChevronRight, Loader2, Crown, Gift } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
 import { useRewardGate } from '@/hooks/useRewardGate';
-import { ItemDef } from '@/lib/skins/catalog';
+import { ItemDef, type Rarity } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import {
   canFlyToInventory,
@@ -59,6 +59,86 @@ const GLOW_COLORS = {
   epic: 'bg-violet-400',
   legendary: 'bg-amber-400',
 };
+
+const GIFT_BUTTON_PALETTE: Record<
+  Rarity,
+  { top: string; bottom: string; lip: string; glow: string }
+> = {
+  common: { top: '#4ade80', bottom: '#16a34a', lip: '#166534', glow: 'rgba(74,222,128,0.55)' },
+  uncommon: { top: '#34d399', bottom: '#059669', lip: '#065f46', glow: 'rgba(52,211,153,0.55)' },
+  rare: { top: '#38bdf8', bottom: '#0284c7', lip: '#075985', glow: 'rgba(56,189,248,0.6)' },
+  epic: { top: '#a78bfa', bottom: '#7c3aed', lip: '#4c1d95', glow: 'rgba(167,139,250,0.6)' },
+  legendary: { top: '#fcd34d', bottom: '#ea580c', lip: '#9a3412', glow: 'rgba(251,191,36,0.65)' },
+};
+
+const GIFT_SPARKLES = [
+  { className: '-left-1.5 -top-2 h-4 w-4', delay: '0s' },
+  { className: '-right-1 top-1 h-3 w-3', delay: '0.9s' },
+  { className: 'right-10 -bottom-1 h-3.5 w-3.5', delay: '1.7s' },
+];
+
+function GiftOpenButton({
+  rarity,
+  label,
+  busy,
+  busyLabel,
+  disabled,
+  onClick,
+}: {
+  rarity: Rarity;
+  label: string;
+  busy: boolean;
+  busyLabel: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const palette = GIFT_BUTTON_PALETTE[rarity] ?? GIFT_BUTTON_PALETTE.common;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      data-busy={busy || undefined}
+      className="gift-open-btn group relative w-full pb-1.5 text-white outline-none disabled:cursor-not-allowed"
+      style={
+        {
+          '--gift-top': palette.top,
+          '--gift-bottom': palette.bottom,
+          '--gift-lip': palette.lip,
+          '--gift-glow': palette.glow,
+        } as React.CSSProperties
+      }
+    >
+      <span aria-hidden className="gift-open-halo" />
+      <span aria-hidden className="gift-open-lip" />
+      <span className="gift-open-face">
+        <span aria-hidden className="gift-open-shine" />
+        {busy ? (
+          <Loader2 className="relative h-6 w-6 animate-spin" strokeWidth={2.75} />
+        ) : (
+          <Gift className="gift-open-icon relative h-6 w-6" strokeWidth={2.5} />
+        )}
+        <span className="relative">{busy ? busyLabel : label}</span>
+      </span>
+      {!busy &&
+        GIFT_SPARKLES.map((sparkle) => (
+          <svg
+            key={sparkle.delay}
+            aria-hidden
+            viewBox="0 0 16 16"
+            className={cn('gift-open-sparkle absolute', sparkle.className)}
+            style={{ animationDelay: sparkle.delay }}
+          >
+            <path
+              d="M8 0c.4 3.9 1.1 4.6 5 5-3.9.4-4.6 1.1-5 5-.4-3.9-1.1-4.6-5-5 3.9-.4 4.6-1.1 5-5Z"
+              transform="translate(0 3)"
+              fill="#fff"
+            />
+          </svg>
+        ))}
+    </button>
+  );
+}
 
 export function GoldenRewardButton({
   children,
@@ -600,47 +680,62 @@ export const RewardCard = ({
           />
         )}
         {upsell}
-        <button
-          onClick={handleClaimClick}
-          disabled={isProcessing || !showContent}
-          className={cn(
-            'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl font-black transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
-            hasUpsell
-              ? 'border border-white/15 bg-white/10 py-3 text-base text-white shadow-lg hover:bg-white/15'
-              : cn('py-4 text-lg shadow-xl', config.button),
-          )}
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
-              <span className="relative z-20">
-                {prize.slot === 'container'
-                  ? quantity && quantity > 1
-                    ? `Opening ${quantity}...`
-                    : 'Opening...'
-                  : 'Claiming...'}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="relative z-20">
-                {prize.slot === 'container'
-                  ? quantity && quantity > 1
-                    ? `Open All (${quantity})`
-                    : 'Open Now'
-                  : rewardAmount
-                    ? `Claim ${rewardAmount}`
-                    : 'Claim Reward'}
-              </span>
-            </>
-          )}
-        </button>
+        {prize.slot === 'container' && !hasUpsell ? (
+          <GiftOpenButton
+            rarity={prize.rarity}
+            label={
+              quantity && quantity > 1 ? `Open all ${quantity}` : 'Open now'
+            }
+            busy={isProcessing}
+            busyLabel={
+              quantity && quantity > 1 ? `Opening ${quantity}...` : 'Opening...'
+            }
+            disabled={isProcessing || !showContent}
+            onClick={handleClaimClick}
+          />
+        ) : (
+          <button
+            onClick={handleClaimClick}
+            disabled={isProcessing || !showContent}
+            className={cn(
+              'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl font-black transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
+              hasUpsell
+                ? 'border border-white/15 bg-white/10 py-3 text-base text-white shadow-lg hover:bg-white/15'
+                : cn('py-4 text-lg shadow-xl', config.button),
+            )}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
+                <span className="relative z-20">
+                  {prize.slot === 'container'
+                    ? quantity && quantity > 1
+                      ? `Opening ${quantity}...`
+                      : 'Opening...'
+                    : 'Claiming...'}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="relative z-20">
+                  {prize.slot === 'container'
+                    ? quantity && quantity > 1
+                      ? `Open All (${quantity})`
+                      : 'Open Now'
+                    : rewardAmount
+                      ? `Claim ${rewardAmount}`
+                      : 'Claim Reward'}
+                </span>
+              </>
+            )}
+          </button>
+        )}
         {prize.slot === 'container' && onOpenLater && (
           <button
             type="button"
             onClick={onOpenLater}
             disabled={isProcessing || !showContent}
-            className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 text-sm font-black text-white shadow-lg transition hover:bg-white/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl py-3 text-[15px] font-black text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {openLaterLabel}
           </button>

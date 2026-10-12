@@ -49,8 +49,10 @@ export default function DateStrip({
   scrollerRef,
   syncRef,
   liveDate,
+  counts,
   onSelectDate,
 }: {
+  counts?: ReadonlyMap<string, number>;
   dates: string[];
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   syncRef: React.MutableRefObject<(() => void) | null>;
@@ -130,7 +132,7 @@ export default function DateStrip({
   }, [scrollerRef, sync]);
 
   return (
-    <div ref={viewportRef} className="relative w-full overflow-hidden pb-1.5">
+    <div ref={viewportRef} className="relative w-full overflow-hidden pb-2.5">
       <div
         ref={trackRef}
         className="relative flex will-change-transform"
@@ -139,42 +141,60 @@ export default function DateStrip({
         <div
           ref={pillRef}
           aria-hidden
-          className="pointer-events-none absolute bottom-0 left-0 flex h-11 justify-center will-change-transform"
+          className="pointer-events-none absolute left-0 top-0 flex h-[58px] justify-center will-change-transform"
           style={{ width: `${100 / VISIBLE}%` }}
         >
-          <span className="h-11 w-11 rounded-2xl bg-gradient-to-br from-primary/25 to-emerald-400/25 ring-1 ring-primary/40" />
+          <span className="h-[58px] w-[44px] rounded-[16px] bg-primary shadow-[0_6px_14px_-6px_rgba(79,145,73,0.65)]" />
         </div>
         {dates.map((d) => {
           const isToday = d === today;
           const isPast = cmpYmd(d, today) < 0;
+          const load = Math.min(3, counts?.get(d) ?? 0);
           return (
             <button
               key={d}
               type="button"
               onClick={() => onSelectDate(d)}
-              aria-label={d}
-              className="group relative flex shrink-0 flex-col items-center outline-none"
+              aria-label={parseYmd(d).toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+              className="group relative flex h-[58px] shrink-0 flex-col items-center justify-center gap-1 outline-none"
               style={{ width: `${100 / VISIBLE}%` }}
             >
               <span
-                className={`mb-1 text-[11px] font-bold leading-none tracking-wide transition-colors duration-150 group-data-[active=true]:text-primary ${
-                  isPast ? 'text-muted-foreground/40' : 'text-foreground/80'
+                className={`text-[11px] font-bold uppercase leading-none tracking-wide transition-colors duration-150 group-data-[active=true]:text-primary-foreground/85 ${
+                  isToday
+                    ? 'text-primary'
+                    : isPast
+                      ? 'text-muted-foreground/40'
+                      : 'text-muted-foreground'
                 }`}
               >
                 {dayLetterFromYmd(d)}
               </span>
               <span
-                className={`relative flex h-11 w-11 items-center justify-center rounded-2xl text-[16px] font-black transition-colors duration-150 group-data-[active=true]:text-primary ${
-                  isPast
-                    ? 'text-muted-foreground/40 hover:text-muted-foreground/70'
-                    : 'text-foreground'
+                className={`text-[18px] font-black leading-none tabular-nums transition-colors duration-150 group-data-[active=true]:text-primary-foreground ${
+                  isToday
+                    ? 'text-primary'
+                    : isPast
+                      ? 'text-muted-foreground/45'
+                      : 'text-foreground'
                 }`}
               >
                 {parseYmd(d).getDate()}
               </span>
-              {isToday && (
-                <span className="absolute -bottom-1 h-1.5 w-1.5 rounded-full bg-primary" />
-              )}
+              <span className="absolute -bottom-2 flex h-1 items-center gap-[3px]">
+                {Array.from({ length: load }).map((_, n) => (
+                  <span
+                    key={n}
+                    className={`h-1 w-1 rounded-full ${
+                      isPast ? 'bg-muted-foreground/30' : 'bg-primary/55'
+                    }`}
+                  />
+                ))}
+              </span>
             </button>
           );
         })}

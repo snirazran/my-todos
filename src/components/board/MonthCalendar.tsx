@@ -142,7 +142,10 @@ export default function MonthCalendar({
     });
   }, [viewMonth, weekStartsOn]);
 
-  const visibleSet = useMemo(() => new Set(visibleDates ?? []), [visibleDates]);
+  const visibleSet = useMemo(
+    () => new Set((visibleDates?.length ?? 0) > 1 ? visibleDates : []),
+    [visibleDates],
+  );
 
   const onSwipe = (_: unknown, info: PanInfo) => {
     const { offset, velocity } = info;
@@ -171,18 +174,29 @@ export default function MonthCalendar({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={onClose}
-            className="fixed inset-0 z-[95] bg-black/50 pointer-events-auto"
+            className="fixed inset-0 z-[95] bg-slate-950/30 pointer-events-auto"
           />
           <motion.div
             key="cal"
-            initial={{ y: -8 }}
-            animate={{ y: 0 }}
-            exit={{ y: -8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            initial={{ y: -8, opacity: 0 }}
+            animate={{
+              y: 0,
+              opacity: 1,
+              transition: {
+                y: { type: 'spring', stiffness: 420, damping: 34 },
+                opacity: { duration: 0.12, ease: 'easeOut' },
+              },
+            }}
+            exit={{
+              y: -6,
+              opacity: 0,
+              transition: { duration: 0.14, ease: 'easeIn' },
+            }}
             className={`absolute left-0 right-0 top-0 z-[96] px-3 pointer-events-none ${
               belowHeader
-                ? 'pt-[calc(3.75rem+env(safe-area-inset-top))] md:pt-[136px]'
+                ? 'pt-[calc(3.6rem+env(safe-area-inset-top))] md:pt-[136px]'
                 : 'pt-14'
             }`}
           >
@@ -195,13 +209,13 @@ export default function MonthCalendar({
                 belowHeader
                   ? 'max-h-[calc(100dvh-9.5rem-env(safe-area-inset-top)-var(--cal-reserve,0px))] md:max-h-[calc(100dvh-176px-var(--cal-reserve,0px))]'
                   : 'max-h-[calc(100dvh-9rem-var(--cal-reserve,0px))]'
-              } overflow-y-auto overscroll-contain rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto`}
+              } overflow-y-auto overscroll-contain rounded-[24px] border border-border/60 bg-card p-3.5 text-foreground shadow-[0_18px_44px_-14px_rgba(15,23,42,0.4)] pointer-events-auto md:p-4`}
               onClick={(e) => e.stopPropagation()}
             >
               {(heading || showClose) && (
                 <div className="mb-3 flex items-center gap-2">
                   {heading && (
-                    <div className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/15 px-3 py-2 text-center text-[13px] font-bold leading-snug">
+                    <div className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary/10 px-3 py-2 text-center text-[13px] font-bold leading-snug text-primary">
                       <CalendarCheck size={15} className="shrink-0" />
                       <span>{heading}</span>
                     </div>
@@ -210,7 +224,7 @@ export default function MonthCalendar({
                     <button
                       onClick={onClose}
                       aria-label="Close"
-                      className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-primary-foreground transition-colors hover:bg-white/25 active:scale-95"
+                      className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground active:scale-95"
                     >
                       <X size={16} />
                     </button>
@@ -232,10 +246,10 @@ export default function MonthCalendar({
                       aria-live="polite"
                       className="flex items-baseline gap-2 whitespace-nowrap"
                     >
-                      <span className="text-2xl font-black tracking-tight">
+                      <span className="text-[22px] font-black tracking-tight">
                         {monthName}
                       </span>
-                      <span className="text-lg font-bold opacity-[.65]">
+                      <span className="text-[22px] font-black tracking-tight text-muted-foreground/50">
                         {yearLabel}
                       </span>
                     </motion.h3>
@@ -252,7 +266,7 @@ export default function MonthCalendar({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ type: 'spring', stiffness: 480, damping: 32 }}
-                      className="h-9 rounded-full bg-white/15 px-3.5 text-[13px] font-black transition-colors hover:bg-white/25 active:scale-95"
+                      className="h-9 rounded-xl bg-card px-3 text-[13px] font-black text-primary ring-1 ring-border shadow-[0_3px_0_0_hsl(var(--border))] transition-all active:translate-y-0.5 active:shadow-none"
                     >
                       This month
                     </motion.button>
@@ -263,7 +277,7 @@ export default function MonthCalendar({
                   onClick={() => go(-1)}
                   disabled={!canGoPrev}
                   aria-label="Previous month"
-                  className="grid h-9 w-9 place-items-center rounded-full bg-white/15 transition-colors hover:bg-white/25 active:scale-90 disabled:opacity-30 disabled:hover:bg-white/15 disabled:active:scale-100"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-muted/70 text-foreground/80 transition-colors hover:bg-muted active:scale-90 disabled:opacity-30 disabled:hover:bg-muted/70 disabled:active:scale-100"
                 >
                   <ChevronLeft size={18} strokeWidth={2.75} />
                 </button>
@@ -271,17 +285,17 @@ export default function MonthCalendar({
                   type="button"
                   onClick={() => go(1)}
                   aria-label="Next month"
-                  className="grid h-9 w-9 place-items-center rounded-full bg-white/15 transition-colors hover:bg-white/25 active:scale-90"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-muted/70 text-foreground/80 transition-colors hover:bg-muted active:scale-90"
                 >
                   <ChevronRight size={18} strokeWidth={2.75} />
                 </button>
               </div>
 
-              <div className="mb-1 grid grid-cols-7 text-[12px] font-black">
+              <div className="mb-1.5 grid grid-cols-7 text-[11px] font-bold uppercase tracking-wide">
                 {weekdayLetters.map((d, i) => (
                   <div
                     key={i}
-                    className={`text-center ${d.weekend ? 'opacity-[.55]' : 'opacity-80'}`}
+                    className={`text-center ${d.weekend ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}
                   >
                     {d.letter}
                   </div>
@@ -321,7 +335,7 @@ export default function MonthCalendar({
                           key={c.key}
                           className={[
                             'relative flex justify-center',
-                            inBand ? 'bg-white/[.12]' : '',
+                            inBand ? 'bg-primary/[0.07]' : '',
                             inBand && !prevInBand ? 'rounded-l-2xl' : '',
                             inBand && !nextInBand ? 'rounded-r-2xl' : '',
                           ].join(' ')}
@@ -341,15 +355,19 @@ export default function MonthCalendar({
                               onClose();
                             }}
                             className={[
-                              'relative flex h-11 w-full max-w-[3.25rem] flex-col items-center justify-center rounded-2xl text-base font-black tabular-nums transition-[background-color,transform] duration-150 md:h-12 md:text-lg',
+                              'relative flex h-11 w-full max-w-[3.25rem] flex-col items-center justify-center rounded-2xl text-[16px] font-black tabular-nums transition-[background-color,transform] duration-150 md:h-12 md:text-[17px]',
                               disabled
                                 ? 'cursor-not-allowed opacity-25'
-                                : 'hover:bg-white/15 active:scale-90',
-                              isSelected ? 'bg-white text-primary hover:bg-white' : '',
-                              isToday && !isSelected ? 'ring-2 ring-inset ring-white' : '',
-                              !disabled && !isSelected && c.outside ? 'opacity-35' : '',
+                                : 'hover:bg-muted active:scale-90',
+                              isSelected
+                                ? 'bg-primary text-primary-foreground hover:bg-primary'
+                                : '',
+                              isToday && !isSelected
+                                ? 'text-primary ring-2 ring-inset ring-primary/35'
+                                : '',
+                              !disabled && !isSelected && c.outside ? 'opacity-30' : '',
                               !disabled && !isSelected && !c.outside && isPast
-                                ? 'opacity-60'
+                                ? 'text-muted-foreground/70'
                                 : '',
                             ].join(' ')}
                           >
@@ -359,7 +377,11 @@ export default function MonthCalendar({
                                 <span
                                   key={i}
                                   className={`h-1 w-1 rounded-full ${
-                                    isSelected ? 'bg-primary' : 'bg-white/85'
+                                    isSelected
+                                      ? 'bg-white/85'
+                                      : isPast
+                                        ? 'bg-muted-foreground/35'
+                                        : 'bg-primary/55'
                                   }`}
                                 />
                               ))}
@@ -378,7 +400,7 @@ export default function MonthCalendar({
                     onSelect(today);
                     onClose();
                   }}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 py-2.5 text-sm font-black tracking-tight transition-colors hover:bg-white/25 active:scale-[0.98]"
+                  className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] transition-all hover:bg-[#478442] active:translate-y-1 active:shadow-none"
                 >
                   <CalendarCheck size={16} />
                   {todayLabel}

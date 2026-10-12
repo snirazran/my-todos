@@ -95,9 +95,11 @@ function QuickSave({ onSave }: { onSave: (text: string) => Promise<void> | void 
   return (
     <form
       onSubmit={submit}
-      className="flex items-center gap-2 rounded-2xl border border-border/50 bg-muted/60 py-1.5 pl-3 pr-1.5 shadow-sm focus-within:border-primary/50 focus-within:bg-card"
+      className="flex min-h-[52px] items-center gap-2.5 rounded-[20px] border border-border/60 bg-card py-1.5 pl-3 pr-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-colors focus-within:border-primary/50"
     >
-      <Plus className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.75} />
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground">
+        <Plus className="h-4 w-4" strokeWidth={2.75} />
+      </span>
       <input
         ref={inputRef}
         value={text}
@@ -105,7 +107,7 @@ function QuickSave({ onSave }: { onSave: (text: string) => Promise<void> | void 
         placeholder="Save an idea for later"
         aria-label="New saved task"
         enterKeyHint="done"
-        className="min-w-0 flex-1 bg-transparent py-1.5 text-base font-semibold outline-none placeholder:text-muted-foreground/70"
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-base font-semibold outline-none placeholder:text-muted-foreground/60"
       />
       <AnimatePresence initial={false}>
         {text.trim() && (
@@ -116,7 +118,7 @@ function QuickSave({ onSave }: { onSave: (text: string) => Promise<void> | void 
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: 'spring', stiffness: 520, damping: 30 }}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground active:scale-90"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90"
           >
             <CornerDownLeft className="h-4 w-4" strokeWidth={2.75} />
           </motion.button>
@@ -156,6 +158,8 @@ export default React.memo(function BacklogTray({
     id: string;
     top: number;
     left: number;
+    anchorTop?: number;
+    anchorBottom?: number;
   } | null>(null);
   const [confirmItem, setConfirmItem] = useState<Task | null>(null);
   const [editItem, setEditItem] = useState<Task | null>(null);
@@ -198,8 +202,25 @@ export default React.memo(function BacklogTray({
     }
   };
 
-  // Auto-hide when dragging FROM the tray
   const isDraggingAny = !!activeDragId;
+
+  const openMenuFor = (taskId: string, cardId: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-card-id="${cardId}"]`);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setMenu((prev) => {
+      if (prev?.id === taskId) return null;
+      const menuWidth = window.innerWidth >= 640 ? 230 : 180;
+      return {
+        id: taskId,
+        top: rect.bottom + 6,
+        left: rect.right - menuWidth - 8,
+        anchorTop: rect.top,
+        anchorBottom: rect.bottom,
+      };
+    });
+  };
+
 
   const filteredTasks = sortTasks(
     tasks.filter((t) => matchesTaskFilters(t, filters)),
@@ -314,133 +335,106 @@ export default React.memo(function BacklogTray({
               </span>
             </motion.div>
           ) : (
-            groups.flatMap(({ bucket, tasks: groupTasks }) => [
-              showGroupHeaders ? (
-                <motion.div
-                  key={`group-${bucket}`}
-                  layout="position"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="px-1 pb-1 pt-3 first:pt-0"
-                >
-                  <p className="text-[12px] font-black uppercase tracking-wide text-muted-foreground">
-                    {BUCKET_LABEL[bucket]}
-                    <span className="ml-1.5 font-bold opacity-70">{groupTasks.length}</span>
-                  </p>
-                  {bucket === 'old' && (
-                    <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground/80">
-                      Still want these? Give one a day, or let it go.
-                    </p>
+            <motion.div
+              key="list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.18 }}
+              className="shrink-0 overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
+            >
+              {groups.map(({ bucket, tasks: groupTasks }) => (
+                <div key={bucket}>
+                  {showGroupHeaders && (
+                    <div className="relative bg-muted/40 px-3.5 py-2 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/60 first:before:hidden">
+                      <p className="flex items-center gap-2 text-[13px] font-black text-foreground/70">
+                        {BUCKET_LABEL[bucket]}
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-black tabular-nums leading-none text-muted-foreground">
+                          {groupTasks.length}
+                        </span>
+                      </p>
+                      {bucket === 'old' && (
+                        <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground/80">
+                          Still want these? Give one a day, or let it go.
+                        </p>
+                      )}
+                    </div>
                   )}
-                </motion.div>
-              ) : null,
-              ...groupTasks.map((t) => {
-              const originalIndex = tasks.findIndex((it) => it.id === t.id);
-              return (
-                <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{
-                    opacity: 0,
-                    scale: 0.9,
-                    transition: { duration: 0.15 },
-                  }}
-                  key={t.id}
-                  layout="position"
-                  className="w-full relative"
-                  data-hint="saved-task-card"
-                >
-                  <div className="group relative">
-                    <TaskCard
-                      innerRef={(el) =>
-                        setCardRef(draggableIdFor(backlogDayIndex as any, t.id), el)
-                      }
-                      dragId={draggableIdFor(backlogDayIndex as any, t.id)}
-                      task={t}
-                      userTags={userTags}
-                      menuOpen={menu?.id === t.id}
-                      onToggleMenu={(rect) => {
-                        setMenu((prev) => {
-                          if (prev?.id === t.id) return null;
-                          const MENU_W = 160;
-                          const MENU_H = 180; // Approximate height with all options
-                          const MARGIN = 10;
-                          const vw = window.innerWidth;
-                          const vh = window.innerHeight;
-
-                          let left =
-                            rect.left + rect.width / 2 - MENU_W / 2;
-
-                          // Clamp horizontal position
-                          left = Math.max(
-                            MARGIN,
-                            Math.min(left, vw - MENU_W - MARGIN),
-                          );
-
-                          let top = rect.bottom + 8;
-                          // If menu would go off bottom, flip to above
-                          if (top + MENU_H > vh - MARGIN) {
-                            top = rect.top - MENU_H - 8;
-                          }
-
-                          return { id: t.id, top, left };
-                        });
-                      }}
-                      hiddenWhileDragging={activeDragId === t.id}
-                      isRepeating={t.type === 'weekly'}
-                      touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
-                      isAnyDragging={!!activeDragId}
-                      onGrab={(payload) => {
-                        // Same grab logic
-                        const resolvedTags = t.tags?.map((tagId) => {
-                          const found = userTags?.find(
-                            (ut) => ut.id === tagId || ut.name === tagId,
-                          );
-                          return (
-                            found || { id: tagId, name: tagId, color: '' }
-                          );
-                        });
-                        onGrab({
-                          day: backlogDayIndex,
-                          index: originalIndex,
-                          taskId: t.id,
-                          taskText: t.text,
-                          taskType: t.type,
-                          clientX: payload.clientX,
-                          clientY: payload.clientY,
-                          pointerType: payload.pointerType,
-                          rectGetter: () => {
-                            const id = draggableIdFor(backlogDayIndex as any, t.id);
-                            const el = document.querySelector(
-                              `[data-card-id="${id}"]`,
-                            );
-                            return (
-                              el?.getBoundingClientRect() ??
-                              new DOMRect(0, 0, 0, 0)
-                            );
-                          },
-                          tags: resolvedTags,
-                          calendarEventId: t.calendarEventId,
-                          startTime: t.startTime,
-                          endTime: t.endTime,
-                          reminder: t.reminder,
-                          notes: t.notes,
-                          checklist: t.checklist,
-                          frogodoroSession: t.frogodoroSession,
-                        });
-                      }}
-                      onDoToday={
-                        onDoToday ? () => onDoToday(t.id) : undefined
-                      }
-                      hideDoTodayButton={hideDoTodayButton}
-                      compact
-                    />
-                  </div>
-                </motion.div>
-              );
-            }),
-            ])
+                  <AnimatePresence initial={false}>
+                    {groupTasks.map((t) => {
+                      const originalIndex = tasks.findIndex((it) => it.id === t.id);
+                      const cardId = draggableIdFor(backlogDayIndex as any, t.id);
+                      return (
+                        <motion.div
+                          key={t.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                          transition={{ duration: 0.18 }}
+                          className="relative before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-10 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden"
+                          data-hint="saved-task-card"
+                        >
+                          <TaskCard
+                            innerRef={(el) => setCardRef(cardId, el)}
+                            dragId={cardId}
+                            task={t}
+                            userTags={userTags}
+                            menuOpen={menu?.id === t.id}
+                            onToggleMenu={() => {}}
+                            onTap={() => openMenuFor(t.id, cardId)}
+                            hiddenWhileDragging={activeDragId === t.id}
+                            isRepeating={t.type === 'weekly'}
+                            touchAction="auto"
+                            isAnyDragging={!!activeDragId}
+                            onGrab={(payload) => {
+                              const resolvedTags = t.tags?.map((tagId) => {
+                                const found = userTags?.find(
+                                  (ut) => ut.id === tagId || ut.name === tagId,
+                                );
+                                return (
+                                  found || { id: tagId, name: tagId, color: '' }
+                                );
+                              });
+                              onGrab({
+                                day: backlogDayIndex,
+                                index: originalIndex,
+                                taskId: t.id,
+                                taskText: t.text,
+                                taskType: t.type,
+                                clientX: payload.clientX,
+                                clientY: payload.clientY,
+                                pointerType: payload.pointerType,
+                                rectGetter: () => {
+                                  const el = document.querySelector(
+                                    `[data-card-id="${cardId}"]`,
+                                  );
+                                  return (
+                                    el?.getBoundingClientRect() ??
+                                    new DOMRect(0, 0, 0, 0)
+                                  );
+                                },
+                                tags: resolvedTags,
+                                calendarEventId: t.calendarEventId,
+                                startTime: t.startTime,
+                                endTime: t.endTime,
+                                reminder: t.reminder,
+                                notes: t.notes,
+                                checklist: t.checklist,
+                                frogodoroSession: t.frogodoroSession,
+                              });
+                            }}
+                            onDoToday={
+                              onDoToday ? () => onDoToday(t.id) : undefined
+                            }
+                            hideDoTodayButton={hideDoTodayButton}
+                            compact
+                          />
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </motion.div>
           )}
         </AnimatePresence>
       </SideOpenTray>

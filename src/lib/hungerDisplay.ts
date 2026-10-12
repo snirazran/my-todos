@@ -31,21 +31,21 @@ export type HungerState = {
 export function getHungerState(percent: number): HungerState {
   if (percent >= 97)
     return {
-      bg: 'bg-emerald-500',
-      text: 'text-emerald-600 dark:text-emerald-400',
+      bg: 'bg-primary',
+      text: 'text-primary',
       label: 'Full',
-      fill: 'bg-gradient-to-b from-emerald-400 to-emerald-500',
-      ghost: 'bg-emerald-300/60',
-      ring: 'ring-emerald-400/70',
+      fill: 'bg-gradient-to-b from-primary/80 to-primary',
+      ghost: 'bg-primary/30',
+      ring: 'ring-primary/60',
     };
   if (percent > 80)
     return {
-      bg: 'bg-emerald-500',
-      text: 'text-emerald-600 dark:text-emerald-400',
+      bg: 'bg-primary',
+      text: 'text-primary',
       label: 'Nearly full',
-      fill: 'bg-gradient-to-b from-emerald-400 to-emerald-500',
-      ghost: 'bg-emerald-300/60',
-      ring: 'ring-emerald-400/70',
+      fill: 'bg-gradient-to-b from-primary/80 to-primary',
+      ghost: 'bg-primary/30',
+      ring: 'ring-primary/60',
     };
   if (percent > 60)
     return {

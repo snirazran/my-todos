@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ChevronUp, ChevronDown, CalendarDays } from 'lucide-react';
-import { parseYmd, todayYmd, addDays } from './helpers';
+import { parseYmd } from './helpers';
 
 export default function PlannerHeader({
   dateKey,
@@ -44,37 +44,33 @@ export default function PlannerHeader({
     );
   }
 
-  const today = todayYmd();
-  const yesterday = addDays(today, -1);
-  const tomorrow = addDays(today, 1);
-  const d = parseYmd(dateKey);
-  const monthDay = d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
+  const monthLabel = parseYmd(dateKey).toLocaleString('en-US', {
+    month: 'long',
   });
-  const label =
-    dateKey === today
-      ? `Today, ${monthDay}`
-      : dateKey === yesterday
-        ? `Yesterday, ${monthDay}`
-        : dateKey === tomorrow
-          ? `Tomorrow, ${monthDay}`
-          : monthDay;
+  const yearLabel = parseYmd(dateKey).getFullYear();
 
   return (
     <button
       type="button"
       data-hint="planner-date"
       aria-expanded={expanded}
+      aria-label={expanded ? 'Close calendar' : `Open calendar, ${monthLabel} ${yearLabel}`}
       onClick={onToggle}
-      className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl text-foreground"
+      className="pointer-events-auto -ml-1 flex h-10 items-center gap-1.5 rounded-xl px-1 text-foreground transition-colors active:bg-muted/60"
     >
-      <span className="text-sm font-semibold tracking-tight leading-none">{label}</span>
-      {expanded ? (
-        <ChevronUp size={16} className="opacity-70" />
-      ) : (
-        <ChevronDown size={16} className="opacity-70" />
-      )}
+      <span className="text-[22px] font-black leading-none tracking-tight">
+        {monthLabel}
+      </span>
+      <span className="text-[22px] font-black leading-none tracking-tight text-muted-foreground/50">
+        {yearLabel}
+      </span>
+      <ChevronDown
+        size={18}
+        strokeWidth={2.75}
+        className={`ml-0.5 text-muted-foreground transition-transform duration-200 ${
+          expanded ? 'rotate-180' : ''
+        }`}
+      />
     </button>
   );
 }

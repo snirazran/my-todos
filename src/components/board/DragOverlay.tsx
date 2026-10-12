@@ -1,8 +1,10 @@
 'use client';
 import { motion } from 'framer-motion';
+import { CheckCircle2 } from 'lucide-react';
+import { TaskTrailingMeta } from '@/components/ui/TaskMeta';
+import { StepPips } from '@/components/ui/TaskAdornments';
+import { ChecklistCheckbox } from './ChecklistEditor';
 import Fly from '@/components/ui/fly';
-import { EllipsisVertical } from 'lucide-react';
-import { TaskMeta } from '@/components/ui/TaskMeta';
 
 export default function DragOverlay({
   x,
@@ -14,14 +16,10 @@ export default function DragOverlay({
   innerRef,
   text,
   tags,
-  taskType,
-  calendarEventId,
   startTime,
   endTime,
   reminder,
-  notes,
   checklist,
-  frogodoroSession,
   bundleCount = 1,
   compact = false,
 }: {
@@ -31,7 +29,6 @@ export default function DragOverlay({
   dy: number;
   width: number;
   height: number;
-  /** Registers the positioned root so the drag loop can move it directly. */
   innerRef?: (el: HTMLDivElement | null) => void;
   text: string;
   tags?: { id: string; name: string; color: string }[];
@@ -43,15 +40,19 @@ export default function DragOverlay({
   notes?: string;
   checklist?: { id: string; text: string; done: boolean }[];
   frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
-  /** Cards travelling together — >1 fans a stack out behind the lead card. */
   bundleCount?: number;
   compact?: boolean;
 }) {
   const stacked = Math.min(Math.max(bundleCount - 1, 0), 3);
+  const steps = checklist ?? [];
+  const stepsDone = steps.filter((step) => step.done).length;
+  const nextStep = steps.find((step) => !step.done);
+  const tag = tags?.find((t) => !!t.color);
+
   return (
     <div
       ref={innerRef}
-      className="fixed left-0 top-0 z-[100] pointer-events-none"
+      className="pointer-events-none fixed left-0 top-0 z-[100]"
       style={{
         transform: `translate3d(${x - dx}px, ${y - dy}px, 0)`,
         width: `${width}px`,
@@ -64,107 +65,84 @@ export default function DragOverlay({
         transition={{ type: 'spring', stiffness: 520, damping: 34 }}
         style={{ transformOrigin: `${dx}px ${dy}px` }}
       >
-      {/* Cards behind the lead one — the iOS "flock" read: the pile you're
-          carrying is visible before you drop it. */}
-      {Array.from({ length: stacked }, (_, i) => stacked - i).map((depth) => (
-        <motion.div
-          key={depth}
-          initial={{ opacity: 0, y: 0, rotate: 0 }}
-          animate={{
-            opacity: 1,
-            y: -depth * 5,
-            x: depth * 3,
-            rotate: -2 + depth * 2.5,
-          }}
-          transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-          className="absolute inset-x-0 top-0 rounded-xl border border-border/50 bg-card shadow-[0_2px_6px_rgba(0,0,0,0.18)] dark:bg-muted"
-          style={{ height: height, zIndex: -depth }}
-        />
-      ))}
+        {Array.from({ length: stacked }, (_, i) => stacked - i).map((depth) => (
+          <motion.div
+            key={depth}
+            initial={{ opacity: 0, y: 0, rotate: 0 }}
+            animate={{
+              opacity: 1,
+              y: -depth * 5,
+              x: depth * 3,
+              rotate: -1.5 + depth * 2,
+            }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+            className="absolute inset-x-0 top-0 rounded-2xl bg-card shadow-[0_2px_6px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.06] dark:ring-white/10"
+            style={{ height, zIndex: -depth }}
+          />
+        ))}
 
-      {bundleCount > 1 && (
-        <motion.span
-          initial={{ scale: 0.6, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 24 }}
-          className="absolute -right-2 -top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-1.5 text-[13px] font-black tabular-nums text-primary-foreground shadow-md ring-2 ring-card"
-        >
-          {bundleCount}
-        </motion.span>
-      )}
+        {bundleCount > 1 && (
+          <motion.span
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 24 }}
+            className="absolute -right-2 -top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-1.5 text-[13px] font-black tabular-nums text-primary-foreground shadow-md ring-2 ring-card"
+          >
+            {bundleCount}
+          </motion.span>
+        )}
 
-      <motion.div
-        initial={{ scale: 0.98, rotate: 0 }}
-        animate={{ scale: 1.04, rotate: -2 }}
-        transition={{ type: 'spring', stiffness: 480, damping: 26 }}
-        className={[
-          'flex items-center gap-1.5 px-2.5 py-2 select-none rounded-xl',
-          // Lifted card, Trello-style: no outline, just a stronger two-layer
-          // shadow (tight contact shadow + soft ambient one) to read as
-          // "picked up" instead of a colored ring.
-          'bg-card dark:bg-muted',
-          'shadow-[0_2px_4px_rgba(0,0,0,0.14),0_18px_36px_rgba(0,0,0,0.20)]',
-          'dark:shadow-[0_2px_4px_rgba(0,0,0,0.45),0_18px_36px_rgba(0,0,0,0.55)]',
-        ].join(' ')}
-        style={{ minHeight: height }}
-      >
-        <span
-          aria-hidden
-          className="-ml-0.5 flex shrink-0 items-center justify-center self-stretch text-muted-foreground/30"
+        <div
+          data-drag-lift
+          data-tilt
+          className="relative flex select-none items-center gap-2.5 rounded-2xl bg-card py-3 pl-3.5 pr-2.5 ring-1 ring-black/[0.06] dark:ring-white/10 md:gap-2 md:py-2.5 md:pl-3 md:pr-2"
+          style={{ minHeight: height }}
         >
-          <EllipsisVertical className="h-4 w-4" />
-        </span>
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="text-sm font-semibold leading-snug text-foreground whitespace-pre-wrap break-words">
-            {text}
-          </div>
-          <TaskMeta
-            compact
-            className="mt-0.5"
+          {tag && (
+            <span
+              aria-hidden
+              className="absolute left-0 top-1/2 h-[24px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full opacity-90"
+              style={{ backgroundColor: tag.color }}
+            />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block break-words text-[16px] font-semibold leading-snug text-foreground md:text-[15px]">
+              {text}
+            </span>
+            {steps.length > 0 && (
+              <span className="mt-0.5 flex h-7 min-w-0 items-center gap-2">
+                <span className="flex w-[22px] shrink-0 justify-center">
+                  {nextStep ? (
+                    <ChecklistCheckbox
+                      size={18}
+                      checked={false}
+                      onToggle={() => {}}
+                      interactive={false}
+                    />
+                  ) : (
+                    <CheckCircle2 className="h-[18px] w-[18px] text-primary" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground/65 md:text-[13.5px]">
+                  {nextStep
+                    ? nextStep.text || 'Untitled step'
+                    : `All ${steps.length} steps done`}
+                </span>
+                <StepPips items={steps as never} done={stepsDone} />
+              </span>
+            )}
+          </span>
+          <TaskTrailingMeta
             startTime={startTime}
             endTime={endTime}
             reminder={reminder}
             tags={tags}
-            calendarEventId={calendarEventId}
-            hasNotes={!!notes?.trim()}
-            checklist={
-              checklist?.length
-                ? {
-                    done: checklist.filter((c) => c.done).length,
-                    total: checklist.length,
-                  }
-                : null
-            }
+            showTag={false}
           />
-          {frogodoroSession && ((frogodoroSession.focusTime ?? 0) > 0 || (frogodoroSession.breakTime ?? 0) > 0) && (() => {
-            const fmt = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; };
-            return (
-              <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                {(frogodoroSession.focusTime ?? 0) > 0 && (
-                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                    <span className="text-[12px] font-bold text-primary/60">Focus</span>
-                    <span className="text-[11px] font-black text-primary tabular-nums">{fmt(frogodoroSession.focusTime)}</span>
-                  </div>
-                )}
-                {(frogodoroSession.breakTime ?? 0) > 0 && (
-                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
-                    <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                    <span className="text-[12px] font-bold text-sky-500/60">Break</span>
-                    <span className="text-[11px] font-black text-sky-500 tabular-nums">{fmt(frogodoroSession.breakTime)}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-
-        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-muted-foreground/10 bg-muted">
-          <span style={{ transform: 'rotate(2deg)' }}>
-            <Fly size={36} y={-3} />
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] md:h-10 md:w-10">
+            <Fly size={36} y={-3} paused interactive={false} alwaysPlay />
           </span>
-        </span>
-      </motion.div>
+        </div>
       </motion.div>
     </div>
   );

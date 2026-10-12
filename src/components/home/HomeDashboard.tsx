@@ -107,10 +107,18 @@ const FLY_PX = 40;
 type HomeTab = 'all' | 'today';
 
 const demoTasks: Task[] = [
-  { id: 'g1', text: 'Take 10 slow breaths', completed: false, order: 1, startTime: '08:00', reminder: true, tags: ['t1'] } as any,
-  { id: 'g2', text: 'Morning run', completed: false, order: 2, startTime: '23:12', tags: ['t2', 't1'], streak: 4, repeatMode: 'daily', notes: '<p>asdasd</p><p>asdasd</p><p>asd</p><p>sadasdsad</p>', checklist: [{ id: 'c1', text: 'Stretch', done: true }, { id: 'c2', text: 'Run 3km', done: false }] } as any,
+  {
+    id: 'g6',
+    text: 'Check there is no monster under the bed',
+    completed: false,
+    order: 1,
+  },
+  { id: 'g1', text: 'Meditation', completed: true, order: 2 },
+  { id: 'g2', text: 'Read a book', completed: true, order: 3 },
+  { id: 'g3', text: 'Walk 5,000 steps', completed: true, order: 4 },
+  { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 5 },
+  { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
 ];
-const DEMO_TAGS = [{ id: 't1', name: 'Mindfulness', color: '#ec4899' }, { id: 't2', name: 'Fitness and health', color: '#22c55e' }];
 
 const HOME_FILTER_BASE = { showCompleted: false };
 
@@ -1194,7 +1202,7 @@ export default function HomeDashboard() {
                     duplicateTask(id, when);
                   }}
                   isGuest={!user}
-                  tags={user ? tags : (DEMO_TAGS as any)}
+                  tags={tags}
                   filters={filters}
                   onClearFilters={resetFilters}
                   filtersActive={filtersActive}
@@ -1494,12 +1502,12 @@ export default function HomeDashboard() {
 
       <div
         aria-hidden={fabsConcealed || guided || undefined}
-        className={`fixed right-4 z-[40] flex items-center gap-1 rounded-full bg-card/95 p-1 shadow-[0_10px_28px_-10px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/60 backdrop-blur-xl bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
+        className={`fixed right-4 z-[40] flex items-center gap-1 rounded-full bg-card/95 p-1 shadow-[0_4px_14px_-6px_rgba(15,23,42,0.3),0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-border/60 backdrop-blur-xl bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
           fabsConcealed || guided ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
         }`}
         style={
           {
-            '--fab-bottom': 'calc(env(safe-area-inset-bottom) + 88px)',
+            '--fab-bottom': 'calc(env(safe-area-inset-bottom) + 92px)',
             '--fab-bottom-md': 'calc(env(safe-area-inset-bottom) + 24px)',
             translate: `0 ${
               notificationStackHeight > 0 ? -(notificationStackHeight - 4) : 0

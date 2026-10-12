@@ -136,11 +136,26 @@ export const TOAST_SURFACE_STYLE = {
 
 const RESUME_FLOOR_MS = 1500;
 
-const TOAST_EASE_OUT = [0.22, 1, 0.36, 1] as const;
-const TOAST_EASE_IN = [0.4, 0, 1, 1] as const;
 const TOAST_RESTING = 'translateX(0%) translateY(0%) scale(1)';
-const TOAST_ENTER_FROM = 'translateX(0%) translateY(70%) scale(0.94)';
 const TOAST_EXIT_TO = 'translateX(0%) translateY(35%) scale(0.96)';
+const linearJs = (t: number) => t;
+function hideOnExit() {
+  let node: HTMLElement | null = null;
+  return {
+    ref: (el: HTMLElement | null) => {
+      node = el;
+    },
+    onComplete: (definition: unknown) => {
+      const exited =
+        definition === 'exit' ||
+        (typeof definition === 'object' &&
+          (definition as { opacity?: number } | null)?.opacity === 0);
+      if (exited && node) node.style.visibility = 'hidden';
+    },
+  };
+}
+const easeInJs = (t: number) => t * t * t;
+const easeOutJs = (t: number) => 1 - Math.pow(1 - t, 3);
 
 function SwipeableToast({
   disabled,
@@ -336,6 +351,7 @@ export function NotificationProvider({
   };
 
   const renderCard = (n: NotificationItem) => {
+        const exitGuard = hideOnExit();
         const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
         const isMovedToTodayToast = n.content === 'Moved to Today';
         const isDuplicateToast =
@@ -347,32 +363,34 @@ export function NotificationProvider({
         return (
           <motion.div
             key={n.id}
-            ref={measureSlot}
-            custom={swiped}
-            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: TOAST_ENTER_FROM }}
-            animate={{
-              opacity: 1,
-              transform: TOAST_RESTING,
-              transition: {
-                duration: 0.42,
-                ease: TOAST_EASE_OUT,
-                opacity: { duration: 0.2, ease: 'linear' },
-              },
+            ref={(el) => {
+              exitGuard.ref(el);
+              measureSlot(el);
             }}
+            onAnimationComplete={exitGuard.onComplete}
+            custom={swiped}
+            initial={false}
+            animate={{ opacity: 1, transform: TOAST_RESTING }}
             variants={{
               exit: (swipe: { id: number; dir: number } | null) =>
                 swipe?.id === n.id
                   ? {
                       opacity: 0,
                       transform: `translateX(${swipe.dir * 110}%) translateY(0%) scale(1)`,
-                      transition: { duration: 0.24, ease: TOAST_EASE_OUT },
+                      transition: { duration: 0.24, ease: easeOutJs },
+                      transitionEnd: { visibility: 'hidden' },
                     }
                   : reduceMotion
-                    ? { opacity: 0, transition: { duration: 0.15 } }
+                    ? {
+                        opacity: 0,
+                        transition: { duration: 0.15, ease: linearJs },
+                        transitionEnd: { visibility: 'hidden' },
+                      }
                     : {
                         opacity: 0,
                         transform: TOAST_EXIT_TO,
-                        transition: { duration: 0.18, ease: TOAST_EASE_IN },
+                        transition: { duration: 0.18, ease: easeInJs },
+                        transitionEnd: { visibility: 'hidden' },
                       },
             }}
             exit="exit"
@@ -390,8 +408,9 @@ export function NotificationProvider({
                 setHovered(true);
             }}
             onBlurCapture={() => setHovered(false)}
-            style={{ willChange: 'transform, opacity' }}
-            className="pointer-events-auto absolute inset-x-0 bottom-0"
+            className={`pointer-events-auto absolute inset-x-0 bottom-0 ${
+              reduceMotion ? 'toast-enter-fade' : 'toast-enter'
+            }`}
           >
           <SwipeableToast
             disabled={isUndoing}
@@ -481,26 +500,25 @@ export function NotificationProvider({
         );
   };
 
+  const hintGuard = hideOnExit();
   const renderHint = (hint: React.ReactNode) => (
     <motion.div
       key="slot-hint"
-      ref={measureSlot}
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: TOAST_ENTER_FROM }}
-      animate={{
-        opacity: 1,
-        transform: TOAST_RESTING,
-        transition: {
-          duration: 0.42,
-          ease: TOAST_EASE_OUT,
-          opacity: { duration: 0.2, ease: 'linear' },
-        },
+      ref={(el) => {
+        hintGuard.ref(el);
+        measureSlot(el);
       }}
+      onAnimationComplete={hintGuard.onComplete}
+      initial={false}
+      animate={{ opacity: 1, transform: TOAST_RESTING }}
       exit={{
         opacity: 0,
-        transition: { duration: 0.16, ease: 'linear' },
+        transition: { duration: 0.16, ease: linearJs },
+        transitionEnd: { visibility: 'hidden' },
       }}
-      style={{ willChange: 'transform, opacity' }}
-      className="pointer-events-none absolute inset-x-0 bottom-0"
+      className={`pointer-events-none absolute inset-x-0 bottom-0 ${
+        reduceMotion ? 'toast-enter-fade' : 'toast-enter'
+      }`}
     >
       <div
         style={TOAST_SURFACE_STYLE}

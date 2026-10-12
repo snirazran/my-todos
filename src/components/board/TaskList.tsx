@@ -1,9 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
-import { motion } from 'framer-motion';
 import TaskCard, { type SelectModifiers } from './TaskCard';
 import TaskMenu from './TaskMenu';
 import TaskDetailSheet from './TaskDetailSheet';
@@ -27,7 +25,7 @@ import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import Fly from '@/components/ui/fly';
-import { Plus, LayoutList, ListTodo, Repeat, CalendarClock } from 'lucide-react';
+import { Plus, CalendarClock } from 'lucide-react';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
@@ -37,6 +35,7 @@ import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useLeftTongue } from './LeftTongue';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import { cn } from '@/lib/utils';
 import {
   matchesTaskFilters,
   sortTasks,
@@ -44,11 +43,10 @@ import {
 } from '@/lib/taskFilters';
 import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
 
-// Hoisted so the motion wrapper gets a stable transition reference (a new
-// object each render would make framer reconfigure the animation every time).
-const LAYOUT_TRANSITION = {
-  layout: { type: 'spring', stiffness: 500, damping: 40 },
-} as const;
+const ROW_DIVIDER =
+  'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-10 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden md:before:ml-3';
+const DRAG_SHIFT_TRANSITION = 'transform 200ms cubic-bezier(0.2, 0, 0, 1)';
+const FLIP_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
 export default React.memo(function TaskList({
   day,
@@ -201,19 +199,49 @@ export default React.memo(function TaskList({
     run: (scope: 'one' | 'all') => void;
   } | null>(null);
 
-  // Hold content-visibility off for a beat after a drag ends so re-enabling
-  // it (a full-column style recalc) doesn't land on the same frame as the
-  // drop commit and its layout animations.
-  const [dragHold, setDragHold] = useState(false);
+  const [dragSession, setDragSession] = useState<{ items: Task[] } | null>(
+    null,
+  );
+  const [settleBack, setSettleBack] = useState(false);
+  if (isDragging && !dragSession) setDragSession({ items });
+  if (!isDragging && dragSession) {
+    setDragSession(null);
+    setSettleBack(dragSession.items === items);
+  }
   useEffect(() => {
-    if (isAnyDragging) {
-      setDragHold(true);
+    if (!settleBack) return;
+    const id = window.setTimeout(() => setSettleBack(false), 260);
+    return () => window.clearTimeout(id);
+  }, [settleBack]);
+
+  const rowElsRef = useRef(new Map<string, HTMLDivElement>());
+  const lastTopsRef = useRef(new Map<string, number>());
+  const wasDraggingRef = useRef(false);
+  useLayoutEffect(() => {
+    if (isDragging) {
+      wasDraggingRef.current = true;
       return;
     }
-    const id = window.setTimeout(() => setDragHold(false), 300);
-    return () => window.clearTimeout(id);
-  }, [isAnyDragging]);
-  const measurable = isAnyDragging || dragHold;
+    const animate =
+      !wasDraggingRef.current &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    wasDraggingRef.current = false;
+    const next = new Map<string, number>();
+    rowElsRef.current.forEach((el, id) => {
+      const top = el.offsetTop;
+      next.set(id, top);
+      const prev = lastTopsRef.current.get(id);
+      if (!animate || prev === undefined || Math.abs(prev - top) < 1) return;
+      el.animate(
+        [
+          { transform: `translate3d(0, ${prev - top}px, 0)` },
+          { transform: 'translate3d(0, 0, 0)' },
+        ],
+        { duration: 280, easing: FLIP_EASING },
+      );
+    });
+    lastTopsRef.current = next;
+  });
 
   const tz =
     typeof window !== 'undefined'
@@ -593,15 +621,7 @@ export default React.memo(function TaskList({
   }
 
   const rows: React.ReactNode[] = [];
-
-  const renderPlaceholder = (k: string) => (
-    <div
-      key={k}
-      data-drop-placeholder
-      style={dragHeight ? { height: dragHeight } : undefined}
-      className="h-[56px] mb-1"
-    />
-  );
+  const shiftHeight = dragHeight ?? 64;
 
   const inGrace = (id: string) => !!gracePeriodIds?.has(id);
 
@@ -613,191 +633,227 @@ export default React.memo(function TaskList({
     filters.sort,
     (userTags ?? []).map((t) => t.id),
   );
-  // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
-  if (filteredItems.length === 0) {
-    if (placeholderAt === 0) {
-      rows.push(renderPlaceholder(`ph-empty-${day}`));
-    } else if (hiddenIds?.size && items.length > 0) {
-      // Every card here is currently in the air as part of a multi-card drag —
-      // show nothing rather than flashing the "Add a task" empty state.
-      return null;
-    } else if (filtersActive && items.length > 0) {
-      rows.push(
-        <FilteredEmptyState
-          key={`empty-filtered-${day}`}
-          hidden={items.length}
-          onClearAll={() => onClearFilters?.()}
-          compact
-        />,
-      );
-    } else if (emptyMode === 'none') {
-      rows.push(
-        <div
-          key={`empty-none-${day}`}
-          className="flex items-center justify-center w-full py-4 text-center rounded-xl border border-dashed border-muted-foreground/20 bg-muted/20"
-        >
-          <p className="text-xs font-medium text-muted-foreground/80">
-            No activities for this day
-          </p>
-        </div>,
-      );
-    } else {
-      // THEMED EMPTY STATE / ADD BUTTON
-      rows.push(
-        <button
-          key={`empty-state-${day}`}
-          onClick={() => onAddRequested('')}
-          className="flex flex-col items-center justify-center w-full py-3 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
-        >
-          <div className="flex items-center justify-center w-11 h-11 mb-1.5 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-            <Fly size={36} y={-3} />
-          </div>
-          <p className="text-xs font-bold transition-colors text-muted-foreground group-hover:text-primary">
-            Add a task
-          </p>
-        </button>,
+
+  const isPastColumn = !!dateKey && !isToday && !isFuture;
+  const toggleChecklistItem = (t: Task, itemId: string) => {
+    if (!t.checklist) return;
+    const next = t.checklist.map((it) =>
+      it.id === itemId ? { ...it, done: !it.done } : it,
+    );
+    const wasComplete = t.checklist.every((it) => it.done);
+    if (next.every((it) => it.done) && !wasComplete) hapticSuccess();
+    else hapticTick();
+    onPatchTask?.(t.id, { checklist: next }, 'one', undefined, dateKey);
+    fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskId: t.id,
+        details: { checklist: next },
+        date: dateKey ?? todayYmdStr(),
+        timezone: tz,
+      }),
+    }).then(refresh);
+  };
+
+  const others = filteredItems.filter(
+    (t) => !(isSelfDrag && sourceIndex === items.indexOf(t)),
+  );
+  const dragPos = (() => {
+    if (!isSelfDrag || sourceIndex == null) return null;
+    const i = filteredItems.findIndex((t) => items.indexOf(t) === sourceIndex);
+    return i === -1 ? null : i;
+  })();
+  const collapse = (k: number) =>
+    dragPos != null && k >= dragPos ? shiftHeight : 0;
+  const shiftFor = (k: number) =>
+    -collapse(k) + (placeholderAt != null && k >= placeholderAt ? shiftHeight : 0);
+
+  const slotTop = (() => {
+    if (placeholderAt == null || others.length === 0) return 0;
+    const at = Math.min(placeholderAt, others.length);
+    const ref = at < others.length ? others[at] : others[others.length - 1];
+    const el = rowElsRef.current.get(ref.id);
+    if (!el) return 0;
+    const k = at < others.length ? at : others.length - 1;
+    const top = el.offsetTop - collapse(k);
+    return at < others.length ? top : top + el.offsetHeight;
+  })();
+
+  const renderSlot = () => (
+    <div
+      key={`slot-${day}`}
+      data-drop-placeholder
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 z-0 bg-muted/60"
+      style={{
+        height: shiftHeight,
+        transform: `translate3d(0, ${slotTop}px, 0)`,
+        transition: DRAG_SHIFT_TRANSITION,
+      }}
+    />
+  );
+
+  if (filteredItems.length === 0 || (others.length === 0 && !isSelfDrag)) {
+    if (placeholderAt != null) {
+      return (
+        <>
+          {renderSlot()}
+          <div aria-hidden style={{ height: shiftHeight }} />
+        </>
       );
     }
-    return <>{rows}</>;
+    if (hiddenIds?.size && items.length > 0) {
+      return null;
+    }
+    if (filtersActive && items.length > 0) {
+      return (
+        <div className="px-2 py-3">
+          <FilteredEmptyState
+            hidden={items.length}
+            onClearAll={() => onClearFilters?.()}
+            compact
+          />
+        </div>
+      );
+    }
+    if (emptyMode === 'none') {
+      return (
+        <p className="px-3.5 py-4 text-[13px] font-semibold text-muted-foreground/60 md:px-3">
+          Nothing planned
+        </p>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => onAddRequested('')}
+        className="group flex w-full items-center gap-2.5 py-2.5 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 md:gap-2 md:pl-3 md:pr-2 [@media(hover:hover)]:hover:bg-muted/40"
+      >
+        <span className="min-w-0 flex-1 text-[15px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
+          {isToday ? 'Add a task for today' : 'Plan something'}
+        </span>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary md:h-10 md:w-10">
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </span>
+      </button>
+    );
   }
 
-  // ---- Non-empty list
-  // If inserting at the very start
-  if (placeholderAt === 0) {
-    rows.push(renderPlaceholder(`ph-top-${day}`));
-  }
-
-  let visibleIndex = 0;
-
+  let k = 0;
   for (const t of filteredItems) {
     const sourceIdx = items.indexOf(t);
     const isDraggedHere = isSelfDrag && sourceIndex === sourceIdx;
+    const shift = isDragging && !isDraggedHere ? shiftFor(k) : 0;
+    const visuallyFirst =
+      isDragging && !isDraggedHere && k === 0 && placeholderAt !== 0;
+    const id = draggableIdFor(day, t.id);
 
-    if (!isDraggedHere) {
-      const cardKey = `card-${day}-${t.id}`;
-      const wrapKey = `wrap-${day}-${t.id}`;
-      const afterKey = `ph-${day}-${visibleIndex + 1}`;
-      // The card's visual slot including the placeholder — stable for every
-      // card the placeholder doesn't displace, so framer only re-measures the
-      // cards that actually move.
-      const slot =
-        placeholderAt != null && placeholderAt <= visibleIndex
-          ? visibleIndex + 1
-          : visibleIndex;
+    rows.push(
+      <div
+        key={`wrap-${day}-${t.id}`}
+        ref={(el) => {
+          if (el) rowElsRef.current.set(t.id, el);
+          else rowElsRef.current.delete(t.id);
+        }}
+        data-row
+        data-drag-source={isDraggedHere ? 'true' : undefined}
+        className={cn(
+          'relative z-[1]',
+          ROW_DIVIDER,
+          isDraggedHere && 'pointer-events-none opacity-0',
+          visuallyFirst && 'before:hidden',
+        )}
+        style={
+          isDragging || settleBack
+            ? {
+                transform: shift ? `translate3d(0, ${shift}px, 0)` : undefined,
+                transition: DRAG_SHIFT_TRANSITION,
+              }
+            : undefined
+        }
+      >
+        <TaskCard
+          innerRef={(el) => setCardRef(id, el)}
+          dragId={id}
+          task={t}
+          occurrenceDate={dateKey ?? todayYmdStr()}
+          menuOpen={menu?.id === t.id}
+          onToggleMenu={() => {}}
+          onGrab={(payload) => {
+            const resolvedTags = t.tags?.map((tagId) => {
+              const found = userTags?.find(
+                (ut) => ut.id === tagId || ut.name === tagId,
+              );
+              return found || { id: tagId, name: tagId, color: '' };
+            });
 
-      rows.push(
-        <motion.div
-          key={wrapKey}
-          layout="position"
-          layoutDependency={slot}
-          initial={false}
-          transition={LAYOUT_TRANSITION}
-          className={
-            // content-visibility lets long columns skip rendering offscreen
-            // cards while scrolling (the p-1/-m-1 pair gives shadows ink room
-            // inside the containment box). Disabled during drags (and briefly
-            // after the drop) so framer can measure cards for the reorder
-            // animations without the re-enable recalc hitting the drop frame.
-            measurable
-              ? 'relative -m-1 p-1 [contain-intrinsic-size:auto_60px]'
-              : 'relative -m-1 p-1 [content-visibility:auto] [contain-intrinsic-size:auto_60px]'
-          }
-        >
-          <TaskCard
-            key={cardKey}
-            innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
-            dragId={draggableIdFor(day, t.id)}
-            task={t}
-            occurrenceDate={dateKey ?? todayYmdStr()}
-            menuOpen={menu?.id === t.id}
-            onToggleMenu={(rect) => {
-              setMenu((prev) => {
-                if (prev?.id === t.id) return null;
-                const MENU_W = 160; // Updated width to match TaskMenu min-w
-                const MENU_H = 60;
-                const GAP = 8;
-                const MARGIN = 10;
-                const vw =
-                  typeof window !== 'undefined' ? window.innerWidth : 480;
-                const vh =
-                  typeof window !== 'undefined' ? window.innerHeight : 800;
-                let left = rect.left + rect.width / 2 - MENU_W / 2;
-                left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-                let top = rect.bottom + GAP;
-                if (top + MENU_H > vh - MARGIN) {
-                  top = rect.top - MENU_H - GAP;
-                }
-                top = Math.max(MARGIN, Math.min(top, vh - MENU_H - MARGIN));
-                return { id: t.id, top, left };
-              });
-            }}
-            onGrab={(payload) => {
-              const id = draggableIdFor(day, t.id);
-              // Resolve tags
-              const resolvedTags = t.tags?.map((tagId) => {
-                const found = userTags?.find(
-                  (ut) => ut.id === tagId || ut.name === tagId,
+            onGrab({
+              day,
+              index: sourceIdx,
+              taskId: t.id,
+              taskText: t.text,
+              taskType: t.type,
+              clientX: payload.clientX,
+              clientY: payload.clientY,
+              pointerType: payload.pointerType,
+              rectGetter: () => {
+                const el =
+                  document.querySelector<HTMLElement>(
+                    `[data-card-id="${id}"]`,
+                  ) ?? null;
+                return (
+                  el?.getBoundingClientRect() ??
+                  new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1)
                 );
-                return found || { id: tagId, name: tagId, color: '' };
-              });
+              },
+              tags: resolvedTags,
+              calendarEventId: t.calendarEventId,
+              startTime: t.startTime,
+              endTime: t.endTime,
+              reminder: t.reminder,
+              notes: t.notes,
+              checklist: t.checklist,
+              frogodoroSession: t.frogodoroSession,
+            });
+          }}
+          isRepeating={t.type === 'weekly'}
+          userTags={userTags}
+          isAnyDragging={isAnyDragging}
+          compact
+          onTap={() => setActionSheetId(t.id)}
+          onToggleComplete={() => handleToggleComplete(t)}
+          onToggleChecklistItem={
+            t.completed || isFuture
+              ? undefined
+              : (itemId) => toggleChecklistItem(t, itemId)
+          }
+          disableDrag={disableDrag}
+          isPast={isPastColumn}
+          showStreak
+          isToday={isToday}
+          flyPaused={!isToday}
+          selectionMode={!!selection?.active}
+          selected={!!selection?.isSelected(t.id)}
+          selectable={!!selection}
+          onSelectToggle={
+            selection
+              ? (mods) => selection.toggle(t, mods, filteredItems)
+              : undefined
+          }
+        />
+      </div>,
+    );
 
-              onGrab({
-                day,
-                index: sourceIdx, // original array index
-                taskId: t.id,
-                taskText: t.text,
-                taskType: t.type,
-                clientX: payload.clientX,
-                clientY: payload.clientY,
-                pointerType: payload.pointerType,
-                rectGetter: () => {
-                  const el =
-                    document.querySelector<HTMLElement>(
-                      `[data-card-id="${id}"]`,
-                    ) ?? null;
-                  return (
-                    el?.getBoundingClientRect() ??
-                    new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1)
-                  );
-                },
-                tags: resolvedTags,
-                calendarEventId: t.calendarEventId,
-                startTime: t.startTime,
-                endTime: t.endTime,
-                reminder: t.reminder,
-                notes: t.notes,
-                checklist: t.checklist,
-                frogodoroSession: t.frogodoroSession,
-              });
-            }}
-            hiddenWhileDragging={false}
-            isRepeating={t.type === 'weekly'}
-            userTags={userTags}
-            isAnyDragging={isAnyDragging}
-            compact
-            onTap={() => setActionSheetId(t.id)}
-            onToggleComplete={() => handleToggleComplete(t)}
-            disableDrag={disableDrag}
-            isPast={!!dateKey && !isToday && !isFuture}
-            showStreak
-            isToday={isToday}
-            selectionMode={!!selection?.active}
-            selected={!!selection?.isSelected(t.id)}
-            selectable={!!selection}
-            onSelectToggle={
-              selection
-                ? (mods) => selection.toggle(t, mods, filteredItems)
-                : undefined
-            }
-          />
-        </motion.div>,
+    if (!isDraggedHere) k++;
+  }
+
+  if (placeholderAt != null) {
+    rows.push(renderSlot());
+    if (!isSelfDrag) {
+      rows.push(
+        <div key={`spacer-${day}`} aria-hidden style={{ height: shiftHeight }} />,
       );
-
-      if (placeholderAt === visibleIndex + 1) {
-        rows.push(renderPlaceholder(afterKey));
-      }
-
-      visibleIndex++;
     }
   }
 

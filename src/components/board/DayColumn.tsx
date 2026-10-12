@@ -1,26 +1,86 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Icon } from '@/components/ui/Icon';
+import { addDays, parseYmd, todayYmd } from './helpers';
+
+type DayLabel = { name: string; date: string | null };
+
+function labelFor(title: string, dateKey?: string, longNames = true): DayLabel {
+  if (dateKey) {
+    const today = todayYmd();
+    const d = parseYmd(dateKey);
+    const date = d.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+    const weekday = d.toLocaleString('en-US', {
+      weekday: longNames ? 'long' : 'short',
+    });
+    const relativeDate = longNames ? `${weekday.slice(0, 3)}, ${date}` : date;
+    if (dateKey === today) return { name: 'Today', date: relativeDate };
+    if (dateKey === addDays(today, 1)) return { name: 'Tomorrow', date: relativeDate };
+    if (dateKey === addDays(today, -1)) return { name: 'Yesterday', date: relativeDate };
+    return { name: weekday, date };
+  }
+  const match = title.match(/^(.*) (\d+\/\d+)$/);
+  return match ? { name: match[1], date: match[2] } : { name: title, date: null };
+}
+
+function DayHeading({
+  label,
+  isToday,
+  isPast,
+  status,
+}: {
+  label: DayLabel;
+  isToday: boolean;
+  isPast: boolean;
+  status?: React.ReactNode;
+}) {
+  return (
+    <h2 className="flex min-w-0 items-baseline gap-2">
+      <span
+        className={`shrink-0 text-[18px] font-black leading-none tracking-tight ${
+          isToday
+            ? 'text-primary'
+            : isPast
+              ? 'text-muted-foreground/70'
+              : 'text-foreground'
+        }`}
+      >
+        {label.name}
+      </span>
+      {(label.date || status) && (
+        <span
+          className={`min-w-0 truncate text-[13px] font-bold tabular-nums leading-none ${
+            isPast ? 'text-muted-foreground/50' : 'text-muted-foreground'
+          }`}
+        >
+          {label.date}
+          {label.date && status ? ' · ' : null}
+          {status}
+        </span>
+      )}
+    </h2>
+  );
+}
 
 export default function DayColumn({
   title,
+  dateKey,
   count,
   totalCount,
   listRef,
   children,
   footer,
-  maxHeightClass = 'max-h-[65svh] md:max-h-[74svh]', // ⬅ default shorter on mobile
-  /** Set true when a composer is open in this column to make it a bit shorter */
+  maxHeightClass = 'max-h-[65svh] md:max-h-[74svh]',
   compact = false,
   isToday = false,
   isPast = false,
   headerAction,
   note,
   disableVerticalScroll = false,
+  longNames = true,
 }: {
   title: string;
+  dateKey?: string;
   count?: number;
   totalCount?: number;
   listRef: (el: HTMLDivElement | null) => void;
@@ -30,149 +90,103 @@ export default function DayColumn({
   compact?: boolean;
   isToday?: boolean;
   isPast?: boolean;
-  /** Rendered at the header's trailing edge — the column's own controls. */
   headerAction?: React.ReactNode;
-  /** Rides beside the task count — e.g. how much a filter is hiding. */
   note?: React.ReactNode;
-  /** Keep the task surface fully expanded instead of making it its own scroller. */
   disableVerticalScroll?: boolean;
+  longNames?: boolean;
 }) {
   const appliedMax = compact
     ? 'max-h-[60svh] md:max-h-[70svh]'
     : maxHeightClass;
+  const label = labelFor(title, dateKey, longNames);
 
-  // Split "Sunday 7/12" into name and date
-  const match = title.match(/^(.*) (\d+\/\d+)$/);
-  const displayName = match ? match[1] : title;
-  const displayDate = match ? match[2] : null;
+  const open = count ?? 0;
+  const total = totalCount ?? count ?? 0;
+  const status =
+    total === 0 ? null : isPast ? (
+      open === 0 ? (
+        'All done'
+      ) : (
+        `${total - open}/${total} done`
+      )
+    ) : open === 0 ? (
+      <span className="text-primary">All done</span>
+    ) : (
+      `${open} left`
+    );
 
   return (
     <section
       className={[
-        'group relative flex flex-col overflow-visible',
-        'rounded-[20px]',
-        // Recessed list surface, distinct from the cards sitting on top of
-        // it (Trello-style layering) — a soft grey in light mode, dropping
-        // to the page's own near-black in dark mode so the (lighter) cards
-        // clearly pop off it instead of blending in.
-        isPast ? 'bg-muted/40 dark:bg-background/60' : 'bg-muted/70 dark:bg-background',
-        'border border-border/50 shadow-sm',
+        'relative flex flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
+        isPast ? 'dark:bg-card/70' : '',
         appliedMax,
-        'p-2',
-        'min-h-[100px]',
-        'transition-colors duration-300',
       ].join(' ')}
     >
-      <div className="flex flex-col gap-2 px-1 mb-2 pt-1">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-baseline gap-2">
-            {displayDate && (
-              <span
-                className={`text-2xl font-black tracking-tight leading-none ${
-                  isToday
-                    ? 'text-primary'
-                    : isPast
-                      ? 'text-muted-foreground/70'
-                      : 'text-foreground'
-                }`}
-              >
-                {displayDate}
-              </span>
-            )}
-            {isToday ? (
-              <span className="relative z-0 px-1.5 py-0.5 rounded-md text-[13px] font-bold tracking-wide bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary">
-                {displayName}
-              </span>
-            ) : (
-              <span
-                className={`text-[13px] font-bold tracking-wide ${
- isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
- }`}
-              >
-                {displayName}
-              </span>
-            )}
-          </h2>
-
-          {headerAction ? (
-            <div className="relative -mr-1 flex items-center gap-1">{headerAction}</div>
-          ) : null}
-        </div>
-
-        {(count !== undefined || note) && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 -mt-1">
-            {count !== undefined && (
-              <span className="flex items-center gap-1.5">
-                <Icon name="planner" className="-my-1 h-5 w-5 shrink-0" />
-                <span
-                  className={`text-xs font-bold ${
-                    isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
-                  }`}
-                >
-                  {totalCount !== undefined && count !== totalCount
-                    ? `${count} left · ${totalCount} total`
-                    : `${count} ${count === 1 ? 'task' : 'tasks'}`}
-                </span>
-              </span>
-            )}
-            {note}
+      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-border/60 py-1.5 pl-3.5 pr-1.5 md:pl-3">
+        <DayHeading
+          label={label}
+          isToday={isToday}
+          isPast={isPast}
+          status={status}
+        />
+        {headerAction ? (
+          <div className="relative flex shrink-0 items-center gap-0.5">
+            {headerAction}
           </div>
-        )}
+        ) : null}
       </div>
 
-      <motion.div
-        layoutScroll
+      {note ? (
+        <div className="shrink-0 border-b border-border/60 px-3.5 py-1.5 md:px-3">
+          {note}
+        </div>
+      ) : null}
+
+      <div
         ref={listRef}
         className={[
-          'flex-1 px-0.5 pt-1 overflow-x-hidden transition-colors rounded-xl',
+          'relative flex-1 overflow-x-hidden',
           disableVerticalScroll
             ? 'overflow-y-visible touch-pan-y'
             : 'overflow-y-auto no-scrollbar touch-pan-y overscroll-y-contain',
-          'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >
         {children}
-      </motion.div>
+      </div>
 
-      {footer ? <div className="shrink-0">{footer}</div> : null}
+      {footer ? (
+        <div className="shrink-0 border-t border-border/60">{footer}</div>
+      ) : null}
     </section>
   );
 }
 
 export function DayColumnShell({
   title,
+  dateKey,
   isToday = false,
   isPast = false,
+  longNames = true,
 }: {
   title: string;
+  dateKey?: string;
   isToday?: boolean;
   isPast?: boolean;
+  longNames?: boolean;
 }) {
-  const match = title.match(/^(.*) (\d+\/\d+)$/);
-  const displayName = match ? match[1] : title;
-  const displayDate = match ? match[2] : null;
   return (
     <section
       aria-hidden
-      className={[
-        'flex min-h-[200px] flex-col rounded-[20px] border border-border/50 p-3 shadow-sm',
-        isPast ? 'bg-muted/40 dark:bg-background/60' : 'bg-muted/70 dark:bg-background',
-      ].join(' ')}
+      className="flex min-h-[200px] flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
     >
-      <h2 className="flex items-baseline gap-2 px-1 pt-1">
-        {displayDate && (
-          <span
-            className={`text-2xl font-black tracking-tight leading-none ${
-              isToday ? 'text-primary' : isPast ? 'text-muted-foreground/70' : 'text-foreground'
-            }`}
-          >
-            {displayDate}
-          </span>
-        )}
-        <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-          {displayName}
-        </span>
-      </h2>
+      <div className="flex min-h-[52px] items-center border-b border-border/60 pl-3.5 md:pl-3">
+        <DayHeading
+          label={labelFor(title, dateKey, longNames)}
+          isToday={isToday}
+          isPast={isPast}
+        />
+      </div>
     </section>
   );
 }

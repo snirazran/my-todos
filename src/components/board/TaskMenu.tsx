@@ -7,7 +7,13 @@ import { Trash2, Pencil, CalendarCheck, Check, Bell, ListChecks } from 'lucide-r
 import { Icon } from '@/components/ui/Icon';
 
 interface TaskMenuProps {
-  menu: { id: string; top: number; left: number } | null;
+  menu: {
+    id: string;
+    top: number;
+    left: number;
+    anchorTop?: number;
+    anchorBottom?: number;
+  } | null;
   onClose: () => void;
   onDelete?: () => void;
   onDoLater?: () => void;
@@ -73,7 +79,12 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const left = Math.max(margin, Math.min(menu.left, vw - w - margin));
-    const top = Math.max(margin, Math.min(menu.top, vh - h - margin));
+    let wanted = menu.top;
+    if (menu.anchorTop !== undefined && menu.anchorBottom !== undefined) {
+      const below = menu.anchorBottom + 6;
+      wanted = below + h <= vh - margin ? below : menu.anchorTop - h - 6;
+    }
+    const top = Math.max(margin, Math.min(wanted, vh - h - margin));
     setPos({ top, left });
   }, [menu]);
 

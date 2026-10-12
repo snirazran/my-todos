@@ -1,14 +1,26 @@
 import { Flame } from 'lucide-react';
 import type { ChecklistItem } from '@/lib/checklist';
 
-export function StreakPill({ count }: { count: number }) {
+export function StreakPill({
+  count,
+  size = 'md',
+}: {
+  count: number;
+  size?: 'md' | 'sm';
+}) {
   return (
     <span
       aria-label={`${count} in a row`}
       title={`${count} in a row`}
-      className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-black tabular-nums leading-none text-orange-500 dark:text-orange-400"
+      className={`inline-flex shrink-0 items-center gap-0.5 font-black tabular-nums leading-none text-orange-500 dark:text-orange-400 ${
+        size === 'sm' ? 'text-[13px]' : 'text-[14px]'
+      }`}
     >
-      <Flame className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+      <Flame
+        className={size === 'sm' ? 'h-4 w-4' : 'h-[18px] w-[18px]'}
+        fill="currentColor"
+        strokeWidth={0}
+      />
       {count}
     </span>
   );
@@ -47,4 +59,12 @@ export function StepPips({ items, done }: { items: ChecklistItem[]; done: number
       ))}
     </span>
   );
+}
+
+export function formatFocusSpan(seconds: number) {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 1) return `${Math.max(1, Math.round(seconds))}s`;
+  if (minutes < 60) return `${minutes}m`;
+  const rest = minutes % 60;
+  return rest ? `${Math.floor(minutes / 60)}h ${rest}m` : `${minutes / 60}h`;
 }

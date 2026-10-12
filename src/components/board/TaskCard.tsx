@@ -1,19 +1,22 @@
 ﻿'use client';
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import {
+  CalendarDays,
   CheckCircle2,
   Plus,
-  EllipsisVertical,
   Check,
+  Timer,
 } from 'lucide-react';
-import { TaskMeta } from '@/components/ui/TaskMeta';
-import { BuddyBadge } from '@/components/ui/BuddyBadge';
-import { motion, AnimatePresence } from 'framer-motion';
+import { TaskTrailingMeta } from '@/components/ui/TaskMeta';
+import { BuddyLine } from '@/components/ui/BuddyBadge';
+import { StreakPill, formatFocusSpan } from '@/components/ui/TaskAdornments';
+import { StepsStrip } from '@/components/ui/TaskSteps';
+import { checklistPayout } from '@/lib/checklist';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 import { useLeftTongue } from './LeftTongue';
-import { hapticImpact } from '@/lib/haptics';
+import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
@@ -54,6 +57,8 @@ export default function TaskCard({
   selected = false,
   selectable = true,
   onSelectToggle,
+  onToggleChecklistItem,
+  flyPaused = false,
 }: {
   dragId: string;
   task: Task;
@@ -90,6 +95,8 @@ export default function TaskCard({
   /** False for cards that can't take part in bulk actions (past columns). */
   selectable?: boolean;
   onSelectToggle?: (mods: SelectModifiers) => void;
+  onToggleChecklistItem?: (itemId: string) => void;
+  flyPaused?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -381,11 +388,22 @@ export default function TaskCard({
       checklist: task.checklist,
       streak: projectedStreak,
     });
-  const chipClass = compact
-    ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold tracking-normal transition-colors border shadow-sm'
-    : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-colors border shadow-sm';
 
   const timerPhase = useTaskTimerPhase(task.id);
+  const isDone = !!task.completed;
+  const tags = (task.tags ?? [])
+    .map((tagId) => getTagDetails(tagId))
+    .filter((tag): tag is NonNullable<typeof tag> => !!tag);
+  const checklist = task.checklist;
+  const steps = React.useMemo(
+    () => (checklist?.length ? checklistPayout(checklist) : null),
+    [checklist],
+  );
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const focusSeconds = task.frogodoroSession?.focusTime ?? 0;
+  const streak = showStreak && isRepeating && !isDone ? (task.streak ?? 0) : 0;
+  const showDoToday = !!onDoToday && !hideDoTodayButton && !selectionMode;
+  const showFly = !!onToggleComplete;
 
   return (
     <div
@@ -399,44 +417,20 @@ export default function TaskCard({
         WebkitTapHighlightColor: 'transparent',
       }}
       className={[
-        compact
-          ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-xl transition-colors duration-200'
-          : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-colors duration-200',
-        task.completed
+        'group relative flex select-none items-center gap-2.5 bg-card py-3 pl-3.5 pr-2.5 transition-colors duration-150 md:gap-2 md:py-2.5 md:pl-3 md:pr-2',
+        isDone
           ? isPast
             ? 'cursor-pointer'
             : 'cursor-default'
           : disableDrag
             ? 'cursor-pointer'
             : 'cursor-grab',
-        // The column itself now sits a shade darker/greyer (DayColumn) so
-        // cards need to visibly pop off it, Trello-style — only in the
-        // planner's compact list; the home page's non-compact cards sit on
-        // their own lighter list surface and are unaffected. Trello itself
-        // drops the card outline entirely and relies on a soft drop shadow
-        // for edge definition instead, so the border here stays present
-        // (for the hover/active/menu highlight below) but transparent at
-        // rest.
-        compact
-          ? 'bg-card dark:bg-muted border shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)]'
-          : 'bg-card border shadow-sm',
-        timerPhase && !task.completed
-          ? timerPhase === 'break'
-            ? 'border-sky-500/70 dark:border-sky-400/70'
-            : 'border-primary/70 dark:border-primary/80'
-          : compact
-            ? 'border-transparent'
-            : 'border-border/80',
-        task.completed || (timerPhase && !task.completed)
-          ? ''
-          : 'md:hover:border-primary/40 active:border-primary/40',
-        compact ? 'mb-1' : 'mb-2.5',
-        menuOpen ? 'z-50 border-primary/30' : '',
-        // Inset ring, not an offset one: the column clips horizontally
-        // (overflow-x-hidden), so an outward ring gets sliced at both edges.
         selected
-          ? 'ring-2 ring-inset ring-primary !border-primary/60 bg-primary/[0.06] dark:bg-primary/[0.12]'
-          : '',
+          ? 'bg-primary/[0.07] dark:bg-primary/[0.12]'
+          : selectionMode
+            ? ''
+            : 'active:bg-muted/50 [@media(hover:hover)]:hover:bg-muted/40',
+        menuOpen ? 'z-50 bg-muted/40' : '',
         selectionMode && !selectable ? 'opacity-40' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
@@ -444,177 +438,155 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      <motion.div className="flex w-full items-center gap-1.5">
-        {/* Left gutter: the 3-dot drag hint at rest, the selection checkbox
-            once multi-select is on. On pointers that hover, the checkbox also
-            fades in over the hint so a selection can start without a menu. */}
-        {selectionMode ? (
-          <div
-            aria-hidden
-            className="-ml-0.5 flex shrink-0 items-center justify-center self-stretch"
-          >
-            <span
-              className={`grid h-[18px] w-[18px] place-items-center rounded-md border-2 transition-colors ${
-                selected
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-muted-foreground/35 bg-transparent'
-              }`}
-            >
-              {selected && <Check className="h-3 w-3" strokeWidth={4} />}
-            </span>
-          </div>
-        ) : (
-          <div className="-ml-0.5 relative flex shrink-0 items-center justify-center self-stretch text-muted-foreground/30">
-            <EllipsisVertical
-              className={`h-4 w-4 ${
-                selectable && onSelectToggle
-                  ? '[@media(hover:hover)]:group-hover:opacity-0 transition-opacity'
-                  : ''
-              }`}
-            />
-            {selectable && onSelectToggle && (
-              <button
-                type="button"
-                aria-label="Select task"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectToggle({ shift: false, meta: false });
-                }}
-                className="absolute inset-y-0 -inset-x-1 hidden place-items-center opacity-0 transition-opacity [@media(hover:hover)]:grid [@media(hover:hover)]:group-hover:opacity-100"
-              >
-                <span className="grid h-[18px] w-[18px] place-items-center rounded-md border-2 border-muted-foreground/40 bg-card" />
-              </button>
-            )}
-          </div>
-        )}
+      {tags.length > 0 && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute left-0 top-1/2 h-[24px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full ${
+            isDone ? 'opacity-30' : 'opacity-90'
+          }`}
+          style={{
+            background:
+              tags.length > 1
+                ? `linear-gradient(to bottom, ${tags[0].color} 50%, ${tags[1].color} 50%)`
+                : tags[0].color,
+          }}
+        />
+      )}
 
-        <div
-          className={`flex-1 min-w-0 flex flex-col ${task.completed ? 'opacity-60' : ''}`}
-        >
-          <div
-            className={`whitespace-pre-wrap break-words transition-colors ${
-              compact
-                ? 'text-sm font-semibold leading-snug'
-                : 'text-[15px] font-semibold leading-[1.4]'
-            } ${
-              task.completed ? 'text-muted-foreground' : 'text-foreground'
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span
-                className={`min-w-0 whitespace-pre-wrap break-words ${
-                  task.completed ? 'line-through' : ''
-                }`}
-              >
-                {task.text}
-              </span>
-              {task.isTutorial && (
-                <span className="inline-flex flex-shrink-0 items-center rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary no-underline">
-                  Practice
-                </span>
-              )}
-              <BuddyBadge taskId={task.id} date={occurrenceDate} />
-            </div>
-          </div>
-          <TaskMeta
-            compact={compact}
-            className={compact ? 'mt-0.5' : 'mt-1'}
-            startTime={task.startTime}
-            endTime={task.endTime}
-            reminder={task.reminder}
-            tags={(task.tags ?? [])
-              .map((tagId) => getTagDetails(tagId))
-              .filter((tag): tag is NonNullable<typeof tag> => !!tag)}
-            streak={showStreak && isRepeating ? task.streak : 0}
-            calendarEventId={task.calendarEventId}
-            hasNotes={!!task.notes?.trim()}
-            checklist={
-              task.checklist?.length
-                ? {
-                    done: task.checklist.filter((c) => c.done).length,
-                    total: task.checklist.length,
-                  }
-                : null
-            }
-            isDone={task.completed}
-          />
-
-          {task.frogodoroSession && ((task.frogodoroSession.focusTime ?? 0) > 0 || (task.frogodoroSession.breakTime ?? 0) > 0) && (
-            <div className="flex flex-wrap items-center gap-1 mt-0.5">
-              {(task.frogodoroSession.focusTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.focusTime; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                  <span className="text-[12px] font-bold text-primary/60">Focus</span>
-                  <span className="text-[11px] font-black text-primary tabular-nums">{t}</span>
-                </div>
-              ); })()}
-              {(task.frogodoroSession.breakTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.breakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                  <span className="text-[12px] font-bold text-sky-500/60">Break</span>
-                  <span className="text-[11px] font-black text-sky-500 tabular-nums">{t}</span>
-                </div>
-              ); })()}
-            </div>
-          )}
-        </div>
-
-        <div
-          className={`shrink-0 flex items-center gap-1.5 ${
-            selectionMode ? 'pointer-events-none' : ''
+      {selectionMode && (
+        <span
+          aria-hidden
+          className={`grid h-[20px] w-[20px] shrink-0 place-items-center rounded-md border-2 transition-colors ${
+            selected
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-muted-foreground/35'
           }`}
         >
-          {onDoToday && !hideDoTodayButton && !selectionMode && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDoToday();
-              }}
-              title="Add to Today"
-              className="flex items-center justify-center w-8 h-8 bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400 rounded-full hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors"
-              type="button"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          )}
+          {selected && <Check className="h-3 w-3" strokeWidth={4} />}
+        </span>
+      )}
 
-          {/* Completion indicator (right) — tap to toggle */}
-          <button
-            type="button"
-            disabled={!onToggleComplete}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onToggleComplete && !isAnyDragging && !refuseTap())
-                onToggleComplete();
-            }}
-            aria-label={task.completed ? 'Mark not done' : 'Mark done'}
-            className={`relative h-10 w-10 shrink-0 rounded-full transition-transform active:scale-90 ${
-              onToggleComplete ? 'cursor-pointer' : 'cursor-default'
+      <div
+        className={`min-w-0 flex-1 transition-opacity duration-200 ${
+          isDone ? 'opacity-60' : ''
+        }`}
+      >
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span
+            className={`break-words text-[16px] font-semibold leading-snug line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[15px] ${
+              isDone
+                ? 'text-muted-foreground decoration-current'
+                : 'text-foreground decoration-transparent'
             }`}
           >
-            <span
-              ref={(el) => registerFly(dragId, el)}
-              className={`absolute inset-0 flex items-center justify-center rounded-full border-2 border-muted-foreground/20 bg-muted transition-opacity duration-200 ${
-                task.completed || grabbing
-                  ? 'opacity-0 pointer-events-none'
-                  : 'opacity-100'
-              }`}
-            >
-              <Fly size={36} paused={task.completed} y={-3} />
-              <FlyValueBadge value={flyValue} />
+            {task.text}
+          </span>
+          {task.isTutorial && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary">
+              Practice
             </span>
-            <span
-              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-                task.completed || grabbing
-                  ? 'opacity-100'
-                  : 'opacity-0 pointer-events-none'
-              }`}
-            >
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
+          )}
+          {streak > 0 && <StreakPill count={streak} size="sm" />}
+          {(task.calendarEventId || focusSeconds > 0) && (
+            <span className="inline-flex items-center gap-1.5">
+              {task.calendarEventId && (
+                <CalendarDays
+                  aria-label="From your calendar"
+                  className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
+                />
+              )}
+              {focusSeconds > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
+                  <Timer className="h-3.5 w-3.5" />
+                  {formatFocusSpan(focusSeconds)}
+                </span>
+              )}
             </span>
-          </button>
-        </div>
-      </motion.div>
+          )}
+        </span>
+        <BuddyLine
+          className="mt-0.5"
+          taskId={task.id}
+          isDone={isDone}
+          date={occurrenceDate}
+        />
+        {steps && (
+          <StepsStrip
+            taskText={task.text}
+            items={steps.items}
+            doneCount={steps.doneCount}
+            open={stepsOpen && !isAnyDragging}
+            isDone={isDone}
+            onToggleOpen={() => {
+              hapticTick();
+              setStepsOpen((v) => !v);
+            }}
+            onToggleItem={
+              onToggleChecklistItem && !selectionMode
+                ? onToggleChecklistItem
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      <TaskTrailingMeta
+        className={`transition-opacity duration-200 ${isDone ? 'opacity-50' : ''}`}
+        startTime={task.startTime}
+        endTime={task.endTime}
+        reminder={task.reminder}
+        tags={tags}
+        isDone={isDone}
+        activePhase={!isDone && timerPhase ? timerPhase : null}
+        showTag={false}
+      />
+
+      {showDoToday && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDoToday?.();
+          }}
+          title="Do it today"
+          aria-label={`Do ${task.text} today`}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary transition-[background-color,transform] active:scale-90 [@media(hover:hover)]:hover:bg-primary/15"
+          type="button"
+        >
+          <Plus className="h-5 w-5" strokeWidth={2.75} />
+        </button>
+      )}
+
+      {showFly && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onToggleComplete && !isAnyDragging && !selectionMode && !refuseTap())
+              onToggleComplete();
+          }}
+          aria-label={isDone ? 'Mark not done' : 'Mark done'}
+          className={`relative h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90 md:h-10 md:w-10 ${
+            selectionMode ? 'pointer-events-none' : 'cursor-pointer'
+          }`}
+        >
+          <span
+            ref={(el) => registerFly(dragId, el)}
+            className={`absolute inset-0 flex items-center justify-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] transition-opacity duration-200 ${
+              isDone || grabbing ? 'pointer-events-none opacity-0' : 'opacity-100'
+            }`}
+          >
+            <Fly size={36} paused={isDone || flyPaused} y={-3} interactive={false} />
+            <FlyValueBadge value={flyValue} />
+          </span>
+          <span
+            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+              isDone || grabbing ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+          >
+            <CheckCircle2 className="h-9 w-9 text-primary md:h-8 md:w-8" />
+          </span>
+        </button>
+      )}
     </div>
   );
 }

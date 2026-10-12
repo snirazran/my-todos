@@ -259,34 +259,50 @@ export default function ManageTasksPage() {
     [accountCreatedAt, fetchRange],
   );
 
-  // Move a single task to any date (possibly outside the loaded window) via the
-  // atomic move API, then re-center the board on the destination.
   const moveTaskToDate = useCallback(
     async (taskId: string, fromDateKey: string, targetKey: string) => {
-      // Optimistically remove from source column.
+      if (fromDateKey === targetKey) return;
       setTasksByDate((prev) => {
-        if (!prev[fromDateKey]) return prev;
-        return {
-          ...prev,
-          [fromDateKey]: prev[fromDateKey].filter((t) => t.id !== taskId),
-        };
+        const source = fromDateKey ? prev[fromDateKey] : undefined;
+        const moved = source?.find((t) => t.id === taskId);
+        const next = { ...prev };
+        if (source) next[fromDateKey] = source.filter((t) => t.id !== taskId);
+        if (moved && next[targetKey]) {
+          next[targetKey] = [
+            ...next[targetKey].filter((t) => t.id !== taskId),
+            { ...moved, type: moved.type === 'backlog' ? 'regular' : moved.type },
+          ];
+        }
+        return next;
       });
-      try {
-        await fetch('/api/tasks', {
+      if (!fromDateKey) setBacklog((prev) => prev.filter((t) => t.id !== taskId));
+      const move = (date: string) =>
+        fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             taskId,
-            move: { type: 'regular', date: targetKey },
+            move: { type: 'regular', date },
             timezone: tz,
           }),
         });
-      } catch (e) {
-        console.error('moveTaskToDate failed', e);
-      }
-      await jumpToDate(targetKey);
+      await trackWrite(async () => {
+        try {
+          await move(targetKey);
+        } catch (e) {
+          console.error('moveTaskToDate failed', e);
+        }
+      });
+      showNotification(
+        `Moved to ${relativeDayLabel(targetKey)}`,
+        fromDateKey
+          ? async () => {
+              await trackWrite(() => move(fromDateKey));
+            }
+          : undefined,
+      );
     },
-    [tz, jumpToDate],
+    [tz, trackWrite, showNotification],
   );
 
   const duplicateTaskToDate = useCallback(

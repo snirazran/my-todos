@@ -91,12 +91,7 @@ export function PactStripRow({ view }: { view: PactView }) {
       }}
       className={statusDockRowClass(ready ? 'ready' : 'idle')}
     >
-      <span
-        className={cn(
-          'min-h-11 min-w-11 shrink-0 rounded-xl transition-shadow duration-500',
-          ready && 'shadow-[0_0_0_3px_rgba(251,191,36,0.4)]',
-        )}
-      >
+      <span className="min-h-11 min-w-11 shrink-0 rounded-xl">
         <QuestRewardTileBadge
           rewards={pactWeekRewardTiles(active)}
           catalog={view.rewardCatalog as never}

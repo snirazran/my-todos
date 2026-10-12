@@ -3,16 +3,79 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ShieldAlert, X } from 'lucide-react';
+import { CloudUpload, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 
 const SNOOZE_KEY = 'guestBannerSnoozedAt';
 const SNOOZE_MS = 3 * 24 * 60 * 60 * 1000;
+
+type FrogIndices = React.ComponentProps<typeof FrogSnapshot>['indices'];
+
+export function GuestBackupCard({
+  indices,
+  onSave,
+  onDismiss,
+}: {
+  indices?: FrogIndices;
+  onSave: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="relative flex items-center gap-3 rounded-[20px] border border-border/60 bg-card py-2.5 pl-2.5 pr-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+      <span
+        aria-hidden
+        className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-100 to-emerald-50 dark:from-sky-950/60 dark:to-emerald-950/30"
+      >
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2">
+          <FrogSnapshot
+            indices={indices}
+            width={64}
+            height={58}
+            visualOffsetY={0}
+          />
+        </span>
+        <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-card text-sky-500 shadow-sm ring-1 ring-black/5">
+          <CloudUpload className="h-3 w-3" strokeWidth={3} />
+        </span>
+      </span>
+
+      <span className="min-w-0 flex-1 pr-5">
+        <span className="block text-[15px] font-black leading-tight tracking-tight text-foreground">
+          Back up your frog
+        </span>
+        <span className="mt-0.5 block text-[12.5px] font-semibold leading-snug text-muted-foreground">
+          It only lives on this device
+        </span>
+      </span>
+
+      <button
+        type="button"
+        onClick={onSave}
+        className="h-10 shrink-0 rounded-xl bg-primary px-3.5 text-[14px] font-black tracking-tight text-primary-foreground shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+      >
+        Save it
+      </button>
+
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-card text-muted-foreground/70 shadow-sm ring-1 ring-border/70 transition-colors hover:text-foreground"
+      >
+        <X className="h-3 w-3" strokeWidth={3} />
+      </button>
+    </div>
+  );
+}
 
 export function GuestAccountBanner() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [snoozed, setSnoozed] = useState(true);
+  const show = !loading && !!user?.isAnonymous && !snoozed;
+  const { indices } = useWardrobeIndices(show);
 
   useEffect(() => {
     try {
@@ -31,42 +94,21 @@ export function GuestAccountBanner() {
     } catch {}
   };
 
-  const show = !loading && !!user?.isAnonymous && !snoozed;
-
   return (
     <AnimatePresence initial={false}>
       {show && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="overflow-hidden px-2 md:px-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="px-1.5 pt-1.5 md:px-4"
         >
-          <div className="mb-1 flex items-center gap-2.5 rounded-2xl border border-amber-300/60 bg-amber-50 py-2 pl-3 pr-1.5 dark:border-amber-500/30 dark:bg-amber-500/10">
-            <ShieldAlert
-              className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
-              strokeWidth={2.5}
-            />
-            <p className="min-w-0 flex-1 text-xs font-bold leading-tight text-amber-900 dark:text-amber-100">
-              Your frog isn&apos;t backed up — it lives only on this device.
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push('/login?upgrade=1')}
-              className="h-8 shrink-0 rounded-xl bg-amber-500 px-3 text-xs font-black tracking-tight text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.97]"
-            >
-              Save it
-            </button>
-            <button
-              type="button"
-              onClick={dismiss}
-              aria-label="Dismiss"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-amber-700/70 transition-colors hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-200/70 dark:hover:text-amber-100"
-            >
-              <X className="h-4 w-4" strokeWidth={2.5} />
-            </button>
-          </div>
+          <GuestBackupCard
+            indices={indices}
+            onSave={() => router.push('/login?upgrade=1')}
+            onDismiss={dismiss}
+          />
         </motion.div>
       )}
     </AnimatePresence>

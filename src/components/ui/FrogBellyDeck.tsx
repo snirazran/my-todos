@@ -169,7 +169,7 @@ export function FrogBellyDeck({
             <span
               className={cn(
                 'whitespace-nowrap text-[13px] font-black leading-none transition-colors duration-300',
-                feedActive ? 'text-emerald-600 dark:text-emerald-400' : tone.text,
+                feedActive ? 'text-primary' : tone.text,
               )}
             >
               {bare ? caption : title}

@@ -12,7 +12,7 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 142 76% 36%;
+    --primary: 115 33% 43%;
     --primary-foreground: 355 100% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
@@ -24,7 +24,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 142 76% 36%;
+    --ring: 115 33% 43%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -46,7 +46,7 @@
     --card-foreground: 140 18% 93%;
     --popover: 150 16% 12%;
     --popover-foreground: 140 18% 93%;
-    --primary: 142 65% 55%;
+    --primary: 114 36% 58%;
     --primary-foreground: 150 32% 8%;
     --secondary: 150 14% 16%;
     --secondary-foreground: 140 14% 91%;
@@ -58,7 +58,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 145 13% 30%;
     --input: 145 13% 36%;
-    --ring: 142 70% 56%;
+    --ring: 114 36% 58%;
     --chart-1: 206 80% 62%;
     --chart-2: 150 65% 52%;
     --chart-3: 38 90% 60%;
@@ -1579,6 +1579,32 @@ body.dragging {
   animation: drag-settle-shadow 240ms ease-out both;
 }
 
+[data-drag-lift][data-tilt] {
+  animation-name: drag-lift-tilt;
+}
+
+[data-drag-lift][data-tilt][data-dropping='true'] {
+  animation-name: drag-settle-tilt;
+}
+
+@keyframes drag-lift-tilt {
+  from {
+    transform: scale(1) rotate(0deg);
+  }
+  to {
+    transform: scale(1.04) rotate(-2deg);
+  }
+}
+
+@keyframes drag-settle-tilt {
+  from {
+    transform: scale(1.04) rotate(-2deg);
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
 @keyframes drag-lift {
   from {
     transform: scale(1);
@@ -1742,5 +1768,200 @@ body.dragging {
   .claim-nudge,
   .claim-nudge > [role='button']::after {
     animation: none;
+  }
+}
+
+.gift-open-halo {
+  position: absolute;
+  inset: 2px -4px -2px;
+  border-radius: 24px;
+  background: var(--gift-glow);
+  filter: blur(18px);
+  opacity: 0.45;
+  pointer-events: none;
+  animation: gift-open-halo 2.6s ease-in-out infinite;
+}
+
+.gift-open-lip {
+  position: absolute;
+  inset: 6px 0 0;
+  border-radius: 20px;
+  background: var(--gift-lip);
+  pointer-events: none;
+}
+
+.gift-open-face {
+  position: relative;
+  display: flex;
+  height: 60px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 0 20px;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  background: linear-gradient(to bottom, var(--gift-top), var(--gift-bottom));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  transition: transform 110ms ease-out;
+}
+
+.gift-open-btn:not(:disabled):active .gift-open-face {
+  transform: translateY(4px);
+}
+
+.gift-open-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.5) 48%,
+    rgba(255, 255, 255, 0.15) 56%,
+    transparent 66%
+  );
+  transform: translateX(-130%);
+  animation: gift-open-shine 2.8s ease-in-out 0.6s infinite;
+  pointer-events: none;
+}
+
+.gift-open-icon {
+  transform-origin: 50% 90%;
+  animation: gift-open-hop 2.8s ease-in-out 0.6s infinite;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.2));
+}
+
+.gift-open-sparkle {
+  opacity: 0;
+  pointer-events: none;
+  animation: gift-open-twinkle 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+}
+
+.gift-open-btn[data-busy] .gift-open-halo,
+.gift-open-btn[data-busy] .gift-open-shine {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes gift-open-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes gift-open-shine {
+  0%,
+  55% {
+    transform: translateX(-130%);
+  }
+  85%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+@keyframes gift-open-hop {
+  0%,
+  52%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  60% {
+    transform: translateY(-5px) rotate(-10deg);
+  }
+  68% {
+    transform: translateY(0) rotate(8deg);
+  }
+  74% {
+    transform: translateY(-2px) rotate(-4deg);
+  }
+  80% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes gift-open-twinkle {
+  0%,
+  60%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+  86% {
+    opacity: 0;
+    transform: scale(0.5) rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-open-halo,
+  .gift-open-shine,
+  .gift-open-icon,
+  .gift-open-sparkle {
+    animation: none;
+  }
+}
+
+.buddy-nudge-fly {
+  animation: buddy-nudge-fly 3.2s ease-in-out infinite;
+}
+
+@keyframes buddy-nudge-fly {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0) rotate(4deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-nudge-fly {
+    animation: none;
+  }
+}
+
+.toast-enter {
+  animation:
+    toast-enter-move 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    toast-enter-fade 200ms linear backwards;
+}
+
+.toast-enter-fade {
+  animation: toast-enter-fade 200ms linear backwards;
+}
+
+@keyframes toast-enter-move {
+  from {
+    transform: translateY(70%) scale(0.94);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes toast-enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

@@ -91,7 +91,7 @@ export function HomePageSkeleton() {
               <div
                 key={i}
                 className={cn(
-                  'flex items-center gap-3 py-3 pl-3.5 pr-2.5 md:pl-4 md:pr-3',
+                  'flex items-center gap-3 py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3',
                   i > 0 && 'border-t border-border/50',
                 )}
               >
@@ -120,44 +120,35 @@ function PlannerColumnSkeleton({
   return (
     <div
       className={cn(
-        'w-[88vw] shrink-0 self-start sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px]',
+        'w-[88vw] max-w-[480px] shrink-0 self-start md:w-[330px] lg:w-[310px] xl:w-[292px]',
         className,
       )}
     >
-      {/* Matches DayColumn: a recessed grey surface with white task cards on top. */}
-      <div
-        className={cn(
-          'rounded-[20px] border border-border/50 p-2 shadow-sm',
-          isPast
-            ? 'bg-muted/40 dark:bg-background/60'
-            : 'bg-muted/70 dark:bg-background',
-        )}
-      >
-        <div className="mb-2 flex flex-col gap-2 px-1 pt-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <Skeleton className="h-6 w-14 rounded-md" />
-              <Skeleton className="h-3 w-16 rounded-full" />
-            </div>
-            <div className="flex items-center gap-2">
-              {!isPast && <Skeleton className="h-5 w-5 rounded-full" />}
-              <Skeleton className="h-7 w-7 rounded-lg" />
-            </div>
+      <div className="overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-[52px] items-center justify-between border-b border-border/60 pl-3.5 pr-2.5">
+          <div className="flex items-baseline gap-2">
+            <Skeleton className="h-5 w-16 rounded-md" />
+            <Skeleton className="h-3 w-20 rounded-full" />
           </div>
-          <div className="-mt-1 flex items-center gap-1.5">
-            <Skeleton className="h-3.5 w-3.5 rounded-md" />
-            <Skeleton className="h-3 w-16 rounded-full" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-7 w-7 rounded-lg" />
+            <Skeleton className="h-7 w-7 rounded-lg" />
           </div>
         </div>
-        <div className="flex flex-col gap-2 px-0.5 pt-1">
-          {Array.from({ length: rows }).map((_, i) => (
-            <TaskRowSkeleton
-              key={i}
-              width={['w-1/4', 'w-1/3', 'w-1/4', 'w-2/5', 'w-1/3'][i % 5]}
-              className={cn(isPast && 'bg-card/60')}
-            />
-          ))}
-        </div>
+        {['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3', 'w-2/5'].slice(0, rows).map((w, i) => (
+          <div
+            key={i}
+            className={cn(
+              'flex items-center gap-2.5 py-3 pl-3.5 pr-2.5',
+              i > 0 && 'border-t border-border/60',
+              isPast && 'opacity-60',
+            )}
+          >
+            <Skeleton className={cn('h-4 rounded-full', w)} />
+            <span className="flex-1" />
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -169,14 +160,15 @@ export function PlannerPageSkeleton() {
       label="Loading your planner"
       className="relative h-full w-full overflow-hidden bg-background"
     >
-      <div className="absolute left-0 right-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-10 flex flex-col items-center gap-2 px-3">
-        <Skeleton className="h-10 w-44 rounded-2xl" />
-        <div className="w-full rounded-2xl bg-card/40 px-2 py-1.5 backdrop-blur-xl md:hidden">
-          <Skeleton className="h-9 w-full rounded-xl" />
+      <div className="absolute left-0 right-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-10 flex flex-col items-center gap-2 px-3 md:top-[80px]">
+        <Skeleton className="hidden h-11 w-80 rounded-2xl md:block" />
+        <div className="w-full max-w-[480px] rounded-[22px] border border-border/60 bg-card px-3 pb-2 pt-2.5 md:hidden">
+          <Skeleton className="mb-3 h-5 w-36 rounded-full" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
         </div>
       </div>
 
-      <div className="flex justify-center gap-3 overflow-hidden px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-16">
+      <div className="flex justify-center gap-3 overflow-hidden px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[140px]">
         <PlannerColumnSkeleton rows={4} isPast className="hidden md:block" />
         <PlannerColumnSkeleton rows={5} isPast />
         <PlannerColumnSkeleton rows={5} />

@@ -36,6 +36,16 @@ export type DragState = {
   bundleCount?: number;
 };
 
+function offsetWithin(el: HTMLElement, ancestor: HTMLElement): number | null {
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node && node !== ancestor) {
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+  return node === ancestor ? y : null;
+}
+
 export function useDragManager() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -58,6 +68,7 @@ export function useDragManager() {
   // re-renders no matter how many tasks are on the board.
   const overlayElRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef({ dx: 0, dy: 0 });
+  const dragHeightRef = useRef(0);
   const frameCallbackRef = useRef<((x: number, y: number) => void) | null>(
     null,
   );
@@ -233,6 +244,7 @@ export function useDragManager() {
       hapticIndexRef.current = null;
       hapticDayRef.current = day;
       dragOffsetRef.current = { dx: dxScaled, dy: clientY - rect.top };
+      dragHeightRef.current = rect.height;
       grabPointRef.current = { x: clientX, y: clientY };
       autoScrollArmedXRef.current = false;
       autoScrollArmedYRef.current = false;
@@ -322,6 +334,10 @@ export function useDragManager() {
         done();
         return;
       }
+      el.querySelector<HTMLElement>('[data-drag-lift]')?.setAttribute(
+        'data-dropping',
+        'true',
+      );
       el.style.transition = 'transform 170ms cubic-bezier(0.22, 1, 0.36, 1)';
       el.style.transform = `translate3d(${targetRect.left}px, ${targetRect.top}px, 0)`;
       window.setTimeout(done, 180);
@@ -577,24 +593,35 @@ export function useDragManager() {
            pendingVy = dirY * (MIN_V + (MAX_V - MIN_V) * easeQuad(distY));
         }
 
-        // Determine Index
+        const probeY =
+          py - dragOffsetRef.current.dy + dragHeightRef.current / 2;
+        const originTop = lr.top + list.clientTop - list.scrollTop;
+        const cardEls = list.querySelectorAll<HTMLElement>('[data-card-id]');
         let newIndex = 0;
-        const cardEls = Array.from(list.querySelectorAll<HTMLElement>('[data-card-id]'));
-        if (cardEls.length > 0) {
-           let placed = false;
-           // Optimization: Binary search could be better but linear is fine for <100 items
-           for (let i = 0; i < cardEls.length; i++) {
-             const cr = cardEls[i].getBoundingClientRect();
-             const mid = cr.top + cr.height / 2;
-             if (py < mid) {
-               newIndex = i;
-               placed = true;
-               break;
-             }
-           }
-           if (!placed) newIndex = cardEls.length;
+        let afterSource = false;
+        for (let i = 0; i < cardEls.length; i++) {
+          const card = cardEls[i];
+          const row = card.closest<HTMLElement>('[data-row]') ?? card;
+          if (row.hasAttribute('data-drag-source')) {
+            afterSource = true;
+            continue;
+          }
+          const offset = offsetWithin(row, list);
+          let top: number;
+          let height: number;
+          if (offset === null) {
+            const r = card.getBoundingClientRect();
+            top = r.top;
+            height = r.height;
+          } else {
+            top =
+              originTop + offset - (afterSource ? dragHeightRef.current : 0);
+            height = row.offsetHeight;
+          }
+          if (probeY > top + height / 2) newIndex++;
+          else break;
         }
-        
+
         if (hapticIndexRef.current === null) {
           hapticIndexRef.current = newIndex;
         } else if (newIndex !== hapticIndexRef.current) {

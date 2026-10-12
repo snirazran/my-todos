@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti';
 import { usePathname, useRouter } from 'next/navigation';
 import { Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
@@ -581,9 +582,6 @@ function PledgeProgress({
   const reduceMotion = useReducedMotion();
   const left = Math.max(0, goal.days - goal.progress);
   const ratio = goal.stepCount > 0 ? goal.stepsFilled / goal.stepCount : 0;
-  const prize = rewards?.length
-    ? pledgePrizeSummary(rewards, rewardCatalog, isPremium)
-    : null;
   return (
     <div className="mt-4 border-t border-white/20 pt-4 text-left short-screen:mt-3 short-screen:pt-3">
       <div className="flex items-baseline justify-between gap-3">
@@ -605,11 +603,6 @@ function PledgeProgress({
           className="h-full origin-left rounded-full bg-gradient-to-r from-yellow-200 to-white"
         />
       </div>
-      {prize && (
-        <p className="mt-2 text-[12px] font-bold text-white/80">
-          Prize: {prize}
-        </p>
-      )}
     </div>
   );
 }
@@ -634,6 +627,7 @@ function RevealStep({
   const [count, setCount] = useState(celebration.previousCount);
   const [popped, setPopped] = useState(false);
   const [frogReady, setFrogReady] = useState(false);
+  const [frogDressed, setFrogDressed] = useState(false);
   const shortScreen = useMediaQuery('(max-height: 800px)');
   const frogHeight = shortScreen ? 234 : 300;
   const frogWidth = Math.round((frogHeight * 128) / 144);
@@ -647,7 +641,7 @@ function RevealStep({
     view.goal && view.goal.progress < view.goal.days ? view.goal : null;
 
   useEffect(() => {
-    const frogTimer = window.setTimeout(() => setFrogReady(true), 250);
+    const frogTimer = window.setTimeout(() => setFrogReady(true), 450);
     const popTimer = window.setTimeout(() => {
       setCount(view.count);
       setPopped(true);
@@ -671,7 +665,7 @@ function RevealStep({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-gradient-to-b from-orange-500 via-orange-400 to-orange-600">
       <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
-        <RotatingRays colorClass="text-white" />
+        <RotatingRays colorClass="text-white" masked={false} size="118vmax" />
       </div>
       <div
         className="pointer-events-none absolute inset-0"
@@ -762,7 +756,7 @@ function RevealStep({
             initial={{ opacity: 0, y: 14 }}
             animate={popped ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 24 }}
-            className="mt-5 w-full rounded-[24px] bg-white/15 p-4 ring-1 ring-inset ring-white/25 backdrop-blur-sm short-screen:mt-3 short-screen:p-3"
+            className="mt-5 w-full rounded-[24px] bg-white/20 p-4 ring-1 ring-inset ring-white/30 short-screen:mt-3 short-screen:p-3"
           >
             <StreakChain view={view} play={popped} />
             {activeGoal && (
@@ -788,15 +782,31 @@ function RevealStep({
             transition={{ type: 'spring', stiffness: 240, damping: 20 }}
             className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-11px)] z-20 flex justify-center short-screen:bottom-[calc(100%-10px)]"
           >
-            {frogReady && (
-              <Frog
-                ref={frogRef}
-                width={frogWidth}
-                height={frogHeight}
-                indices={indices}
-                emote="love"
-              />
-            )}
+            <div className="relative">
+              {frogReady && (
+                <Frog
+                  ref={frogRef}
+                  width={frogWidth}
+                  height={frogHeight}
+                  indices={indices}
+                  emote="love"
+                  onDressed={() => setFrogDressed(true)}
+                />
+              )}
+              {!frogDressed && (
+                <div
+                  className={
+                    frogReady ? 'pointer-events-none absolute inset-0' : ''
+                  }
+                >
+                  <FrogSnapshot
+                    indices={indices}
+                    width={frogWidth}
+                    height={frogHeight}
+                  />
+                </div>
+              )}
+            </div>
           </motion.div>
 
           <motion.div

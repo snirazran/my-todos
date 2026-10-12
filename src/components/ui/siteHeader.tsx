@@ -182,7 +182,7 @@ export default function SiteHeader() {
           href="/"
           className="relative inline-flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg shrink-0"
         >
-          <span className="text-2xl font-black tracking-tighter text-transparent bg-gradient-to-r from-primary via-emerald-500 to-primary bg-clip-text transition-all group-hover:opacity-80">
+          <span className="text-2xl font-black tracking-tighter text-transparent bg-gradient-to-r from-primary via-[#6fae68] to-primary bg-clip-text transition-all group-hover:opacity-80">
             Frogress
           </span>
         </Link>
@@ -530,7 +530,7 @@ function RightActions({
             className="h-9 w-9 rounded-full object-cover shadow-sm"
           />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-700 text-sm font-black text-white shadow-sm">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#62a65b] to-[#34631f] text-sm font-black text-white shadow-sm">
             {(user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()}
           </span>
         )}

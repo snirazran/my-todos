@@ -35,7 +35,6 @@ import {
   cmpYmd,
   addDays,
   relativeDayLabel,
-  WEEK_ORDER,
 } from './helpers';
 import DayColumn, { DayColumnShell } from './DayColumn';
 import TaskList from './TaskList';
@@ -61,6 +60,7 @@ import { useTaskFilters } from '@/hooks/useTaskFilters';
 import DateStrip, { createLiveDateStore, type LiveDateStore } from './DateStrip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import DragOverlay from './DragOverlay';
+import { Icon } from '@/components/ui/Icon';
 import PlannerHeader from './PlannerHeader';
 import MonthCalendar from './MonthCalendar';
 import CalendarSyncRow from './CalendarSyncRow';
@@ -70,7 +70,6 @@ import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { useSections } from '@/hooks/useSections';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
-import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
 import {
   TOUR_EVENT,
@@ -89,6 +88,18 @@ import { notifyQuestClaims } from '@/lib/questClaims';
 type RepeatChoice = 'this-week' | 'weekly';
 
 const EDGE_LOAD_DAYS = 7;
+const EMPTY_TASKS: Task[] = [];
+const EMPTY_TAGS: { id: string; name: string; color: string }[] = [];
+
+type ColumnHandlers = {
+  removeTask: (day: DisplayDay, id: string) => Promise<void>;
+  onAddRequested: (text: string) => void;
+  onToggleRepeat: (taskId: string) => void;
+  onEditTask: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
+  onDoLater: (day: DisplayDay, taskId: string) => Promise<void>;
+  onStartTimer: (task: Task) => void;
+  onPickDuplicateDate: (taskId: string) => void;
+};
 
 // Keep finished tasks pinned to the bottom of a column while preserving the
 // relative order within the active and completed groups (stable). Returns the
@@ -138,6 +149,21 @@ function LivePlannerHeader({
   );
 }
 
+const DOCK_TONES = {
+  amber: {
+    chip: 'bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300',
+    active: 'bg-amber-500 text-white ring-amber-500',
+  },
+  slate: {
+    chip: 'bg-slate-100 text-slate-600 dark:bg-slate-400/15 dark:text-slate-300',
+    active: 'bg-slate-600 text-white ring-slate-600',
+  },
+  sky: {
+    chip: 'bg-sky-100 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300',
+    active: 'bg-sky-500 text-white ring-sky-500',
+  },
+} as const;
+
 function DockTile({
   tileRef,
   hint,
@@ -147,6 +173,7 @@ function DockTile({
   title,
   subtitle,
   activeTitle,
+  tone,
 }: {
   tileRef: React.RefObject<HTMLDivElement | null>;
   hint?: string;
@@ -156,13 +183,15 @@ function DockTile({
   title: string;
   subtitle: string;
   activeTitle: string;
+  tone: keyof typeof DOCK_TONES;
 }) {
+  const colors = DOCK_TONES[tone];
   return (
     <motion.div
       ref={tileRef}
       data-hint={hint}
       initial={{ opacity: 0, y: 16, scale: 0.94 }}
-      animate={{ opacity: 1, y: active ? -6 : 0, scale: active ? 1.05 : 1 }}
+      animate={{ opacity: 1, y: active ? -4 : 0, scale: active ? 1.04 : 1 }}
       transition={{
         type: 'spring',
         stiffness: 520,
@@ -170,17 +199,15 @@ function DockTile({
         delay: index * 0.04,
       }}
       className={[
-        'flex h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] border px-3 text-center shadow-sm transition-[background-color,border-color,color] duration-150',
-        active
-          ? 'border-primary bg-primary text-primary-foreground'
-          : 'border-border/50 bg-card text-foreground',
+        'flex h-[96px] flex-col items-center justify-center gap-1.5 rounded-[22px] px-3 text-center shadow-[0_10px_28px_-10px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 transition-colors duration-150',
+        active ? colors.active : 'bg-card text-foreground ring-border/60',
       ].join(' ')}
     >
       <motion.span
-        animate={active ? { scale: 1.15, rotate: -6 } : { scale: 1, rotate: 0 }}
+        animate={active ? { scale: 1.12, rotate: -6 } : { scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 520, damping: 18 }}
         className={`grid h-10 w-10 place-items-center rounded-2xl ${
-          active ? 'bg-white/20' : 'bg-primary/10 text-primary'
+          active ? 'bg-white/20' : colors.chip
         }`}
       >
         {icon}
@@ -189,8 +216,8 @@ function DockTile({
         {active ? activeTitle : title}
       </span>
       <span
-        className={`text-[11px] font-bold leading-none ${
-          active ? 'text-primary-foreground/85' : 'text-muted-foreground'
+        className={`text-[11.5px] font-bold leading-none ${
+          active ? 'text-white/85' : 'text-muted-foreground'
         }`}
       >
         {subtitle}
@@ -290,6 +317,15 @@ export default function TaskBoard({
 }) {
   const pathname = usePathname();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarRaised, setCalendarRaised] = useState(false);
+  useEffect(() => {
+    if (calendarOpen) {
+      setCalendarRaised(true);
+      return;
+    }
+    const id = window.setTimeout(() => setCalendarRaised(false), 220);
+    return () => window.clearTimeout(id);
+  }, [calendarOpen]);
   const {
     scrollerRef,
     setSlideRef,
@@ -470,7 +506,8 @@ export default function TaskBoard({
   const { data: tagsData } = useSWR('/api/tags', (url) =>
     fetch(url).then((r) => r.json()),
   );
-  const userTags = tagsData?.tags || [];
+  const userTags: { id: string; name: string; color: string }[] =
+    tagsData?.tags ?? EMPTY_TAGS;
 
   useEffect(() => {
     cancelDrag();
@@ -967,24 +1004,44 @@ export default function TaskBoard({
     [],
   );
 
-  const selectionFor = useCallback(
-    (dk: string, dayIndex: number) => ({
-      active: selection.active,
-      isSelected: (taskId: string) => selection.isSelected(dk, taskId),
+  const {
+    active: selectionActive,
+    isSelected: selectionIsSelected,
+    toggle: selectionToggle,
+    selectRange: selectionSelectRange,
+    enter: selectionEnter,
+  } = selection;
+  const selectionCache = useMemo(
+    () => new Map<string, ReturnType<typeof buildSelection>>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectionActive, selectionIsSelected, selectionToggle, selectionSelectRange, selectionEnter, refFor],
+  );
+  function buildSelection(dk: string, dayIndex: number) {
+    return {
+      active: selectionActive,
+      isSelected: (taskId: string) => selectionIsSelected(dk, taskId),
       toggle: (t: Task, mods: { shift: boolean }, visible: Task[]) => {
         if (mods.shift) {
-          selection.selectRange(
+          selectionSelectRange(
             refFor(t, dk, dayIndex),
             visible.map((v) => refFor(v, dk, dayIndex)),
           );
         } else {
-          selection.toggle(refFor(t, dk, dayIndex));
+          selectionToggle(refFor(t, dk, dayIndex));
         }
       },
-      enter: (t: Task) => selection.enter(refFor(t, dk, dayIndex)),
-    }),
-    [selection, refFor],
-  );
+      enter: (t: Task) => selectionEnter(refFor(t, dk, dayIndex)),
+    };
+  }
+  const selectionFor = (dk: string, dayIndex: number) => {
+    const key = `${dk}:${dayIndex}`;
+    let cached = selectionCache.get(key);
+    if (!cached) {
+      cached = buildSelection(dk, dayIndex);
+      selectionCache.set(key, cached);
+    }
+    return cached;
+  };
 
   /** The picked tasks, resolved back to live Task objects. */
   const selectedTasks = useMemo(() => {
@@ -1913,6 +1970,54 @@ export default function TaskBoard({
     [setBacklog, trackWrite, tz, showNotification],
   );
 
+  const latestRef = useRef({
+    removeOnDate,
+    handleEditTask,
+    handleDoLater,
+    onToggleRepeat,
+    windowDates,
+  });
+  latestRef.current = {
+    removeOnDate,
+    handleEditTask,
+    handleDoLater,
+    onToggleRepeat,
+    windowDates,
+  };
+  const columnHandlersRef = useRef(new Map<string, ColumnHandlers>());
+  const handlersFor = (dk: string): ColumnHandlers => {
+    let h = columnHandlersRef.current.get(dk);
+    if (!h) {
+      const indexOf = () => latestRef.current.windowDates.indexOf(dk);
+      h = {
+        removeTask: async (_d, id) => latestRef.current.removeOnDate(dk, id),
+        onAddRequested: (text) => {
+          setQuickText(text);
+          setInitialDateKey(dk);
+          const i = indexOf();
+          if (i >= 0) setPageIndex(i);
+          setShowQuickAdd(true);
+        },
+        onToggleRepeat: (taskId) =>
+          latestRef.current.onToggleRepeat?.(taskId, dk),
+        onEditTask: async (_d, taskId, newText) =>
+          latestRef.current.handleEditTask(indexOf(), taskId, newText),
+        onDoLater: async (_d, taskId) =>
+          latestRef.current.handleDoLater(indexOf(), taskId),
+        onStartTimer: (t) => {
+          setTimerTask(t);
+          setShowTimer(true);
+        },
+        onPickDuplicateDate: (taskId) => {
+          setPendingMove({ taskId, fromDateKey: dk, mode: 'duplicate' });
+          setMoveCalendarOpen(true);
+        },
+      };
+      columnHandlersRef.current.set(dk, h);
+    }
+    return h;
+  };
+
   const renderCenter = useDeferredValue(pageIndex);
   const renderRadius = (isMobile ? 2 : 7) + (drag?.active ? 3 : 0);
   const isColumnLive = (i: number) =>
@@ -2089,6 +2194,9 @@ export default function TaskBoard({
   };
 
   const showDock = !!drag?.active && !savedDropHidden;
+  const overDropTile = dateZoneActive || isDragOverBacklog;
+  const capsuleHidden =
+    scrollLocked || selection.active || !!drag?.active;
   const showSavedDrop = showDock && drag.fromDay !== BACKLOG_IDX;
   const dragFromKey =
     drag?.active && drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : undefined;
@@ -2108,10 +2216,7 @@ export default function TaskBoard({
         ['--lens-m' as string]: lensOpen ? '48px' : '0px',
       }}
     >
-      {/* SCROLLER — layoutScroll keeps card layout animations scroll-aware so
-          horizontal scrolling never reads as cards sliding sideways. */}
-      <motion.div
-        layoutScroll
+      <div
         ref={scrollerRef}
         dir="ltr"
         data-role="board-scroller"
@@ -2124,7 +2229,7 @@ export default function TaskBoard({
       >
         <div
           ref={trackRef}
-          className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top)+var(--lens-m))] md:pt-[calc(140px+var(--lens))] transition-[padding] duration-200 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200"
+          className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[140px] pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] translate-y-[var(--lens-m)] md:translate-y-[var(--lens)] transition-transform duration-200 ease-out"
         >
           {renderEdge('past')}
           {windowDates.map((dk, i) => (
@@ -2143,6 +2248,8 @@ export default function TaskBoard({
               {isColumnLive(i) ? (
               <DayColumn
                 title={titleForIndex(i)}
+                dateKey={dk}
+                longNames={isMobile}
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
                 totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
@@ -2205,50 +2312,48 @@ export default function TaskBoard({
                         setPageIndex(i);
                         setShowQuickAdd(true);
                       }}
-                      className="mt-1.5 hidden w-full items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold text-muted-foreground/80 transition-colors md:flex [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                      className="group flex w-full items-center gap-2.5 py-2 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 md:gap-2 md:pl-3 md:pr-2 [@media(hover:hover)]:hover:bg-muted/40"
                     >
-                      <Plus className="h-4 w-4" strokeWidth={3} />
-                      <span>Add a task</span>
+                      <span className="min-w-0 flex-1 text-[15px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
+                        Add a task
+                      </span>
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
+                        <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                      </span>
                     </button>
                   ) : undefined
                 }
               >
                 <TaskList
                   day={i as any}
-                  items={sortedTasksByDate[dk] ?? []}
+                  items={sortedTasksByDate[dk] ?? EMPTY_TASKS}
                   gracePeriodIds={recentlyCompleted}
                   isDragging={!!drag?.active}
                   dragFromDay={drag?.fromDay}
                   dragFromIndex={drag?.fromIndex}
-                  targetDay={effectiveTargetDay as any}
-                  targetIndex={clampedTargetIndex}
+                  targetDay={
+                    effectiveTargetDay === i && !overDropTile ? (i as any) : null
+                  }
+                  targetIndex={
+                    effectiveTargetDay === i && !overDropTile
+                      ? clampedTargetIndex
+                      : null
+                  }
                   dragHeight={drag?.height}
-                  removeTask={async (_d, id) => removeOnDate(dk, id)}
+                  removeTask={handlersFor(dk).removeTask}
                   onGrab={onGrabMaybeBundled as any}
                   setCardRef={setCardRef}
                   selection={selectionFor(dk, i)}
                   hiddenIds={draggingBundleIds?.get(dk)}
-                  onAddRequested={(text) => {
-                    setQuickText(text);
-                    setInitialDateKey(dk);
-                    setPageIndex(i);
-                    setShowQuickAdd(true);
-                  }}
+                  onAddRequested={handlersFor(dk).onAddRequested}
                   userTags={userTags}
                   onToggleRepeat={
-                    onToggleRepeat
-                      ? (taskId: string) => onToggleRepeat(taskId, dk)
-                      : (undefined as any)
+                    onToggleRepeat ? handlersFor(dk).onToggleRepeat : undefined
                   }
-                  onEditTask={async (_d, taskId, newText) =>
-                    handleEditTask(i, taskId, newText)
-                  }
-                  onDoLater={async (_d, taskId) => handleDoLater(i, taskId)}
+                  onEditTask={handlersFor(dk).onEditTask}
+                  onDoLater={handlersFor(dk).onDoLater}
                   onScheduleTask={onScheduleTask}
-                  onStartTimer={(t) => {
-                    setTimerTask(t);
-                    setShowTimer(true);
-                  }}
+                  onStartTimer={handlersFor(dk).onStartTimer}
                   onPatchTask={patchTask}
                   dateKey={dk}
                   isAnyDragging={!!drag?.active}
@@ -2260,19 +2365,14 @@ export default function TaskBoard({
                   emptyMode={cmpYmd(dk, todayKey) < 0 ? 'none' : 'add'}
                   disableDrag={false}
                   isFuture={cmpYmd(dk, todayKey) > 0}
-                  onPickDuplicateDate={(taskId) => {
-                    setPendingMove({
-                      taskId,
-                      fromDateKey: dk,
-                      mode: 'duplicate',
-                    });
-                    setMoveCalendarOpen(true);
-                  }}
+                  onPickDuplicateDate={handlersFor(dk).onPickDuplicateDate}
                 />
               </DayColumn>
               ) : (
                 <DayColumnShell
                   title={titleForIndex(i)}
+                  dateKey={dk}
+                  longNames={isMobile}
                   isToday={dk === todayKey}
                   isPast={cmpYmd(dk, todayKey) < 0}
                 />
@@ -2281,21 +2381,14 @@ export default function TaskBoard({
           ))}
           {renderEdge('future')}
         </div>
-      </motion.div>
+      </div>
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div
         className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none px-3 md:top-[80px] ${
-          calendarOpen ? 'z-[97]' : 'z-[60]'
+          calendarRaised ? 'z-[97]' : 'z-[60]'
         } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
-        <div className="md:hidden pointer-events-auto flex w-full items-center justify-center">
-          <LivePlannerHeader
-            liveDate={liveDate}
-            expanded={calendarOpen}
-            onToggle={() => setCalendarOpen((v) => !v)}
-          />
-        </div>
         <div className="hidden md:flex items-center gap-2.5 pointer-events-auto">
           <AnimatePresence initial={false} mode="popLayout">
             {!calendarOpen && !drag?.active && !todayInView && (
@@ -2310,7 +2403,7 @@ export default function TaskBoard({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 460, damping: 32 }}
-                className="flex h-11 items-center gap-1.5 rounded-2xl border border-border/50 bg-card px-4 text-sm font-black text-primary shadow-sm transition-[background-color,transform] hover:bg-muted/60 active:scale-95"
+                className="flex h-11 items-center gap-1.5 rounded-2xl bg-[#4f9149] px-4 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,background-color] hover:bg-[#478442] active:translate-y-1 active:shadow-none"
               >
                 <CalendarCheck className="h-4 w-4" strokeWidth={2.5} />
                 Today
@@ -2354,32 +2447,60 @@ export default function TaskBoard({
             )}
           </motion.div>
         </div>
-        {!calendarOpen && (
-          <div className="md:hidden pointer-events-auto w-full px-2 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl">
-            <DateStrip
-              dates={windowDates}
-              scrollerRef={scrollerRef}
-              syncRef={stripSyncRef}
+        <div className="pointer-events-auto w-full max-w-[480px] md:hidden">
+          <div className="flex min-h-[44px] items-center justify-between gap-2 px-2">
+            <LivePlannerHeader
               liveDate={liveDate}
-              onSelectDate={(d) => {
-                const i = windowDates.indexOf(d);
-                if (i >= 0) centerColumnSmooth(i);
-              }}
+              expanded={calendarOpen}
+              onToggle={() => setCalendarOpen((v) => !v)}
             />
+            <AnimatePresence initial={false}>
+              {!calendarOpen && !drag?.active && !todayInView && (
+                <motion.button
+                  key="today-chip"
+                  type="button"
+                  onClick={goToToday}
+                  aria-label="Go back to today"
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+                  className="flex h-9 items-center gap-1.5 rounded-xl bg-[#4f9149] px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+                >
+                  <CalendarCheck className="h-4 w-4" strokeWidth={2.5} />
+                  Today
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
-        )}
+          {!calendarOpen && (
+            <div className="mt-1.5">
+              <DateStrip
+                dates={windowDates}
+                scrollerRef={scrollerRef}
+                syncRef={stripSyncRef}
+                liveDate={liveDate}
+                counts={openTaskCounts}
+                onSelectDate={(d) => {
+                  const i = windowDates.indexOf(d);
+                  if (i >= 0) centerColumnSmooth(i);
+                }}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Mobile lens — drops out of the column header's filter button and
             pushes the board down, so the chips read as belonging to it. */}
         <AnimatePresence>
           {isMobile && lensOpen && !calendarOpen && !drag?.active && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
               style={{ ['--strip-fade' as string]: 'var(--card)' }}
-              className="pointer-events-auto w-full max-w-[420px] rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl md:hidden"
+              className="pointer-events-auto w-full max-w-[480px] rounded-[22px] border border-border/60 bg-card px-2 py-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.05)] md:hidden"
             >
               <FilterChipStrip
                 filters={filters}
@@ -2402,7 +2523,7 @@ export default function TaskBoard({
         <div className="pointer-events-none fixed inset-x-0 top-[88px] z-[61] hidden justify-center px-6 md:flex lg:px-10">
           <div
             style={{ ['--strip-fade' as string]: 'var(--card)' }}
-            className="pointer-events-auto flex min-w-0 max-w-full items-center rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl"
+            className="pointer-events-auto flex min-w-0 max-w-full items-center rounded-[22px] border border-border/60 bg-card px-2 py-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
           >
             <FilterChipStrip
               filters={filters}
@@ -2511,98 +2632,62 @@ export default function TaskBoard({
         }}
       />
 
-      {/* Bottom toolbar (Backlog) */}
       <div
-        style={{
-          // Lift above the notification stack like the home FAB does.
-          ['--stack' as string]: `${notificationStackHeight}px`,
-          transition: 'padding 200ms ease',
-        }}
-        className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+32px+var(--stack))] pointer-events-none transition-opacity duration-150 ${
-          // Below the drag ghost (z-[100]): the card under the finger is the
-          // object being manipulated and has to stay visible. The strip's fill
-          // and border still read as the active target around it.
-          drag?.active ? 'z-[95]' : 'z-[40]'
-        } ${
-          scrollLocked || (selection.active && !drag?.active) || showDock
-            ? 'invisible opacity-0'
-            : ''
+        data-hint="saved-drop-target"
+        aria-hidden={capsuleHidden || undefined}
+        className={`fixed right-4 z-[40] flex items-center gap-1 rounded-full bg-card p-1 shadow-[0_4px_14px_-6px_rgba(15,23,42,0.3),0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-border/60 bottom-[calc(env(safe-area-inset-bottom)+92px)] md:bottom-6 md:right-6 ${
+          capsuleHidden ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
+        style={{
+          translate: `0 ${
+            notificationStackHeight > 0 ? -(notificationStackHeight - 4) : 0
+          }px`,
+          transition:
+            'translate 320ms cubic-bezier(0.22,1,0.36,1), opacity 160ms ease',
+        }}
       >
-        <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
-          {/* One shared surface for the saved-tasks target, the week dots,
-              and add — previously three independent floating shapes with no
-              visual relationship to each other. At rest it's a normal row;
-              the moment a drag starts, that row fades out (kept mounted so
-              the bar never resizes) and a single drop strip takes over
-              almost the full bar — no per-item growing/shrinking fight, so
-              nothing clips or fights for space. */}
-          <div
-            data-hint="saved-drop-target"
-            className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm md:h-[68px] md:max-w-[360px] md:px-2"
-          >
-            <div
-              className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
-                showDock ? 'pointer-events-none opacity-0' : 'opacity-100'
-              }`}
-              aria-hidden={showDock}
-            >
-              <BacklogBox
-                count={backlog.length}
-                isDragOver={false}
-                isDragging={false}
-                isRepeating={draggingRepeating}
-                isDesktop={false}
-                onClick={() => setBacklogOpen(true)}
-              />
-
-              <div
-                className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden"
-                aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
-              >
-                {WEEK_ORDER.map((day) => {
-                  const visibleDate = windowDates[pageIndex] ?? activeDateKey;
-                  const active = parseYmd(visibleDate).getDay() === day;
-                  return (
-                    <span
-                      key={day}
-                      aria-hidden="true"
-                      className={`h-1 shrink-0 rounded-full transition-[width,background-color] ${
-                        active ? 'w-4 bg-primary' : 'w-1.5 bg-primary/20'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                aria-label="Add task"
-                disabled={
-                  scrollLocked ||
-                  backlogOpen ||
-                  !!drag?.active ||
-                  calendarOpen ||
-                  moveCalendarOpen ||
-                  showQuickAdd ||
-                  showTimer
-                }
-                onClick={() => {
-                  const visibleDate = windowDates[pageIndex] ?? activeDateKey;
-                  const targetDate =
-                    cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
-                  setQuickText('');
-                  setInitialDateKey(targetDate);
-                  setShowQuickAdd(true);
-                }}
-                className="relative grid h-14 w-14 shrink-0 -translate-y-3 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-4px_rgba(0,0,0,0.4)] ring-4 ring-card transition-[opacity,transform] active:scale-95 disabled:pointer-events-none disabled:opacity-0"
-              >
-                <Plus className="h-6 w-6 stroke-[3]" />
-              </button>
-            </div>
-
-          </div>
-        </div>
+        <button
+          type="button"
+          data-hint="saved-tasks"
+          aria-label={
+            backlog.length
+              ? `Saved tasks, ${backlog.length}`
+              : 'Saved tasks'
+          }
+          tabIndex={capsuleHidden ? -1 : undefined}
+          onClick={() => setBacklogOpen(true)}
+          className="flex h-12 min-w-12 items-center justify-center gap-0.5 rounded-full px-2 text-foreground transition-[transform,background-color] active:scale-95 [@media(hover:hover)]:hover:bg-muted"
+        >
+          <Icon name="saved" className="h-8 w-8" />
+          {backlog.length > 0 && (
+            <span className="pr-1 text-[15px] font-black tabular-nums">
+              {backlog.length}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          aria-label="Add task"
+          tabIndex={capsuleHidden ? -1 : undefined}
+          disabled={
+            backlogOpen ||
+            calendarOpen ||
+            moveCalendarOpen ||
+            showQuickAdd ||
+            showTimer
+          }
+          onClick={() => {
+            const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+            const targetDate =
+              cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
+            setQuickText('');
+            setInitialDateKey(targetDate);
+            setShowQuickAdd(true);
+          }}
+          className="grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-transform hover:brightness-105 active:scale-95 disabled:pointer-events-none"
+        >
+          <Plus className="h-6 w-6 stroke-[3]" />
+        </button>
       </div>
 
       <AnimatePresence>
@@ -2612,9 +2697,9 @@ export default function TaskBoard({
             ref={dockRef}
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 28, transition: { duration: 0.14 } }}
+            exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeOut' } }}
             transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-            className="pointer-events-none fixed inset-x-0 z-[96] flex justify-center px-3 bottom-[calc(env(safe-area-inset-bottom)+84px)] md:bottom-[calc(env(safe-area-inset-bottom)+32px)]"
+            className="pointer-events-none fixed inset-x-0 z-[96] flex justify-center px-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-[calc(env(safe-area-inset-bottom)+24px)]"
           >
             <div
               className={`grid w-[88vw] max-w-[440px] gap-3 ${
@@ -2643,6 +2728,7 @@ export default function TaskBoard({
                         : 'Moves to Saved'
                   }
                   activeTitle={skipMode ? 'Release to skip' : 'Release to save'}
+                  tone={skipMode ? 'slate' : 'amber'}
                 />
               )}
               {showDateTile && (
@@ -2654,6 +2740,7 @@ export default function TaskBoard({
                   title="Pick a date"
                   subtitle="Any day, any week"
                   activeTitle="Release to pick"
+                  tone="sky"
                 />
               )}
             </div>
