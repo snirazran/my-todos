@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Tags } from 'lucide-react';
+import { Check, Tags } from 'lucide-react';
 import { QuestTrack } from '@/components/ui/QuestTrack';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
@@ -81,6 +81,7 @@ export function NextQuestStrip({
   isPremium,
   introFill = false,
   introHold = false,
+  loading = false,
 }: {
   claimables?: Claimable[];
   trackables?: Trackable[];
@@ -88,6 +89,7 @@ export function NextQuestStrip({
   isPremium?: boolean;
   introFill?: boolean;
   introHold?: boolean;
+  loading?: boolean;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -381,17 +383,27 @@ export function NextQuestStrip({
         transition: { duration: 0.12 },
       }
     : {
-        initial: { opacity: 0, y: 10, scale: 0.985 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: -8, scale: 0.985 },
-        transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const },
+        initial: { opacity: 0, y: 6 },
+        animate: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const },
+        },
+        exit: {
+          opacity: 0,
+          transition: { duration: 0.12, ease: 'easeOut' as const },
+        },
       };
 
   // The Leap and the quests arrive from two different requests. Committing the
   // slot to whichever lands first is what made a refresh show a daily quest and
   // then visibly swap to the Leap a second later, so the slot waits until both
   // contenders are known before it picks one.
-  const awaitingPact = pactLoading && !pactView;
+  const awaitingPact = loading || (pactLoading && !pactView);
+
+  useEffect(() => {
+    void import('@/components/ui/QuestCards');
+  }, []);
 
   const slotKey = awaitingPact
     ? 'loading'
@@ -411,9 +423,10 @@ export function NextQuestStrip({
       : 'ready'
     : 'idle';
 
-  const strip = awaitingPact ? (
+  const skeletonRow = (
     <div
       data-dock-row
+      aria-hidden
       className={statusDockRowClass('idle', false)}
     >
       <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
@@ -422,7 +435,9 @@ export function NextQuestStrip({
         <Skeleton className="h-2.5 w-full rounded-full" />
       </div>
     </div>
-  ) : pactWins && livePact ? (
+  );
+
+  const strip = awaitingPact ? null : pactWins && livePact ? (
     <PactStripRow view={livePact} />
   ) : !claimable && !nextUp ? null : (
     <div
@@ -442,7 +457,7 @@ export function NextQuestStrip({
       {readyClaim || displayNextUp ? (
         <>
           <span
-            className={`min-h-11 min-w-11 shrink-0 ${readyClaim && !claiming ? 'animate-quest-pulse motion-reduce:animate-none' : ''}`}
+            className={`min-h-11 min-w-11 shrink-0 rounded-xl transition-shadow duration-500 ${readyClaim ? 'shadow-[0_0_0_3px_rgba(251,191,36,0.4)]' : ''}`}
           >
             <QuestRewardTileBadge
               reward={(readyClaim ?? displayNextUp)?.reward}
@@ -465,7 +480,13 @@ export function NextQuestStrip({
               </span>
             ) : (
               <>
-                <span className="min-w-0 truncate text-[14px] font-bold leading-tight text-foreground">
+                <span className="flex min-w-0 items-center gap-1.5 truncate text-[14px] font-bold leading-tight text-foreground">
+                  {readyClaim && (
+                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#4f9149] text-white">
+                      <Check className="h-2.5 w-2.5" strokeWidth={4} />
+                    </span>
+                  )}
+                  <span className="min-w-0 truncate">
                   {readyClaim ? (
                     readyClaim.kind === 'season' ? (
                       readyClaim.seasonName
@@ -483,6 +504,7 @@ export function NextQuestStrip({
                       maxTags={1}
                     />
                   ) : null}
+                  </span>
                 </span>
                 <QuestTrack
                   progress={displayNextUp?.progress ?? 1}
@@ -543,19 +565,29 @@ export function NextQuestStrip({
     {/* mode="wait" so the outgoing row finishes leaving before the next one
         arrives — two rows cross-fading in the same slot read as a glitch,
         one handing over to the other reads as a consequence. */}
-    <AnimatePresence mode="wait" initial={false}>
-      {strip && (
-        <motion.div
-          key={slotKey}
-          ref={setStripEl}
-          {...slotMotion}
-          className="md:h-full"
-          style={{ willChange: 'transform, opacity' }}
-        >
-          {strip}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    {awaitingPact ? (
+      skeletonRow
+    ) : (
+      <motion.div
+        initial={{ opacity: 0.4 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        className="md:h-full"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          {strip && (
+            <motion.div
+              key={slotKey}
+              ref={setStripEl}
+              {...slotMotion}
+              className="md:h-full"
+            >
+              {strip}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    )}
     <div className="w-full border-t border-border/50 p-2 empty:hidden">
       <QuestPriorityDebug
         title="home next-up"

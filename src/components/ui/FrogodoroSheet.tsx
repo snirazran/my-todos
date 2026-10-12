@@ -47,6 +47,7 @@ import { Bell, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
 import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { FocusScene } from '@/components/ui/FocusScene';
+import { FocusSubjectPanel } from '@/components/ui/FocusSubjectPicker';
 import {
   focusPhaseCatches,
   fliesCaughtFor,
@@ -311,6 +312,7 @@ type Props = Readonly<{
   // of waiting for the START tap. Ignored while a session is already active.
   autoStart?: boolean;
   onMutateToday?: () => void;
+  onSubjectChange?: (task: Task) => void;
 }>;
 
 export default function FrogodoroSheet({
@@ -320,6 +322,7 @@ export default function FrogodoroSheet({
   tags: userTags = [],
   autoStart = false,
   onMutateToday,
+  onSubjectChange,
 }: Props) {
   useRegisterOpenSheet(open);
   const taskDisplayName = task ? getTaskDisplayName(task) : '';
@@ -374,6 +377,22 @@ export default function FrogodoroSheet({
   }, []);
   const [showSounds, setShowSounds] = useState(false);
   const [showPond, setShowPond] = useState(false);
+  const [subjectsOpen, setSubjectsOpen] = useState(false);
+  const subjectsDrag = useDragControls();
+  useEffect(() => {
+    if (!open) setSubjectsOpen(false);
+  }, [open]);
+  useEffect(() => {
+    if (!subjectsOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setSubjectsOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [subjectsOpen]);
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
   const [confirmTaskSwitch, setConfirmTaskSwitch] = useState(false);
@@ -1255,6 +1274,46 @@ export default function FrogodoroSheet({
                     >
                       {/* Timer Card */}
                       <div className={`relative overflow-hidden ${splitDone ? 'bg-sky-500 text-white dark:bg-sky-700' : getPhaseColor()}`}>
+                        <AnimatePresence>
+                          {subjectsOpen && !timerActive && !awaitingDone && (
+                            <motion.div
+                              key="subjects"
+                              initial={{ y: '100%' }}
+                              animate={{ y: 0 }}
+                              exit={{ y: '100%' }}
+                              transition={{ type: 'spring', stiffness: 380, damping: 38 }}
+                              drag="y"
+                              dragControls={subjectsDrag}
+                              dragListener={false}
+                              dragConstraints={{ top: 0, bottom: 0 }}
+                              dragElastic={{ top: 0, bottom: 0.5 }}
+                              dragMomentum={false}
+                              onDragEnd={(_event, { offset, velocity }) => {
+                                if (offset.y > 70 || velocity.y > 600) {
+                                  setSubjectsOpen(false);
+                                }
+                              }}
+                              style={{ willChange: 'transform' }}
+                              className={`absolute inset-0 z-[60] overflow-hidden ${getPhaseColor()}`}
+                            >
+                              <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/[0.12]" />
+                              <div className="relative h-full">
+                                <FocusSubjectPanel
+                                  active={open}
+                                  currentSubjectId={task?.id}
+                                  onPick={(picked) => {
+                                    setSubjectsOpen(false);
+                                    onSubjectChange?.(picked);
+                                  }}
+                                  onClose={() => setSubjectsOpen(false)}
+                                  onHeaderPointerDown={(event) =>
+                                    subjectsDrag.start(event)
+                                  }
+                                />
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                         {splitDone ? (
                           /* Split background: green (focus) | blue (break) */
                           <div aria-hidden className="absolute inset-y-0 left-0 z-0 w-1/2 bg-primary dark:bg-green-700" />
@@ -1470,6 +1529,10 @@ export default function FrogodoroSheet({
                                 type="button"
                                 onClick={() => {
                                   hapticTick();
+                                  if (onSubjectChange) {
+                                    setSubjectsOpen(true);
+                                    return;
+                                  }
                                   onOpenChange(false);
                                   window.setTimeout(
                                     () =>
@@ -1653,7 +1716,10 @@ export default function FrogodoroSheet({
                                 onGainLand={() => setChipPulse((p) => p + 1)}
                                 onFrogReady={handleFrogReady}
                                 suspended={
-                                  confirmStop || confirmPause || confirmTaskSwitch
+                                  confirmStop ||
+                                  confirmPause ||
+                                  confirmTaskSwitch ||
+                                  subjectsOpen
                                 }
                               />
                             )}

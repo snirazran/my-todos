@@ -93,8 +93,8 @@ export function PactStripRow({ view }: { view: PactView }) {
     >
       <span
         className={cn(
-          'min-h-11 min-w-11 shrink-0',
-          ready && !claiming && 'animate-quest-pulse motion-reduce:animate-none',
+          'min-h-11 min-w-11 shrink-0 rounded-xl transition-shadow duration-500',
+          ready && 'shadow-[0_0_0_3px_rgba(251,191,36,0.4)]',
         )}
       >
         <QuestRewardTileBadge

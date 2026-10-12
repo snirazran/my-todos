@@ -163,3 +163,87 @@ export function TaskMeta({
     </div>
   );
 }
+
+export function TaskTrailingMeta({
+  startTime,
+  endTime,
+  reminder,
+  tags,
+  isNext = false,
+  isDone = false,
+  activePhase = null,
+  className,
+}: {
+  startTime?: string;
+  endTime?: string;
+  reminder?: string | boolean | null;
+  tags?: TaskMetaTag[];
+  isNext?: boolean;
+  isDone?: boolean;
+  activePhase?: 'focus' | 'break' | null;
+  className?: string;
+}) {
+  const tag = tags?.[0];
+  if (!startTime && !tag && !activePhase) return null;
+  const highlight = isNext && !isDone;
+
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 flex-col items-end justify-center gap-1 text-right leading-none md:flex-row-reverse md:items-center md:gap-3',
+        className,
+      )}
+    >
+      {activePhase ? (
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 text-[12px] font-black md:text-[13px]',
+            activePhase === 'break'
+              ? 'text-sky-600 dark:text-sky-400'
+              : 'text-primary',
+          )}
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 shrink-0 animate-pulse rounded-full motion-reduce:animate-none',
+              activePhase === 'break' ? 'bg-sky-500' : 'bg-primary',
+            )}
+          />
+          {activePhase === 'break' ? 'Break' : 'Focus'}
+        </span>
+      ) : (
+        startTime && (
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 text-[12px] font-bold tabular-nums md:text-[13px]',
+              highlight ? 'text-primary' : 'text-muted-foreground/75',
+            )}
+          >
+            {reminder && !highlight && <Bell className="h-3 w-3 shrink-0" />}
+            {highlight && (
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+            )}
+            {endTime && endTime !== startTime
+              ? `${startTime}–${endTime}`
+              : startTime}
+          </span>
+        )
+      )}
+      {tag && (
+        <span className="hidden max-w-[140px] items-center gap-1 text-[12px] font-semibold text-muted-foreground/70 md:inline-flex">
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: tag.color || '#6366f1' }}
+          />
+          <span className="truncate">{tag.name}</span>
+          {(tags?.length ?? 0) > 1 && (
+            <span className="shrink-0 tabular-nums">
+              +{(tags?.length ?? 0) - 1}
+            </span>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}

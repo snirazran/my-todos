@@ -1,8 +1,11 @@
 import {
+  CalendarDays,
+  Check,
   CheckCircle2,
   ChevronDown,
   Circle,
   EllipsisVertical,
+  Timer,
   CalendarCheck,
   CalendarClock,
   Filter,
@@ -10,12 +13,12 @@ import {
   Plus,
   ListChecks,
   EyeOff,
-  Eye,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
-import { TaskMeta } from '@/components/ui/TaskMeta';
+import { TaskTrailingMeta } from '@/components/ui/TaskMeta';
+import { StepPips, StreakPill } from '@/components/ui/TaskAdornments';
 import {
   hapticGrab,
   hapticImpact,
@@ -49,7 +52,10 @@ import {
   TouchSensor,
   Modifier,
   MeasuringStrategy,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
   type CollisionDetection,
+  type DropAnimation,
 } from '@dnd-kit/core';
 import {
   restrictToVerticalAxis,
@@ -79,10 +85,9 @@ import TagsPopup from '@/components/ui/TagsPopup';
 import { SectionEditorSheet } from '@/components/ui/SectionEditorSheet';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
-import { BuddyBadge } from '@/components/ui/BuddyBadge';
+import { BuddyLine } from '@/components/ui/BuddyBadge';
 import {
   ChecklistCheckbox,
-  ChecklistRewardTrack,
 } from '../board/ChecklistEditor';
 import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
 import {
@@ -158,8 +163,17 @@ const animateLayoutChanges: AnimateLayoutChanges = (args) =>
   args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true;
 
 const pointerMidpointCollision: CollisionDetection = (args) => {
-  const { droppableContainers, droppableRects, pointerCoordinates } = args;
-  if (!pointerCoordinates) return closestCenter(args);
+  const {
+    active,
+    collisionRect,
+    droppableContainers,
+    droppableRects,
+    pointerCoordinates,
+  } = args;
+  const probeY = collisionRect
+    ? collisionRect.top + collisionRect.height / 2
+    : pointerCoordinates?.y;
+  if (probeY == null) return closestCenter(args);
 
   const rows = droppableContainers
     .filter((c) => !c.disabled && droppableRects.get(c.id))
@@ -168,10 +182,12 @@ const pointerMidpointCollision: CollisionDetection = (args) => {
 
   if (rows.length === 0) return [];
 
-  const hit =
-    rows.find(
-      (r) => pointerCoordinates.y < r.rect.top + r.rect.height / 2,
-    ) ?? rows[rows.length - 1];
+  const passed = rows.filter(
+    (r) =>
+      r.container.id !== active.id &&
+      probeY > r.rect.top + r.rect.height / 2,
+  ).length;
+  const hit = rows[Math.min(passed, rows.length - 1)];
 
   return [{ id: hit.container.id, data: { droppableContainer: hit.container } }];
 };
@@ -187,9 +203,111 @@ const LIST_GROUP_DIVIDER =
   'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:h-px before:bg-border/60 first:before:hidden';
 
 const SORT_TRANSITION = {
-  duration: 260,
+  duration: 240,
   easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
 };
+
+const DROP_ANIMATION: DropAnimation = {
+  duration: 240,
+  easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)',
+  sideEffects: (params) => {
+    params.dragOverlay.node
+      .querySelector<HTMLElement>('[data-drag-lift]')
+      ?.setAttribute('data-dropping', 'true');
+    return defaultDropAnimationSideEffects({
+      styles: { active: { opacity: '0' } },
+    })(params);
+  },
+};
+
+function TaskDragPreview({
+  task,
+  tags,
+}: {
+  task: Task;
+  tags: { id: string; name: string; color: string }[];
+}) {
+  const steps = task.checklist ?? [];
+  const stepsDone = steps.filter((step) => step.done).length;
+  const nextStep = steps.find((step) => !step.done);
+  return (
+    <div className="h-full w-full">
+    <div
+      data-drag-lift
+      className="relative flex h-full w-full items-center gap-3 overflow-hidden rounded-2xl bg-card py-3 pl-3.5 pr-2.5 ring-1 ring-black/[0.06] dark:ring-white/10 md:pl-4 md:pr-3"
+    >
+      {tags.length > 0 && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[26px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full opacity-90"
+          style={{ backgroundColor: tags[0].color }}
+        />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span className="text-[15.5px] font-semibold leading-snug text-foreground md:text-[16px]">
+            {task.text}
+          </span>
+          {(task.streak ?? 0) > 0 && <StreakPill count={task.streak ?? 0} />}
+        </span>
+        <BuddyLine
+          className="mt-0.5"
+          taskId={task.id}
+          date={new Intl.DateTimeFormat('en-CA').format(new Date())}
+        />
+        {steps.length > 0 && (
+          <span className="mt-0.5 flex h-7 min-w-0 items-center gap-2 text-muted-foreground/70">
+            <span className="flex w-[22px] shrink-0 justify-center">
+              {nextStep ? (
+                <ChecklistCheckbox
+                  size={18}
+                  checked={false}
+                  onToggle={() => {}}
+                  interactive={false}
+                />
+              ) : (
+                <CheckCircle2 className="h-[18px] w-[18px] text-primary" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground/65 md:text-[14px]">
+              {nextStep ? nextStep.text || 'Untitled step' : `All ${steps.length} steps done`}
+            </span>
+            <StepPips items={steps} done={stepsDone} />
+          </span>
+        )}
+      </span>
+      <TaskTrailingMeta
+        startTime={task.startTime}
+        endTime={task.endTime}
+        reminder={task.reminder}
+        tags={tags}
+      />
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] md:h-12 md:w-12">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/fly.svg" alt="" draggable={false} className="h-8 w-8" />
+      </span>
+    </div>
+    </div>
+  );
+}
+
+function SectionDragPreview({ name }: { name: string }) {
+  return (
+    <div className="h-full w-full">
+    <div
+      data-drag-lift
+      className="relative flex h-full w-full items-center gap-1 rounded-xl bg-card pl-2.5 pr-2 ring-1 ring-black/[0.06] dark:ring-white/10 md:pl-3"
+    >
+      <span className="-ml-1 grid h-7 w-5 shrink-0 place-items-center text-muted-foreground/70">
+        <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-black text-foreground/70 md:text-[14px]">
+        {name}
+      </span>
+    </div>
+    </div>
+  );
+}
 
 interface SortableTaskItemProps {
   task: Task;
@@ -231,11 +349,12 @@ const clockMinutes = (hhmm?: string): number | null => {
   return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
 };
 
-const SortableTaskItem = React.forwardRef<
-  HTMLDivElement,
-  SortableTaskItemProps
->(
-  (
+type TaskRowBodyProps = SortableTaskItemProps & {
+  isDragging: boolean;
+  onSwipeOpenChange: (open: boolean) => void;
+};
+
+const TaskRowBody = React.memo(function TaskRowBody(
     {
       task,
       isDone,
@@ -261,9 +380,10 @@ const SortableTaskItem = React.forwardRef<
       hintPeekPrimary = false,
       isDesktop = false,
       isNextTimed = false,
-    },
-    ref,
-  ) => {
+      isDragging,
+      onSwipeOpenChange,
+    }: TaskRowBodyProps,
+  ) {
     const checklist = task.checklist ?? [];
     const checklistPayoutState = React.useMemo(
       () => checklistPayout(checklist),
@@ -273,6 +393,7 @@ const SortableTaskItem = React.forwardRef<
     const metaTags = (task.tags ?? [])
       .map((tagId) => getTagDetails(tagId))
       .filter((tag): tag is NonNullable<typeof tag> => !!tag);
+    const focusSecondsToday = task.frogodoroSession?.focusTime ?? 0;
 
     /* Swipe Logic */
     const [openSide, setOpenSide] = useState<'timer' | 'secondary' | null>(null);
@@ -392,19 +513,9 @@ const SortableTaskItem = React.forwardRef<
       return () => el.removeEventListener('touchmove', onTouchMove);
     }, []);
 
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({
-      id: task.id,
-      disabled: isDragDisabled || isOpen,
-      animateLayoutChanges,
-      transition: SORT_TRANSITION,
-    });
+    useEffect(() => {
+      onSwipeOpenChange(isOpen);
+    }, [isOpen, onSwipeOpenChange]);
     const showSwipeActions =
       !isDesktop && !isDragging && !isSortDragging && !isExitingLater;
 
@@ -703,68 +814,11 @@ const SortableTaskItem = React.forwardRef<
       onOpenDetail?.(task);
     };
 
-    const style = {
-      transform: pixelSnappedTranslate(transform),
-      transition,
-      zIndex: isDragging
-        ? 30
-        : isOpen
-          ? 20
-          : isMenuOpen
-            ? 50
-            : isExitingLater
-              ? 0
-              : 1,
-    };
-
     return (
       <motion.div
-        ref={(node: HTMLDivElement | null) => {
-          setNodeRef(node);
-          (
-            containerRef as React.MutableRefObject<HTMLDivElement | null>
-          ).current = node;
-          if (typeof ref === 'function') ref(node);
-          else if (ref)
-            (ref as React.MutableRefObject<HTMLDivElement | null>).current =
-              node;
-        }}
-        style={{ ...style, overflow: isDragging ? 'visible' : 'hidden' }}
-        {...attributes}
-        {...listeners}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          (listeners as any)?.onKeyDown?.(e);
-          if (
-            e.key === 'Enter' &&
-            !e.defaultPrevented &&
-            e.target === e.currentTarget &&
-            !isDragging &&
-            !isOpen
-          ) {
-            e.preventDefault();
-            onOpenDetail?.(task);
-          }
-        }}
-        // The card's own drop shadow has to live here, on the outermost
-        // layer — its children below are clipped by this element's own
-        // `overflow: hidden` (needed for the swipe-reveal actions), and any
-        // box-shadow on a clipped child is invisible no matter how it's
-        // styled. This layer's *own* shadow isn't affected by its own
-        // overflow setting, only its children's are.
-        className={`relative w-full ${LIST_ROW_DIVIDER} ${isDragging ? 'z-30 rounded-2xl shadow-[0_18px_36px_-14px_rgba(0,0,0,0.35)] before:hidden dark:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.7)]' : isMenuOpen ? 'z-50' : 'z-auto'} ${hintRowGlow ? 'hint-row-glow' : ''}`}
-        data-is-active={!isDone}
-        data-hint={isDone ? undefined : 'task-row'}
-        data-tag-ids={isDone ? undefined : task.tags?.join(',') || undefined}
-        data-savable={
-          !isDone &&
-          !isWeekly &&
-          !task.isStarter &&
-          (task.repeatMode ?? 'none') === 'none' &&
-          !task.repeatGroupId &&
-          onDoLater
-            ? 'true'
-            : undefined
-        }
+        ref={containerRef}
+        style={{ overflow: isDragging ? 'visible' : 'hidden' }}
+        className={`relative w-full ${isDragging ? 'bg-muted/60' : ''} ${hintRowGlow ? 'hint-row-glow' : ''}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={isExitingLater ? { opacity: 1 } : { opacity: 0 }}
@@ -778,7 +832,7 @@ const SortableTaskItem = React.forwardRef<
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
             opacity: { duration: 0.2, ease: 'easeOut', delay: 0.15 },
           }}
-          className={`group relative w-full ${isDragging ? 'overflow-visible rounded-2xl shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative w-full ${isDragging ? 'invisible' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe actions stay behind the row until the drag snaps open. A
               swipe never performs an action by itself. */}
@@ -892,13 +946,7 @@ const SortableTaskItem = React.forwardRef<
               relative flex w-full flex-col py-3 pl-3.5 pr-2.5 md:py-3.5 md:pl-4 md:pr-3
               transition-[box-shadow,background-color] duration-200
               bg-card
-              ${
-                timerPhase && !isDone
-                  ? timerPhase === 'break'
-                    ? 'shadow-[inset_3px_0_0_0_rgb(14_165_233)]'
-                    : 'shadow-[inset_3px_0_0_0_hsl(var(--primary))]'
-                  : 'shadow-none'
-              }
+              shadow-none
               ${isHovered && isDesktop && !isDone ? 'bg-muted/40' : ''}
               ${
                 isGlowActive && !isDone
@@ -919,6 +967,19 @@ const SortableTaskItem = React.forwardRef<
             }}
             onClick={handleCardClick}
           >
+            {metaTags.length > 0 && (
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute left-0 top-1/2 h-[26px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-200 ${isDone ? 'opacity-30' : 'opacity-90'}`}
+                style={{
+                  background:
+                    metaTags.length > 1
+                      ? `linear-gradient(to bottom, ${metaTags[0].color} 50%, ${metaTags[1].color} 50%)`
+                      : metaTags[0].color,
+                }}
+              />
+            )}
+
             {/* Glow Animation Overlay */}
             {isGlowActive && !isDone && (
               <div
@@ -939,11 +1000,11 @@ const SortableTaskItem = React.forwardRef<
 
             {/* Content — clicking the row toggles completion */}
             <div
-              className={`relative z-10 min-w-0 flex-1 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+              className={`relative z-10 min-w-0 flex-1 self-center transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
             >
-                <span className="flex flex-wrap items-center gap-1.5">
+                <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                   <motion.span
-                    className={`text-[15px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[16px] ${
+                    className={`text-[15.5px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[16px] ${
                       isDone
                         ? 'text-muted-foreground decoration-current'
                         : 'text-foreground decoration-transparent'
@@ -955,23 +1016,32 @@ const SortableTaskItem = React.forwardRef<
                   >
                     {task.text}
                   </motion.span>
-                  <BuddyBadge
-                    taskId={task.id}
-                    date={new Intl.DateTimeFormat('en-CA').format(new Date())}
-                  />
+                  {(task.streak ?? 0) > 0 && !isDone && (
+                    <StreakPill count={task.streak ?? 0} />
+                  )}
+                  {(task.calendarEventId || focusSecondsToday > 0) && (
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground/60">
+                      {task.calendarEventId && (
+                        <CalendarDays
+                          aria-label="From your calendar"
+                          className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
+                        />
+                      )}
+                      {focusSecondsToday > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
+                          <Timer className="h-3.5 w-3.5" />
+                          {formatFocusSpan(focusSecondsToday)}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </span>
 
-                <TaskMeta
+                <BuddyLine
                   className="mt-0.5"
-                  startTime={task.startTime}
-                  endTime={task.endTime}
-                  reminder={task.reminder}
-                  tags={metaTags}
-                  streak={isWeekly ? task.streak : 0}
-                  calendarEventId={task.calendarEventId}
-                  hasNotes={!!task.notes?.trim()}
-                  isNext={isNextTimed}
+                  taskId={task.id}
                   isDone={isDone}
+                  date={new Intl.DateTimeFormat('en-CA').format(new Date())}
                 />
 
                 {checklist.length > 0 && (
@@ -985,31 +1055,12 @@ const SortableTaskItem = React.forwardRef<
                       hapticTick();
                       onToggleSteps?.();
                     }}
-                    onCheckNext={
+                    onToggleItem={
                       onToggleChecklistItem
                         ? (itemId) => onToggleChecklistItem(task, itemId)
                         : undefined
                     }
                   />
-                )}
-
-                {task.frogodoroSession && ((task.frogodoroSession.focusTime ?? 0) > 0 || (task.frogodoroSession.breakTime ?? 0) > 0) && (
-                  <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                    {(task.frogodoroSession.focusTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.focusTime; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                        <span className="text-[12px] font-bold text-primary/60">Focus</span>
-                        <span className="text-[11px] font-black text-primary tabular-nums">{t}</span>
-                      </div>
-                    ); })()}
-                    {(task.frogodoroSession.breakTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.breakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
-                        <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                        <span className="text-[12px] font-bold text-sky-500/60">Break</span>
-                        <span className="text-[11px] font-black text-sky-500 tabular-nums">{t}</span>
-                      </div>
-                    ); })()}
-                  </div>
                 )}
             </div>
 
@@ -1063,6 +1114,17 @@ const SortableTaskItem = React.forwardRef<
                 )}
               </div>
             )}
+
+            <TaskTrailingMeta
+              className={`relative z-10 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-50' : ''}`}
+              startTime={task.startTime}
+              endTime={task.endTime}
+              reminder={task.reminder}
+              tags={metaTags}
+              isNext={isNextTimed}
+              isDone={isDone}
+              activePhase={!isDone && timerPhase ? timerPhase : null}
+            />
 
             {/* Completion indicator (right) — only this toggles completion */}
             <div
@@ -1152,100 +1214,97 @@ const SortableTaskItem = React.forwardRef<
             </div>
             </div>
 
-            <AnimatePresence initial={false}>
-              {stepsOpen && checklist.length > 0 && (
-                <motion.div
-                  key="steps"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
-                  onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="relative z-10 w-full overflow-hidden"
-                >
-                  <div className="pb-1 pl-5 pr-0 pt-2 md:pr-[52px]">
-                    <ChecklistRewardTrack
-                      items={checklistPayoutState.items}
-                      className="mb-1"
-                    />
-                    {checklistPayoutState.items.map((item) => {
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onPointerDown={(e) => e.preventDefault()}
-                          onClick={() => onToggleChecklistItem?.(task, item.id)}
-                          aria-pressed={item.done}
-                          className="flex min-h-[44px] w-full touch-manipulation items-center gap-3 rounded-xl px-3 text-left transition-colors duration-150 active:bg-primary/10 [@media(hover:hover)]:hover:bg-primary/[0.06]"
-                        >
-                          <ChecklistCheckbox
-                            size={23}
-                            checked={item.done}
-                            onToggle={() =>
-                              onToggleChecklistItem?.(task, item.id)
-                            }
-                            interactive={false}
-                          />
-                          <span
-                            className={`min-w-0 flex-1 break-words text-[14px] font-semibold leading-snug transition-colors duration-200 md:text-[15px] ${
-                              item.done
-                                ? 'text-muted-foreground/70 line-through decoration-muted-foreground/50'
-                                : 'text-foreground/90'
-                            }`}
-                          >
-                            {item.text || 'Untitled step'}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.div>
         </motion.div>
       </motion.div>
     );
-  },
-);
+});
+
+const SortableTaskItem = React.forwardRef<
+  HTMLDivElement,
+  SortableTaskItemProps
+>(function SortableTaskItem(props, ref) {
+  const {
+    task,
+    isDone,
+    isDragDisabled,
+    isWeekly,
+    isMenuOpen,
+    isExitingLater,
+    onDoLater,
+    onOpenDetail,
+  } = props;
+  const [swipeOpen, setSwipeOpen] = useState(false);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: task.id,
+    disabled: isDragDisabled || swipeOpen,
+    animateLayoutChanges,
+    transition: SORT_TRANSITION,
+  });
+
+  return (
+    <div
+      ref={(node: HTMLDivElement | null) => {
+        setNodeRef(node);
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      }}
+      style={{
+        transform: pixelSnappedTranslate(transform),
+        transition,
+        zIndex: swipeOpen ? 20 : isMenuOpen ? 50 : isExitingLater ? 0 : 1,
+      }}
+      {...attributes}
+      {...listeners}
+      onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+        (listeners as any)?.onKeyDown?.(e);
+        if (
+          e.key === 'Enter' &&
+          !e.defaultPrevented &&
+          e.target === e.currentTarget &&
+          !isDragging &&
+          !swipeOpen
+        ) {
+          e.preventDefault();
+          onOpenDetail?.(task);
+        }
+      }}
+      className={`relative w-full ${LIST_ROW_DIVIDER} ${isDragging ? 'before:hidden' : ''}`}
+      data-is-active={!isDone}
+      data-hint={isDone ? undefined : 'task-row'}
+      data-tag-ids={isDone ? undefined : task.tags?.join(',') || undefined}
+      data-savable={
+        !isDone &&
+        !isWeekly &&
+        !task.isStarter &&
+        (task.repeatMode ?? 'none') === 'none' &&
+        !task.repeatGroupId &&
+        onDoLater
+          ? 'true'
+          : undefined
+      }
+    >
+      <TaskRowBody
+        {...props}
+        isDragging={isDragging}
+        onSwipeOpenChange={setSwipeOpen}
+      />
+    </div>
+  );
+});
 
 const stopRowGesture = {
   onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
   onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
   onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
 };
-
-function StepsBonus({ items, doneCount }: { items: ChecklistItem[]; doneCount: number }) {
-  const markers = items.flatMap((it, i) => (it.reward ? [i + 1] : []));
-  if (markers.length === 0) return null;
-  const caught = markers.filter((m) => doneCount >= m).length;
-  const allCaught = caught === markers.length;
-  return (
-    <span
-      aria-hidden
-      className={`inline-flex items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-1.5 transition-colors duration-300 ${
-        allCaught ? 'bg-primary/15' : 'bg-background/80'
-      }`}
-    >
-      <span
-        className={`grid place-items-center transition-[opacity,filter] duration-300 ${
-          allCaught ? '' : 'opacity-50 grayscale'
-        }`}
-        style={{ width: 16, height: 16 }}
-      >
-        <Fly size={20} x={-2} y={-4} interactive={false} paused />
-      </span>
-      <span
-        className={`text-[11px] font-black leading-none tabular-nums ${
-          allCaught ? 'text-primary' : 'text-primary/60'
-        }`}
-      >
-        +{markers.length}
-      </span>
-    </span>
-  );
-}
 
 function StepsStrip({
   taskText,
@@ -1254,7 +1313,7 @@ function StepsStrip({
   open,
   isDone,
   onToggleOpen,
-  onCheckNext,
+  onToggleItem,
 }: {
   taskText: string;
   items: ChecklistItem[];
@@ -1262,96 +1321,162 @@ function StepsStrip({
   open: boolean;
   isDone: boolean;
   onToggleOpen: () => void;
-  onCheckNext?: (itemId: string) => void;
+  onToggleItem?: (itemId: string) => void;
 }) {
   const total = items.length;
   const allDone = doneCount === total;
   const next = items.find((it) => !it.done);
-  const showPeek = !open && !!next && !isDone;
+  const canTick = !!onToggleItem && !isDone;
+  const stepsLabel = `${total} ${total === 1 ? 'step' : 'steps'}`;
 
   return (
     <div
       {...stopRowGesture}
       onClick={(e) => e.stopPropagation()}
-      className={`mt-1.5 inline-flex h-9 max-w-full items-center rounded-full transition-colors duration-150 ${
-        allDone && !isDone
-          ? 'bg-primary/10 active:bg-primary/20 [@media(hover:hover)]:hover:bg-primary/15'
-          : 'bg-muted/70 active:bg-muted [@media(hover:hover)]:hover:bg-muted'
-      }`}
+      className="mt-0.5"
     >
-      {showPeek && onCheckNext ? (
-        <span className="flex flex-shrink-0 pl-3">
-          <ChecklistCheckbox
-            size={18}
-            checked={false}
-            onToggle={() => onCheckNext(next.id)}
-          />
-        </span>
-      ) : (
-        <span
-          aria-hidden
-          className={`flex flex-shrink-0 pl-3 ${
-            allDone ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          {allDone ? (
-            <CheckCircle2 className="h-[18px] w-[18px]" />
-          ) : (
-            <ListChecks className="h-[18px] w-[18px]" />
-          )}
-        </span>
-      )}
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label={`${open ? 'Hide' : 'Show'} steps for ${taskText}, ${doneCount} of ${total} done`}
-        onClick={onToggleOpen}
-        className="flex h-full min-w-0 touch-manipulation items-center gap-2 rounded-r-full pl-2 pr-2.5 text-left"
-      >
-        <span className="relative min-w-0 overflow-hidden">
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={showPeek ? next.id : allDone ? 'done' : 'steps'}
-              initial={{ y: 8, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -8, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-              className={`block truncate text-[13px] font-semibold leading-[1.35] md:text-[14px] ${
-                allDone ? 'text-primary' : 'text-foreground/75'
-              }`}
-            >
-              {showPeek
-                ? next.text || 'Untitled step'
-                : allDone
-                  ? `All ${total} steps done`
-                  : `${total} steps`}
-            </motion.span>
-          </AnimatePresence>
-        </span>
-        <span aria-hidden className="h-3.5 w-px flex-shrink-0 bg-foreground/10" />
-        <span className="flex flex-shrink-0 items-center gap-1.5">
-          <span
-            className={`text-[12px] font-bold leading-none tabular-nums ${
-              allDone ? 'text-primary' : 'text-muted-foreground'
-            }`}
+      <AnimatePresence initial={false} mode="wait">
+        {open ? (
+          <motion.div
+            key="list"
+            initial={{ height: 28, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 28, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+            className="overflow-hidden"
           >
-            {doneCount}/{total}
-          </span>
-          <StepsBonus items={items} doneCount={doneCount} />
-          <ChevronDown
-            className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
-              open ? 'rotate-180' : ''
-            }`}
-            strokeWidth={3}
-          />
-        </span>
-      </button>
+            <ul className="flex flex-col">
+              {items.map((item, i) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    disabled={!canTick}
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => onToggleItem?.(item.id)}
+                    aria-pressed={item.done}
+                    className="-ml-1 flex min-h-[34px] w-[calc(100%+0.25rem)] touch-manipulation items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 text-left transition-colors disabled:cursor-default active:bg-muted/60 [@media(hover:hover)]:hover:bg-muted/40"
+                  >
+                    <span className="flex w-[22px] shrink-0 justify-center">
+                      <ChecklistCheckbox
+                        size={18}
+                        checked={item.done}
+                        onToggle={() => onToggleItem?.(item.id)}
+                        interactive={false}
+                      />
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 break-words text-[13.5px] font-semibold leading-snug transition-colors duration-200 md:text-[14px] ${
+                        item.done
+                          ? 'text-muted-foreground/60 line-through decoration-muted-foreground/40'
+                          : 'text-foreground/80'
+                      }`}
+                    >
+                      {item.text || 'Untitled step'}
+                    </span>
+                    {item.reward && (
+                      <span
+                        aria-label="Pays a fly"
+                        className={`shrink-0 transition-[opacity,filter] duration-300 ${
+                          doneCount >= i + 1 ? '' : 'opacity-40 grayscale'
+                        }`}
+                        style={{ width: 18, height: 18 }}
+                      >
+                        <Fly size={22} x={-2} y={-3} interactive={false} paused />
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              aria-expanded
+              aria-label={`Hide steps for ${taskText}`}
+              onClick={onToggleOpen}
+              className="mb-0.5 flex h-7 items-center gap-2 rounded-lg pr-2 text-[12px] font-bold text-muted-foreground/70 transition-colors [@media(hover:hover)]:hover:text-foreground"
+            >
+              <span className="flex w-[22px] shrink-0 justify-center">
+                <ChevronDown className="h-4 w-4 rotate-180" strokeWidth={2.75} />
+              </span>
+              <StepPips items={items} done={doneCount} />
+              Hide
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="line"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
+            className="flex h-7 max-w-full items-center gap-2"
+          >
+            <span className="flex w-[22px] flex-shrink-0 justify-center">
+              {next && canTick ? (
+                <ChecklistCheckbox
+                  size={18}
+                  checked={false}
+                  onToggle={() => onToggleItem?.(next.id)}
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className={allDone ? 'text-primary' : 'text-muted-foreground/70'}
+                >
+                  {allDone ? (
+                    <CheckCircle2 className="h-[18px] w-[18px]" />
+                  ) : (
+                    <ListChecks className="h-[18px] w-[18px]" />
+                  )}
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              aria-expanded={false}
+              aria-label={`Show steps for ${taskText}, ${doneCount} of ${total} done`}
+              onClick={onToggleOpen}
+              className="-mr-1.5 flex h-full min-w-0 touch-manipulation items-center gap-2 rounded-lg pr-1.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/50"
+            >
+              <span className="relative min-w-0 overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={next && !isDone ? next.id : allDone ? 'done' : 'steps'}
+                    initial={{ y: 8, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -8, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+                    className={`block truncate text-[13px] font-semibold leading-[1.35] md:text-[14px] ${
+                      allDone ? 'text-primary' : 'text-foreground/65'
+                    }`}
+                  >
+                    {next && !isDone
+                      ? next.text || 'Untitled step'
+                      : allDone
+                        ? `All ${stepsLabel} done`
+                        : stepsLabel}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+              <StepPips items={items} done={doneCount} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 let lastSortDragAt = 0;
 const TAP_SLOP_PX = 8;
+
+function formatFocusSpan(seconds: number) {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 1) return `${Math.max(1, Math.round(seconds))}s`;
+  if (minutes < 60) return `${minutes}m`;
+  const rest = minutes % 60;
+  return rest ? `${Math.floor(minutes / 60)}h ${rest}m` : `${minutes / 60}h`;
+}
 
 function pixelSnappedTranslate(
   transform: { x: number; y: number } | null,
@@ -1409,7 +1534,7 @@ function SortableSectionHeader({
       data-is-active="true"
       data-section-header="true"
       className={`relative w-full select-none bg-muted/40 ${LIST_GROUP_DIVIDER} ${
-        isDragging ? 'opacity-90 before:hidden' : ''
+        isDragging ? 'bg-muted/70 before:hidden' : ''
       }`}
     >
       <div
@@ -1417,7 +1542,7 @@ function SortableSectionHeader({
         {...listeners}
         onClick={onToggleCollapsed}
         className={`group flex min-h-[40px] cursor-pointer items-center gap-1 py-1 pl-2.5 pr-2 transition-colors md:pl-3 ${
-          isDragging ? 'rounded-xl bg-popover shadow-md ring-1 ring-border/70' : ''
+          isDragging ? 'invisible' : ''
         }`}
       >
         <motion.span
@@ -1511,6 +1636,97 @@ function AddSectionRow({
       <Plus className="-ml-0.5 h-4 w-4" strokeWidth={2.75} />
       <span className="shrink-0">New section</span>
     </button>
+  );
+}
+
+const CLEARED_SPARKS = [0, 45, 90, 135, 180, 225, 270, 315];
+
+function DayClearedState({
+  doneCount,
+  hideActions,
+  onPlanTomorrow,
+  onAddTask,
+  onShowCompleted,
+  addDisabled,
+}: {
+  doneCount: number;
+  hideActions: boolean;
+  onPlanTomorrow: () => void;
+  onAddTask: () => void;
+  onShowCompleted?: () => void;
+  addDisabled: boolean;
+}) {
+  return (
+    <div className="fly-caught-enter">
+      <div className="flex flex-col items-center px-5 pb-5 pt-7 text-center">
+        <span className="relative grid h-16 w-16 place-items-center">
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-full bg-primary/10 motion-safe:animate-[day-cleared-halo_2.8s_ease-in-out_3]"
+          />
+          {CLEARED_SPARKS.map((angle, i) => (
+            <span
+              key={angle}
+              aria-hidden
+              className="day-cleared-spark absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full"
+              style={
+                {
+                  '--spark-angle': `${angle}deg`,
+                  animationDelay: `${120 + i * 18}ms`,
+                  backgroundColor: i % 2 ? '#f59e0b' : '#4f9149',
+                } as React.CSSProperties
+              }
+            />
+          ))}
+          <span className="day-cleared-seal relative grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#68b85c] to-[#4f9149] text-white shadow-[0_8px_18px_-8px_rgba(79,145,73,0.8),inset_0_-2px_0_rgba(0,0,0,0.12)]">
+            <Check className="h-7 w-7" strokeWidth={3.5} />
+          </span>
+        </span>
+        <p className="mt-3 text-[20px] font-black leading-tight tracking-tight text-foreground">
+          Day cleared!
+        </p>
+        <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
+          {doneCount} {doneCount === 1 ? 'task' : 'tasks'} done today
+        </p>
+        {!hideActions && (
+          <div className="mt-5 flex w-full gap-2">
+            <button
+              type="button"
+              onClick={onPlanTomorrow}
+              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[14px] font-black text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-transform active:scale-[0.97]"
+            >
+              <CalendarClock className="h-4 w-4" strokeWidth={2.75} />
+              Plan tomorrow
+            </button>
+            <button
+              type="button"
+              onClick={onAddTask}
+              disabled={addDisabled}
+              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-muted text-[14px] font-black text-foreground transition-transform active:scale-[0.97] disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" strokeWidth={3} />
+              Add task
+            </button>
+          </div>
+        )}
+      </div>
+      {onShowCompleted && (
+        <button
+          type="button"
+          onClick={onShowCompleted}
+          className="flex w-full items-center justify-between border-t border-border/60 py-3 pl-4 pr-3.5 text-left transition-colors active:bg-muted/50 [@media(hover:hover)]:hover:bg-muted/40"
+        >
+          <span className="inline-flex items-center gap-2 text-[13px] font-bold text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            {doneCount} done today
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-[13px] font-black text-primary">
+            Show
+            <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -1787,6 +2003,7 @@ export default function TaskList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
   const [isAnyDragging, setIsAnyDragging] = useState(false);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [sectionEditor, setSectionEditor] = useState<
     { mode: 'create' } | { mode: 'edit'; sectionId: string } | null
   >(null);
@@ -2296,6 +2513,7 @@ export default function TaskList({
     hapticGrab();
     lastDragOverIdRef.current = null;
     setIsAnyDragging(true);
+    setDragActiveId(String(event.active.id));
     if (openSteps.size) {
       setOpenSteps(new Set());
       setCollapsedForDrag(true);
@@ -2392,6 +2610,7 @@ export default function TaskList({
   const handleDragCancel = () => {
     if (maxDragDistRef.current >= 5) lastSortDragAt = performance.now();
     setIsAnyDragging(false);
+    setDragActiveId(null);
     setCollapsedForDrag(false);
     clearDraggingSection();
     activeAreaLimitsRef.current = null;
@@ -2418,6 +2637,7 @@ export default function TaskList({
     );
     if (travelled >= 5) lastSortDragAt = performance.now();
     setIsAnyDragging(false);
+    setDragActiveId(null);
     setCollapsedForDrag(false);
     activeAreaLimitsRef.current = null;
     const { active, over } = event;
@@ -2539,6 +2759,16 @@ export default function TaskList({
     });
   };
 
+  const dragActiveTask = dragActiveId
+    ? tasks.find((t) => t.id === dragActiveId) ?? null
+    : null;
+  const dragActiveSectionId = dragActiveId
+    ? sectionIdFromSortable(dragActiveId)
+    : null;
+  const dragActiveSection = dragActiveSectionId
+    ? sections.find((sec) => sec.id === dragActiveSectionId) ?? null
+    : null;
+
   const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
     const limits = activeAreaLimitsRef.current;
     const container = scrollContainerRef.current;
@@ -2563,16 +2793,16 @@ export default function TaskList({
 
       let newY = verticalRestricted.y;
 
-      // Bottom restriction
+      const overhang = draggingNodeRect.height / 2;
+
       const currentBottom = draggingNodeRect.bottom + newY;
-      if (currentBottom > limitBottom) {
-        newY = limitBottom - draggingNodeRect.bottom;
+      if (currentBottom > limitBottom + overhang) {
+        newY = limitBottom + overhang - draggingNodeRect.bottom;
       }
 
-      // Top restriction
       const currentTop = draggingNodeRect.top + newY;
-      if (currentTop < limitTop) {
-        newY = limitTop - draggingNodeRect.top;
+      if (currentTop < limitTop - overhang) {
+        newY = limitTop - overhang - draggingNodeRect.top;
       }
 
       return {
@@ -2606,35 +2836,16 @@ export default function TaskList({
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
             allTasksCompleted && !filtersActive ? (
-              <div className="fly-caught-enter flex flex-col items-center gap-1.5 px-2 pb-0 pt-6 text-center">
-                <Fly size={34} y={-2} paused={paused} />
-                <p className="mt-1 text-[16px] font-black leading-tight tracking-tight text-foreground">
-                  All caught for today
-                </p>
-                {onShowCompleted ? (
-                  <button
-                    type="button"
-                    onClick={onShowCompleted}
-                    className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[12px] font-semibold text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    Show {tasks.length} done
-                  </button>
-                ) : (
-                  <p className="text-[12px] font-semibold text-muted-foreground">
-                    {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} done
-                  </p>
-                )}
-                <div className={hideAddControls ? 'hidden' : 'mt-4 w-full border-t border-border/60'}>
-                  <EmptyAddRow
-                    label="Add another task"
-                    quickAddOpen={quickAddOpen}
-                    onClick={() =>
-                      onAddRequested('', null, { preselectToday: true })
-                    }
-                  />
-                </div>
-              </div>
+              <DayClearedState
+                doneCount={tasks.length}
+                hideActions={hideAddControls}
+                onPlanTomorrow={() => router.push('/planner')}
+                onAddTask={() =>
+                  onAddRequested('', null, { preselectToday: true })
+                }
+                onShowCompleted={onShowCompleted}
+                addDisabled={quickAddOpen}
+              />
             ) : filtersActive ? (
               <FilteredEmptyState
                 hidden={tasks.length}
@@ -2789,6 +3000,24 @@ export default function TaskList({
                   </AnimatePresence>
                 </SortableContext>
               </div>
+              {typeof document !== 'undefined' &&
+                createPortal(
+                  <DragOverlay dropAnimation={DROP_ANIMATION} zIndex={70}>
+                    {dragActiveTask ? (
+                      <TaskDragPreview
+                        task={dragActiveTask}
+                        tags={(dragActiveTask.tags ?? [])
+                          .map((tagId) => getTagDetails(tagId))
+                          .filter(
+                            (tag): tag is NonNullable<typeof tag> => !!tag,
+                          )}
+                      />
+                    ) : dragActiveSection ? (
+                      <SectionDragPreview name={dragActiveSection.name} />
+                    ) : null}
+                  </DragOverlay>,
+                  document.body,
+                )}
             </DndContext>
           )}
 

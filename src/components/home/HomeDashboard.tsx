@@ -980,6 +980,7 @@ export default function HomeDashboard() {
                   isPremium={isPremium}
                   introFill={guided}
                   introHold={questIntroHeld}
+                  loading={questsData === undefined && !questsError}
                 />
               </motion.div>
             )}
@@ -1454,6 +1455,7 @@ export default function HomeDashboard() {
         tags={tags}
         autoStart={timerAutoStart}
         onMutateToday={() => mutateToday()}
+        onSubjectChange={(picked) => setTimerTask(picked as unknown as Task)}
       />
 
       {!showTimer && (

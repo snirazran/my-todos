@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Clock } from 'lucide-react';
-import { useBuddyState } from '@/hooks/useBuddyState';
+import { useBuddyBonusFlies, useBuddyState } from '@/hooks/useBuddyState';
 import type { FrogIndices } from '@/lib/friends/indices';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { cn } from '@/lib/utils';
@@ -56,16 +56,60 @@ export function BuddyBadge({
   taskId,
   date,
   size = 24,
+  variant = 'avatar',
   className,
 }: {
   taskId: string;
   date?: string;
   size?: number;
+  variant?: 'avatar' | 'chip';
   className?: string;
 }) {
   const byTaskId = useBuddyState();
   const state = byTaskId[taskId];
   if (!state) return null;
+
+  if (variant === 'chip') {
+    const pending = state.status === 'pending';
+    const done =
+      !pending &&
+      (state.oneTime
+        ? state.partnerCompletedDates.length > 0
+        : !!date && state.partnerCompletedDates.includes(date));
+    const firstName = state.partnerName?.trim().split(/\s+/)[0] || 'Buddy';
+    return (
+      <span
+        title={
+          pending
+            ? `Waiting for ${state.partnerName} to accept`
+            : done
+              ? `${state.partnerName} completed this`
+              : `Shared with ${state.partnerName}`
+        }
+        className={cn(
+          'inline-flex h-7 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-[12.5px] font-black',
+          pending
+            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+            : done
+              ? 'bg-[#4f9149]/15 text-[#3d7a38] dark:text-emerald-400'
+              : 'bg-muted text-muted-foreground',
+          className,
+        )}
+      >
+        <BuddyFrogFace
+          indices={state.partnerIndices}
+          size={24}
+          className="shrink-0 ring-1 ring-inset ring-black/5"
+        />
+        <span className="truncate">{firstName}</span>
+        {pending ? (
+          <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+        ) : done ? (
+          <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
+        ) : null}
+      </span>
+    );
+  }
 
   if (state.status === 'pending') {
     return (
@@ -125,6 +169,95 @@ export function BuddyBadge({
           />
         </span>
       )}
+    </span>
+  );
+}
+
+export function BuddyLine({
+  taskId,
+  date,
+  isDone = false,
+  className,
+}: {
+  taskId: string;
+  date?: string;
+  isDone?: boolean;
+  className?: string;
+}) {
+  const byTaskId = useBuddyState();
+  const bonusFlies = useBuddyBonusFlies();
+  const state = byTaskId[taskId];
+  if (!state) return null;
+
+  const firstName = state.partnerName?.trim().split(/\s+/)[0] || 'your buddy';
+  const pending = state.status === 'pending';
+  const partnerDone =
+    !pending &&
+    (state.oneTime
+      ? state.partnerCompletedDates.length > 0
+      : !!date && state.partnerCompletedDates.includes(date));
+
+  const tone = pending
+    ? 'text-amber-600 dark:text-amber-400'
+    : partnerDone
+      ? 'text-[#3d7a38] dark:text-emerald-400'
+      : 'text-muted-foreground';
+
+  const message = pending ? (
+    <>Waiting for {firstName} to join</>
+  ) : partnerDone && isDone ? (
+    <>You both finished · +{bonusFlies} each</>
+  ) : partnerDone ? (
+    <>
+      <b className="font-black">{firstName}</b> finished · your turn
+    </>
+  ) : isDone ? (
+    <>Waiting on {firstName}</>
+  ) : (
+    <>
+      With <b className="font-black text-foreground/80">{firstName}</b> · +
+      {bonusFlies} each
+    </>
+  );
+
+  return (
+    <span className={cn('flex h-7 min-w-0 items-center gap-2', className)}>
+      <span className="relative shrink-0">
+        <BuddyFrogFace
+          indices={state.partnerIndices}
+          size={22}
+          className={cn(
+            'ring-2',
+            pending
+              ? 'opacity-70 ring-amber-400/60'
+              : partnerDone
+                ? 'ring-[#4f9149]'
+                : 'ring-border',
+          )}
+        />
+        {(pending || partnerDone) && (
+          <span
+            className={cn(
+              'absolute -bottom-0.5 -right-1 grid h-3 w-3 place-items-center rounded-full text-white ring-2 ring-card',
+              pending ? 'bg-amber-500' : 'bg-[#4f9149]',
+            )}
+          >
+            {pending ? (
+              <Clock className="h-2 w-2" strokeWidth={3.5} />
+            ) : (
+              <Check className="h-2 w-2" strokeWidth={4} />
+            )}
+          </span>
+        )}
+      </span>
+      <span
+        className={cn(
+          'min-w-0 truncate text-[12.5px] font-semibold md:text-[13px]',
+          tone,
+        )}
+      >
+        {message}
+      </span>
     </span>
   );
 }

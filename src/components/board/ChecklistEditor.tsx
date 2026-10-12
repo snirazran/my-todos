@@ -41,6 +41,29 @@ function firstBonusLength(): number | null {
   return null;
 }
 
+export function checklistRewardHint(items: ChecklistItem[]): string | null {
+  const total = items.length;
+  if (total === 0) return null;
+  const doneCount = items.filter((it) => it.done).length;
+  const markers = items.flatMap((it, i) => (it.reward ? [i + 1] : []));
+  if (markers.length === 0) {
+    const need = firstBonusLength();
+    if (!need || need <= total) return null;
+    return `Add ${stepWord(need - total)} more to earn a bonus fly`;
+  }
+  const caught = markers.filter((m) => doneCount >= m).length;
+  const next = markers.find((m) => doneCount < m);
+  if (next === undefined) {
+    return `Bonus caught · +${markers.length} ${markers.length === 1 ? 'fly' : 'flies'}`;
+  }
+  if (next === total) {
+    return caught === 0
+      ? `Check all ${total} steps for a bonus fly`
+      : 'Finish all steps for your last bonus fly';
+  }
+  return `${stepWord(next - doneCount)} to ${caught === 0 ? 'a' : 'the next'} bonus fly`;
+}
+
 export function ChecklistRewardTrack({
   items,
   teach = false,
@@ -286,7 +309,8 @@ export function ChecklistEditor({
   onChange,
   autoFocus = null,
   className = '',
-}: ChecklistEditorProps) {
+  hideRewardTrack = false,
+}: ChecklistEditorProps & { hideRewardTrack?: boolean }) {
   // Synchronous source of truth: blur→click sequences fire before React
   // re-renders, so handlers must never read a stale render closure.
   const latestRef = useRef(items);
@@ -405,7 +429,9 @@ export function ChecklistEditor({
       layoutScroll
       className={`flex flex-col ${className}`}
     >
-      <ChecklistRewardTrack items={rewardItems} teach className="mb-2" />
+      {!hideRewardTrack && (
+        <ChecklistRewardTrack items={rewardItems} teach className="mb-2" />
+      )}
       <Reorder.Group
         as="div"
         axis="y"
@@ -444,8 +470,8 @@ export function ChecklistEditor({
 
       {!atCap && (
         <div className="flex min-h-[44px] items-start gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
-          <span className="mt-[10px] grid h-[23px] w-[23px] shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
-            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+          <span className="mt-[10px] grid h-[23px] w-[23px] shrink-0 place-items-center text-muted-foreground/50">
+            <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
           </span>
           <textarea
             ref={addRef}
@@ -469,7 +495,7 @@ export function ChecklistEditor({
               }
             }}
             onBlur={addFromDraft}
-            placeholder="Add a step…"
+            placeholder="Add a step"
             className={`${TEXT_CLASS} text-foreground placeholder:text-muted-foreground/50`}
           />
         </div>
@@ -593,7 +619,7 @@ function ChecklistRow({
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => onRemove(false)}
           aria-label="Remove step"
-          className="mt-2 shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-all hover:text-rose-500 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+          className="mt-2 shrink-0 rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:text-rose-500 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
         >
           <X className="h-4 w-4" />
         </button>
@@ -609,7 +635,7 @@ function ChecklistRow({
             className={`mt-2 shrink-0 touch-none rounded-lg p-1.5 transition-colors cursor-grab active:cursor-grabbing ${
               dragging
                 ? 'text-foreground'
-                : 'text-muted-foreground/35 [@media(hover:hover)]:hover:text-muted-foreground'
+                : 'text-muted-foreground/25 [@media(hover:hover)]:hover:text-muted-foreground'
             }`}
           >
             <GripVertical className="h-4 w-4" />

@@ -19,7 +19,15 @@ import type { RatingMoment } from '@/lib/rateApp';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
-  { ssr: false },
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        aria-hidden
+        className="h-11 w-11 rounded-xl border-2 border-border/40 bg-muted/60"
+      />
+    ),
+  },
 );
 
 type Catalog = Record<string, QuestRewardCatalogItem>;

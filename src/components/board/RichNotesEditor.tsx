@@ -241,7 +241,7 @@ export function NotesView({
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="ml-3 mt-0.5 text-[12px] font-bold text-primary"
+          className="mb-1.5 ml-3 mt-0.5 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"
         >
           {showAll ? 'Show less' : 'Show more'}
         </button>

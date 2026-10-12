@@ -2717,6 +2717,7 @@ export default function TaskBoard({
         task={timerTask as any}
         tags={userTags}
         onMutateToday={() => window.dispatchEvent(new Event('board-refresh'))}
+        onSubjectChange={(picked) => setTimerTask(picked as any)}
       />
 
       {!showTimer && (

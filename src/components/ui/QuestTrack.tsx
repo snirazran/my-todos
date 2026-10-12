@@ -33,6 +33,7 @@ export function QuestTrack({
 
   return (
     <span className="mt-0.5 flex items-center gap-2">
+      <span className={action && !action.disabled ? 'claim-nudge flex flex-1' : 'contents'}>
       <span
         role={action ? 'button' : 'progressbar'}
         tabIndex={action ? 0 : undefined}
@@ -88,6 +89,7 @@ export function QuestTrack({
         >
           {action?.label ?? ''}
         </span>
+      </span>
       </span>
       {safeTarget > 1 && !action && (
         <span className="shrink-0 text-[11px] font-black tabular-nums text-muted-foreground">

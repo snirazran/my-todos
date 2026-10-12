@@ -6,7 +6,7 @@ import {
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
-  Clock,
+  ChevronRight,
   EyeOff,
   Flame,
   Pen,
@@ -36,7 +36,9 @@ import { BuddyTaskInvite } from '@/components/ui/buddy/BuddyTaskInvite';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
-import { ChecklistEditor } from './ChecklistEditor';
+import { ChecklistEditor, checklistRewardHint } from './ChecklistEditor';
+import { normalizeChecklistRewards } from '@/lib/checklist';
+import { StepPips } from '@/components/ui/TaskAdornments';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor, { NotesView } from './RichNotesEditor';
@@ -312,15 +314,21 @@ export default function TaskDetailSheet({
   const streak = displayTask.streak ?? 0;
 
   const taskTags = displayTask.tags ?? [];
+  const rewardItems = normalizeChecklistRewards(checklist);
+  const stepsDone = rewardItems.filter((item) => item.done).length;
+  const rewardHint = checklistRewardHint(rewardItems);
   const hasContent = !!notesText || checklist.length > 0;
   const hasMeta =
     isCompleted ||
     (isRepeating && streak > 0) ||
-    !!buddy ||
-    (minimal && (isRepeating || !!displayTask.startTime || taskTags.length > 0));
-
-  const chipBase =
-    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black leading-none';
+    (minimal &&
+      (!!buddy || isRepeating || !!displayTask.startTime || taskTags.length > 0));
+  const buddyDoneToday =
+    !!buddy &&
+    buddy.status === 'active' &&
+    (buddy.oneTime
+      ? buddy.partnerCompletedDates.length > 0
+      : buddy.partnerCompletedDates.includes(todayYmd()));
 
   return (
     <>
@@ -352,10 +360,7 @@ export default function TaskDetailSheet({
                 : 'pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-2'
             }`}
           >
-            {/* Main card — mirrors the QuickAddSheet shell */}
-            <div
-              className="relative flex min-h-0 shrink-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:rounded-[24px] sm:shadow-none sm:ring-0"
-            >
+            <div className="relative flex min-h-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:rounded-[24px] sm:shadow-none sm:ring-0">
               <div
                 onPointerDown={(e) => dragControls.start(e)}
                 className="flex h-7 shrink-0 items-center justify-center touch-none cursor-grab active:cursor-grabbing sm:hidden"
@@ -363,13 +368,13 @@ export default function TaskDetailSheet({
                 <div className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
               </div>
 
-              <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 sm:right-4 sm:top-4">
+              <div className="absolute right-3 top-3 z-10 flex items-center gap-1 sm:right-4 sm:top-4">
                 {onDelete && (
                   <button
                     onClick={runAndClose(onDelete)}
                     aria-label="Delete task"
                     title="Delete"
-                    className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground/70 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                    className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground/50 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -388,114 +393,86 @@ export default function TaskDetailSheet({
                   {!minimal && onEdit ? (
                     <button
                       onClick={onEdit}
-                      className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+                      className="group w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
-                      <span className="text-[21px] font-black leading-[27px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
+                      <span className="text-[22px] font-black leading-[28px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
                         {displayTask.text}
-                        <Pencil className="mb-1 ml-2 inline-block h-4 w-4 text-muted-foreground/50" />
+                        <Pencil className="mb-1 ml-2 inline-block h-3.5 w-3.5 text-muted-foreground/35 transition-colors group-hover:text-muted-foreground" />
                       </span>
                     </button>
                   ) : (
-                    <span className="block text-[21px] font-black leading-[27px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
+                    <span className="block text-[22px] font-black leading-[28px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
                       {displayTask.text}
                     </span>
                   )}
                 </div>
 
                 {hasMeta && (
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px] font-black">
                     {isCompleted && (
-                      <span className={`${chipBase} bg-green-500/10 text-green-600 dark:text-green-400`}>
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="inline-flex h-7 items-center gap-1 rounded-full bg-green-500/10 px-2.5 text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="h-4 w-4" />
                         Completed
                       </span>
                     )}
                     {isRepeating && streak > 0 && (
-                      <span
-                        className={`${chipBase} bg-orange-500/10 text-orange-500`}
-                        title={`${streak} in a row`}
-                      >
-                        <Flame className="h-3.5 w-3.5" fill="currentColor" />
-                        <span className="tabular-nums">×{streak}</span>
+                      <span className="inline-flex h-7 items-center gap-1 rounded-full bg-orange-500/10 px-2.5 text-orange-600 dark:text-orange-400">
+                        <Flame className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+                        <span className="tabular-nums">{streak} in a row</span>
                       </span>
                     )}
-                    {minimal && displayTask.startTime && (
-                      <button
-                        onClick={!minimal && onSchedule ? onSchedule : undefined}
-                        disabled={minimal || !onSchedule}
-                        className={`${chipBase} bg-primary/10 text-primary disabled:pointer-events-none`}
-                      >
-                        <Bell className="h-3 w-3" />
-                        <span className="tabular-nums">{displayTask.startTime}</span>
-                      </button>
+                    {minimal && buddy && (
+                      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#4f9149]/10 pl-1 pr-2.5 text-[#3d7a38] dark:text-emerald-400">
+                        <BuddyFrogFace indices={buddy.partnerIndices} size={20} />
+                        With {buddy.partnerName}
+                      </span>
                     )}
                     {minimal && isRepeating && (
-                      <span className={`${chipBase} bg-muted/70 text-muted-foreground`}>
-                        <AppIcon name="repeat" label="Repeat" className="h-3 w-3" />
+                      <span className="inline-flex h-7 items-center gap-1 rounded-full bg-muted/70 px-2.5 text-muted-foreground">
+                        <Repeat className="h-3.5 w-3.5" />
                         {repeatLabel}
                       </span>
                     )}
-                    {buddy && buddy.status === 'pending' ? (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 py-0.5 pl-0.5 pr-2"
-                        title={`Waiting for ${buddy.partnerName} to accept`}
-                      >
-                        <BuddyFrogFace
-                          indices={buddy.partnerIndices}
-                          size={20}
-                          className="opacity-75 ring-2 ring-inset ring-amber-500/40"
-                        />
-                        <span className="text-[11px] font-black leading-none text-amber-600 dark:text-amber-500">
-                          Waiting for {buddy.partnerName}
-                        </span>
+                    {minimal && displayTask.startTime && (
+                      <span className="inline-flex h-7 items-center gap-1 rounded-full bg-muted/70 px-2.5 tabular-nums text-muted-foreground">
+                        <Bell className="h-3.5 w-3.5" />
+                        {displayTask.startTime}
                       </span>
-                    ) : buddy ? (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full bg-[#4f9149]/10 py-0.5 pl-0.5 pr-2"
-                        title={`Shared with ${buddy.partnerName}`}
-                      >
-                        <BuddyFrogFace indices={buddy.partnerIndices} size={20} />
-                        <span className="text-[11px] font-black leading-none text-[#4f9149]">
-                          With {buddy.partnerName}
-                        </span>
-                      </span>
-                    ) : null}
-                    {minimal && taskTags.map((tagId) => {
-                      const t = tagDetails(tagId);
-                      if (!t) return null;
-                      return (
-                        <button
-                          key={tagId}
-                          onClick={undefined}
-                          disabled={minimal || !onAddTags}
-                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-black tracking-wide leading-4 disabled:pointer-events-none"
-                          style={{
-                            backgroundColor: `${t.color}20`,
-                            color: t.color,
-                            borderColor: `${t.color}40`,
-                          }}
-                        >
-                          {t.name}
-                        </button>
-                      );
-                    })}
+                    )}
+                    {minimal &&
+                      taskTags.map((tagId) => {
+                        const t = tagDetails(tagId);
+                        if (!t) return null;
+                        return (
+                          <span
+                            key={tagId}
+                            className="inline-flex h-7 items-center gap-1.5 rounded-full bg-muted/70 px-2.5 text-muted-foreground"
+                          >
+                            <span
+                              aria-hidden
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: t.color }}
+                            />
+                            {t.name}
+                          </span>
+                        );
+                      })}
                   </div>
                 )}
 
                 {!minimal && (
                   <>
-                    <div className="mt-3 h-px shrink-0 bg-border/60" />
-
                     <div
                       style={
                         keyboardActive && vvHeight
                           ? { maxHeight: Math.max(150, vvHeight - 200) }
                           : undefined
                       }
-                      className={`-mx-2 mt-2 flex min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain px-2 pb-1 ${
-                        keyboardActive ? '' : 'max-h-[min(460px,50dvh)]'
-                      }`}
+                      className="-mx-2 mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 pb-1"
                     >
+                      {(editingNotes || notesText) && (
+                        <SectionLabel>Notes</SectionLabel>
+                      )}
                       {editingNotes ? (
                         <RichNotesEditor
                           value={notes}
@@ -507,109 +484,159 @@ export default function TaskDetailSheet({
                           }}
                         />
                       ) : notesText ? (
-                        <NotesView
-                          value={notes}
-                          onEdit={() => setEditingNotes(true)}
-                        />
+                        <div className="rounded-2xl bg-muted/45 py-0.5">
+                          <NotesView
+                            value={notes}
+                            onEdit={() => setEditingNotes(true)}
+                          />
+                        </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => setEditingNotes(true)}
-                          className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted-foreground/70 transition-colors [@media(hover:hover)]:hover:bg-muted/40"
+                          className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:bg-muted/40"
                         >
                           <span className="grid h-[23px] w-[23px] shrink-0 place-items-center">
                             <Pen className="h-4 w-4" />
                           </span>
-                          Add notes…
+                          Add notes
                         </button>
                       )}
 
+                      {checklist.length > 0 && (
+                        <SectionLabel
+                          aside={
+                          <span className="flex items-center gap-2">
+                            <span className="text-[12px] font-bold tabular-nums text-muted-foreground">
+                              {stepsDone}/{rewardItems.length}
+                            </span>
+                            <StepPips items={rewardItems} done={stepsDone} />
+                          </span>
+                          }
+                        >
+                          Steps
+                        </SectionLabel>
+                      )}
+
                       <ChecklistEditor
+                        hideRewardTrack
                         items={checklist}
                         onChange={(next, { persist: persistNow }) => {
                           setChecklist(next);
                           if (persistNow) persist({ checklist: next });
                         }}
                       />
-                    </div>
 
-                    {!keyboardActive && (
-                      <div
-                        className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3"
-                      >
-                        {onSetRepeat && (
-                          <PropertyChip
-                            dataHint="repeat-button"
-                            active={isRepeating}
-                            icon={<Repeat className="h-4 w-4" />}
-                            onClick={() => setShowRepeat(true)}
-                          >
-                            {isRepeating ? repeatChipLabel : 'Repeat'}
-                          </PropertyChip>
-                        )}
-                        {onSchedule && (
-                          <PropertyChip
-                            active={!!displayTask.startTime || !!displayTask.reminder}
-                            icon={<Bell className="h-4 w-4" />}
-                            onClick={onSchedule}
-                          >
-                            {displayTask.startTime ? (
-                              <span className="tabular-nums">
-                                {displayTask.startTime}
-                              </span>
-                            ) : (
-                              'Remind me'
-                            )}
-                          </PropertyChip>
-                        )}
-                        {onAddTags && (
-                          <span
-                            data-hint="task-tags-button"
-                            data-tag-ids={taskTags.join(',') || undefined}
-                            className="inline-flex flex-wrap items-center gap-1.5"
-                          >
-                            {taskTags.some((id) => tagDetails(id)) ? (
-                              taskTags.map((tagId) => {
-                                const t = tagDetails(tagId);
-                                if (!t) return null;
-                                return (
-                                  <button
-                                    key={tagId}
-                                    type="button"
-                                    onClick={onAddTags}
-                                    className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-black transition-transform active:scale-95"
-                                    style={{
-                                      backgroundColor: `${t.color}1a`,
-                                      color: t.color,
-                                      borderColor: `${t.color}40`,
-                                    }}
-                                  >
-                                    <Tag className="h-3.5 w-3.5" />
-                                    {t.name}
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <PropertyChip
-                                icon={<Tag className="h-4 w-4" />}
-                                onClick={onAddTags}
-                              >
-                                Tag
-                              </PropertyChip>
-                            )}
+                      {rewardHint && (
+                        <p className="flex items-center gap-1.5 px-2 pb-1 pt-1 text-[12px] font-semibold text-muted-foreground">
+                          <span className="grid h-4 w-4 place-items-center">
+                            <Fly size={18} x={-1} y={-2} interactive={false} paused />
                           </span>
-                        )}
-                        {canShareWithBuddy && !buddy && (
-                          <PropertyChip
-                            tone="buddy"
-                            icon={<Users className="h-4 w-4" strokeWidth={2.5} />}
-                            onClick={() => setShowBuddyInvite(true)}
-                          >
-                            Do with a friend
-                          </PropertyChip>
-                        )}
-                      </div>
-                    )}
+                          {rewardHint}
+                        </p>
+                      )}
+
+                    {!keyboardActive &&
+                      (onSetRepeat || onSchedule || onAddTags || canShareWithBuddy) && (
+                        <>
+                        <SectionLabel>Details</SectionLabel>
+                        <div className="overflow-hidden rounded-2xl bg-muted/45">
+                          {onSetRepeat && (
+                            <PropertyRow
+                              dataHint="repeat-button"
+                              tint="green"
+                              icon={<Repeat className="h-4 w-4" strokeWidth={2.5} />}
+                              label="Repeat"
+                              onClick={() => setShowRepeat(true)}
+                            >
+                              {isRepeating ? repeatLabel : 'Never'}
+                            </PropertyRow>
+                          )}
+                          {onSchedule && (
+                            <PropertyRow
+                              tint="amber"
+                              icon={<Bell className="h-4 w-4" strokeWidth={2.5} />}
+                              label="Time"
+                              onClick={onSchedule}
+                            >
+                              {displayTask.startTime ? (
+                                <span className="tabular-nums">
+                                  {displayTask.endTime &&
+                                  displayTask.endTime !== displayTask.startTime
+                                    ? `${displayTask.startTime}–${displayTask.endTime}`
+                                    : displayTask.startTime}
+                                  {displayTask.reminder ? ' · Reminder' : ''}
+                                </span>
+                              ) : (
+                                'None'
+                              )}
+                            </PropertyRow>
+                          )}
+                          {onAddTags && (
+                            <PropertyRow
+                              dataHint="task-tags-button"
+                              dataTagIds={taskTags.join(',') || undefined}
+                              tint="violet"
+                              icon={<Tag className="h-4 w-4" strokeWidth={2.5} />}
+                              label="Tags"
+                              onClick={onAddTags}
+                            >
+                              {taskTags.some((id) => tagDetails(id)) ? (
+                                <span className="flex min-w-0 items-center justify-end gap-2.5">
+                                  {taskTags.map((tagId) => {
+                                    const t = tagDetails(tagId);
+                                    if (!t) return null;
+                                    return (
+                                      <span
+                                        key={tagId}
+                                        className="inline-flex min-w-0 items-center gap-1"
+                                      >
+                                        <span
+                                          aria-hidden
+                                          className="h-2 w-2 shrink-0 rounded-full"
+                                          style={{ backgroundColor: t.color }}
+                                        />
+                                        <span className="truncate">{t.name}</span>
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              ) : (
+                                'None'
+                              )}
+                            </PropertyRow>
+                          )}
+                          {canShareWithBuddy && (
+                            <PropertyRow
+                              tint="buddy"
+                              icon={<Users className="h-4 w-4" strokeWidth={2.5} />}
+                              label="Buddy"
+                              onClick={
+                                buddy ? undefined : () => setShowBuddyInvite(true)
+                              }
+                            >
+                              {buddy ? (
+                                <span className="inline-flex min-w-0 items-center gap-1.5">
+                                  <BuddyFrogFace
+                                    indices={buddy.partnerIndices}
+                                    size={20}
+                                  />
+                                  <span className="truncate">
+                                    {buddy.status === 'pending'
+                                      ? `Waiting for ${buddy.partnerName}`
+                                      : buddyDoneToday
+                                        ? `${buddy.partnerName} · done`
+                                        : buddy.partnerName}
+                                  </span>
+                                </span>
+                              ) : (
+                                'Do it with a friend'
+                              )}
+                            </PropertyRow>
+                          )}
+                        </div>
+                        </>
+                      )}
 
                     {!keyboardActive &&
                       buddy?.status === 'pending' &&
@@ -629,18 +656,17 @@ export default function TaskDetailSheet({
                               setCancelling(false);
                             }
                           }}
-                          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border/60 bg-muted/40 text-[13px] font-black tracking-tight text-muted-foreground transition-transform active:scale-[0.99] disabled:opacity-60"
+                          className="mt-1.5 self-center rounded-full px-3 py-1.5 text-[12px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
                         >
-                          <Clock className="h-4 w-4" strokeWidth={2.5} />
                           Cancel invite to {buddy.partnerName}
                         </button>
                       )}
+                    </div>
                   </>
                 )}
               </div>
             </div>
 
-            {/* Duplicate options — completed + past tasks */}
             {minimal && onDuplicate && (
               <div className="shrink-0 rounded-[28px] bg-popover p-3 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
                 <p className="mb-2 text-center text-[13px] font-black text-muted-foreground">
@@ -671,7 +697,6 @@ export default function TaskDetailSheet({
               </div>
             )}
 
-            {/* Primary action — the chunky CTA, twin of Add Task */}
             {keyboardActive ? null : isCompleted ? (
               onComplete && (
                 <button
@@ -683,69 +708,69 @@ export default function TaskDetailSheet({
                 </button>
               )
             ) : (
-              <button
-                onClick={runAndClose(onComplete)}
-                disabled={!onComplete}
-                className={[
-                  'group relative h-14 w-full shrink-0 overflow-hidden rounded-[28px] text-[17px] font-black transition-all',
-                  'bg-[#4f9149] text-white',
-                  'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
-                  '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
-                  'disabled:pointer-events-none disabled:opacity-60 disabled:grayscale',
-                ].join(' ')}
-              >
-                <span className="relative z-10 flex items-center justify-center gap-2.5">
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-white/90 shadow-sm">
-                    <Fly size={30} y={-2} interactive={false} />
-                  </span>
-                  <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
-                  {!!onComplete && taskFlies > 1 && (
-                    <span
-                      title={`Completing this now catches ${taskFlies} flies`}
-                      className="rounded-full bg-white/25 px-2 py-1 text-[13px] font-black leading-none tabular-nums"
-                    >
-                      {taskFlies}
+              <div className="flex shrink-0 items-stretch gap-2.5">
+                {!minimal && onStartTimer && (
+                  <TaskFocusButton
+                    taskId={displayTask?.id ?? ''}
+                    onClick={runAndClose(onStartTimer)}
+                  />
+                )}
+                <button
+                  onClick={runAndClose(onComplete)}
+                  disabled={!onComplete}
+                  className={[
+                    'group relative h-14 min-w-0 flex-1 overflow-hidden rounded-[28px] text-[17px] font-black transition-all',
+                    'bg-[#4f9149] text-white',
+                    'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
+                    '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
+                    'disabled:pointer-events-none disabled:opacity-60 disabled:grayscale',
+                  ].join(' ')}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2.5">
+                    <span className="grid h-9 w-9 place-items-center rounded-full bg-white/90 shadow-sm">
+                      <Fly size={30} y={-2} interactive={false} />
                     </span>
-                  )}
-                </span>
-              </button>
+                    <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
+                    {!!onComplete && taskFlies > 1 && (
+                      <span
+                        title={`Completing this now catches ${taskFlies} flies`}
+                        className="rounded-full bg-white/25 px-2 py-1 text-[13px] font-black leading-none tabular-nums"
+                      >
+                        +{taskFlies}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </div>
             )}
 
-            {/* Secondary actions */}
             {!minimal &&
               !keyboardActive &&
-              (onStartTimer || (isRepeating && onSkipToday) || onDoLater) && (
-                <div className="flex shrink-0 gap-2.5">
-                  {onStartTimer && (
-                    <TaskFocusButton
-                      taskId={displayTask?.id ?? ''}
-                      onClick={runAndClose(onStartTimer)}
-                    />
+              ((isRepeating && onSkipToday) || onDoLater) && (
+                <button
+                  type="button"
+                  onClick={runAndClose(
+                    isRepeating && onSkipToday ? onSkipToday : onDoLater,
                   )}
+                  data-hint={
+                    isRepeating && onSkipToday ? undefined : 'save-later-button'
+                  }
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 self-center rounded-full bg-popover px-4 text-[13px] font-bold text-muted-foreground ring-1 ring-border/70 shadow-[0_2px_0_0_rgba(0,0,0,0.12)] transition-colors active:translate-y-px [@media(hover:hover)]:hover:text-foreground"
+                >
                   {isRepeating && onSkipToday ? (
-                    <SecondaryButton
-                      label="Skip today"
-                      onClick={runAndClose(onSkipToday)}
-                      icon={<EyeOff className="h-5 w-5 text-muted-foreground" />}
-                    />
-                  ) : onDoLater ? (
-                    <SecondaryButton
-                      label="Save for later"
-                      onClick={runAndClose(onDoLater)}
-                      icon={
-                        <AppIcon
-                          name="saved"
-                          label="Save for later"
-                          className="h-8 w-8"
-                        />
-                      }
-                      dataHint="save-later-button"
-                    />
-                  ) : null}
-                </div>
+                    <>
+                      <EyeOff className="h-4 w-4" />
+                      Skip today
+                    </>
+                  ) : (
+                    <>
+                      <AppIcon name="saved" className="h-5 w-5" />
+                      Save for later
+                    </>
+                  )}
+                </button>
               )}
-
           </div>
         )}
       </BaseSheet>
@@ -777,67 +802,70 @@ export default function TaskDetailSheet({
   );
 }
 
-function PropertyChip({
+function SectionLabel({
+  children,
+  aside,
+}: {
+  children: React.ReactNode;
+  aside?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-1 mt-4 flex items-center justify-between gap-3 px-2 first:mt-1">
+      <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
+        {children}
+      </span>
+      {aside}
+    </div>
+  );
+}
+
+const PROPERTY_TINT = {
+  green: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  violet: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+  buddy: 'bg-[#4f9149]/15 text-[#4f9149] dark:text-emerald-400',
+} as const;
+
+function PropertyRow({
   icon,
-  active = false,
-  tone = 'default',
+  tint,
+  label,
   onClick,
   dataHint,
+  dataTagIds,
   children,
 }: {
   icon: React.ReactNode;
-  active?: boolean;
-  tone?: 'default' | 'buddy';
-  onClick: () => void;
+  tint: keyof typeof PROPERTY_TINT;
+  label: string;
+  onClick?: () => void;
   dataHint?: string;
+  dataTagIds?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       data-hint={dataHint}
+      data-tag-ids={dataTagIds}
       onClick={onClick}
-      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold transition-[transform,background-color,color] active:scale-95 ${
-        tone === 'buddy'
-          ? 'bg-[#4f9149]/10 text-[#4f9149] [@media(hover:hover)]:hover:bg-[#4f9149]/[0.16]'
-          : active
-            ? 'bg-primary/10 text-primary [@media(hover:hover)]:hover:bg-primary/15'
-            : 'bg-muted/70 text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
-      }`}
+      disabled={!onClick}
+      className="flex min-h-[50px] w-full items-center gap-3 border-border/50 px-3.5 text-left transition-colors disabled:cursor-default [&:not(:first-child)]:border-t enabled:active:bg-muted [@media(hover:hover)]:enabled:hover:bg-muted/70"
     >
-      <span className="flex shrink-0">{icon}</span>
-      <span className="whitespace-nowrap">{children}</span>
-    </button>
-  );
-}
-
-function SecondaryButton({
-  label,
-  icon,
-  onClick,
-  dataHint,
-  activePhase = null,
-}: {
-  label: React.ReactNode;
-  icon: React.ReactNode;
-  onClick: () => void;
-  dataHint?: string;
-  activePhase?: 'focus' | 'break' | null;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      data-hint={dataHint}
-      className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[22px] text-[14px] font-black ring-1 transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 ${
-        activePhase === 'focus'
-          ? 'bg-[#4f9149] text-white ring-[#34631f]/50 shadow-[0_3px_0_0_#34631f] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_#34631f]'
-          : activePhase === 'break'
-            ? 'bg-sky-500 text-white ring-sky-700/50 shadow-[0_3px_0_0_#0369a1] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_#0369a1] dark:bg-sky-700'
-            : 'bg-popover text-foreground ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]'
-      }`}
-    >
-      <span className="flex shrink-0 items-center">{icon}</span>
-      <span className="truncate">{label}</span>
+      <span
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[10px] ${PROPERTY_TINT[tint]}`}
+      >
+        {icon}
+      </span>
+      <span className="shrink-0 text-[15px] font-semibold text-foreground">
+        {label}
+      </span>
+      <span className="ml-auto flex min-w-0 items-center justify-end text-right text-[14px] font-semibold text-muted-foreground">
+        <span className="min-w-0 truncate">{children}</span>
+      </span>
+      {onClick && (
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+      )}
     </button>
   );
 }
@@ -871,32 +899,30 @@ function TaskFocusButton({
   );
 
   return (
-    <SecondaryButton
-      activePhase={isFocusing ? phase : null}
-      label={
-        isFocusing ? (
-          <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[clamp(11px,3.3vw,14px)] max-[380px]:gap-1">
-            <span>{phase === 'break' ? 'On break' : 'Focusing'}</span>
-            <span className="tabular-nums text-white/90">
-              {formatTimer(timeLeft)}
-            </span>
-          </span>
-        ) : (
-          'Focus timer'
-        )
-      }
+    <button
+      type="button"
       onClick={onClick}
-      icon={
-        isFocusing ? (
-          <TimerClockIcon
-            running={isRunning}
-            className="h-8 w-8 max-[360px]:hidden"
-          />
-        ) : (
-          <AppIcon name="clock" label="Focus timer" className="h-8 w-8" />
-        )
-      }
-      dataHint="focus-button"
-    />
+      data-hint="focus-button"
+      aria-label={isFocusing ? 'Open focus timer' : 'Focus timer'}
+      title="Focus timer"
+      className={`flex h-14 shrink-0 items-center justify-center gap-1.5 rounded-[28px] text-[14px] font-black ring-1 transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 ${
+        isFocusing ? 'px-4' : 'w-14'
+      } ${
+        isFocusing && phase === 'focus'
+          ? 'bg-[#4f9149] text-white ring-[#34631f]/50 shadow-[0_3px_0_0_#34631f]'
+          : isFocusing
+            ? 'bg-sky-500 text-white ring-sky-700/50 shadow-[0_3px_0_0_#0369a1] dark:bg-sky-700'
+            : 'bg-popover text-foreground ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]'
+      }`}
+    >
+      {isFocusing ? (
+        <>
+          <TimerClockIcon running={isRunning} className="h-7 w-7" />
+          <span className="tabular-nums">{formatTimer(timeLeft)}</span>
+        </>
+      ) : (
+        <AppIcon name="clock" label="Focus timer" className="h-8 w-8" />
+      )}
+    </button>
   );
 }
