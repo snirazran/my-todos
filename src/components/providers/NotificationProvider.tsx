@@ -78,6 +78,8 @@ interface NotificationContextType {
   count: number;
   /** Measured pixel height of the visible notification stack (0 when empty). */
   stackHeight: number;
+  /** Low-priority content that fills the toast slot only while no toast is up. */
+  setSlotHint: (hint: React.ReactNode | null) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -191,6 +193,24 @@ export function NotificationProvider({
   const [undoingId, setUndoingId] = useState<number | null>(null);
   const [stackHeight, setStackHeight] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [slotHint, setSlotHint] = useState<React.ReactNode | null>(null);
+  const [slotHeight, setSlotHeight] = useState(0);
+  const slotObserverRef = useRef<ResizeObserver | null>(null);
+  const slotObservedRef = useRef<HTMLElement | null>(null);
+  const measureSlot = useCallback((el: HTMLDivElement | null) => {
+    if (!el || el === slotObservedRef.current) return;
+    slotObserverRef.current ??= new ResizeObserver((entries) => {
+      const entry = entries.find((e) => e.target === slotObservedRef.current);
+      if (entry) setSlotHeight((entry.target as HTMLElement).offsetHeight);
+    });
+    if (slotObservedRef.current) {
+      slotObserverRef.current.unobserve(slotObservedRef.current);
+    }
+    slotObservedRef.current = el;
+    slotObserverRef.current.observe(el);
+    setSlotHeight(el.offsetHeight);
+  }, []);
+  useEffect(() => () => slotObserverRef.current?.disconnect(), []);
   const reduceMotion = useReducedMotion();
   const openSheets = useSheetStore((s) => s.count);
   const stackSuppressed = openSheets > 0;
@@ -258,6 +278,15 @@ export function NotificationProvider({
     hovered || pressed || pageHidden || undoingId !== null || stackSuppressed;
 
   const current = undoItem ?? front;
+  const slotEmpty = !current && !slotHint;
+  useEffect(() => {
+    if (!slotEmpty) return;
+    if (slotObservedRef.current) {
+      slotObserverRef.current?.unobserve(slotObservedRef.current);
+      slotObservedRef.current = null;
+    }
+    setSlotHeight(0);
+  }, [slotEmpty]);
 
   useAutoDismiss(
     frontId,
@@ -318,6 +347,7 @@ export function NotificationProvider({
         return (
           <motion.div
             key={n.id}
+            ref={measureSlot}
             custom={swiped}
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: TOAST_ENTER_FROM }}
             animate={{
@@ -361,7 +391,7 @@ export function NotificationProvider({
             }}
             onBlurCapture={() => setHovered(false)}
             style={{ willChange: 'transform, opacity' }}
-            className="pointer-events-auto relative w-full"
+            className="pointer-events-auto absolute inset-x-0 bottom-0"
           >
           <SwipeableToast
             disabled={isUndoing}
@@ -451,6 +481,36 @@ export function NotificationProvider({
         );
   };
 
+  const renderHint = (hint: React.ReactNode) => (
+    <motion.div
+      key="slot-hint"
+      ref={measureSlot}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: TOAST_ENTER_FROM }}
+      animate={{
+        opacity: 1,
+        transform: TOAST_RESTING,
+        transition: {
+          duration: 0.42,
+          ease: TOAST_EASE_OUT,
+          opacity: { duration: 0.2, ease: 'linear' },
+        },
+      }}
+      exit={{
+        opacity: 0,
+        transition: { duration: 0.16, ease: 'linear' },
+      }}
+      style={{ willChange: 'transform, opacity' }}
+      className="pointer-events-none absolute inset-x-0 bottom-0"
+    >
+      <div
+        style={TOAST_SURFACE_STYLE}
+        className="dark flex min-h-12 w-full items-center gap-3 rounded-[18px] px-3.5 py-2 text-foreground"
+      >
+        {hint}
+      </div>
+    </motion.div>
+  );
+
   return (
     <NotificationContext.Provider
       value={{
@@ -459,6 +519,7 @@ export function NotificationProvider({
         isVisible: !stackSuppressed && notifications.length > 0,
         count: stackSuppressed ? 0 : notifications.length,
         stackHeight: stackSuppressed ? 0 : stackHeight,
+        setSlotHint,
       }}
     >
       {children}
@@ -477,13 +538,16 @@ export function NotificationProvider({
           role="status"
           aria-live="polite"
           className="relative w-full md:w-[380px] md:self-end"
+          style={{ height: slotHeight }}
         >
-          <AnimatePresence initial={false} mode="popLayout" custom={swiped}>
-            {current && renderCard(current)}
+          <AnimatePresence initial={false} custom={swiped}>
+            {current
+              ? renderCard(current)
+              : slotHint
+                ? renderHint(slotHint)
+                : null}
           </AnimatePresence>
         </div>
-        {/* Bottom slot: cinematic skip hint portals in here (below all toasts) */}
-        <div id="frog-bottom-stack-bottom" className="contents" />
           </div>,
           document.body,
         )}

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
@@ -68,10 +67,7 @@ import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { HomePageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
-import {
-  TOAST_SURFACE_STYLE,
-  useNotification,
-} from '@/components/providers/NotificationProvider';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { cn } from '@/lib/utils';
 import {
@@ -1561,7 +1557,8 @@ const SPEED_HINT_LIMIT = 3;
 
 function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [active, setActive] = React.useState(false);
-  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  const [showHint, setShowHint] = React.useState(false);
+  const { setSlotHint } = useNotification();
 
   React.useEffect(() => {
     let shown = 0;
@@ -1571,9 +1568,15 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         localStorage.setItem(SPEED_HINT_KEY, String(shown + 1));
       }
     } catch {}
-    if (shown >= SPEED_HINT_LIMIT) return;
-    setPortalTarget(document.getElementById('frog-bottom-stack-bottom'));
+    if (shown < SPEED_HINT_LIMIT) setShowHint(true);
   }, []);
+
+  React.useEffect(() => {
+    if (!showHint) return;
+    setSlotHint(<SpeedHintContent active={active} />);
+  }, [showHint, active, setSlotHint]);
+
+  React.useEffect(() => () => setSlotHint(null), [setSlotHint]);
 
   const handleSkip = React.useCallback(() => {
     if (active) return;
@@ -1608,47 +1611,31 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         onPointerDown={handlePointerDown}
       />
 
-      {portalTarget &&
-        createPortal(
-          <motion.div
-            initial={{ opacity: 0, transform: 'translateY(70%) scale(0.94)' }}
-            animate={{ opacity: 1, transform: 'translateY(0%) scale(1)' }}
-            exit={{
-              opacity: 0,
-              transform: 'translateY(35%) scale(0.96)',
-              transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
-            }}
-            transition={{
-              duration: 0.42,
-              ease: [0.22, 1, 0.36, 1],
-              opacity: { duration: 0.2, ease: 'linear' },
-            }}
-            style={{ ...TOAST_SURFACE_STYLE, willChange: 'transform, opacity' }}
-            className="dark pointer-events-none flex min-h-12 w-full items-center gap-3 rounded-[18px] px-3.5 py-2 text-foreground md:w-[380px] md:self-end"
-          >
-            <span
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 shrink-0"
-              aria-hidden
-            >
-              {active ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
-                  <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
-                </svg>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
-                </svg>
-              )}
-            </span>
-            <span
-              className={`flex-1 text-sm font-semibold select-none transition-colors duration-200 ${active ? 'text-primary' : 'text-foreground'}`}
-            >
-              {active ? 'x2 speed' : 'Tap anywhere to speed up'}
-            </span>
-          </motion.div>,
-          portalTarget,
+    </>
+  );
+}
+
+function SpeedHintContent({ active }: { active: boolean }) {
+  return (
+    <>
+      <span
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25"
+        aria-hidden
+      >
+        {active ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+            <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+          </svg>
         )}
+      </span>
+      <span className="flex-1 select-none text-sm font-semibold text-foreground">
+        {active ? 'x2 speed' : 'Tap anywhere to speed up'}
+      </span>
     </>
   );
 }
