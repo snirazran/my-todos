@@ -30,6 +30,7 @@ import type {
 } from '@/lib/quests/types';
 import Fly from './fly';
 import Frog from './frog';
+import { FrogSnapshot } from './FrogSnapshot';
 import { Icon } from './Icon';
 import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
@@ -2004,6 +2005,7 @@ export const RewardTile = memo(function RewardTile({
   frogClassName,
   flySize,
   flyOversample,
+  still = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -2022,6 +2024,8 @@ export const RewardTile = memo(function RewardTile({
   flySize?: number;
   /** Backing-resolution headroom for flies shown inside scale animations. */
   flyOversample?: number;
+  /** Draw outfits as a one-frame snapshot instead of a live Rive frog. */
+  still?: boolean;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -2119,19 +2123,34 @@ export const RewardTile = memo(function RewardTile({
         </div>
       ) : previewIndices && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
-          <Frog
-            className={cn(
-              'object-contain',
-              compact
-                ? 'h-[118%] w-[118%] -translate-y-[18%]'
-                : 'h-[120%] w-[120%] translate-y-[8%]',
-              frogClassName,
-            )}
-            indices={previewIndices}
-            width={compact ? 96 : 64}
-            height={compact ? 96 : 64}
-            paused={paused}
-          />
+          {still ? (
+            <FrogSnapshot
+              className={cn(
+                'object-contain',
+                compact
+                  ? 'h-[118%] w-[118%] -translate-y-[18%]'
+                  : 'h-[120%] w-[120%] translate-y-[8%]',
+                frogClassName,
+              )}
+              indices={previewIndices}
+              width={compact ? 96 : 64}
+              height={compact ? 96 : 64}
+            />
+          ) : (
+            <Frog
+              className={cn(
+                'object-contain',
+                compact
+                  ? 'h-[118%] w-[118%] -translate-y-[18%]'
+                  : 'h-[120%] w-[120%] translate-y-[8%]',
+                frogClassName,
+              )}
+              indices={previewIndices}
+              width={compact ? 96 : 64}
+              height={compact ? 96 : 64}
+              paused={paused}
+            />
+          )}
         </div>
       ) : item || reward.type === 'BOX' ? (
         <RewardTileGloss />

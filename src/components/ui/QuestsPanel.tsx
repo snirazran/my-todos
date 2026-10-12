@@ -269,9 +269,24 @@ export function QuestsPanel({
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
     null,
   );
-  const [openSeasonKind, setOpenSeasonKind] = useState<
+  const [openSeasonKind, setOpenSeasonKindState] = useState<
     'active' | 'grace' | null
-  >(null);
+  >(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = sessionStorage.getItem(OPEN_SEASON_KEY);
+      return stored === 'active' || stored === 'grace' ? stored : null;
+    } catch {
+      return null;
+    }
+  });
+  const setOpenSeasonKind = (kind: 'active' | 'grace' | null) => {
+    setOpenSeasonKindState(kind);
+    try {
+      if (kind) sessionStorage.setItem(OPEN_SEASON_KEY, kind);
+      else sessionStorage.removeItem(OPEN_SEASON_KEY);
+    } catch {}
+  };
   const [plusOpen, setPlusOpen] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('quests');
   const openPlus = (placement: string) => {
@@ -739,6 +754,8 @@ export function QuestsPanel({
   );
 }
 
+const OPEN_SEASON_KEY = 'quests:openSeason';
+
 function formatSeasonCountdown(endsAt: string) {
   const diffMs = new Date(endsAt).getTime() - Date.now();
   if (!Number.isFinite(diffMs) || diffMs <= 0) return 'Ended';
@@ -1068,6 +1085,28 @@ function SeasonGraceCard({
   );
 }
 
+function useNearViewport(
+  ref: React.RefObject<HTMLElement | null>,
+  enabled: boolean,
+) {
+  const [near, setNear] = useState(!enabled);
+  useEffect(() => {
+    if (!enabled) {
+      setNear(true);
+      return;
+    }
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setNear(entry.isIntersecting),
+      { rootMargin: '240px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, enabled]);
+  return near;
+}
+
 function SeasonRewardPreview({
   reward,
   rewardCatalog,
@@ -1075,6 +1114,7 @@ function SeasonRewardPreview({
   paused = false,
   hideQuantityBadge = false,
   showRays = false,
+  still = false,
   className,
 }: {
   reward: QuestReward;
@@ -1083,11 +1123,14 @@ function SeasonRewardPreview({
   paused?: boolean;
   hideQuantityBadge?: boolean;
   showRays?: boolean;
+  still?: boolean;
   className?: string;
 }) {
   const catalogId = reward.itemId ?? reward.backgroundId;
   const item = catalogId ? rewardCatalog[catalogId] : null;
   const isGift = item?.slot === 'container';
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const nearViewport = useNearViewport(frameRef, still && isGift);
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
 
   return (
@@ -1095,7 +1138,10 @@ function SeasonRewardPreview({
       {/* The prize fills its frame instead of floating in it — overflow is
           clipped here so nothing spills onto the bar, while the count badge
           stays outside this box and rides the corner. */}
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl bg-card">
+      <div
+        ref={frameRef}
+        className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl bg-card"
+      >
         {showRays ? (
           <span
             aria-hidden="true"
@@ -1112,11 +1158,13 @@ function SeasonRewardPreview({
         ) : null}
         {isGift ? (
           <div className="relative z-10 h-[136%] w-[136%] -translate-y-[14%]">
-            <GiftRive
-              className="h-full w-full"
-              color={item.riveIndex}
-              paused={paused}
-            />
+            {nearViewport && (
+              <GiftRive
+                className="h-full w-full"
+                color={item.riveIndex}
+                paused={paused}
+              />
+            )}
           </div>
         ) : (
           <div
@@ -1137,6 +1185,7 @@ function SeasonRewardPreview({
               compact
               flySize={64}
               paused={paused}
+              still={still}
               hideBadge
               className={cn(
                 'h-full w-full rounded-2xl border-0 bg-transparent shadow-none',
@@ -1230,6 +1279,7 @@ function SeasonPassRewardCard({
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
           paused={paused}
+          still={paused}
           className="h-full w-full"
         />
       </div>
