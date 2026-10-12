@@ -1,14 +1,14 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import {
   SEASON_PASS_DEFAULTS,
-  type SeasonSkinIds,
+  type SeasonSlotRarities,
 } from '@/lib/quests/seasonLadder';
+import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 /**
- * The saved defaults the season generator starts from: pass knobs plus which
- * catalog skins fill the ladder's six "new skin" rungs. Generating a season
- * stamps a copy into the season itself, so later template edits never rewrite
- * a season that is already running.
+ * The pass rules every monthly season is stamped from: pacing knobs, the
+ * rarity each "new skin" rung rolls at, and which wardrobe slots it may draw
+ * from. A season keeps its own copy, so edits only reach seasons not yet live.
  */
 export interface QuestSeasonTemplateDoc {
   _id?: mongoose.Types.ObjectId;
@@ -19,7 +19,8 @@ export interface QuestSeasonTemplateDoc {
   maxStepsPerDay: number;
   tierSkipCost: number;
   graceHours: number;
-  skinIds: SeasonSkinIds;
+  slotRarities?: SeasonSlotRarities;
+  skinPool?: WardrobeSlot[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,7 +39,8 @@ const QuestSeasonTemplateSchema = new Schema<QuestSeasonTemplateDoc>(
     },
     tierSkipCost: { type: Number, default: SEASON_PASS_DEFAULTS.tierSkipCost },
     graceHours: { type: Number, default: SEASON_PASS_DEFAULTS.graceHours },
-    skinIds: { type: Schema.Types.Mixed, default: () => ({}) },
+    slotRarities: { type: Schema.Types.Mixed, default: undefined },
+    skinPool: { type: [String], default: undefined },
   },
   {
     collection: 'questSeasonTemplates',

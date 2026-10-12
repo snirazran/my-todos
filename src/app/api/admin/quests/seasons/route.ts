@@ -2,207 +2,143 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestSeasonModel from '@/lib/models/QuestSeason';
+import { loadSeasonTemplate, seasonToAdminView } from '@/lib/quests/seasons';
 import {
-  buildSeasonPassLadder,
-  createQuestSeason,
-  normalizeSeasonPassConfig,
-  sanitizeSeasonRewards,
-  seasonToAdminView,
-} from '@/lib/quests/seasons';
-import { SEASON_REWARDS_PER_LANE } from '@/lib/quests/types';
-import type {
-  QuestAmountMode,
-  QuestReward,
-  QuestRewardType,
-} from '@/lib/quests/types';
+  ensureSeasonCalendar,
+  ensureSeasonForMonth,
+  pickSeasonSkins,
+  restampUpcomingSeason,
+} from '@/lib/quests/seasonProvision';
+import {
+  normalizeSeasonSkinIds,
+  SEASON_SKIN_SLOTS,
+  type SeasonSkinSlot,
+} from '@/lib/quests/seasonLadder';
+import {
+  isSeasonMonthKey,
+  SEASON_PLAN_AHEAD_MONTHS,
+  seasonMonthKey,
+  shiftSeasonMonth,
+} from '@/lib/quests/seasonCalendar';
+import { getCachedCatalog } from '@/lib/skins/getCatalog';
 
-const VALID_REWARD_TYPES = new Set<QuestRewardType>([
-  'FLIES',
-  'ITEM',
-  'BOX',
-  'SHIELD',
-]);
-const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
+export const dynamic = 'force-dynamic';
 
 const json = (body: unknown, status = 200) =>
-  NextResponse.json(body, { status });
-
-function sanitizeReward(input: any): QuestReward | null {
-  if (!input || !VALID_REWARD_TYPES.has(input.type)) return null;
-
-  if (input.type === 'SHIELD') {
-    return {
-      type: 'SHIELD',
-      amountMode: 'fixed',
-      amount: Math.max(1, Math.min(10, Math.floor(Number(input.amount) || 1))),
-    };
-  }
-
-  if (input.type === 'FLIES') {
-    const amountMode = VALID_AMOUNT_MODES.has(input.amountMode)
-      ? input.amountMode
-      : 'fixed';
-    if (amountMode === 'random') {
-      const minAmount = Number(input.minAmount);
-      const maxAmount = Number(input.maxAmount);
-      if (
-        !Number.isFinite(minAmount) ||
-        !Number.isFinite(maxAmount) ||
-        minAmount <= 0 ||
-        maxAmount < minAmount
-      ) {
-        return null;
-      }
-      return {
-        type: 'FLIES',
-        amountMode,
-        minAmount: Math.floor(minAmount),
-        maxAmount: Math.floor(maxAmount),
-      };
-    }
-
-    const amount = Number(input.amount);
-    if (!Number.isFinite(amount) || amount <= 0) return null;
-    return {
-      type: 'FLIES',
-      amountMode,
-      amount: Math.floor(amount),
-    };
-  }
-
-  if (typeof input.itemId !== 'string' || !input.itemId.trim()) return null;
-  return {
-    type: input.type,
-    itemId: input.itemId.trim(),
-    amount:
-      input.type === 'BOX'
-        ? Math.max(1, Math.floor(Number(input.amount) || 1))
-        : undefined,
-  };
-}
-
-function sanitizeTierRewards(input: unknown) {
-  return sanitizeSeasonRewards(input).map((entry) => ({
-    tier: entry.tier,
-    freeRewards: entry.freeRewards
-      .map(sanitizeReward)
-      .filter(Boolean)
-      .slice(0, SEASON_REWARDS_PER_LANE) as QuestReward[],
-    premiumRewards: entry.premiumRewards
-      .map(sanitizeReward)
-      .filter(Boolean)
-      .slice(0, SEASON_REWARDS_PER_LANE) as QuestReward[],
-  }));
-}
-
-function sanitizeBody(body: any) {
-  const name = typeof body?.name === 'string' ? body.name.trim() : '';
-  const startsAt = new Date(body?.startsAt);
-  const endsAt = new Date(body?.endsAt);
-
-  if (!name) return { error: 'Season name is required' };
-  if (!Number.isFinite(startsAt.getTime())) return { error: 'Start date is required' };
-  if (!Number.isFinite(endsAt.getTime())) return { error: 'End date is required' };
-  if (endsAt <= startsAt) return { error: 'End date must be after start date' };
-
-  const config = normalizeSeasonPassConfig(body);
-  const authored = sanitizeTierRewards(body?.tierRewards ?? body?.dayRewards);
-  const fallback = buildSeasonPassLadder(config.tierCount);
-  // Every rung has to pay something on at least one lane — a dead tier reads as
-  // a bug on the board, so an empty one falls back to the template's rung.
-  const tierRewards = Array.from({ length: config.tierCount }, (_, index) => {
-    const tier = index + 1;
-    const entry = authored.find((candidate) => candidate.tier === tier);
-    if (
-      entry &&
-      (entry.freeRewards.length > 0 || entry.premiumRewards.length > 0)
-    ) {
-      return entry;
-    }
-    return fallback[index];
+  NextResponse.json(body, {
+    status,
+    headers: { 'Cache-Control': 'no-store' },
   });
 
+const SLOT_KEYS = new Set<string>(SEASON_SKIN_SLOTS.map((slot) => slot.key));
+
+async function calendarPayload() {
+  const [seasons, template] = await Promise.all([
+    QuestSeasonModel.find({}).sort({ startsAt: -1 }).lean(),
+    loadSeasonTemplate(),
+  ]);
   return {
-    payload: {
-      name,
-      startsAt,
-      endsAt,
-      ...config,
-      tierRewards,
-      isActive: body?.isActive !== false,
-    },
+    seasons: seasons.map(seasonToAdminView),
+    template,
+    now: new Date().toISOString(),
   };
 }
 
 export async function GET() {
   try {
     await requireUserId();
-    await connectMongo();
-    const seasons = await QuestSeasonModel.find({})
-      .sort({ startsAt: -1 })
-      .lean();
-    return json({ seasons: seasons.map(seasonToAdminView) });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
+  }
+  try {
+    await connectMongo();
+    await ensureSeasonCalendar();
+    return json(await calendarPayload());
+  } catch (error) {
+    console.error('Failed to load seasons:', error);
+    return json({ error: 'Failed to load seasons' }, 500);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     await requireUserId();
-    const body = await req.json();
-    const sanitized = sanitizeBody(body);
-    if ('error' in sanitized) return json({ error: sanitized.error }, 400);
-
-    await connectMongo();
-    const season = await createQuestSeason(sanitized.payload);
-    return json({ ok: true, season: seasonToAdminView(season) });
-  } catch (error) {
-    return json(
-      { error: error instanceof Error ? error.message : 'Failed to create season' },
-      400,
-    );
-  }
-}
-
-export async function PUT(req: NextRequest) {
-  try {
-    await requireUserId();
-    const body = await req.json();
-    const seasonId =
-      typeof body?.id === 'string' && body.id.trim() ? body.id.trim() : '';
-    if (!seasonId) return json({ error: 'Missing season id' }, 400);
-
-    const sanitized = sanitizeBody(body);
-    if ('error' in sanitized) return json({ error: sanitized.error }, 400);
-
-    await connectMongo();
-    const season = await QuestSeasonModel.findOneAndUpdate(
-      { seasonId },
-      { $set: sanitized.payload, $unset: { dayRewards: '', dailyTargetFlies: '' } },
-      { new: true },
-    );
-    if (!season) return json({ error: 'Season not found' }, 404);
-    return json({ ok: true, season: seasonToAdminView(season) });
-  } catch (error) {
-    return json(
-      { error: error instanceof Error ? error.message : 'Failed to update season' },
-      400,
-    );
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    await requireUserId();
-    const body = await req.json();
-    const seasonId =
-      typeof body?.id === 'string' && body.id.trim() ? body.id.trim() : '';
-    if (!seasonId) return json({ error: 'Missing season id' }, 400);
-    await connectMongo();
-    await QuestSeasonModel.deleteOne({ seasonId });
-    return json({ ok: true });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
+  }
+  try {
+    const body = await req.json();
+    const action = String(body?.action ?? '');
+    await connectMongo();
+
+    if (action === 'plan') {
+      const monthKey = body?.monthKey;
+      const thisMonth = seasonMonthKey(new Date());
+      const limit = shiftSeasonMonth(thisMonth, SEASON_PLAN_AHEAD_MONTHS);
+      if (!isSeasonMonthKey(monthKey) || monthKey < thisMonth || monthKey > limit) {
+        return json({ error: 'Pick a month within the planning window' }, 400);
+      }
+      const season = await ensureSeasonForMonth(monthKey);
+      if (!season) {
+        return json({ error: 'A hand-dated season already covers that month' }, 409);
+      }
+      return json(await calendarPayload());
+    }
+
+    const seasonId = typeof body?.id === 'string' ? body.id.trim() : '';
+    const season = seasonId ? await QuestSeasonModel.findOne({ seasonId }) : null;
+    if (!season) return json({ error: 'Season not found' }, 404);
+
+    if (action === 'rename') {
+      const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : '';
+      if (!name) return json({ error: 'Season name is required' }, 400);
+      season.set({ name });
+      await season.save();
+      return json(await calendarPayload());
+    }
+
+    if (action === 'reroll') {
+      if (!season.monthKey) {
+        return json({ error: 'Only monthly seasons roll their skins' }, 400);
+      }
+      const slot = body?.slot;
+      if (slot !== undefined && !SLOT_KEYS.has(slot)) {
+        return json({ error: 'Unknown skin rung' }, 400);
+      }
+      const skinIds = await pickSeasonSkins({
+        monthKey: season.monthKey,
+        template: await loadSeasonTemplate(),
+        keep: normalizeSeasonSkinIds(season.skinIds),
+        slots: slot ? [slot as SeasonSkinSlot] : undefined,
+        excludeSeasonId: season.seasonId,
+      });
+      await restampUpcomingSeason(season.seasonId, { skinIds });
+      return json(await calendarPayload());
+    }
+
+    if (action === 'setSkin') {
+      const slot = body?.slot;
+      const itemId = typeof body?.itemId === 'string' ? body.itemId : '';
+      if (!SLOT_KEYS.has(slot)) return json({ error: 'Unknown skin rung' }, 400);
+      const template = await loadSeasonTemplate();
+      const item = (await getCachedCatalog()).find((entry) => entry.id === itemId);
+      if (!item) return json({ error: 'That item is not in the catalog' }, 400);
+      if (item.rarity !== template.slotRarities[slot as SeasonSkinSlot]) {
+        return json({ error: 'That rung only takes the rarity set in the pass rules' }, 400);
+      }
+      const skinIds = {
+        ...normalizeSeasonSkinIds(season.skinIds),
+        [slot]: itemId,
+      };
+      await restampUpcomingSeason(season.seasonId, { skinIds });
+      return json(await calendarPayload());
+    }
+
+    return json({ error: 'Unknown action' }, 400);
+  } catch (error) {
+    return json(
+      { error: error instanceof Error ? error.message : 'Season update failed' },
+      400,
+    );
   }
 }

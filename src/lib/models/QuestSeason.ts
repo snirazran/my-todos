@@ -1,5 +1,8 @@
 import mongoose, { Schema, type Model } from 'mongoose';
-import type { QuestSeasonTierReward } from '@/lib/quests/seasonLadder';
+import type {
+  QuestSeasonTierReward,
+  SeasonSkinIds,
+} from '@/lib/quests/seasonLadder';
 
 export type { QuestSeasonTierReward };
 
@@ -29,7 +32,9 @@ export type QuestSeasonSizeKey = keyof QuestSeasonImages;
 export interface QuestSeasonDoc {
   _id?: mongoose.Types.ObjectId;
   seasonId: string;
+  monthKey?: string;
   name: string;
+  skinIds?: SeasonSkinIds;
   images: QuestSeasonImages;
   imageFiles?: QuestSeasonImageFiles;
   startsAt: Date;
@@ -49,7 +54,9 @@ export interface QuestSeasonDoc {
 const QuestSeasonSchema = new Schema<QuestSeasonDoc>(
   {
     seasonId: { type: String, required: true, unique: true, index: true },
+    monthKey: { type: String, index: { unique: true, sparse: true } },
     name: { type: String, required: true },
+    skinIds: { type: Schema.Types.Mixed, default: undefined },
     images: {
       mobile: { type: String, default: '' },
       tablet: { type: String, default: '' },

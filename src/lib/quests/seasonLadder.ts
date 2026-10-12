@@ -1,4 +1,9 @@
 import type { QuestReward, QuestRewards } from '@/lib/quests/types';
+import {
+  RARITY_ORDER,
+  type Rarity,
+  type WardrobeSlot,
+} from '@/lib/skins/catalog';
 
 export type QuestSeasonTierReward = {
   tier: number;
@@ -7,29 +12,59 @@ export type QuestSeasonTierReward = {
 };
 
 export type SeasonSkinSlot =
-  | 'uncommon'
-  | 'rare1'
-  | 'rare2'
-  | 'epic1'
-  | 'epic2'
-  | 'legendary';
+  | 'tier6'
+  | 'tier12'
+  | 'tier16'
+  | 'tier24'
+  | 'finaleFree'
+  | 'finalePlus';
 
 export type SeasonSkinIds = Partial<Record<SeasonSkinSlot, string>>;
+export type SeasonSlotRarities = Record<SeasonSkinSlot, Rarity>;
 
 export const SEASON_SKIN_SLOTS: Array<{
   key: SeasonSkinSlot;
-  label: string;
-  rarity: string;
   tier: number;
+  finale: boolean;
   lane: 'free' | 'plus';
+  rarity: Rarity;
 }> = [
-  { key: 'uncommon', label: 'Uncommon skin', rarity: 'uncommon', tier: 6, lane: 'plus' },
-  { key: 'rare1', label: 'Rare skin (free trophy)', rarity: 'rare', tier: 12, lane: 'free' },
-  { key: 'rare2', label: 'Rare skin', rarity: 'rare', tier: 16, lane: 'plus' },
-  { key: 'epic1', label: 'Epic skin', rarity: 'epic', tier: 24, lane: 'plus' },
-  { key: 'epic2', label: 'Epic skin (free finale)', rarity: 'epic', tier: 30, lane: 'free' },
-  { key: 'legendary', label: 'Legendary skin (Plus finale)', rarity: 'legendary', tier: 30, lane: 'plus' },
+  { key: 'tier6', tier: 6, finale: false, lane: 'plus', rarity: 'common' },
+  { key: 'tier12', tier: 12, finale: false, lane: 'free', rarity: 'rare' },
+  { key: 'tier16', tier: 16, finale: false, lane: 'plus', rarity: 'common' },
+  { key: 'tier24', tier: 24, finale: false, lane: 'plus', rarity: 'rare' },
+  { key: 'finaleFree', tier: 30, finale: true, lane: 'free', rarity: 'rare' },
+  { key: 'finalePlus', tier: 30, finale: true, lane: 'plus', rarity: 'epic' },
 ];
+
+export const SEASON_SKIN_POOL_SLOTS: WardrobeSlot[] = [
+  'skin',
+  'hat',
+  'body',
+  'hand_item',
+];
+
+export function defaultSeasonSlotRarities(): SeasonSlotRarities {
+  return Object.fromEntries(
+    SEASON_SKIN_SLOTS.map((slot) => [slot.key, slot.rarity]),
+  ) as SeasonSlotRarities;
+}
+
+export function normalizeSeasonSlotRarities(input: unknown): SeasonSlotRarities {
+  const src = (input ?? {}) as Record<string, unknown>;
+  const out = defaultSeasonSlotRarities();
+  for (const slot of SEASON_SKIN_SLOTS) {
+    const value = src[slot.key];
+    if (RARITY_ORDER.includes(value as Rarity)) out[slot.key] = value as Rarity;
+  }
+  return out;
+}
+
+export function normalizeSeasonSkinPool(input: unknown): WardrobeSlot[] {
+  if (!Array.isArray(input)) return [...SEASON_SKIN_POOL_SLOTS];
+  const picked = SEASON_SKIN_POOL_SLOTS.filter((slot) => input.includes(slot));
+  return picked.length > 0 ? picked : [...SEASON_SKIN_POOL_SLOTS];
+}
 
 /**
  * What the grace window after a season ends is actually for.
@@ -159,17 +194,17 @@ export function buildSeasonPassLadder(
     [[flies(20)], [gift(SIMPLE_GIFT_ID)]],
     [[flies(20)], [flies(40)]],
     [[gift(FANCY_GIFT_ID)], [gift(FANCY_GIFT_ID)]],
-    [[flies(15)], [skinOr(skinIds, 'uncommon', gift(FANCY_GIFT_ID))]],
+    [[flies(15)], [skinOr(skinIds, 'tier6', gift(FANCY_GIFT_ID))]],
     [[flies(20)], [flies(30)]],
     [[gift(SIMPLE_GIFT_ID)], [flies(40)]],
     [[flies(15)], [gift(SIMPLE_GIFT_ID)]],
     [[flies(40), gift(FANCY_GIFT_ID)], [shield(), flies(45)]],
     [[flies(15)], [flies(30)]],
-    [[skinOr(skinIds, 'rare1', gift(AMAZING_GIFT_ID))], [gift(FANCY_GIFT_ID)]],
+    [[skinOr(skinIds, 'tier12', gift(AMAZING_GIFT_ID))], [gift(FANCY_GIFT_ID)]],
     [[flies(15)], [flies(40)]],
     [[gift(SIMPLE_GIFT_ID)], [flies(30)]],
     [[flies(25), shield()], [gift(AMAZING_GIFT_ID)]],
-    [[flies(15)], [skinOr(skinIds, 'rare2', gift(AMAZING_GIFT_ID))]],
+    [[flies(15)], [skinOr(skinIds, 'tier16', gift(AMAZING_GIFT_ID))]],
     [[flies(20)], [flies(40)]],
     [[flies(15)], [gift(FANCY_GIFT_ID)]],
     [[flies(15)], [flies(40)]],
@@ -177,7 +212,7 @@ export function buildSeasonPassLadder(
     [[flies(15)], [flies(40)]],
     [[flies(20)], [gift(FANCY_GIFT_ID)]],
     [[flies(20)], [flies(40)]],
-    [[flies(20)], [skinOr(skinIds, 'epic1', gift(AMAZING_GIFT_ID))]],
+    [[flies(20)], [skinOr(skinIds, 'tier24', gift(AMAZING_GIFT_ID))]],
     [[flies(30), gift(AMAZING_GIFT_ID)], [gift(AMAZING_GIFT_ID)]],
     [[flies(15)], [flies(45)]],
     [[flies(20)], [gift(FANCY_GIFT_ID)]],
@@ -186,8 +221,8 @@ export function buildSeasonPassLadder(
   ];
 
   const finale: [QuestRewards, QuestRewards] = [
-    [skinOr(skinIds, 'epic2', gift(AMAZING_GIFT_ID)), flies(80)],
-    [skinOr(skinIds, 'legendary', gift(AMAZING_GIFT_ID)), gift(AMAZING_GIFT_ID)],
+    [skinOr(skinIds, 'finaleFree', gift(AMAZING_GIFT_ID)), flies(80)],
+    [skinOr(skinIds, 'finalePlus', gift(AMAZING_GIFT_ID)), gift(AMAZING_GIFT_ID)],
   ];
 
   const count = Math.max(1, Math.floor(tierCount));

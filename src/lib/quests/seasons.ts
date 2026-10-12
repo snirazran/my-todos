@@ -1,4 +1,3 @@
-import { v4 as uuid } from 'uuid';
 import QuestSeasonModel, {
   type QuestSeasonDoc,
   type QuestSeasonImages,
@@ -9,22 +8,20 @@ import QuestSeasonTemplateModel, {
 } from '@/lib/models/QuestSeasonTemplate';
 import { getZonedToday } from '@/lib/utils';
 import {
-  buildSeasonPassLadder,
   normalizeSeasonPassConfig,
   normalizeSeasonSkinIds,
+  normalizeSeasonSkinPool,
+  normalizeSeasonSlotRarities,
   SEASON_PASS_DEFAULTS,
   SEASON_PASS_LIMITS,
   type QuestSeasonTierReward,
   type SeasonPassConfig,
-  type SeasonSkinIds,
+  type SeasonSlotRarities,
 } from '@/lib/quests/seasonLadder';
+import type { WardrobeSlot } from '@/lib/skins/catalog';
 import type { QuestRewards, SeasonLane } from '@/lib/quests/types';
 
 export * from '@/lib/quests/seasonLadder';
-
-function emptySeasonImages(): QuestSeasonImages {
-  return { mobile: '', tablet: '', web: '', webLarge: '' };
-}
 
 function normalizeSeasonImages(input: unknown): QuestSeasonImages {
   const src = (input ?? {}) as Partial<QuestSeasonImages>;
@@ -141,21 +138,18 @@ export function seasonToAdminView(doc: QuestSeasonDoc) {
   const config = readSeasonPassConfig(doc);
   return {
     id: doc.seasonId,
+    monthKey: doc.monthKey ?? null,
     name: doc.name,
     images: normalizeSeasonImages(doc.images),
     startsAt: doc.startsAt.toISOString(),
     endsAt: doc.endsAt.toISOString(),
     ...config,
+    skinIds: normalizeSeasonSkinIds(doc.skinIds),
     tierRewards: readSeasonTierRewards(doc),
     isActive: doc.isActive,
     createdAt: doc.createdAt?.toISOString(),
     updatedAt: doc.updatedAt?.toISOString(),
   };
-}
-
-export function getSeasonDayCount(startsAt: Date, endsAt: Date) {
-  const durationMs = endsAt.getTime() - startsAt.getTime();
-  return Math.max(1, Math.ceil(durationMs / 86_400_000));
 }
 
 export function seasonGraceEndsAt(endsAt: Date, graceHours: number) {
@@ -532,10 +526,11 @@ export async function findClaimableSeason(seasonId: string, now = new Date()) {
     : null;
 }
 
-// ── Template + generator ─────────────────────────────────────────────────────
+// ── Template ─────────────────────────────────────────────────────────────────
 
 export type SeasonTemplateView = SeasonPassConfig & {
-  skinIds: SeasonSkinIds;
+  slotRarities: SeasonSlotRarities;
+  skinPool: WardrobeSlot[];
   limits: typeof SEASON_PASS_LIMITS;
   defaults: SeasonPassConfig;
 };
@@ -546,7 +541,8 @@ export async function loadSeasonTemplate(): Promise<SeasonTemplateView> {
   }).lean();
   return {
     ...normalizeSeasonPassConfig(doc ?? SEASON_PASS_DEFAULTS),
-    skinIds: normalizeSeasonSkinIds((doc as any)?.skinIds),
+    slotRarities: normalizeSeasonSlotRarities(doc?.slotRarities),
+    skinPool: normalizeSeasonSkinPool(doc?.skinPool),
     limits: SEASON_PASS_LIMITS,
     defaults: SEASON_PASS_DEFAULTS,
   };
@@ -554,73 +550,22 @@ export async function loadSeasonTemplate(): Promise<SeasonTemplateView> {
 
 export async function saveSeasonTemplate(input: {
   config: SeasonPassConfig;
-  skinIds: SeasonSkinIds;
+  slotRarities: SeasonSlotRarities;
+  skinPool: WardrobeSlot[];
 }) {
   await QuestSeasonTemplateModel.findOneAndUpdate(
     { configId: SEASON_TEMPLATE_CONFIG_ID },
-    { $set: { ...input.config, skinIds: input.skinIds } },
+    {
+      $set: {
+        ...input.config,
+        slotRarities: input.slotRarities,
+        skinPool: input.skinPool,
+      },
+      $unset: { skinIds: '' },
+    },
     { new: true, upsert: true },
   );
   return loadSeasonTemplate();
-}
-
-export function sanitizeSeasonRewards(input: unknown): QuestSeasonTierReward[] {
-  return normalizeSeasonTierRewards(input);
-}
-
-export async function createQuestSeason(
-  payload: SeasonPassConfig & {
-    name: string;
-    images?: QuestSeasonImages;
-    startsAt: Date;
-    endsAt: Date;
-    tierRewards: QuestSeasonTierReward[];
-    isActive: boolean;
-  },
-) {
-  return QuestSeasonModel.create({
-    seasonId: uuid(),
-    ...payload,
-    images: payload.images ?? emptySeasonImages(),
-  });
-}
-
-/**
- * Builds a season off the saved template. The admin owns the name, the dates
- * and whether it goes live; the template owns the ladder and the pass knobs,
- * copied in so later template edits leave this season alone.
- */
-export async function generateQuestSeason(input: {
-  name: string;
-  startsAt: Date;
-  endsAt: Date;
-  isActive: boolean;
-  overrides?: Partial<SeasonPassConfig>;
-  skinIds?: SeasonSkinIds;
-}) {
-  const template = await loadSeasonTemplate();
-  const config = normalizeSeasonPassConfig({
-    ...template,
-    ...(input.overrides ?? {}),
-  });
-  const skinIds = input.skinIds
-    ? normalizeSeasonSkinIds(input.skinIds)
-    : template.skinIds;
-
-  return createQuestSeason({
-    name: input.name,
-    startsAt: input.startsAt,
-    endsAt: input.endsAt,
-    isActive: input.isActive,
-    ...config,
-    tierRewards: buildSeasonPassLadder(config.tierCount, skinIds),
-  });
-}
-
-export function buildDefaultSeasonRewards(
-  tierCount: number,
-): QuestSeasonTierReward[] {
-  return buildSeasonPassLadder(tierCount);
 }
 
 export type SeasonRewardSummary = {
