@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Tags } from 'lucide-react';
+import { Tags } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
+import { hapticTick } from '@/lib/haptics';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
   enqueueQuestRewardReveal,
@@ -12,7 +14,6 @@ import {
 import {
   HintButton,
   ObjectiveLabel,
-  ObjectiveProgressBar,
   QuestRewardTileBadge,
   claimRequestFor,
   objectiveCardTone,
@@ -438,7 +439,7 @@ export function NextQuestStrip({
                 ? 'border-amber-400/70 bg-amber-100/80 hover:bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15 dark:hover:bg-amber-500/20'
                 : `${objectiveCardTone(true)} hover:bg-lime-100 dark:hover:bg-lime-500/20`
             }`
-          : 'mb-2 gap-3 rounded-2xl border border-border/60 bg-card px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[border-color,box-shadow,transform] active:scale-[0.99] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:shadow-[0_6px_16px_-10px_rgba(0,0,0,0.25)] md:mb-3 md:px-4 md:py-3'
+          : 'mb-2 gap-3 rounded-2xl border border-primary/15 bg-primary/[0.06] px-3 py-2.5 transition-[border-color,background-color,transform] active:scale-[0.99] dark:bg-primary/[0.09] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary/[0.09] md:mb-3 md:px-4 md:py-3'
       }`}
     >
       {showClaimable && claimable ? (
@@ -507,6 +508,68 @@ export function NextQuestStrip({
         </>
       ) : displayNextUp ? (
         <>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-primary">
+              <Icon name="quests" className="h-4 w-4 shrink-0" />
+              <span className="shrink-0">Quest</span>
+              {!displayNextUp.needsFocusTags &&
+              !fillingTrackable &&
+              !introTrackable &&
+              (nextUpReasonLabel || nextUpResetLabel) ? (
+                <span className="min-w-0 truncate font-bold normal-case tracking-normal text-muted-foreground">
+                  · {nextUpReasonLabel ?? nextUpResetLabel}
+                </span>
+              ) : null}
+              {displayNextUp.hint && !displayNextUp.needsFocusTags ? (
+                <span
+                  className="-my-1 ml-auto shrink-0"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <HintButton
+                    compact
+                    text={displayNextUp.hint}
+                    tags={displayNextUp.tags}
+                    onShowMe={
+                      displayNextUp.guideId
+                        ? () =>
+                            startHintGuide(displayNextUp.guideId!, {
+                              ...displayNextUp.guideContext,
+                              tags: displayNextUp.tags,
+                            })
+                        : undefined
+                    }
+                  />
+                </span>
+              ) : null}
+            </span>
+            {displayNextUp.needsFocusTags ? (
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-[14px] font-black leading-tight text-foreground md:text-[15px]">
+                  Pick a tag to start
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-background/70 px-2 py-0.5 text-[12px] font-black text-primary">
+                  <Tags aria-hidden="true" className="h-3 w-3" strokeWidth={2.75} />
+                  Pick a tag
+                </span>
+              </span>
+            ) : (
+              <>
+                <span className="min-w-0 text-[14px] font-black leading-tight text-foreground md:text-[15px]">
+                  <span className="line-clamp-2 md:line-clamp-1">
+                    <ObjectiveLabel
+                      label={displayNextUp.remainingLabel}
+                      tags={displayNextUp.tags}
+                      maxTags={1}
+                    />
+                  </span>
+                </span>
+                <QuestTrack
+                  progress={displayNextUp.progress}
+                  target={displayNextUp.target}
+                />
+              </>
+            )}
+          </div>
           <QuestRewardTileBadge
             reward={displayNextUp.reward}
             rewards={displayNextUp.rewards}
@@ -514,70 +577,6 @@ export function NextQuestStrip({
             isPremium={!!isPremium}
             small
           />
-          {displayNextUp.needsFocusTags ? (
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-[12px] font-black text-foreground">
-                Pick a tag to start this quest
-              </span>
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[12px] font-black text-primary">
-                <Tags aria-hidden="true" className="h-3 w-3" strokeWidth={2.75} />
-                Pick a tag
-              </span>
-            </div>
-          ) : (
-            <div className="flex min-w-0 flex-1 flex-col gap-1 md:gap-1.5">
-              <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                <span
-                  aria-hidden="true"
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-                />
-                <span className="shrink-0">Next quest</span>
-                {!fillingTrackable &&
-                !introTrackable &&
-                (nextUpReasonLabel || nextUpResetLabel) ? (
-                  <span className="min-w-0 truncate text-muted-foreground/80">
-                    · {nextUpReasonLabel ?? nextUpResetLabel}
-                  </span>
-                ) : null}
-              </span>
-              <span className="min-w-0 text-[13px] font-black leading-tight text-foreground md:text-[14px] md:font-bold">
-                <span className="line-clamp-2 md:line-clamp-1">
-                  <ObjectiveLabel
-                    label={displayNextUp.remainingLabel}
-                    tags={displayNextUp.tags}
-                    maxTags={1}
-                  />
-                </span>
-              </span>
-              <ObjectiveProgressBar
-                heightClassName="h-4 md:h-3.5"
-                progress={displayNextUp.progress}
-                target={displayNextUp.target}
-              />
-            </div>
-          )}
-          {displayNextUp.hint && !displayNextUp.needsFocusTags ? (
-            <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
-              <HintButton
-                text={displayNextUp.hint}
-                tags={displayNextUp.tags}
-                onShowMe={
-                  displayNextUp.guideId
-                    ? () =>
-                        startHintGuide(displayNextUp.guideId!, {
-                          ...displayNextUp.guideContext,
-                          tags: displayNextUp.tags,
-                        })
-                    : undefined
-                }
-              />
-            </span>
-          ) : (
-            <ChevronRight
-              aria-hidden="true"
-              className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-[transform,color] group-hover:translate-x-0.5 group-hover:text-primary"
-            />
-          )}
         </>
       ) : null}
     </div>
@@ -625,6 +624,42 @@ export function NextQuestStrip({
       />
     </div>
     </>
+  );
+}
+
+function QuestTrack({ progress, target }: { progress: number; target: number }) {
+  const safeTarget = Math.max(1, target);
+  const shown = Math.min(Math.max(0, progress), safeTarget);
+  const pct = (shown / safeTarget) * 100;
+  const done = shown >= safeTarget;
+  const prevProgress = useRef(progress);
+  useEffect(() => {
+    const prev = prevProgress.current;
+    prevProgress.current = progress;
+    if (progress > prev) hapticTick();
+  }, [progress]);
+  return (
+    <span className="mt-0.5 flex items-center gap-2">
+      <span
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={safeTarget}
+        aria-valuenow={shown}
+        className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-primary/15"
+      >
+        <span
+          className={`absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-500 ${
+            done ? 'bg-lime-600' : 'bg-amber-400'
+          }`}
+          style={{ width: `${Math.max(pct, 8)}%` }}
+        />
+      </span>
+      {safeTarget > 1 && (
+        <span className="shrink-0 text-[11px] font-black tabular-nums text-muted-foreground">
+          {shown}/{safeTarget}
+        </span>
+      )}
+    </span>
   );
 }
 

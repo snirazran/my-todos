@@ -556,10 +556,12 @@ export function HintButton({
   text,
   tags,
   onShowMe,
+  compact = false,
 }: {
   text: string;
   tags?: ObjectiveTagChip[];
   onShowMe?: () => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement | null>(null);
@@ -588,8 +590,15 @@ export function HintButton({
           event.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[12px] font-black text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5"
+        className={
+          compact
+            ? 'inline-flex h-6 items-center gap-1 rounded-lg px-1.5 text-[11px] font-black normal-case tracking-normal text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground'
+            : 'inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[12px] font-black text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5'
+        }
       >
+        {compact && (
+          <Lightbulb className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
+        )}
         Hint
       </button>
       {open && (

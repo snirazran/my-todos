@@ -5,20 +5,20 @@ import {
   EllipsisVertical,
   CalendarCheck,
   CalendarClock,
-  Repeat,
   Filter,
   CalendarDays,
   Pencil,
   Plus,
   Flame,
-  Pen,
+  Bell,
+  Clock,
+  StickyNote,
   ListChecks,
   EyeOff,
   Eye,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
-import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon } from '@/components/ui/Icon';
 import {
   hapticGrab,
@@ -222,7 +222,14 @@ interface SortableTaskItemProps {
   paused?: boolean;
   hintPeekPrimary?: boolean;
   isDesktop?: boolean;
+  isNextTimed?: boolean;
 }
+
+const clockMinutes = (hhmm?: string): number | null => {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+};
 
 const SortableTaskItem = React.forwardRef<
   HTMLDivElement,
@@ -253,6 +260,7 @@ const SortableTaskItem = React.forwardRef<
       paused = false,
       hintPeekPrimary = false,
       isDesktop = false,
+      isNextTimed = false,
     },
     ref,
   ) => {
@@ -261,6 +269,85 @@ const SortableTaskItem = React.forwardRef<
       () => checklistPayout(checklist),
       [checklist],
     );
+
+    const metaItems: { key: string; node: React.ReactNode }[] = [];
+    if (task.startTime) {
+      const TimeIcon = task.reminder ? Bell : Clock;
+      metaItems.push({
+        key: 'time',
+        node: (
+          <span
+            className={`inline-flex items-center gap-1 tabular-nums ${
+              isNextTimed && !isDone ? 'text-primary' : ''
+            }`}
+          >
+            {isNextTimed && !isDone ? (
+              <span className="mr-0.5 text-[11px] font-black uppercase tracking-wide md:text-[12px]">
+                Next
+              </span>
+            ) : (
+              <TimeIcon className="h-3 w-3 flex-shrink-0 md:h-3.5 md:w-3.5" />
+            )}
+            {task.endTime && task.endTime !== task.startTime
+              ? `${task.startTime}–${task.endTime}`
+              : task.startTime}
+          </span>
+        ),
+      });
+    }
+    for (const tagId of task.tags ?? []) {
+      const tag = getTagDetails(tagId);
+      if (!tag) continue;
+      metaItems.push({
+        key: `tag-${tagId}`,
+        node: (
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 flex-shrink-0 rounded-full"
+              style={{ backgroundColor: tag.color || '#6366f1' }}
+            />
+            <span className="truncate">{tag.name}</span>
+          </span>
+        ),
+      });
+    }
+    if (isWeekly && (task.streak ?? 0) > 0) {
+      metaItems.push({
+        key: 'streak',
+        node: (
+          <span
+            className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500"
+            title={
+              isDone
+                ? `${task.streak} in a row`
+                : `${task.streak} in a row — finish today to keep it`
+            }
+          >
+            <Flame className="h-3.5 w-3.5" fill="currentColor" />
+            <span className="font-black tabular-nums">{task.streak}</span>
+          </span>
+        ),
+      });
+    }
+    if (task.calendarEventId || task.notes?.trim()) {
+      metaItems.push({
+        key: 'icons',
+        node: (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground/70">
+            {task.calendarEventId && (
+              <CalendarDays
+                aria-label="From your calendar"
+                className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
+              />
+            )}
+            {task.notes?.trim() && (
+              <StickyNote aria-label="Has notes" className="h-3.5 w-3.5" />
+            )}
+          </span>
+        ),
+      });
+    }
 
     /* Swipe Logic */
     const [openSide, setOpenSide] = useState<'timer' | 'secondary' | null>(null);
@@ -930,58 +1017,6 @@ const SortableTaskItem = React.forwardRef<
             <div
               className={`relative z-10 min-w-0 flex-1 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
             >
-                {( (task.tags && task.tags.length > 0) || task.startTime ) && (
-                  <div className="flex flex-wrap gap-1 mb-1">
-                    <AnimatePresence mode="popLayout">
-                      {task.startTime && (
-                        <motion.span
-                          initial={false}
-                          exit={{ opacity: 0, scale: 0 }}
-                          key="task-time-tag"
-                          className="inline-flex"
-                        >
-                          <TimeTag
-                            startTime={task.startTime}
-                            endTime={task.endTime}
-                            reminder={task.reminder}
-                          />
-                        </motion.span>
-                      )}
-                      {task.tags?.map((tagId) => {
-                        const tagDetails = getTagDetails(tagId);
-                        if (!tagDetails) return null;
-
-                        const color = tagDetails.color;
-                        const name = tagDetails.name;
-
-                        return (
-                          <motion.span
-                            initial={false}
-                            exit={{ opacity: 0, scale: 0 }}
-                            transition={{ duration: 0.2 }}
-                            key={tagId}
-                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[13px] font-bold tracking-normal shadow-sm transition-colors ${
- !color
- ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
- : 'tag-chip'
- }`}
-                            style={
-                              color
-                                ? ({
-                                    backgroundColor: `${color}20`,
-                                    borderColor: `${color}40`,
-                                    '--tag-color': color,
-                                  } as React.CSSProperties)
-                                : undefined
-                            }
-                          >
-                            {name}
-                          </motion.span>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                )}
                 <span className="flex flex-wrap items-center gap-1.5">
                   <motion.span
                     className={`text-[15px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17px] ${
@@ -996,38 +1031,26 @@ const SortableTaskItem = React.forwardRef<
                   >
                     {task.text}
                   </motion.span>
-                  {isWeekly && (
-                    <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
-                  )}
-                  {isWeekly && (task.streak ?? 0) > 0 && (
-                    <span
-                      className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500 no-underline"
-                      title={
-                        isDone
-                          ? `${task.streak} in a row`
-                          : `${task.streak} in a row — finish today to keep it`
-                      }
-                    >
-                      <Flame className="h-4 w-4" fill="currentColor" />
-                      <span className="text-[12px] font-black tabular-nums leading-none">
-                        ×{task.streak}
-                      </span>
-                    </span>
-                  )}
                   <BuddyBadge
                     taskId={task.id}
                     date={new Intl.DateTimeFormat('en-CA').format(new Date())}
                   />
-                  {task.calendarEventId && (
-                    <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                  )}
-                  {task.notes?.trim() && (
-                    <Pen
-                      aria-label="Has notes"
-                      className="h-4 w-4 flex-shrink-0 text-muted-foreground/70"
-                    />
-                  )}
                 </span>
+
+                {metaItems.length > 0 && (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] font-semibold leading-5 text-muted-foreground md:text-[13px]">
+                    {metaItems.map((item, i) => (
+                      <React.Fragment key={item.key}>
+                        {i > 0 && (
+                          <span aria-hidden="true" className="text-muted-foreground/40">
+                            ·
+                          </span>
+                        )}
+                        {item.node}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
 
                 {checklist.length > 0 && (
                   <StepsStrip
@@ -2146,6 +2169,21 @@ export default function TaskList({
     toggle(task.id, forceState);
   };
 
+  const [nowMinutes, setNowMinutes] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setNowMinutes(d.getHours() * 60 + d.getMinutes());
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
+
   // Determine visible tasks
   const visibleTasks = tasks.filter((t) => {
     const isTemporarilyVisible = delayedCompleted.has(t.id);
@@ -2204,6 +2242,21 @@ export default function TaskList({
 
   // Combined for DnD context and empty-state checks
   const sortedVisibleTasks = [...sortedActiveTasks, ...completedTasks];
+
+  let nextTimedTaskId: string | undefined;
+  let nextTimedStart = Infinity;
+  if (nowMinutes !== null) {
+    for (const t of sortedActiveTasks) {
+      if (t.completed || vSet.has(t.id)) continue;
+      const start = clockMinutes(t.startTime);
+      if (start === null) continue;
+      const end = clockMinutes(t.endTime) ?? start;
+      if (Math.max(start, end) >= nowMinutes && start < nextTimedStart) {
+        nextTimedStart = start;
+        nextTimedTaskId = t.id;
+      }
+    }
+  }
 
   // Exactly one row demos the swipe: the same one the coach has spotlit, so a
   // tagged guide never nudges rows sitting behind its own dim.
@@ -2737,7 +2790,10 @@ export default function TaskList({
                           handleTaskToggle={handleTaskToggle}
                           onMenuOpen={openMenu}
                           getTagDetails={getTagDetails}
-                          isDragDisabled={isCompleted || filters.sort !== 'manual'}
+                          isDragDisabled={
+                            isCompleted ||
+                            (filters.sort !== 'manual' && filters.sort !== 'time')
+                          }
                           isWeekly={taskKind(task) === 'weekly'}
                           isGlowActive={isCompleted ? false : isGlowActive}
                           disableLayout={isCompleted ? true : isAnyDragging}
@@ -2772,6 +2828,7 @@ export default function TaskList({
                           paused={paused}
                           hintPeekPrimary={isHintPeekPrimary}
                           isDesktop={!usesSwipeTrays}
+                          isNextTimed={task.id === nextTimedTaskId}
                         />
                       );
                     })}

@@ -308,7 +308,9 @@ export function TaskFilterSheet({
                 <p className="mt-2 px-1 text-[11px] font-semibold text-muted-foreground">
                   {filters.sort === 'tag'
                     ? 'Tasks group by tag, untagged last. Drag to reorder is off.'
-                    : 'Drag to reorder is off while sorted.'}
+                    : filters.sort === 'time'
+                      ? 'Timed tasks follow the clock. Untimed tasks keep your order.'
+                      : 'Drag to reorder is off while sorted.'}
                 </p>
               )}
             </div>
