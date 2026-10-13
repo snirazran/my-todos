@@ -375,7 +375,9 @@ async function undoShuffle(userId: string, user: LeanUser) {
   }
 
   await UserModel.updateOne({ _id: userId }, { $set: set });
-  await announceChange(userId, itemsChanged, backgroundId);
+  void announceChange(userId, itemsChanged, backgroundId).catch((err) =>
+    console.error('Style shuffle undo announce failed', err),
+  );
   return json({
     ok: true,
     shuffled: itemsChanged || !!backgroundId,
@@ -486,8 +488,10 @@ export async function POST(req: NextRequest) {
 
     await UserModel.updateOne({ _id: userId }, { $set: set });
 
-    await announceChange(userId, itemsShuffled, backgroundId);
-    await bumpQuestMetric({ userId, metric: 'skin_equipped' });
+    void Promise.all([
+      announceChange(userId, itemsShuffled, backgroundId),
+      bumpQuestMetric({ userId, metric: 'skin_equipped' }),
+    ]).catch((err) => console.error('Style shuffle follow-ups failed', err));
 
     return json({ ok: true, shuffled: true, auto, tryOn, canUndo: true });
   } catch {
