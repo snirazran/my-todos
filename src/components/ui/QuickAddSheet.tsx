@@ -1,6 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import useSWR, { mutate } from 'swr';
@@ -12,6 +19,7 @@ import {
   useMotionValue,
 } from 'framer-motion';
 import {
+  ArrowUp,
   Bell,
   CalendarDays,
   Check,
@@ -20,6 +28,7 @@ import {
   Plus,
   Repeat,
   Rows3,
+  Sparkles,
   Tag,
   X,
 } from 'lucide-react';
@@ -36,6 +45,7 @@ import { useIntros } from '@/hooks/useIntros';
 import { useUIStore } from '@/lib/uiStore';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import { launchTaskEntranceFrom } from '@/lib/taskEntrance';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
@@ -51,6 +61,7 @@ import {
   nameMatchesBucket,
   parseNaturalInput,
   parseYmdLocal,
+  stripNaturalTokens,
   repeatModeFor,
   ymdLocal,
   type RepeatRule,
@@ -143,6 +154,10 @@ const ToolbarChip = React.forwardRef<
     onClick: () => void;
   }
 >(function ToolbarChip({ icon, label, ariaLabel, active = false, onClick }, ref) {
+  const settled = useRef(false);
+  useEffect(() => {
+    settled.current = true;
+  }, []);
   return (
     <button
       ref={ref}
@@ -156,7 +171,15 @@ const ToolbarChip = React.forwardRef<
       }`}
     >
       {icon}
-      <span className="whitespace-nowrap">{label}</span>
+      <motion.span
+        key={label}
+        initial={settled.current ? { opacity: 0, y: 5 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 560, damping: 32 }}
+        className="whitespace-nowrap"
+      >
+        {label}
+      </motion.span>
     </button>
   );
 });
@@ -200,7 +223,10 @@ export default function QuickAddSheet({
   const [bulkInitialTasks, setBulkInitialTasks] = useState<string[] | null>(null);
   const [bulkOmittedCount, setBulkOmittedCount] = useState(0);
   const [nlDismissed, setNlDismissed] = useState('');
-  const [nlApplied, setNlApplied] = useState('');
+  const [nlOverride, setNlOverride] = useState({ date: false, time: false });
+  const [tagSuggestDismissed, setTagSuggestDismissed] = useState('');
+  const sendRef = useRef<HTMLButtonElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [tags, setTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -240,13 +266,6 @@ export default function QuickAddSheet({
     if (el.scrollLeft !== clampedScroll) el.scrollLeft = clampedScroll;
     setTagFadeRight(maxScroll - clampedScroll > 4);
   }, [tagScroll.ref]);
-  const [chipView, setChipView] = useState<{
-    startTime: string;
-    notify: boolean;
-    reminder: string;
-    tags: SavedTag[];
-  }>({ startTime: '', notify: false, reminder: 'at_time', tags: [] });
-
   const tagManager = useTagManager({
     open,
     selectedTags: tags,
@@ -362,6 +381,10 @@ export default function QuickAddSheet({
   );
 
   const stripTags = tagManager.savedTags;
+  const tagColors = tags
+    .map((id) => stripTags.find((t) => t.id === id)?.color)
+    .filter((c): c is string => !!c)
+    .slice(0, 3);
 
   useEffect(() => {
     updateTagFade();
@@ -450,71 +473,109 @@ export default function QuickAddSheet({
     el.style.height = `${el.scrollHeight}px`;
   }, [text, open]);
 
-  useEffect(() => {
-    // Render the saved area immediately so its height is reserved from the first
-    // frame — the whole sheet then rises as one motion instead of growing late.
+
+  const [openSeen, setOpenSeen] = useState(false);
+  if (open !== openSeen) {
+    setOpenSeen(open);
     setSuggestionsReady(open);
-  }, [open]);
+    if (open) {
+      setText(initialText);
+      setBulkInitialTasks(null);
+      setBulkOmittedCount(0);
 
-  useEffect(() => {
-    if (!open) return;
+      const initialDay = (() => {
+        if (defaultDateKey) {
+          const dow = parseYmdLocal(defaultDateKey).getDay() as Exclude<ApiDay, -1>;
+          return daysOrder ? daysOrder.indexOf(dow) : dow;
+        }
+        if (defaultPickedDay !== undefined) return defaultPickedDay as DisplayDay;
+        return todayDisplayIndex(daysOrder);
+      })();
+      setPickedDays(
+        defaultRepeatDaily
+          ? ([0, 1, 2, 3, 4, 5, 6] as DisplayDay[])
+          : [
+              (initialDay >= 0
+                ? initialDay
+                : todayDisplayIndex(daysOrder)) as DisplayDay,
+            ],
+      );
 
-    setText(initialText);
-    setBulkInitialTasks(null);
-    setBulkOmittedCount(0);
+      setRepeat(defaultRepeat);
+      setRepeatEndDate(null);
+      setRepeatRule(null);
+      setTags([]);
+      setIsSubmitting(false);
+      tagManager.reset();
 
-    const initialDay = (() => {
-      if (defaultDateKey) {
-        const dow = parseYmdLocal(defaultDateKey).getDay() as Exclude<ApiDay, -1>;
-        return daysOrder ? daysOrder.indexOf(dow) : dow;
-      }
-      if (defaultPickedDay !== undefined) return defaultPickedDay as DisplayDay;
-      return todayDisplayIndex(daysOrder);
-    })();
-    setPickedDays(
-      defaultRepeatDaily
-        ? ([0, 1, 2, 3, 4, 5, 6] as DisplayDay[])
-        : [
-            (initialDay >= 0
-              ? initialDay
-              : todayDisplayIndex(daysOrder)) as DisplayDay,
-          ],
-    );
+      setStartTime('');
+      setEndTime('');
+      setReminder('at_time');
+      setNotifyEnabled(false);
+      setShowReminderPicker(false);
+      setActivePicker(null);
+      setShowCalendarPicker(false);
+      setAutoAddedTagIds([]);
+      setInputFocused(false);
+      setPickedBacklogTaskId(null);
+      setPickedBacklogText(null);
+      setPickedNotes(undefined);
+      setPickedChecklist(undefined);
+      setShowSavedConfirm(false);
+      setHasSuggestionContent(false);
+      setManagedTag(null);
+      setPickedSectionId(defaultSectionId);
+      setSectionPickedManually(!!defaultSectionId);
+      setShowSectionPicker(false);
 
-    setRepeat(defaultRepeat);
-    setRepeatEndDate(null);
-    setRepeatRule(null);
-    setTags([]);
-    setIsSubmitting(false);
-    tagManager.reset();
-
-    setStartTime('');
-    setEndTime('');
-    setReminder('at_time');
-    setNotifyEnabled(false);
-    setShowReminderPicker(false);
-    setActivePicker(null);
-    setShowCalendarPicker(false);
-    setAutoAddedTagIds([]);
-    setInputFocused(false);
-    setPickedBacklogTaskId(null);
-    setPickedBacklogText(null);
-    setPickedNotes(undefined);
-    setPickedChecklist(undefined);
-    setShowSavedConfirm(false);
-    setHasSuggestionContent(false);
-    setManagedTag(null);
-    setPickedSectionId(defaultSectionId);
-    setSectionPickedManually(!!defaultSectionId);
-    setShowSectionPicker(false);
-
-    const initialDate = defaultDateKey ?? ymdLocal(new Date());
-    setSelectedDateKey(initialDate);
-    calendar.setCalendarMonthFromDate(parseYmdLocal(initialDate));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialText, defaultRepeat, defaultPickedDay, defaultDateKey, daysOrder, defaultSectionId]);
+      const initialDate = defaultDateKey ?? ymdLocal(new Date());
+      setSelectedDateKey(initialDate);
+      calendar.setCalendarMonthFromDate(parseYmdLocal(initialDate));
+      setNlOverride({ date: false, time: false });
+      setNlDismissed('');
+      setTagSuggestDismissed('');
+    }
+  }
 
   const isLater = pickedDays.includes(7);
+  const nlParsed = useMemo(() => parseNaturalInput(text), [text]);
+  const nlActive = !isLater && !!nlParsed && text !== nlDismissed;
+  const nlDateKey = nlActive && !nlOverride.date ? nlParsed?.dateKey : undefined;
+  const nlStartTime =
+    nlActive && !nlOverride.time ? nlParsed?.startTime : undefined;
+  const nlApplied = !!(nlDateKey || nlStartTime);
+  const nlTokens = nlApplied
+    ? (nlParsed?.tokens ?? []).filter((t) =>
+        t.kind === 'date' ? !!nlDateKey : !!nlStartTime,
+      )
+    : [];
+  const displayDayOf = (date: Date) => {
+    const displayDay = daysOrder
+      ? daysOrder.indexOf(date.getDay() as Exclude<ApiDay, -1>)
+      : date.getDay();
+    return (
+      displayDay >= 0 ? displayDay : todayDisplayIndex(daysOrder)
+    ) as DisplayDay;
+  };
+  const effectiveDateKey = nlDateKey ?? selectedDateKey;
+  const effectivePickedDays = nlDateKey
+    ? [displayDayOf(parseYmdLocal(nlDateKey))]
+    : pickedDays;
+  const effectiveStartTime = nlStartTime ?? startTime;
+  const effectiveNotify = nlStartTime ? true : notifyEnabled;
+  const nlKey = `${nlParsed?.dateKey ?? ''}|${nlParsed?.startTime ?? ''}`;
+  useLayoutEffect(() => {
+    setNlOverride({ date: false, time: false });
+  }, [nlKey]);
+  useEffect(() => {
+    if (open && nlApplied) markIntroSeenRef.current('quickAddNl');
+  }, [open, nlApplied]);
+  const takeOverNlTime = () => {
+    if (!nlStartTime) return;
+    setStartTime(nlStartTime);
+    setNotifyEnabled(true);
+    setNlOverride((o) => ({ ...o, time: true }));
+  };
   const pickedSection =
     sections.find((s) => s.id === pickedSectionId) ?? null;
   const sectionBtnRef = useRef<HTMLButtonElement>(null);
@@ -562,8 +623,10 @@ export default function QuickAddSheet({
   const tomorrowKey = ymdLocal(tomorrowDate);
   const todayIndex = todayDisplayIndex(daysOrder);
   const tomorrowIndex = ((todayIndex + 1) % 7) as DisplayDay;
-  const selectedDay = (pickedDays[0] ?? todayIndex) as DisplayDay;
-  const anchorDate = selectedDateKey ? parseYmdLocal(selectedDateKey) : new Date();
+  const selectedDay = (effectivePickedDays[0] ?? todayIndex) as DisplayDay;
+  const anchorDate = effectiveDateKey
+    ? parseYmdLocal(effectiveDateKey)
+    : new Date();
   const anchorApiDay = anchorDate.getDay() as Exclude<ApiDay, -1>;
   const anchorDisplayDay = displayDayFromApi(anchorApiDay, daysOrder);
   const repeatDay = (
@@ -577,14 +640,6 @@ export default function QuickAddSheet({
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
-  const selectedTagChips = useMemo(
-    () =>
-      tags
-        .map((id) => tagManager.savedTags.find((t) => t.id === id))
-        .filter((t): t is SavedTag => !!t),
-    [tags, tagManager.savedTags],
-  );
-  const hasChips = notifyEnabled || selectedTagChips.length > 0;
   const isShortScreen = availableSheetHeight < 700;
   // The sheet hugs its content and sits at the bottom; this is just the cap so a
   // long saved list can't grow past the screen (it scrolls internally instead).
@@ -610,30 +665,6 @@ export default function QuickAddSheet({
   // it sizes to its content, above it scrolls inside.
   const suggestionsMax = Math.min(420, Math.round(availableSheetHeight * 0.42));
 
-  // Keep the last chip rendered while the row collapses.
-  useEffect(() => {
-    if (hasChips) {
-      setChipView({
-        startTime,
-        notify: notifyEnabled,
-        reminder,
-        tags: selectedTagChips,
-      });
-      return;
-    }
-    const t = window.setTimeout(
-      () =>
-        setChipView({
-          startTime: '',
-          notify: false,
-          reminder: 'at_time',
-          tags: [],
-        }),
-      320,
-    );
-    return () => window.clearTimeout(t);
-  }, [hasChips, startTime, notifyEnabled, reminder, selectedTagChips]);
-
   useEffect(() => {
     if (!open) {
       setSheetBaseHeight(null);
@@ -647,42 +678,54 @@ export default function QuickAddSheet({
 
   const selectedDateLabel = isLater
     ? 'Later'
-    : selectedDateKey === todayKey
+    : effectiveDateKey === todayKey
       ? 'Today'
-      : selectedDateKey === tomorrowKey
+      : effectiveDateKey === tomorrowKey
         ? 'Tomorrow'
-        : selectedDateKey
-          ? parseYmdLocal(selectedDateKey).toLocaleDateString('en-US', {
+        : effectiveDateKey
+          ? parseYmdLocal(effectiveDateKey).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
             })
           : labelForDisplayDay(selectedDay as Exclude<DisplayDay, 7>, daysOrder);
 
-  // "call mom tomorrow at 3pm" → offer to schedule it. The chip only fills in
-  // the date/time fields; what was typed stays exactly as typed.
-  const nlParsed = useMemo(() => parseNaturalInput(text), [text]);
-  const nlSuggestion =
-    !isLater &&
-    nlParsed &&
-    text !== nlDismissed &&
-    text !== nlApplied &&
-    ((nlParsed.dateKey && nlParsed.dateKey !== selectedDateKey) ||
-      (nlParsed.startTime && nlParsed.startTime !== startTime))
-      ? nlParsed
+  const nlMirror =
+    nlTokens.length > 0
+      ? (() => {
+          const parts: React.ReactNode[] = [];
+          let at = 0;
+          [...nlTokens]
+            .sort((a, b) => a.start - b.start)
+            .forEach((token) => {
+              if (token.start > at) parts.push(text.slice(at, token.start));
+              parts.push(
+                <mark
+                  key={`${token.kind}-${text.slice(token.start, token.end)}`}
+                  className="nl-mark rounded-[8px] bg-primary/15 text-transparent shadow-[0_0_0_2px_hsl(var(--primary)/0.15)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
+                >
+                  {text.slice(token.start, token.end)}
+                </mark>,
+              );
+              at = token.end;
+            });
+          parts.push(text.slice(at));
+          return parts;
+        })()
       : null;
-  const nlLabel = nlSuggestion
+  const nlLabel = nlApplied
     ? [
-        nlSuggestion.dateKey
-          ? nlSuggestion.dateKey === todayKey
+        nlDateKey
+          ? nlDateKey === todayKey
             ? 'Today'
-            : nlSuggestion.dateKey === tomorrowKey
+            : nlDateKey === tomorrowKey
               ? 'Tomorrow'
-              : parseYmdLocal(nlSuggestion.dateKey).toLocaleDateString(
-                  'en-US',
-                  { weekday: 'short', month: 'short', day: 'numeric' },
-                )
+              : parseYmdLocal(nlDateKey).toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })
           : null,
-        nlSuggestion.startTime ?? null,
+        nlStartTime ?? null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -723,18 +766,6 @@ export default function QuickAddSheet({
   const openReminderPicker = useCallback(() => {
     requestAnimationFrame(() => setShowReminderPicker(true));
   }, []);
-
-  const applyNlSuggestion = () => {
-    if (!nlSuggestion) return;
-    markIntroSeenRef.current('quickAddNl');
-    if (nlSuggestion.dateKey)
-      selectCalendarDate(parseYmdLocal(nlSuggestion.dateKey));
-    if (nlSuggestion.startTime) {
-      setStartTime(nlSuggestion.startTime);
-      setNotifyEnabled(true);
-    }
-    setNlApplied(text);
-  };
 
   // Focus areas are user-defined docs with arbitrary ids, so matching goes
   // through semantic buckets: task text → bucket → a tag connected to a
@@ -864,7 +895,7 @@ export default function QuickAddSheet({
   const resolvedTagSuggestions =
     questTagSuggestions.length > 0 ? questTagSuggestions : aiTagSuggestions;
   const showQuestTagSuggestion =
-    resolvedTagSuggestions.length > 0 && text !== nlDismissed;
+    resolvedTagSuggestions.length > 0 && text !== tagSuggestDismissed;
 
   const repeatMode =
     repeat === 'custom'
@@ -884,10 +915,11 @@ export default function QuickAddSheet({
     }[repeatMode] ?? 'Repeat';
 
   const actionsFade = useScrollFade(
-    `${selectedDateLabel}|${repeatShortLabel}|${repeatsOn}|${notifyEnabled}|${startTime}|${pickedSection?.id ?? ''}|${sections.length}|${stripTags.length}`,
+    `${selectedDateLabel}|${repeatShortLabel}|${repeatsOn}|${effectiveNotify}|${effectiveStartTime}|${pickedSection?.id ?? ''}|${sections.length}|${stripTags.length}`,
   );
 
   const selectSingleDay = (day: DisplayDay) => {
+    setNlOverride((o) => ({ ...o, date: true }));
     setPickedDays([day]);
     const date = new Date();
     const offset = day === tomorrowIndex ? 1 : 0;
@@ -897,14 +929,9 @@ export default function QuickAddSheet({
   };
 
   const selectCalendarDate = (date: Date) => {
-    const dateKey = ymdLocal(date);
-    const displayDay = daysOrder
-      ? (daysOrder.indexOf(date.getDay() as Exclude<ApiDay, -1>) as DisplayDay)
-      : (date.getDay() as DisplayDay);
-    setSelectedDateKey(dateKey);
-    setPickedDays([
-      (displayDay >= 0 ? displayDay : todayDisplayIndex(daysOrder)) as DisplayDay,
-    ]);
+    setNlOverride((o) => ({ ...o, date: true }));
+    setSelectedDateKey(ymdLocal(date));
+    setPickedDays([displayDayOf(date)]);
     setShowCalendarPicker(false);
     setActivePicker(null);
   };
@@ -916,7 +943,7 @@ export default function QuickAddSheet({
     const trimmed = taskText.trim();
     if (!trimmed) return null;
 
-    const apiDays: ApiDay[] = pickedDays
+    const apiDays: ApiDay[] = effectivePickedDays
       .slice()
       .sort()
       .map((day) => apiDayFromDisplay(day, daysOrder));
@@ -924,11 +951,11 @@ export default function QuickAddSheet({
 
     const exactDates =
       repeat === 'monthly' || repeat === 'custom'
-        ? selectedDateKey
-          ? [selectedDateKey]
+        ? effectiveDateKey
+          ? [effectiveDateKey]
           : undefined
-        : repeat === 'this-week' && !isLater && selectedDateKey
-          ? [selectedDateKey]
+        : repeat === 'this-week' && !isLater && effectiveDateKey
+          ? [effectiveDateKey]
           : undefined;
 
     return {
@@ -937,9 +964,9 @@ export default function QuickAddSheet({
       dates: exactDates,
       repeat,
       tags,
-      startTime: startTime || undefined,
-      endTime: endTime || undefined,
-      reminder: notifyEnabled ? reminder : undefined,
+      startTime: effectiveStartTime || undefined,
+      endTime: (nlStartTime ? undefined : endTime) || undefined,
+      reminder: effectiveNotify ? reminder : undefined,
       repeatEndDate: repeat !== 'this-week' ? repeatEndDate : null,
       repeatRule: repeat === 'custom' ? repeatRule : null,
       notes: includeSavedDetails && pickedBacklogTaskId ? pickedNotes : undefined,
@@ -951,12 +978,17 @@ export default function QuickAddSheet({
 
   const doSubmit = async (removeSavedTask: boolean) => {
     if (isSubmitting) return;
-    const submitData = submitDataFor(text, true);
+    const submitData = submitDataFor(
+      nlTokens.length > 0 ? stripNaturalTokens(text, nlTokens) || text : text,
+      true,
+    );
     if (!submitData) return;
     const savedTaskId = removeSavedTask ? pickedBacklogTaskId : null;
 
     hapticSuccess();
     markIntroSeenRef.current('quickAddNl');
+    const origin = sendRef.current?.getBoundingClientRect();
+    if (origin) launchTaskEntranceFrom(origin);
     onOpenChange(false);
 
     const attempt = async (): Promise<void> => {
@@ -1051,14 +1083,13 @@ export default function QuickAddSheet({
   if (!mounted) return null;
 
   const sheetVariants = {
-    hidden: isDesktop ? { opacity: 0, scale: 0.97, y: -12 } : { y: '100%' },
-    visible: isDesktop ? { opacity: 1, scale: 1, y: 0 } : { y: 0 },
+    hidden: isDesktop ? { opacity: 0, y: 14 } : { y: '100%' },
+    visible: isDesktop ? { opacity: 1, y: 0 } : { y: 0 },
     exit: ({ velocity, offset }: { velocity: number; offset: number }) => {
       if (isDesktop) {
         return {
           opacity: 0,
-          scale: 0.97,
-          y: -12,
+          y: 8,
           transition: {
             type: 'tween' as const,
             ease: [0.32, 0.72, 0, 1] as const,
@@ -1098,7 +1129,7 @@ export default function QuickAddSheet({
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="fixed inset-0 z-[1399] bg-black/80 will-change-opacity sm:bg-black/60 sm:backdrop-blur-[2px]"
+                className="fixed inset-0 z-[1399] bg-black/50 will-change-opacity sm:bg-black/40"
                 style={{ opacity: backdropOpacity }}
               />
 
@@ -1109,11 +1140,14 @@ export default function QuickAddSheet({
                 animate="visible"
                 exit="exit"
                 custom={dragExitRef.current}
-                transition={{
-                  type: 'tween',
-                  ease: [0.32, 0.72, 0, 1],
-                  duration: isDesktop ? 0.2 : 0.4,
-                }}
+                transition={
+                  isDesktop
+                    ? {
+                        y: { type: 'spring', stiffness: 520, damping: 40 },
+                        opacity: { duration: 0.16, ease: 'easeOut' },
+                      }
+                    : { type: 'spring', stiffness: 420, damping: 40, mass: 0.9 }
+                }
                 drag={!isDesktop ? 'y' : false}
                 dragControls={dragControls}
                 dragListener={false}
@@ -1153,7 +1187,7 @@ export default function QuickAddSheet({
                 }}
                 className={`fixed z-[1400] flex max-h-[100dvh] transform-gpu pointer-events-none will-change-transform ${
                   isDesktop
-                    ? 'inset-0 items-start justify-center p-6 pt-[18vh]'
+                    ? 'inset-0 items-start justify-center p-6 pt-[14vh]'
                     : `inset-x-0 bottom-0 items-end px-3 pt-2 sm:px-6 ${
                         keyboardActive ? 'pb-2' : 'pb-4 sm:pb-6'
                       }`
@@ -1165,20 +1199,8 @@ export default function QuickAddSheet({
                     keyboardActive ? '' : 'pb-[env(safe-area-inset-bottom)]'
                   }`}
                 >
-                  {isDesktop && (
-                    <div className="mb-2 flex shrink-0 justify-end">
-                      <button
-                        type="button"
-                        aria-label="Close"
-                        onClick={() => onOpenChange(false)}
-                        className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                  )}
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-5 pb-3 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:pt-5">
+                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-5 pb-3.5 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.14),0_22px_44px_-18px_rgba(15,23,42,0.4)] sm:pt-5">
                     {!isDesktop && (
                       <div
                         onPointerDown={(e) => dragControls.start(e)}
@@ -1188,59 +1210,36 @@ export default function QuickAddSheet({
                       </div>
                     )}
                     <div dir="ltr" className="w-full pt-1">
-                      {/* Tags render above the input */}
-                      <div
-                        className={`grid px-1 transition-[grid-template-rows,opacity] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${
-                          hasChips
-                            ? 'mb-2 grid-rows-[1fr] opacity-100'
-                            : 'grid-rows-[0fr] opacity-0'
-                        }`}
-                      >
-                        <div className="min-h-0 overflow-hidden">
-                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
-                            {chipView.notify && (
-                              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[13px] font-black text-primary shadow-sm">
-                                <Bell className="h-3 w-3 shrink-0 text-amber-500" />
-                                <span className="tabular-nums">
-                                  {chipView.startTime || '09:00'}
-                                </span>
-                                {chipView.reminder !== 'at_time' && (
-                                  <span className="text-primary/70">
-                                    · {chipView.reminder} before
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                            {chipView.tags.map((tag) => (
-                              <button
-                                key={tag.id}
-                                type="button"
-                                aria-label={`Remove ${tag.name}`}
-                                onPointerDown={(e) => e.preventDefault()}
-                                onClick={() =>
-                                  setTags((prev) =>
-                                    prev.filter((id) => id !== tag.id),
-                                  )
-                                }
-                                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
-                                style={{
-                                  backgroundColor: `${tag.color}20`,
-                                  color: tag.color,
-                                  borderColor: `${tag.color}40`,
-                                }}
-                              >
-                                <span className="max-w-[180px] truncate">
-                                  {tag.name}
-                                </span>
-                                <X className="h-3 w-3 shrink-0 stroke-[3]" />
-                              </button>
-                            ))}
+                      <div className="relative flex shrink-0 items-start gap-3">
+                        <AnimatePresence initial={false}>
+                          {tagColors.length > 0 && (
+                            <motion.span
+                              key="tag-bar"
+                              aria-hidden="true"
+                              initial={{ scaleY: 0, opacity: 0 }}
+                              animate={{ scaleY: 1, opacity: 1 }}
+                              exit={{ scaleY: 0, opacity: 0 }}
+                              transition={{ type: 'spring', stiffness: 520, damping: 30 }}
+                              className="absolute -left-5 top-[13px] flex h-7 w-[4px] origin-center flex-col overflow-hidden rounded-r-full sm:top-[15px]"
+                            >
+                              {tagColors.map((color, i) => (
+                                <span
+                                  key={`${color}-${i}`}
+                                  className="min-h-0 flex-1 transition-colors duration-200"
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                        <div className="relative min-w-0 flex-1">
+                          <div
+                            ref={mirrorRef}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-1 pt-3 pb-1 text-left text-[22px] font-semibold leading-[30px] tracking-tight text-transparent sm:text-2xl"
+                          >
+                            {nlMirror}
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 items-start gap-3">
-                        <div className="relative flex-1">
                           <textarea
                             ref={inputRef}
                             value={text}
@@ -1248,6 +1247,12 @@ export default function QuickAddSheet({
                             onChange={(e) =>
                               setText(e.target.value.replace(/\s*\n+\s*/g, ' '))
                             }
+                            onScroll={(e) => {
+                              if (mirrorRef.current) {
+                                mirrorRef.current.scrollTop =
+                                  e.currentTarget.scrollTop;
+                              }
+                            }}
                             onPaste={handleTaskPaste}
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
@@ -1260,7 +1265,7 @@ export default function QuickAddSheet({
                             autoCapitalize="sentences"
                             enterKeyHint="done"
                             maxLength={100}
-                            className="block w-full min-h-[60px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground caret-primary placeholder:text-muted-foreground/45 focus:outline-none disabled:opacity-50 text-left sm:text-2xl"
+                            className="no-scrollbar relative block w-full min-h-[60px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground caret-primary placeholder:text-muted-foreground/45 focus:outline-none disabled:opacity-50 text-left sm:text-2xl"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -1279,23 +1284,49 @@ export default function QuickAddSheet({
                             </span>
                           )}
                         </div>
-                        <motion.div
-                          aria-hidden
-                          initial={false}
-                          animate={
+                        {!isDesktop && (
+                        <button
+                          ref={sendRef}
+                          type="button"
+                          {...keyboardSafeTap(() => {
+                            if (hasTaskText && !isSubmitting) void handleSubmit();
+                          })}
+                          disabled={isSubmitting}
+                          aria-disabled={!hasTaskText}
+                          aria-label={submitLabel}
+                          className={`relative mt-1.5 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow,transform] duration-200 ease-out sm:mt-2 sm:h-[52px] sm:w-[52px] ${
                             hasTaskText
-                              ? { scale: [1, 1.12, 1.04], rotate: [0, -6, 0] }
-                              : { scale: 1, rotate: 0 }
-                          }
-                          transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
-                          className={`mt-1 grid h-14 w-14 shrink-0 place-items-center rounded-full ring-inset transition-[background-color,box-shadow] duration-300 sm:h-16 sm:w-16 ${
-                            hasTaskText
-                              ? 'bg-primary/10 ring-2 ring-primary/50'
-                              : 'bg-muted/60 ring-1 ring-border/60'
+                              ? 'bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] active:translate-y-[3px] active:shadow-none [@media(hover:hover)]:hover:bg-[#478442]'
+                              : 'cursor-default bg-primary/[0.16] ring-1 ring-inset ring-primary/25'
                           }`}
                         >
-                          <Fly size={48} y={-3} />
-                        </motion.div>
+                          <AnimatePresence initial={false} mode="popLayout">
+                            {hasTaskText ? (
+                              <motion.span
+                                key="send"
+                                initial={{ scale: 0.3, opacity: 0, rotate: -60 }}
+                                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                                exit={{ scale: 0.3, opacity: 0, rotate: 30 }}
+                                transition={{ type: 'spring', stiffness: 640, damping: 26 }}
+                                className="grid place-items-center"
+                              >
+                                <ArrowUp className="h-6 w-6" strokeWidth={3} />
+                              </motion.span>
+                            ) : (
+                              <motion.span
+                                key="fly"
+                                initial={{ scale: 0.4, opacity: 0, y: 8 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.5, opacity: 0, y: -14, rotate: -12 }}
+                                transition={{ type: 'spring', stiffness: 520, damping: 24 }}
+                                className="grid place-items-center"
+                              >
+                                <Fly size={40} y={-3} interactive={false} />
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </button>
+                        )}
                       </div>
 
                       {showNlHint && (
@@ -1304,58 +1335,65 @@ export default function QuickAddSheet({
                         </p>
                       )}
 
-                      {(nlSuggestion || showQuestTagSuggestion) && (
-                        <div className="mt-3 mb-1 flex flex-wrap items-center gap-x-2 gap-y-3.5 px-1.5">
-                          {nlSuggestion && (
-                            <button
-                              type="button"
-                              {...keyboardSafeTap(applyNlSuggestion)}
-                              className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 text-[13px] font-black text-primary shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:bg-primary/15"
+                      {(nlApplied || showQuestTagSuggestion) && (
+                        <div className="mt-2 mb-0.5 flex flex-wrap items-center gap-2 px-0.5">
+                          {nlApplied && (
+                            <motion.span
+                              key={nlLabel}
+                              initial={{ opacity: 0, scale: 0.88, y: 4 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              transition={{ type: 'spring', stiffness: 560, damping: 30 }}
+                              className="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-primary/10 pl-2.5 pr-0.5 text-[13px] font-black text-primary"
                             >
-                              {nlSuggestion.dateKey ? (
-                                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                              ) : (
-                                <Bell className="h-3 w-3 shrink-0 text-amber-500" />
-                              )}
-                              <span className="truncate tabular-nums">
-                                {nlLabel}
-                              </span>
-                              <Plus className="h-3 w-3 shrink-0 stroke-[3]" />
-                            </button>
-                          )}
-                          {showQuestTagSuggestion &&
-                            resolvedTagSuggestions.map((suggestedTag) => (
+                              <Sparkles className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+                              <span className="truncate tabular-nums">{nlLabel}</span>
                               <button
-                                key={suggestedTag.id}
                                 type="button"
-                                {...keyboardSafeTap(() =>
-                                  setTags((prev) =>
-                                    prev.includes(suggestedTag.id)
-                                      ? prev
-                                      : [...prev, suggestedTag.id],
-                                  ),
-                                )}
-                                className="relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
-                                style={{
-                                  backgroundColor: `${suggestedTag.color}20`,
-                                  color: suggestedTag.color,
-                                  borderColor: `${suggestedTag.color}40`,
-                                }}
+                                aria-label="Keep as text"
+                                title="Keep as text"
+                                {...keyboardSafeTap(() => setNlDismissed(text))}
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-primary/60 transition-colors [@media(hover:hover)]:hover:bg-primary/15 [@media(hover:hover)]:hover:text-primary"
                               >
-                                <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
-                                <span className="max-w-[128px] truncate">
-                                  {suggestedTag.name}
-                                </span>
+                                <X className="h-3.5 w-3.5" strokeWidth={3} />
                               </button>
-                            ))}
-                          <button
-                            type="button"
-                            aria-label="Dismiss suggestions"
-                            {...keyboardSafeTap(() => setNlDismissed(text))}
-                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                            </motion.span>
+                          )}
+                          {showQuestTagSuggestion && (
+                            <>
+                              {resolvedTagSuggestions.map((suggestedTag) => (
+                                <button
+                                  key={suggestedTag.id}
+                                  type="button"
+                                  {...keyboardSafeTap(() =>
+                                    setTags((prev) =>
+                                      prev.includes(suggestedTag.id)
+                                        ? prev
+                                        : [...prev, suggestedTag.id],
+                                    ),
+                                  )}
+                                  className="relative inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-dashed px-2.5 text-[13px] font-black transition-transform active:scale-95 [@media(hover:hover)]:hover:opacity-75"
+                                  style={{
+                                    backgroundColor: `${suggestedTag.color}12`,
+                                    color: suggestedTag.color,
+                                    borderColor: `${suggestedTag.color}55`,
+                                  }}
+                                >
+                                  <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+                                  <span className="max-w-[128px] truncate">
+                                    {suggestedTag.name}
+                                  </span>
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                aria-label="Dismiss tag suggestions"
+                                {...keyboardSafeTap(() => setTagSuggestDismissed(text))}
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
 
@@ -1519,9 +1557,13 @@ export default function QuickAddSheet({
                       <div
                         ref={actionsFade.ref}
                         onScroll={actionsFade.update}
-                        className={`-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5 ${
-                          actionsFade.faded ? 'mask-fade-right' : ''
-                        }`}
+                        className={
+                          isDesktop
+                            ? '-mx-1 flex flex-wrap items-center gap-1.5 px-1 pb-0.5'
+                            : `-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5 ${
+                                actionsFade.faded ? 'mask-fade-right' : ''
+                              }`
+                        }
                       >
                         {!hideDayPicker && (
                           <ToolbarChip
@@ -1546,14 +1588,16 @@ export default function QuickAddSheet({
                         <ToolbarChip
                           icon={<Bell className="h-4 w-4" />}
                           label={
-                            notifyEnabled && startTime ? startTime : 'Reminder'
+                            effectiveNotify && effectiveStartTime
+                              ? effectiveStartTime
+                              : 'Reminder'
                           }
                           ariaLabel={
-                            notifyEnabled && startTime
-                              ? `Reminder at ${startTime}`
+                            effectiveNotify && effectiveStartTime
+                              ? `Reminder at ${effectiveStartTime}`
                               : 'Set a reminder'
                           }
-                          active={notifyEnabled}
+                          active={effectiveNotify}
                           onClick={openReminderPicker}
                         />
                         {sections.length > 0 && !isLater && (
@@ -1648,61 +1692,46 @@ export default function QuickAddSheet({
                           }}
                       />
 
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      minHeight: hasTaskText || keyboardActive ? 56 : undefined,
-                    }}
-                    className="pointer-events-none relative min-h-0 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]"
-                  >
-                    <AnimatePresence initial={false}>
-                      {hasTaskText && (
-                        <motion.div
-                          key="quick-add-actions"
-                          initial={{ opacity: 0, y: -64 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -64 }}
-                          transition={{
-                            duration: 0.4,
-                            ease: [0.32, 0.72, 0, 1],
-                          }}
-                          className="pointer-events-auto absolute inset-x-0 top-0 pt-1"
-                        >
-                          <button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={!hasTaskText || isSubmitting}
-                            className={[
-                              'group relative h-14 w-full rounded-[28px] text-[17px] font-black overflow-hidden transition-all sm:h-16 sm:text-[18px]',
-                              'bg-[#4f9149] text-white',
-                              'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
-                              '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
-                              'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
-                            ].join(' ')}
-                          >
-                            <span className="relative z-10 flex items-center justify-center gap-2">
-                              {isSubmitting ? (
-                                'Adding...'
-                              ) : (
-                                <>
-                                  <Plus className="w-4 h-4 stroke-[3]" />
-                                  <span>{submitLabel}</span>
-                                </>
-                              )}
+                      {isDesktop && (
+                        <div className="-mx-5 -mb-3.5 mt-3.5 flex items-center justify-between gap-3 border-t border-border/60 bg-muted/30 px-5 py-3">
+                          <span className="flex items-center gap-3 text-[12px] font-semibold text-muted-foreground/80">
+                            <span className="inline-flex items-center gap-1.5">
+                              <kbd className="rounded-md border border-border/80 bg-card px-1.5 py-0.5 font-sans text-[11px] font-bold text-muted-foreground shadow-[0_1px_0_0_hsl(var(--border))]">
+                                ↵
+                              </kbd>
+                              add
                             </span>
-                            {isDesktop && !isSubmitting && (
-                              <span className="pointer-events-none absolute right-5 top-1/2 z-10 -translate-y-1/2 inline-flex items-center rounded-lg border border-white/25 bg-white/15 px-2 py-1 text-[11px] font-bold tracking-wide text-white/85">
-                                Enter ↵
-                              </span>
-                            )}
-                          </button>
-                        </motion.div>
+                            <span className="inline-flex items-center gap-1.5">
+                              <kbd className="rounded-md border border-border/80 bg-card px-1.5 py-0.5 font-sans text-[11px] font-bold text-muted-foreground shadow-[0_1px_0_0_hsl(var(--border))]">
+                                esc
+                              </kbd>
+                              close
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onOpenChange(false)}
+                              className="h-10 rounded-xl px-3.5 text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              ref={sendRef}
+                              type="button"
+                              onClick={() => {
+                                if (hasTaskText && !isSubmitting) void handleSubmit();
+                              }}
+                              disabled={!hasTaskText || isSubmitting}
+                              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#4f9149] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow,background-color,opacity] hover:-translate-y-px hover:bg-[#478442] hover:shadow-[0_4px_0_0_#34631f] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
+                            >
+                              <Plus className="h-4 w-4" strokeWidth={3} />
+                              {submitLabel}
+                            </button>
+                          </span>
+                        </div>
                       )}
-                    </AnimatePresence>
-
+                    </div>
                   </div>
                   </div>
                 </div>
@@ -1719,7 +1748,7 @@ export default function QuickAddSheet({
                   tomorrowIndex={tomorrowIndex}
                   todayKey={todayKey}
                   tomorrowKey={tomorrowKey}
-                  selectedDateKey={selectedDateKey}
+                  selectedDateKey={effectiveDateKey}
                   selectSingleDay={selectSingleDay}
                   selectCalendarDate={selectCalendarDate}
                   showCalendarPicker={showCalendarPicker}
@@ -1727,10 +1756,16 @@ export default function QuickAddSheet({
                   calendarMonthLabel={calendar.calendarMonthLabel}
                   calendarCells={calendar.calendarCells}
                   shiftCalendarMonth={calendar.shiftCalendarMonth}
-                  notifyEnabled={notifyEnabled}
-                  setNotifyEnabled={setNotifyEnabled}
-                  startTime={startTime}
-                  setStartTime={setStartTime}
+                  notifyEnabled={effectiveNotify}
+                  setNotifyEnabled={(v) => {
+                    takeOverNlTime();
+                    setNotifyEnabled(v);
+                  }}
+                  startTime={effectiveStartTime}
+                  setStartTime={(v) => {
+                    takeOverNlTime();
+                    setStartTime(v);
+                  }}
                   reminder={reminder}
                   setReminder={setReminder}
                   showReminderPicker={showReminderPicker}
@@ -1894,7 +1929,7 @@ export default function QuickAddSheet({
             ...(tags.length > 0
               ? [`${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}`]
               : []),
-            ...(notifyEnabled ? ['Reminder'] : []),
+            ...(effectiveNotify ? ['Reminder'] : []),
             ...(pickedSection ? [pickedSection.name] : []),
           ]}
           submitting={isSubmitting}

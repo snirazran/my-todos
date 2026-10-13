@@ -166,6 +166,25 @@ export interface ParsedNaturalInput {
   dateKey?: string;
   startTime?: string;
   cleaned: string;
+  tokens: NaturalToken[];
+}
+
+export interface NaturalToken {
+  kind: 'date' | 'time';
+  start: number;
+  end: number;
+}
+
+export function stripNaturalTokens(text: string, tokens: NaturalToken[]) {
+  let out = text;
+  for (const t of [...tokens].sort((a, b) => b.start - a.start)) {
+    out = out.slice(0, t.start) + out.slice(t.end);
+  }
+  return out
+    .replace(/\s+(at|on|by)\s*$/i, '')
+    .replace(/^\s*(at|on|by)\s+/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /** Detect a date/time phrase in free text, e.g. "call mom tomorrow at 3pm". */
@@ -173,8 +192,16 @@ export function parseNaturalInput(text: string): ParsedNaturalInput | null {
   let working = text;
   let dateKey: string | undefined;
   let startTime: string | undefined;
+  const tokens: NaturalToken[] = [];
+  let removed: [number, number] | null = null;
 
-  const cut = (index: number, length: number) => {
+  const cut = (index: number, length: number, kind: NaturalToken['kind']) => {
+    const lead = working.slice(index, index + length).search(/\S/);
+    let start = index + Math.max(0, lead);
+    if (removed && start >= removed[0]) start += removed[1];
+    const end = index + length + (removed && index >= removed[0] ? removed[1] : 0);
+    tokens.push({ kind, start, end });
+    if (!removed) removed = [index, length];
     working = working.slice(0, index) + working.slice(index + length);
   };
 
@@ -192,7 +219,7 @@ export function parseNaturalInput(text: string): ParsedNaturalInput | null {
       d.setDate(d.getDate() + delta);
     }
     dateKey = ymdLocal(d);
-    cut(dateMatch.index, dateMatch[0].length);
+    cut(dateMatch.index, dateMatch[0].length, 'date');
   }
 
   const ampm = working.match(
@@ -209,20 +236,20 @@ export function parseNaturalInput(text: string): ParsedNaturalInput | null {
     if (ampm[3].toLowerCase() === 'pm') h += 12;
     if (h < 24) {
       startTime = `${pad(h)}:${ampm[2] ?? '00'}`;
-      cut(ampm.index, ampm[0].length);
+      cut(ampm.index, ampm[0].length, 'time');
     }
   } else if (colon24 && colon24.index !== undefined) {
     startTime = `${pad(Number(colon24[1]))}:${colon24[2]}`;
-    cut(colon24.index, colon24[0].length);
+    cut(colon24.index, colon24[0].length, 'time');
   } else if (namedTime && namedTime.index !== undefined) {
     startTime = namedTime[1].toLowerCase() === 'midnight' ? '00:00' : '12:00';
-    cut(namedTime.index, namedTime[0].length);
+    cut(namedTime.index, namedTime[0].length, 'time');
   } else if (bareAt && bareAt.index !== undefined) {
     const raw = Number(bareAt[1]);
     if (raw >= 1 && raw <= 23) {
       const h = raw <= 7 ? raw + 12 : raw;
       startTime = `${pad(h)}:00`;
-      cut(bareAt.index, bareAt[0].length);
+      cut(bareAt.index, bareAt[0].length, 'time');
     }
   }
 
@@ -235,7 +262,7 @@ export function parseNaturalInput(text: string): ParsedNaturalInput | null {
     .trim();
   if (!cleaned) return null;
 
-  return { dateKey, startTime, cleaned };
+  return { dateKey, startTime, cleaned, tokens };
 }
 
 const hasToken = (haystack: string, needle: string) =>

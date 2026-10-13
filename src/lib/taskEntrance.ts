@@ -19,6 +19,18 @@ export function markFreshTasks(
   });
 }
 
+let pendingOrigin: { rect: DOMRect; until: number } | null = null;
+
+export function launchTaskEntranceFrom(rect: DOMRect) {
+  pendingOrigin = { rect, until: Date.now() + FRESH_TTL_MS };
+}
+
+function takeOrigin() {
+  const origin = pendingOrigin;
+  pendingOrigin = null;
+  return origin && origin.until > Date.now() ? origin.rect : null;
+}
+
 export function isFreshTask(id: string) {
   const until = fresh.get(id);
   if (until === undefined) return false;
@@ -148,15 +160,80 @@ function followersOf(row: HTMLElement, stopAt: HTMLElement | null) {
 }
 
 function revealInScroller(row: HTMLElement, scroller: HTMLElement | null) {
-  if (!scroller) return;
+  if (!scroller) return 0;
   const box = scroller.getBoundingClientRect();
   const r = row.getBoundingClientRect();
   const isPage = scroller.tagName === 'MAIN';
   const top = box.top + 8;
   const bottom = Math.min(box.bottom, window.innerHeight) - (isPage ? 150 : 8);
-  if (r.top >= top && r.bottom <= bottom) return;
+  if (r.top >= top && r.bottom <= bottom) return 0;
   const delta = r.bottom > bottom ? r.bottom - bottom : r.top - top;
-  scroller.scrollTo({ top: scroller.scrollTop + delta, behavior: 'smooth' });
+  const max = scroller.scrollHeight - scroller.clientHeight;
+  const next = Math.max(0, Math.min(max, scroller.scrollTop + delta));
+  const applied = next - scroller.scrollTop;
+  scroller.scrollTo({ top: next, behavior: 'smooth' });
+  return applied;
+}
+
+const FLIGHT_MS = 540;
+
+function flyIntoSlot(origin: DOMRect, slot: HTMLElement, scrollDelta: number) {
+  const target = slot.getBoundingClientRect();
+  const size = Math.max(28, Math.min(40, target.width * 0.86));
+  const startX = origin.left + origin.width / 2 - size / 2;
+  const startY = origin.top + origin.height / 2 - size / 2;
+  const dx = target.left + target.width / 2 - size / 2 - startX;
+  const dy = target.top - scrollDelta + target.height / 2 - size / 2 - startY;
+
+  const layer = document.createElement('div');
+  layer.setAttribute('aria-hidden', 'true');
+  layer.style.cssText =
+    'position:fixed;inset:0;pointer-events:none;z-index:10050;overflow:hidden;contain:strict';
+  const xLayer = document.createElement('div');
+  const yLayer = document.createElement('div');
+  const fly = document.createElement('img');
+  fly.src = '/widgets/Fly.svg';
+  fly.alt = '';
+  xLayer.style.cssText = `position:absolute;left:${startX}px;top:${startY}px;width:${size}px;height:${size}px;will-change:transform`;
+  yLayer.style.cssText = 'width:100%;height:100%;will-change:transform';
+  fly.style.cssText =
+    'display:block;width:100%;height:100%;will-change:transform,opacity;filter:drop-shadow(0 3px 4px rgba(15,23,42,0.22))';
+  yLayer.appendChild(fly);
+  xLayer.appendChild(yLayer);
+  layer.appendChild(xLayer);
+  document.body.appendChild(layer);
+
+  const timing: KeyframeAnimationOptions = { duration: FLIGHT_MS, fill: 'both' };
+  const lift = Math.min(70, Math.abs(dy) * 0.18);
+  xLayer.animate(
+    [
+      { transform: 'translate3d(0,0,0)' },
+      { transform: `translate3d(${dx}px,0,0)` },
+    ],
+    { ...timing, easing: 'cubic-bezier(0.45, 0, 0.25, 1)' },
+  );
+  yLayer.animate(
+    [
+      { transform: 'translate3d(0,0,0)', easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)' },
+      { transform: `translate3d(0,${lift}px,0)`, offset: 0.16, easing: 'cubic-bezier(0.5, 0, 0.3, 1)' },
+      { transform: `translate3d(0,${dy}px,0)` },
+    ],
+    timing,
+  );
+  const wobble = dx >= 0 ? 16 : -16;
+  const flight = fly.animate(
+    [
+      { transform: 'scale(0.5) rotate(0deg)', opacity: 0 },
+      { transform: `scale(1.12) rotate(${-wobble}deg)`, opacity: 1, offset: 0.22 },
+      { transform: `scale(1.04) rotate(${wobble * 0.6}deg)`, opacity: 1, offset: 0.7 },
+      { transform: 'scale(0.92) rotate(0deg)', opacity: 1, offset: 0.96 },
+      { transform: 'scale(0.92) rotate(0deg)', opacity: 0 },
+    ],
+    timing,
+  );
+  const cleanup = () => layer.remove();
+  flight.onfinish = cleanup;
+  flight.oncancel = cleanup;
 }
 
 function sparkBurst(row: HTMLElement, fly: HTMLElement, delay: number) {
@@ -192,7 +269,8 @@ export function playTaskEntrance(
   if (rect.right < 0 || rect.left > window.innerWidth || rect.height === 0) return;
 
   const scroller = scrollParent(row);
-  revealInScroller(row, scroller);
+  const scrollDelta = revealInScroller(row, scroller);
+  const origin = takeOrigin();
 
   if (prefersReducedMotion()) {
     row.animate([{ opacity: 0 }, { opacity: 1 }], {
@@ -254,7 +332,11 @@ export function playTaskEntrance(
   window.setTimeout(() => fx.remove(), enterDelay + 1400);
 
   const fly = row.querySelector<HTMLElement>('[data-fly-slot]');
-  const landAt = enterDelay + 170;
+  let landAt = enterDelay + 170;
+  if (fly && origin) {
+    flyIntoSlot(origin, fly, scrollDelta);
+    landAt = Math.max(landAt, FLIGHT_MS - 30);
+  }
   if (fly) {
     const bounce = flyPop();
     fly.animate(
