@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import { RewardCard } from './gift-box/RewardCard';
+import { FlyGlyph, PlusOfferButton, RewardCard } from './gift-box/RewardCard';
 import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
@@ -26,7 +26,7 @@ import {
   takePlusOfferAfterAd,
 } from '@/lib/ads';
 import { useNotification } from '@/components/providers/NotificationProvider';
-import { FlyAmount } from '@/components/ui/FlyAmount';
+import { X } from 'lucide-react';
 import { useUIStore } from '@/lib/uiStore';
 import { hapticCelebrate, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { maybeRequestAppRating, type RatingMoment } from '@/lib/rateApp';
@@ -571,46 +571,131 @@ function handleGiftBoxClosed() {
   }));
 }
 
-function useFlyDoubleOffer() {
+const OFFER_MS = 8000;
+const OFFER_ENTER_DELAY_MS = 650;
+
+function FlyDoubleOffer() {
   const offer = useStore(revealStore, (state) => state.flyOffer);
   const { showNotification } = useNotification();
   const setPremiumModalOpen = useUIStore((state) => state.setPremiumModalOpen);
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [held, setHeld] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const remainingRef = useRef(OFFER_MS);
+
   useEffect(() => {
     if (!offer) return;
-    revealStore.setState({ flyOffer: null });
-    const double = async () => {
+    remainingRef.current = OFFER_MS;
+    setBusy(false);
+    setHeld(false);
+    const enter = window.setTimeout(() => setVisible(true), OFFER_ENTER_DELAY_MS);
+    return () => window.clearTimeout(enter);
+  }, [offer]);
+
+  useEffect(() => {
+    if (!visible || busy || held) return;
+    const startedAt = Date.now();
+    const timer = window.setTimeout(() => setVisible(false), remainingRef.current);
+    return () => {
+      window.clearTimeout(timer);
+      remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
+    };
+  }, [visible, busy, held]);
+
+  if (typeof document === 'undefined') return null;
+
+  const dismiss = () => setVisible(false);
+  const double = async () => {
+    if (!offer || busy) return;
+    setBusy(true);
+    try {
       const outcome = await showRewardedAd(offer.placement);
       if (outcome !== 'rewarded') {
         if (outcome === 'failed') showNotification(rewardedAdFailureMessage());
         return;
       }
-      try {
-        const { bonus, balanceAfter } = await offer.run();
-        landFlies(bonus, balanceAfter, null);
-        if (takePlusOfferAfterAd()) {
-          window.setTimeout(() => setPremiumModalOpen(true, offer.placement), 1600);
-        }
-      } catch (err) {
-        showNotification(
-          err instanceof Error && err.message
-            ? err.message
-            : 'Could not double this reward — try again.',
-        );
+      const { bonus, balanceAfter } = await offer.run();
+      landFlies(bonus, balanceAfter, panelRef.current);
+      setVisible(false);
+      if (takePlusOfferAfterAd()) {
+        window.setTimeout(() => setPremiumModalOpen(true, offer.placement), 1600);
       }
-    };
-    showNotification(
-      <span className="flex items-center gap-1.5">
-        <FlyAmount amount={offer.amount} size={14} className="font-black" />
-        <span className="text-muted-foreground">· watch an ad to double</span>
-      </span>,
-      double,
-      { actionLabel: 'Double ▶', durationMs: 7000 },
-    );
-  }, [offer, showNotification, setPremiumModalOpen]);
+    } catch (err) {
+      showNotification(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not double this reward — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return createPortal(
+    <AnimatePresence
+      onExitComplete={() => {
+        if (!revealStore.getState().flyOffer) return;
+        revealStore.setState({ flyOffer: null });
+      }}
+    >
+      {offer && visible && (
+        <motion.div
+          key={offer.id}
+          ref={panelRef}
+          role="region"
+          aria-label="Double your flies"
+          initial={{ opacity: 0, y: 28, scale: 0.94 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 24, scale: 0.96, transition: { duration: 0.2, ease: 'easeIn' } }}
+          transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+          onPointerEnter={() => setHeld(true)}
+          onPointerLeave={() => setHeld(false)}
+          onFocusCapture={() => setHeld(true)}
+          onBlurCapture={() => setHeld(false)}
+          className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[1310] mx-auto w-[min(calc(100vw-24px),360px)] md:bottom-[calc(env(safe-area-inset-bottom)+24px)]"
+        >
+          <PlusOfferButton
+            mode="ad"
+            intent="double"
+            visual={<FlyGlyph />}
+            badge="×2"
+            title="Double your reward"
+            anchor={{ from: offer.amount, to: offer.amount * 2, unit: 'flies', ready: true }}
+            busy={busy}
+            busyLabel="Loading ad..."
+            onClick={() => void double()}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-5 -bottom-1.5 h-[3px] overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
+          >
+            <span
+              key={offer.id}
+              className="block h-full origin-left rounded-full bg-amber-400"
+              style={{
+                animation: `toast-countdown ${OFFER_MS}ms linear forwards`,
+                animationPlayState: busy || held ? 'paused' : 'running',
+              }}
+            />
+          </span>
+          <button
+            type="button"
+            onClick={dismiss}
+            disabled={busy}
+            aria-label="No thanks"
+            className="absolute -right-2 -top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-slate-900/80 text-white shadow-md ring-2 ring-white/70 transition-transform active:scale-90 disabled:opacity-50 dark:ring-black/40"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={3} />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
 }
 
 export function QuestRewardRevealHost() {
-  useFlyDoubleOffer();
   const { queue, giftOpening, flyGainToast, interlude } = useStore(revealStore);
 
   // The reveal covers the page with a near-opaque backdrop, but it isn't a
@@ -673,6 +758,7 @@ export function QuestRewardRevealHost() {
         />
       )}
       <FlyGainToastPill toast={flyGainToast} />
+      <FlyDoubleOffer />
     </>
   );
 }

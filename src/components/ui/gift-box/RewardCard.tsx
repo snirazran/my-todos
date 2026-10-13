@@ -376,7 +376,7 @@ export function PlusOfferButton({
   );
 }
 
-function FlyGlyph() {
+export function FlyGlyph() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img src="/widgets/Fly.svg" alt="" className="h-6 w-6" />
