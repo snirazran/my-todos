@@ -93,10 +93,11 @@ export type PondData = {
   today: string;
   serverNow: number;
   habits: PondHabit[];
+  completedToday?: number;
   rooms: PondRoom[];
   keepsakes: Keepsake[];
   pinnedKeepsakeId: KeepsakeId | null;
-  weekReward: { required: number; giftName: string; enabled: boolean; earned: boolean };
+  weekReward: { required: number; giftName: string; giftRiveIndex?: number; progress?: number; enabled: boolean; earned: boolean };
 };
 
 /** A bond can contain duplicate completion dates; rewards count shared occurrences once. */

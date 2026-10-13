@@ -13,7 +13,7 @@ export function GiftOutfitPreview({ item, ready }: { item?: PreviewItem | null; 
     return <span className="flex h-full w-full items-center justify-center text-muted-foreground"><Gift className="h-7 w-7" aria-hidden /></span>;
   }
   return (
-    <span className="flex h-full w-full items-center justify-center overflow-hidden">
+    <span data-preview-ready={ready} className="flex h-full w-full items-center justify-center overflow-hidden">
       {item.slot === 'container' ? (
         <GiftRive width={150} height={150} color={item.riveIndex} isMilestone={false} paused />
       ) : (

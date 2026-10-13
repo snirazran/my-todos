@@ -392,49 +392,59 @@ export function WardrobePageSkeleton() {
 
 export function FriendsLeaderboardSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <li
-          key={i}
-          className="flex min-h-[88px] items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-2.5 shadow-sm min-[360px]:gap-3"
-        >
-          <div className="flex aspect-[6/5] w-[76px] shrink-0 items-end justify-center sm:w-[88px]">
-            <Skeleton className="h-[70%] w-[80%] rounded-t-[40px] rounded-b-xl" />
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {Array.from({ length: rows }).map((_, index) => (
+        <li key={index} className="overflow-hidden rounded-[20px] border border-border/60 bg-card">
+          <Skeleton className="h-[144px] rounded-none sm:h-[170px]" />
+          <div className="space-y-2 px-3 py-3">
+            <Skeleton className="h-4 w-2/3 rounded-full" />
+            <Skeleton className="h-3 w-4/5 rounded-full" />
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <Skeleton
-              className={cn(
-                'h-4 rounded-full',
-                ['w-3/5', 'w-2/5', 'w-1/2', 'w-2/3'][i % 4],
-              )}
-            />
-            <Skeleton className="h-3 w-1/3 rounded-full" />
+          <div className="flex gap-2 border-t border-border/40 p-2">
+            <Skeleton className="h-11 flex-1 rounded-xl" />
+            <Skeleton className="h-11 flex-1 rounded-xl" />
           </div>
-          <Skeleton className="h-8 w-9 shrink-0 rounded-xl" />
-          {i > 0 && <Skeleton className="h-10 w-[84px] shrink-0 rounded-full" />}
         </li>
       ))}
     </ul>
   );
 }
 
+function FriendsSectionSkeleton() {
+  return <div className="mb-3 space-y-2 px-1"><Skeleton className="h-5 w-40 rounded-full" /><Skeleton className="h-3 w-3/4 max-w-[280px] rounded-full" /></div>;
+}
+
 export function FriendsPageSkeleton() {
   return (
-    <SkeletonShell
-      label="Loading friends"
-      className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12"
-    >
-      <div className="relative mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11 lg:max-w-5xl">
-        <div className="h-[270px]" />
-        <Skeleton className="relative z-20 -mt-2 h-14 w-[min(22rem,88vw)] rounded-full" />
-
-        <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-6 md:mt-24 md:px-8">
-          <div className="mb-3 flex flex-col gap-2 px-1.5">
-            <Skeleton className="h-5 w-44 rounded-full" />
-            <Skeleton className="h-3 w-64 max-w-full rounded-full" />
-          </div>
-
-          <FriendsLeaderboardSkeleton />
+    <SkeletonShell label="Loading your friends and shared habits" className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
+      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-12">
+        <div className="relative h-[232px] w-full max-w-[480px] md:h-[286px] md:max-w-[760px]">
+          <div className="absolute bottom-4 left-[16%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[22%] lg:left-[28%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-7 w-16 rounded-full" /></div>
+          <div className="absolute bottom-4 left-[84%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[78%] lg:left-[72%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-7 w-16 rounded-full" /></div>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"><Skeleton className="h-[150px] w-[160px] rounded-[60px] md:h-[175px] md:w-[180px]" /><Skeleton className="h-9 w-20 rounded-full" /></div>
+        </div>
+        <div className="relative z-10 flex min-h-[68px] w-full max-w-[688px] items-center gap-3 rounded-[20px] border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+          <div className="hidden w-[220px] shrink-0 items-center gap-2 border-r border-border/50 pr-3 md:flex"><Skeleton className="h-4 w-20 rounded-full" /><Skeleton className="h-3 flex-1 rounded-full" /></div>
+          <div className="flex-1 space-y-2"><Skeleton className="h-4 w-2/3 rounded-full" /><Skeleton className="h-3 w-4/5 rounded-full" /></div>
+        </div>
+        <div className="relative z-20 -mx-3 -mt-12 flex w-[calc(100%+1.5rem)] flex-col gap-6 px-3 pt-16 md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:px-8 md:pt-14">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)]" />
+          <section>
+            <FriendsSectionSkeleton />
+            <div className="rounded-[20px] border border-border/60 bg-card p-3.5 sm:p-4">
+              <div className="flex items-start justify-between gap-3"><div className="flex-1 space-y-2"><Skeleton className="h-3 w-20 rounded-full" /><Skeleton className="h-5 w-2/3 rounded-full" /><Skeleton className="h-3 w-24 rounded-full" /></div><Skeleton className="h-[66px] w-[128px] rounded-2xl" /></div>
+              <div className="mt-3 grid grid-cols-2 gap-2"><Skeleton className="h-9 rounded-xl" /><Skeleton className="h-9 rounded-xl" /></div>
+              <div className="mt-3 flex items-center gap-3"><Skeleton className="h-3 flex-1 rounded-full" /><Skeleton className="h-10 w-24 rounded-xl" /></div>
+            </div>
+            <div className="mt-2.5 flex items-center gap-3 rounded-2xl border border-border/50 bg-card p-3.5"><Skeleton className="h-10 w-10 shrink-0 rounded-xl" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-3/5 rounded-full" /><Skeleton className="h-3 w-full rounded-full" /></div></div>
+          </section>
+          <section>
+            <FriendsSectionSkeleton />
+            <div className="rounded-[20px] border border-border/60 bg-card p-3.5"><div className="flex items-center gap-3"><Skeleton className="h-11 w-11 shrink-0 rounded-2xl" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/2 rounded-full" /><Skeleton className="h-3 w-full rounded-full" /></div></div><Skeleton className="mt-4 h-11 w-full rounded-xl" /></div>
+          </section>
+          <section><FriendsSectionSkeleton /><FriendsLeaderboardSkeleton /></section>
+          <section><FriendsSectionSkeleton /><div className="grid grid-cols-4 gap-2">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)}</div></section>
+          <section><FriendsSectionSkeleton /><Skeleton className="h-[180px] w-full rounded-[20px]" /></section>
         </div>
       </div>
     </SkeletonShell>

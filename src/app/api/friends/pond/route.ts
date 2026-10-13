@@ -11,7 +11,8 @@ import { sharedOccurrences, keepsakeEmoji, type PondData, type PondHabit, type K
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import { equippedToIndices } from '@/lib/friends/indices';
 import { getZonedToday } from '@/lib/utils';
-import { occursOnDate } from '@/lib/taskOccurrence';
+import { occursOnDate, isCompletedOnDate } from '@/lib/taskOccurrence';
+import { currentBuddyTask } from '@/lib/friends/habits';
 import { isOneTimeParams, ONE_TIME_OCCURRENCE, buddyScheduleSummary } from '@/lib/buddy/bond';
 import { resolveEconomyTimezone, economyWeekKey } from '@/lib/economy/guards';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
@@ -44,23 +45,25 @@ export async function GET(req: NextRequest) {
     ]);
     const byId = buildById(catalog);
     const people = new Map(partners.map((partner) => [partner._id, partner]));
-    const habits: PondHabit[] = activeBonds.map((bond, index) => {
+    const habits = activeBonds.map((bond, index): PondHabit | null => {
       const from = bond.fromUserId === userId;
       const partnerId = from ? bond.toUserId : bond.fromUserId;
       const person = people.get(partnerId);
-      const task = tasks.find((row) => row.bondId === bond.bondId && occursOnDate(row, today, tz));
+      const task = currentBuddyTask(tasks, bond.bondId, today, tz);
       const occurrence = isOneTimeParams(bond.createParams) ? ONE_TIME_OCCURRENCE : today;
+      if (!task || (from ? bond.completedFrom : bond.completedTo).includes(occurrence)) return null;
       return {
-        bondId: bond.bondId, taskId: task?.id ?? null, text: task?.text || bond.initialText,
+        bondId: bond.bondId, taskId: task.id, text: task.text,
         partnerId, partnerName: person?.name || person?.frogName || 'Friend', partnerIndices: equippedToIndices(person?.wardrobe?.equipped, byId),
         schedule: buddyScheduleSummary(bond.createParams), dueToday: !!task,
         mineDone: (from ? bond.completedFrom : bond.completedTo).includes(occurrence), partnerDone: (from ? bond.completedTo : bond.completedFrom).includes(occurrence),
         togetherCount: sharedOccurrences(bond.completedFrom, bond.completedTo).length, streak: bond.streak?.count ?? 0, weekProgress: weekCounts[index],
       };
-    }).sort((a, b) => Number(b.dueToday && !b.mineDone) - Number(a.dueToday && !a.mineDone) || Number(b.dueToday) - Number(a.dueToday) || a.text.localeCompare(b.text));
+    }).filter((habit): habit is PondHabit => habit !== null).sort((a, b) => Number(b.partnerDone) - Number(a.partnerDone) || a.text.localeCompare(b.text));
     const duo = me?.duoWeekGift;
-    const data: PondData = { today, serverNow: Date.now(), habits, rooms, keepsakes, pinnedKeepsakeId: (me?.social?.pinnedKeepsakeId as KeepsakeId) ?? null,
-      weekReward: { required: config.buddy.duoWeekTasks, giftName: byId[config.buddy.duoWeekGiftItemId]?.name ?? 'a gift', enabled: config.buddy.duoWeekTasks > 0 && !!config.buddy.duoWeekGiftItemId && config.buddy.duoWeekPerWeek > 0, earned: duo?.weekKey === weekStart && (duo.count ?? 0) > 0 },
+    const completedToday = new Set(tasks.filter((task) => occursOnDate(task, today, tz) && isCompletedOnDate(task, today)).map((task) => task.bondId)).size;
+    const data: PondData = { today, serverNow: Date.now(), habits, completedToday, rooms, keepsakes, pinnedKeepsakeId: (me?.social?.pinnedKeepsakeId as KeepsakeId) ?? null,
+      weekReward: { progress: Math.max(0, ...weekCounts), required: config.buddy.duoWeekTasks, giftName: byId[config.buddy.duoWeekGiftItemId]?.name ?? 'a gift', giftRiveIndex: byId[config.buddy.duoWeekGiftItemId]?.slot === 'container' ? byId[config.buddy.duoWeekGiftItemId].riveIndex : undefined, enabled: config.buddy.duoWeekTasks > 0 && !!config.buddy.duoWeekGiftItemId && config.buddy.duoWeekPerWeek > 0, earned: duo?.weekKey === weekStart && (duo.count ?? 0) > 0 },
     };
     return NextResponse.json(data);
   } catch (error) { console.error('Pond could not load:', error); return NextResponse.json({ error: 'Your pond could not load. Try again.' }, { status: 500 }); }
