@@ -101,7 +101,7 @@ function WardrobePageInner() {
             <PurchaseBurst
               key={purchaseBurst.key}
               rarity={purchaseBurst.rarity}
-              className="top-[38%]"
+              className="top-[76%]"
             />
           )}
           <div data-fly-hero-frog>

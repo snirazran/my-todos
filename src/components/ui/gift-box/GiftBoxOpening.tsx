@@ -342,7 +342,7 @@ export default function GiftBoxOpening({
                             <GiftRive color={giftColor} className="h-full w-full" />
                           </span>
                         }
-                        title="Open another gift"
+                        title="Open another"
                         busy={adBusy}
                         busyLabel="Loading ad..."
                         onClick={() => {

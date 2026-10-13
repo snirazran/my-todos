@@ -32,21 +32,21 @@ export function PactAreaPanel() {
   if (!data || !data.enabled || data.needsAreas) return null;
 
   return (
-    <div ref={ref} id="pact" className="flex flex-col gap-2 pb-6 md:pb-0">
-      <div className="px-1">
-        {/* Section label left, the week's clock right — the same row shape the
-            daily quests use for "Resets in 8h". A countdown belongs to the
-            section, not to one line inside the card, and down there it was
-            competing with the next session for the same glance. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-black text-muted-foreground">
-            <Icon name="leap" className="-my-1.5 h-7 w-7 shrink-0" />
-            This week&apos;s Leap
-          </p>
+    <div ref={ref} id="pact" className="flex flex-col gap-2">
+      <div>
+        <div className="flex min-h-9 items-center justify-between gap-2 pb-1.5 pl-3.5 pr-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="self-center">
+              <Icon name="leap" className="-my-1 h-7 w-7 shrink-0" />
+            </span>
+            <span className="truncate text-[19px] font-black tracking-tight text-foreground">
+              This week&apos;s Leap
+            </span>
+          </span>
           {data.active && !data.active.claimed && (
             <span
               className={cn(
-                'inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-black tracking-wide',
+                'inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-black tabular-nums',
                 data.streak.atRisk
                   ? 'text-amber-600 dark:text-amber-400'
                   : 'text-muted-foreground',
@@ -59,19 +59,10 @@ export function PactAreaPanel() {
             </span>
           )}
         </div>
-        {/* The pitch for picking one area, shown only while there is still a
-            pick to make. Once the week is committed it argues for a decision
-            already taken, and pushes the thing the user came here to see —
-            their commitment — further down the page. */}
         {!data.active && (
-          <>
-            <p className="mt-1.5 text-lg font-black leading-tight text-foreground">
-              One area at a time
-            </p>
-            <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
-              Pick one area a week. The others wait their turn.
-            </p>
-          </>
+          <p className="-mt-1 pb-1 pl-3.5 text-[13px] font-semibold text-muted-foreground">
+            Pick one area a week. The others wait their turn.
+          </p>
         )}
       </div>
       <div className="-mx-1.5 mt-1 md:-mx-4">

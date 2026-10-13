@@ -1641,7 +1641,7 @@ export function TradePanel({
                       mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
                       intent="reroll"
                       visual={<Dices className="h-6 w-6" strokeWidth={2.5} />}
-                      title="Reroll this reward"
+                      title="Reroll reward"
                       busy={rerollBusy}
                       busyLabel="Loading ad..."
                       onClick={() => {

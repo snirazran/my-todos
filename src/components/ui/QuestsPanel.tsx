@@ -28,10 +28,13 @@ import type {
 import {
   DailyChecklistCard,
   getRewardQuantityLabel,
+  JourneyCard,
   MoveToWebCard,
+  QUEST_CARD_CLASS,
+  QuestSectionHeader,
   RewardTile,
+  SideQuestsCard,
   sortStreakPrizes,
-  StarterQuestCard,
   type DailySweepInfo,
   type MoveToWebInfo,
 } from './QuestCards';
@@ -569,21 +572,65 @@ export function QuestsPanel({
                       className={cn(
                         'no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-none [overflow-anchor:none]',
                         'md:flex-none md:min-h-[100dvh] md:overflow-visible',
-                        'bg-muted dark:bg-muted/25',
+                        'bg-background',
                         data.activeSeason
-                          ? 'px-0 pt-0 md:px-0 md:pt-0 md:pb-8'
-                          : 'px-4 pt-[calc(1rem+env(safe-area-inset-top))] md:px-8 md:pt-8 md:pb-8',
-                        'pb-[calc(5rem+env(safe-area-inset-bottom))]',
+                          ? 'px-0 pt-0 md:pb-12'
+                          : 'px-3 pt-[calc(1rem+env(safe-area-inset-top))] md:px-6 md:pt-24 md:pb-12',
+                        'pb-[calc(6rem+env(safe-area-inset-bottom))]',
                       )}
                     >
-                      <div
-                        className={cn(
-                          'mx-auto flex w-full flex-col',
-                          data.activeSeason ? 'max-w-none' : 'max-w-6xl',
-                        )}
-                      >
-                        {data.activeSeason && (
-                          <div className="w-full">
+                      {(() => {
+                        const dailyQuests = data.dailyQuests ?? [];
+                        const onboardingQuests = (data.onboardingQuests ?? []).filter(
+                          (quest) => !isQuestFinished(quest),
+                        );
+                        const completedEarlyObjectives =
+                          data.earlyObjectiveSteps ??
+                          [
+                            ...(data.onboardingQuests ?? []),
+                            ...dailyQuests,
+                          ].reduce(
+                            (sum, quest) =>
+                              sum +
+                              quest.logic.filter(
+                                (block) =>
+                                  block.progress >= Math.max(1, block.target),
+                              ).length,
+                            0,
+                          );
+                        const leapUnlocked =
+                          data.firstOnboardingComplete ?? !data.dailyQuestsGated;
+                        const journeyMode =
+                          onboardingQuests.length > 0 &&
+                          (!!data.dailyQuestsGated || !leapUnlocked);
+                        const dailyCard = data.dailyQuestsGated ? (
+                          journeyMode ? null : (
+                            <DailyQuestsLockedCard
+                              completedSteps={completedEarlyObjectives}
+                              targetSteps={EARLY_UNLOCK_STEP_TARGET}
+                            />
+                          )
+                        ) : dailyQuests.length === 0 ? null : (
+                          <DailyChecklistCard
+                            quests={dailyQuests}
+                            rewardCatalog={data.rewardCatalog}
+                            isPremium={data.isPremium}
+                            claimingObjectiveId={claimingObjectiveId}
+                            onClaimObjective={handleClaimObjective}
+                            sweep={data.dailySweep}
+                            claimingSweep={claimingStreak}
+                            onClaimSweep={handleClaimStreak}
+                            swapsLeft={data.dailyRerollsLeft ?? 0}
+                            swapping={swappingDailies}
+                            onSwapQuests={handleSwapDailies}
+                            paused={false}
+                          />
+                        );
+                        const claimable = data.claimableCount ?? 0;
+
+                        return (
+                          <>
+                          {data.activeSeason && (
                             <QuestSeasonBanner
                               season={data.activeSeason}
                               rewardCatalog={data.rewardCatalog}
@@ -591,85 +638,52 @@ export function QuestsPanel({
                               flush
                               onView={() => setOpenSeasonKind('active')}
                             />
-                          </div>
-                        )}
-                        <div className={cn(
-                          "flex flex-col gap-8",
-                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-2.5 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-muted rounded-t-[24px] md:rounded-none md:bg-transparent"
-                        )}>
-                        {(() => {
-                          const dailyQuests = data.dailyQuests ?? [];
-                          const onboardingQuests = (data.onboardingQuests ?? []).filter(
-                            (quest) => !isQuestFinished(quest),
-                          );
-                          const completedEarlyObjectives =
-                            data.earlyObjectiveSteps ??
-                            [
-                              ...(data.onboardingQuests ?? []),
-                              ...dailyQuests,
-                            ].reduce(
-                              (sum, quest) =>
-                                sum +
-                                quest.logic.filter(
-                                  (block) =>
-                                    block.progress >= Math.max(1, block.target),
-                                ).length,
-                              0,
-                            );
-                          const renderOnboardingCard = (quest: QuestProgressView) => (
-                            <div
-                              key={quest.id}
-                              data-quest-anchor={quest.id}
-                              className="rounded-[24px]"
-                            >
-                              <StarterQuestCard
-                                quest={quest as QuestProgressView & { placement: 'onboarding' }}
+                          )}
+                          <div
+                            className={cn(
+                              'mx-auto flex w-full max-w-3xl flex-col gap-7',
+                              data.activeSeason &&
+                                'relative z-10 -mt-8 rounded-t-[24px] bg-background px-3 pt-6 md:mt-8 md:rounded-none md:px-6 md:pt-0',
+                            )}
+                          >
+                            {!data.activeSeason && (
+                              <div className="flex items-end justify-between gap-3 px-3.5">
+                                <h1 className="text-[30px] font-black leading-none tracking-tight text-foreground">
+                                  Quests
+                                </h1>
+                                {claimable > 0 && (
+                                  <span className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[12px] font-black text-white shadow-[0_2px_0_0_#b45309]">
+                                    <Gift className="h-3.5 w-3.5" strokeWidth={2.75} />
+                                    {claimable} ready
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {data.graceSeason && (
+                              <SeasonGraceCard
+                                season={data.graceSeason}
+                                claiming={claimingSeason}
+                                onOpen={() => setOpenSeasonKind('grace')}
+                                onClaimAll={() =>
+                                  void handleClaimSeason(data.graceSeason?.id)
+                                }
+                              />
+                            )}
+                            {journeyMode && (
+                              <JourneyCard
+                                quests={onboardingQuests}
+                                earlyObjectiveSteps={completedEarlyObjectives}
+                                unlockTarget={EARLY_UNLOCK_STEP_TARGET}
+                                dailyGated={!!data.dailyQuestsGated}
+                                leapUnlocked={leapUnlocked}
                                 rewardCatalog={data.rewardCatalog}
                                 isPremium={data.isPremium}
                                 claimingObjectiveId={claimingObjectiveId}
-                                onClaimObjective={(objectiveId) =>
-                                  handleClaimObjective(quest.id, objectiveId)
-                                }
-                                paused={false}
+                                onClaimObjective={handleClaimObjective}
                               />
-                            </div>
-                          );
-                          const dailyGroup = data.dailyQuestsGated ? (
-                            <DailyQuestsLockedCard
-                              completedSteps={completedEarlyObjectives}
-                              targetSteps={EARLY_UNLOCK_STEP_TARGET}
-                            />
-                          ) : dailyQuests.length === 0 ? (
-                            <PanelCard>No active daily quests here.</PanelCard>
-                          ) : (
-                            <DailyChecklistCard
-                              quests={dailyQuests}
-                              rewardCatalog={data.rewardCatalog}
-                              isPremium={data.isPremium}
-                              claimingObjectiveId={claimingObjectiveId}
-                              onClaimObjective={handleClaimObjective}
-                              sweep={data.dailySweep}
-                              claimingSweep={claimingStreak}
-                              onClaimSweep={handleClaimStreak}
-                              swapsLeft={data.dailyRerollsLeft ?? 0}
-                              swapping={swappingDailies}
-                              onSwapQuests={handleSwapDailies}
-                              paused={false}
-                            />
-                          );
-                          const graceCard = data.graceSeason ? (
-                            <SeasonGraceCard
-                              season={data.graceSeason}
-                              claiming={claimingSeason}
-                              onOpen={() => setOpenSeasonKind('grace')}
-                              onClaimAll={() =>
-                                void handleClaimSeason(data.graceSeason?.id)
-                              }
-                            />
-                          ) : null;
-                          const dailySection = data.moveToWeb ? (
-                            <div className="flex flex-col gap-2.5">
-                              {dailyGroup}
+                            )}
+                            {dailyCard}
+                            {data.moveToWeb && (
                               <MoveToWebCard
                                 moveToWeb={data.moveToWeb}
                                 rewardCatalog={data.rewardCatalog}
@@ -677,38 +691,21 @@ export function QuestsPanel({
                                 claiming={claimingMoveToWeb}
                                 onClaim={handleClaimMoveToWeb}
                               />
-                            </div>
-                          ) : (
-                            dailyGroup
-                          );
-
-                          // The weekly leap owns "which area am I on" now, so
-                          // the areas slot is the pact and nothing else.
-                          const showAreas =
-                            data.firstOnboardingComplete ?? !data.dailyQuestsGated;
-
-                          // One tree, laid out by CSS — never a mobile copy
-                          // beside a desktop copy. `md:hidden` only hides:
-                          // both branches still mounted, so the pact ran two
-                          // PactCards and its settlement sheet, which portals
-                          // out of the hidden subtree, opened twice.
-                          return (
-                            <div className="flex flex-col gap-8 md:grid md:grid-cols-2 md:items-start md:gap-6 lg:gap-8">
-                              <div className="flex flex-col gap-8 md:gap-4">
-                                {graceCard}
-                                {onboardingQuests.length > 0 && (
-                                  <div className="space-y-4">
-                                    {onboardingQuests.map(renderOnboardingCard)}
-                                  </div>
-                                )}
-                                <div>{dailySection}</div>
-                              </div>
-                              {showAreas && <PactAreaPanel />}
-                            </div>
-                          );
-                        })()}
-                        </div>
-                      </div>
+                            )}
+                            {leapUnlocked && <PactAreaPanel />}
+                            {!journeyMode && onboardingQuests.length > 0 && (
+                              <SideQuestsCard
+                                quests={onboardingQuests}
+                                rewardCatalog={data.rewardCatalog}
+                                isPremium={data.isPremium}
+                                claimingObjectiveId={claimingObjectiveId}
+                                onClaimObjective={handleClaimObjective}
+                              />
+                            )}
+                          </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
