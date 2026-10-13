@@ -29,6 +29,7 @@ import {
 import { useTradeReadiness } from '@/hooks/useReadyTrades';
 import Frog from '@/components/ui/frog';
 import { Icon as AppIcon } from '@/components/ui/Icon';
+import { useIntros } from '@/hooks/useIntros';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { GiftOddsButton } from './ItemCard';
@@ -522,6 +523,11 @@ function WardrobeManagerContent({
     };
   }, [data?.wardrobe?.equipped, data?.catalog]);
 
+  const { seenIntros, markIntroSeen } = useIntros(!!user);
+  const neverWorn = !Object.values(data?.wardrobe?.equipped ?? {}).some(Boolean);
+  const showTapToWear =
+    !!user && seenIntros !== undefined && !seenIntros.tapToWear && neverWorn;
+
   const handleItemAction = (item: ItemDef) => {
     if (!user) {
       setNotif({ msg: 'Sign in to equip items!', type: 'error' });
@@ -535,6 +541,7 @@ function WardrobeManagerContent({
     if (item.slot === 'container') {
       setOpeningGiftId(item.id);
     } else {
+      if (showTapToWear) markIntroSeen('tapToWear');
       toggleEquip(item.slot, item.id);
     }
   };
@@ -1048,6 +1055,7 @@ function WardrobeManagerContent({
         sublabel={SLOT_LABEL[card.item.slot]}
         equipped={data?.wardrobe?.equipped?.[card.item.slot] === card.item.id}
         rarityBadge
+        cta={showTapToWear ? 'Tap to wear' : undefined}
         onClick={() => handleItemAction(card.item)}
       >
         <FrogSnapshot

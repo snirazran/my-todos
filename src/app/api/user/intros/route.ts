@@ -11,6 +11,7 @@ const INTRO_KEYS = new Set([
   'quickAddNl',
   'quickAddTagEdit',
   'firstRun',
+  'tapToWear',
 ]);
 
 export async function GET() {

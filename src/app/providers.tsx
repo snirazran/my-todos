@@ -24,6 +24,7 @@ import { AdPixels } from '@/components/providers/AdPixels';
 import { AdConsentBanner } from '@/components/ui/AdConsentBanner';
 import { HintCoach } from '@/components/ui/HintCoach';
 import { QuestRewardRevealHost } from '@/components/ui/questRewardReveal';
+import { RewardRollHost } from '@/components/ui/RewardRoll';
 import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
 import { FlyGameClaimer } from '@/components/providers/FlyGameClaimer';
 import { FocusTimerLauncher } from '@/components/providers/FocusTimerLauncher';
@@ -74,6 +75,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <OnboardingGate />
             <HintCoach />
             <QuestRewardRevealHost />
+            <RewardRollHost />
             <WidgetSyncProvider />
             {children}
           </NotificationProvider>

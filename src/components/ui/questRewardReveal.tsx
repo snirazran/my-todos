@@ -85,12 +85,14 @@ type RevealHostState = {
   flyGainToast: FlyGainToast | null;
   interlude: boolean;
   flyOffer: FlyDoubleOffer | null;
+  flying: number;
 };
 
 type FlyDoubleOffer = {
   id: number;
   amount: number;
   placement: string;
+  notBefore: number;
   run: () => Promise<{ bonus: number; balanceAfter?: number }>;
 };
 
@@ -105,6 +107,7 @@ const revealStore = createStore<RevealHostState>(() => ({
   flyGainToast: null,
   interlude: false,
   flyOffer: null,
+  flying: 0,
 }));
 
 type PressedSource = {
@@ -192,6 +195,17 @@ function launchRect(source?: Element | DOMRect | null): DOMRect {
 
 let flyOfferCounter = 0;
 
+function visibleCounter() {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>('[data-fly-counter]'),
+  ).some((node) => {
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+  });
+}
+
+const COUNTER_WAIT_MS = 900;
+
 function landFlies(
   amount: number,
   balanceAfter: number | undefined,
@@ -199,36 +213,67 @@ function landFlies(
 ) {
   if (amount <= 0) return;
   const from = launchRect(source);
-  const counterVisible = Array.from(
-    document.querySelectorAll<HTMLElement>('[data-fly-counter]'),
-  ).some((node) => {
-    const rect = node.getBoundingClientRect();
-    return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
-  });
-  const before =
-    typeof balanceAfter === 'number' ? balanceAfter - amount : knownFlyBalance;
-  const release = holdFlyCounter();
-  markFlyEarn();
-  if (typeof balanceAfter === 'number') {
-    knownFlyBalance = balanceAfter;
-    patchInventoryFlies(balanceAfter);
-  }
-  mutateInventoryCaches();
-  hapticSuccess();
-  if (!counterVisible) {
-    release();
-    revealStore.setState({
-      flyGainToast: {
-        id: ++toastIdCounter,
-        amount,
-        from: Math.max(0, before),
-        to: Math.max(0, before) + amount,
-      },
+  revealStore.setState((state) => ({ flying: state.flying + 1 }));
+  let finished = false;
+  const done = () => {
+    if (finished) return;
+    finished = true;
+    revealStore.setState((state) => ({ flying: Math.max(0, state.flying - 1) }));
+  };
+
+  const start = (counterVisible: boolean) => {
+    const before =
+      typeof balanceAfter === 'number' ? balanceAfter - amount : knownFlyBalance;
+    const release = holdFlyCounter();
+    markFlyEarn();
+    if (typeof balanceAfter === 'number') {
+      knownFlyBalance = balanceAfter;
+      patchInventoryFlies(balanceAfter);
+    }
+    mutateInventoryCaches();
+    hapticSuccess();
+    if (!counterVisible) {
+      release();
+      revealStore.setState({
+        flyGainToast: {
+          id: ++toastIdCounter,
+          amount,
+          from: Math.max(0, before),
+          to: Math.max(0, before) + amount,
+        },
+      });
+      window.setTimeout(done, 1200);
+      return;
+    }
+    flyFliesToCounter({
+      from,
+      count: amount,
+      onFirstLand: release,
+      onAllLanded: done,
     });
+    window.setTimeout(release, 2500);
+    window.setTimeout(done, 3200);
+  };
+
+  if (visibleCounter()) {
+    start(true);
     return;
   }
-  flyFliesToCounter({ from, count: amount, onFirstLand: release });
-  window.setTimeout(release, 2500);
+  if (!useUIStore.getState().isFirstRunGuided) {
+    start(false);
+    return;
+  }
+  const waitStarted = Date.now();
+  const poll = () => {
+    if (visibleCounter()) {
+      window.setTimeout(() => start(true), 120);
+    } else if (Date.now() - waitStarted > COUNTER_WAIT_MS) {
+      start(false);
+    } else {
+      window.setTimeout(poll, 60);
+    }
+  };
+  poll();
 }
 
 /**
@@ -242,12 +287,14 @@ export function presentFlyReward({
   source,
   double,
   placement = 'double_reward',
+  offerDelayMs = 650,
 }: {
   amount: number;
   balanceAfter?: number;
   source?: Element | DOMRect | null;
   double?: FlyRewardDouble | null;
   placement?: string;
+  offerDelayMs?: number;
 }) {
   const granted = Math.max(0, Math.floor(amount));
   if (granted <= 0) return;
@@ -255,7 +302,13 @@ export function presentFlyReward({
   if (double && rewardedAdsAvailable()) {
     void preloadRewardedAd(placement);
     revealStore.setState({
-      flyOffer: { id: ++flyOfferCounter, amount: granted, placement, run: double },
+      flyOffer: {
+        id: ++flyOfferCounter,
+        amount: granted,
+        placement,
+        notBefore: Date.now() + offerDelayMs,
+        run: double,
+      },
     });
   }
 }
@@ -291,7 +344,7 @@ function createFlyRewardItem(amount: number): ItemDef {
 }
 
 export function useQuestRevealQueueLength() {
-  return useStore(revealStore, (state) => state.queue.length);
+  return useStore(revealStore, (state) => state.queue.length + state.flying);
 }
 
 export function enqueueQuestRewardReveal(
@@ -404,14 +457,15 @@ export function enqueueQuestRewardReveal(
   }
 
   if (!nextEntries.length) return 0;
-  const [flyEntry] = nextEntries;
-  if (nextEntries.length === 1 && flyEntry.fliesGranted) {
+  const [flyEntry, ...prizeEntries] = nextEntries;
+  if (flyEntry.fliesGranted) {
     const claimId = flyEntry.doubleClaimId;
     presentFlyReward({
       amount: flyEntry.fliesGranted,
       balanceAfter: flyEntry.flyBalanceAfter,
       source: options.source,
       placement: 'quest_reward_double',
+      offerDelayMs: prizeEntries.length ? 1400 : 650,
       double:
         claimId && !isPremium
           ? async () => {
@@ -432,7 +486,14 @@ export function enqueueQuestRewardReveal(
             }
           : null,
     });
-    return 0;
+    if (prizeEntries.length) {
+      window.setTimeout(() => {
+        revealStore.setState((state) => ({
+          queue: [...state.queue, ...prizeEntries],
+        }));
+      }, 900);
+    }
+    return prizeEntries.length;
   }
   revealStore.setState((state) => ({
     queue: [...state.queue, ...nextEntries],
@@ -584,14 +645,30 @@ function FlyDoubleOffer() {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const remainingRef = useRef(OFFER_MS);
 
+  const revealBusy = useStore(
+    revealStore,
+    (state) => state.queue.length > 0 || !!state.giftOpening,
+  );
+
   useEffect(() => {
     if (!offer) return;
     remainingRef.current = OFFER_MS;
     setBusy(false);
     setHeld(false);
-    const enter = window.setTimeout(() => setVisible(true), OFFER_ENTER_DELAY_MS);
-    return () => window.clearTimeout(enter);
   }, [offer]);
+
+  const shownOfferRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!offer || revealBusy || visible || shownOfferRef.current === offer.id) return;
+    const wait = Math.max(OFFER_ENTER_DELAY_MS, offer.notBefore - Date.now());
+    const enter = window.setTimeout(() => {
+      const state = revealStore.getState();
+      if (state.queue.length > 0 || state.giftOpening) return;
+      shownOfferRef.current = offer.id;
+      setVisible(true);
+    }, wait);
+    return () => window.clearTimeout(enter);
+  }, [offer, revealBusy, visible]);
 
   useEffect(() => {
     if (!visible || busy || held) return;

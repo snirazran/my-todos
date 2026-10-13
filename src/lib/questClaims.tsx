@@ -1,5 +1,6 @@
 'use client';
 
+import { revealSweepClaim } from '@/components/ui/RewardRoll';
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { hasRewardQuantityBadge } from '@/lib/quests/rewardQuantity';
@@ -8,10 +9,7 @@ import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 import { Check, Lightbulb, Play } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
-import {
-  enqueueQuestRewardReveal,
-  type RevealCatalog,
-} from '@/components/ui/questRewardReveal';
+import type { RevealCatalog } from '@/components/ui/questRewardReveal';
 import { useDismissNotification } from '@/components/providers/NotificationProvider';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import { useUIStore } from '@/lib/uiStore';
@@ -856,7 +854,7 @@ function ClaimRewardToast({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      enqueueQuestRewardReveal(payload.rewardSummary, {
+      revealSweepClaim(payload.rewardSummary, {
         catalog: catalog as RevealCatalog,
         isPremium,
         showFlyGainPill: window.location.pathname !== '/',

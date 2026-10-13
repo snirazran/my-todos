@@ -1,5 +1,6 @@
 import QuestCounterModel from '@/lib/models/QuestCounter';
 import { getZonedToday } from '@/lib/utils';
+import { resolveEconomyTimezone } from '@/lib/economy/guards';
 
 export type QuestMetricKey =
   | 'trade_completed'
@@ -76,7 +77,10 @@ export async function bumpQuestMetric(args: {
   const { userId, metric } = args;
   const amount = args.amount ?? 1;
   if (!userId || amount === 0) return;
-  const dateKey = getZonedToday(args.timezone || 'UTC');
+  const timezone =
+    args.timezone ||
+    (await resolveEconomyTimezone(userId, undefined).catch(() => 'UTC'));
+  const dateKey = getZonedToday(timezone);
   const tagKey = buildTagKey(args.tagIds);
   const tagIds = tagKey ? tagKey.split(',') : [];
   try {

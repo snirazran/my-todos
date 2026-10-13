@@ -82,6 +82,7 @@ export type SweepClaimResult = {
     mega: boolean;
     reward: SweepReward | null;
     megaRewards: SweepReward[];
+    table: SweepRollEntry[];
   };
 };
 
@@ -419,6 +420,7 @@ export async function claimSweepRoll(args: {
       mega: roll.mega,
       reward: drawn,
       megaRewards: roll.mega ? config.megaRewards : [],
+      table,
     },
   };
   recordDoubleableClaim(user, summary);

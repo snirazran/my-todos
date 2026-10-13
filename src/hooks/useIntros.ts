@@ -9,7 +9,8 @@ export type IntroKey =
   | 'plannerTour'
   | 'quickAddNl'
   | 'quickAddTagEdit'
-  | 'firstRun';
+  | 'firstRun'
+  | 'tapToWear';
 
 type IntrosResponse = { seenIntros?: Partial<Record<IntroKey, boolean>> };
 

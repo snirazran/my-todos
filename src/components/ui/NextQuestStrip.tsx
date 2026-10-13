@@ -1,15 +1,13 @@
 'use client';
 
+import { revealSweepClaim } from '@/components/ui/RewardRoll';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Check, Tags } from 'lucide-react';
 import { QuestTrack } from '@/components/ui/QuestTrack';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
-import {
-  enqueueQuestRewardReveal,
-  type RevealCatalog,
-} from '@/components/ui/questRewardReveal';
+import type { RevealCatalog } from '@/components/ui/questRewardReveal';
 import {
   HintButton,
   ObjectiveLabel,
@@ -279,7 +277,7 @@ export function NextQuestStrip({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      enqueueQuestRewardReveal(payload.rewardSummary, {
+      revealSweepClaim(payload.rewardSummary, {
         catalog: (catalog ?? {}) as RevealCatalog,
         isPremium: !!isPremium,
         showFlyGainPill: false,

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { revealSweepClaim } from '@/components/ui/RewardRoll';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
@@ -422,7 +423,11 @@ export function QuestsPanel({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      queueRewardReveal(payload.rewardSummary, 'clean_sweep');
+      revealSweepClaim(payload.rewardSummary, {
+        catalog: (data?.rewardCatalog ?? {}) as RevealCatalog,
+        isPremium: data?.isPremium ?? false,
+        moment: 'clean_sweep',
+      });
       // A Lily Pad is not part of the reveal pipeline, so the only place it
       // would otherwise show up is a silently changed shield count.
       if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
