@@ -56,18 +56,18 @@ export default function PlannerHeader({
       aria-expanded={expanded}
       aria-label={expanded ? 'Close calendar' : `Open calendar, ${monthLabel} ${yearLabel}`}
       onClick={onToggle}
-      className="pointer-events-auto -ml-1 flex h-10 items-center gap-1.5 rounded-xl px-1 text-foreground transition-colors active:bg-muted/60"
+      className="pointer-events-auto -ml-1.5 flex h-9 items-center gap-1 rounded-xl px-1.5 text-foreground transition-colors active:bg-muted/60"
     >
-      <span className="text-[22px] font-black leading-none tracking-tight">
+      <span className="text-[17px] font-extrabold leading-none tracking-tight">
         {monthLabel}
       </span>
-      <span className="text-[22px] font-black leading-none tracking-tight text-muted-foreground/50">
+      <span className="text-[17px] font-extrabold leading-none tracking-tight text-muted-foreground/45">
         {yearLabel}
       </span>
       <ChevronDown
-        size={18}
+        size={16}
         strokeWidth={2.75}
-        className={`ml-0.5 text-muted-foreground transition-transform duration-200 ${
+        className={`text-muted-foreground/70 transition-transform duration-200 ${
           expanded ? 'rotate-180' : ''
         }`}
       />

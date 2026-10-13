@@ -17,7 +17,7 @@ import {
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
-import { TaskTrailingMeta } from '@/components/ui/TaskMeta';
+import { TaskTimeChip, TaskTrailingMeta } from '@/components/ui/TaskMeta';
 import { StepPips, StreakPill, formatFocusSpan } from '@/components/ui/TaskAdornments';
 import { StepsStrip } from '@/components/ui/TaskSteps';
 import {
@@ -36,7 +36,12 @@ import {
   useTransform,
   animate,
 } from 'framer-motion';
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import {
+  hasPendingFreshTasks,
+  isFreshTask,
+  playTaskEntrance,
+} from '@/lib/taskEntrance';
 import { useRouter } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import {
@@ -161,7 +166,9 @@ type ListRow =
   | { kind: 'header'; section: TaskListSection; count: number; doneCount: number };
 
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
-  args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true;
+  args.isSorting || args.wasDragging
+    ? defaultAnimateLayoutChanges(args)
+    : !hasPendingFreshTasks();
 
 const pointerMidpointCollision: CollisionDetection = (args) => {
   const {
@@ -250,8 +257,19 @@ function TaskDragPreview({
           <span className="text-[17px] font-semibold leading-snug text-foreground md:text-[17.5px]">
             {task.text}
           </span>
-          {(task.streak ?? 0) > 0 && <StreakPill count={task.streak ?? 0} />}
         </span>
+        {((task.streak ?? 0) > 0 || task.startTime) && (
+          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            {(task.streak ?? 0) > 0 && (
+              <StreakPill count={task.streak ?? 0} size="sm" />
+            )}
+            <TaskTimeChip
+              startTime={task.startTime}
+              endTime={task.endTime}
+              reminder={task.reminder}
+            />
+          </span>
+        )}
         <BuddyLine
           className="mt-0.5"
           taskId={task.id}
@@ -278,13 +296,8 @@ function TaskDragPreview({
           </span>
         )}
       </span>
-      <TaskTrailingMeta
-        startTime={task.startTime}
-        endTime={task.endTime}
-        reminder={task.reminder}
-        tags={tags}
-      />
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] md:h-12 md:w-12">
+      <TaskTrailingMeta tags={tags} />
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-12 md:w-12">
         <Fly size={40} y={-3} paused interactive={false} alwaysPlay />
       </span>
     </div>
@@ -1017,26 +1030,38 @@ const TaskRowBody = React.memo(function TaskRowBody(
                   >
                     {task.text}
                   </motion.span>
-                  {(task.streak ?? 0) > 0 && !isDone && (
-                    <StreakPill count={task.streak ?? 0} />
-                  )}
-                  {(task.calendarEventId || focusSecondsToday > 0) && (
-                    <span className="inline-flex items-center gap-1.5 text-muted-foreground/60">
-                      {task.calendarEventId && (
-                        <CalendarDays
-                          aria-label="From your calendar"
-                          className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
-                        />
-                      )}
-                      {focusSecondsToday > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
-                          <Timer className="h-3.5 w-3.5" />
-                          {formatFocusSpan(focusSecondsToday)}
-                        </span>
-                      )}
-                    </span>
-                  )}
                 </span>
+                {((task.streak ?? 0) > 0 && !isDone) ||
+                task.startTime ||
+                (!isDone && timerPhase) ||
+                task.calendarEventId ||
+                focusSecondsToday > 0 ? (
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    {(task.streak ?? 0) > 0 && !isDone && (
+                      <StreakPill count={task.streak ?? 0} size="sm" />
+                    )}
+                    <TaskTimeChip
+                      startTime={task.startTime}
+                      endTime={task.endTime}
+                      reminder={task.reminder}
+                      isNext={isNextTimed}
+                      isDone={isDone}
+                      activePhase={!isDone && timerPhase ? timerPhase : null}
+                    />
+                    {task.calendarEventId && (
+                      <CalendarDays
+                        aria-label="From your calendar"
+                        className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
+                      />
+                    )}
+                    {focusSecondsToday > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
+                        <Timer className="h-3.5 w-3.5" />
+                        {formatFocusSpan(focusSecondsToday)}
+                      </span>
+                    )}
+                  </span>
+                ) : null}
 
                 <BuddyLine
                   className="mt-0.5"
@@ -1118,13 +1143,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
 
             <TaskTrailingMeta
               className={`relative z-10 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-50' : ''}`}
-              startTime={task.startTime}
-              endTime={task.endTime}
-              reminder={task.reminder}
               tags={metaTags}
-              isNext={isNextTimed}
-              isDone={isDone}
-              activePhase={!isDone && timerPhase ? timerPhase : null}
             />
 
             {/* Completion indicator (right) — only this toggles completion */}
@@ -1236,6 +1255,7 @@ const SortableTaskItem = React.forwardRef<
     onOpenDetail,
   } = props;
   const [swipeOpen, setSwipeOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const {
     attributes,
     listeners,
@@ -1250,9 +1270,17 @@ const SortableTaskItem = React.forwardRef<
     transition: SORT_TRANSITION,
   });
 
+  useLayoutEffect(() => {
+    if (rowRef.current && isFreshTask(task.id)) {
+      playTaskEntrance(rowRef.current, task.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div
       ref={(node: HTMLDivElement | null) => {
+        rowRef.current = node;
         setNodeRef(node);
         if (typeof ref === 'function') ref(node);
         else if (ref) ref.current = node;

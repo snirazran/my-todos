@@ -36,6 +36,7 @@ import { notifyQuestClaims } from '@/lib/questClaims';
 import { useLeftTongue } from './LeftTongue';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { listSlide } from '@/lib/taskEntrance';
 import {
   matchesTaskFilters,
   sortTasks,
@@ -46,7 +47,6 @@ import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
 const ROW_DIVIDER =
   'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-10 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden md:before:ml-3';
 const DRAG_SHIFT_TRANSITION = 'transform 200ms cubic-bezier(0.2, 0, 0, 1)';
-const FLIP_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
 export default React.memo(function TaskList({
   day,
@@ -151,7 +151,7 @@ export default React.memo(function TaskList({
   onClearFilters?: () => void;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
   /** Controls what to render when there are no items. 'add' = show add-task button (default), 'none' = show "No activities for this day" placeholder. */
-  emptyMode?: 'add' | 'none';
+  emptyMode?: 'add' | 'none' | 'quiet';
   /** When true, tasks in this list cannot be dragged (e.g., past dates). */
   disableDrag?: boolean;
   /** True if this column's date is in the future. Hides "Mark as complete" in the action sheet. */
@@ -232,12 +232,13 @@ export default React.memo(function TaskList({
       next.set(id, top);
       const prev = lastTopsRef.current.get(id);
       if (!animate || prev === undefined || Math.abs(prev - top) < 1) return;
+      const slide = listSlide();
       el.animate(
         [
           { transform: `translate3d(0, ${prev - top}px, 0)` },
           { transform: 'translate3d(0, 0, 0)' },
         ],
-        { duration: 280, easing: FLIP_EASING },
+        { duration: slide.duration, easing: slide.easing },
       );
     });
     lastTopsRef.current = next;
@@ -717,11 +718,32 @@ export default React.memo(function TaskList({
         </div>
       );
     }
-    if (emptyMode === 'none') {
+    if (emptyMode === 'none' || emptyMode === 'quiet') {
+      const label =
+        emptyMode === 'none'
+          ? 'Nothing planned'
+          : isToday
+            ? 'Nothing planned for today'
+            : 'Nothing planned yet';
       return (
-        <p className="px-3.5 py-4 text-[13px] font-semibold text-muted-foreground/60 md:px-3">
-          Nothing planned
-        </p>
+        <div className="absolute inset-0 flex items-center justify-center px-6 pb-[12%]">
+          <button
+            type="button"
+            disabled={emptyMode === 'none'}
+            onClick={() => onAddRequested('')}
+            className="flex flex-col items-center gap-2.5 rounded-2xl px-4 py-3 text-center transition-transform active:scale-[0.97] disabled:pointer-events-none"
+          >
+            <img
+              src="/fly.svg"
+              alt=""
+              draggable={false}
+              className="h-9 w-9 opacity-[0.18] grayscale"
+            />
+            <span className="text-[14px] font-semibold text-muted-foreground/70">
+              {label}
+            </span>
+          </button>
+        </div>
       );
     }
     return (

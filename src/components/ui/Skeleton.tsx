@@ -117,38 +117,61 @@ function PlannerColumnSkeleton({
   isPast?: boolean;
   className?: string;
 }) {
+  const heading = (
+    <div className="flex items-baseline gap-2">
+      <Skeleton className="h-5 w-20 rounded-md" />
+      <Skeleton className="h-3 w-12 rounded-full" />
+    </div>
+  );
+  const actions = (
+    <div className="flex items-center gap-2">
+      <Skeleton className="h-7 w-7 rounded-lg" />
+      <Skeleton className="h-7 w-7 rounded-lg" />
+    </div>
+  );
   return (
     <div
       className={cn(
-        'w-[88vw] max-w-[480px] shrink-0 self-start md:w-[330px] lg:w-[310px] xl:w-[292px]',
+        'flex h-full w-[calc(100vw-24px)] max-w-[480px] shrink-0 flex-col md:w-[330px] md:max-w-none lg:w-[310px] xl:w-[292px]',
         className,
       )}
     >
-      <div className="overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
-        <div className="flex min-h-[52px] items-center justify-between border-b border-border/60 pl-3.5 pr-2.5">
-          <div className="flex items-baseline gap-2">
-            <Skeleton className="h-5 w-16 rounded-md" />
-            <Skeleton className="h-3 w-20 rounded-full" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-7 w-7 rounded-lg" />
-            <Skeleton className="h-7 w-7 rounded-lg" />
-          </div>
+      <div className="flex min-h-9 items-center justify-between pb-1.5 pl-3.5 pr-2 md:hidden">
+        {heading}
+        {actions}
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+        <div className="hidden min-h-[52px] items-center justify-between border-b border-border/60 pl-3 pr-2.5 md:flex">
+          {heading}
+          {actions}
         </div>
-        {['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3', 'w-2/5'].slice(0, rows).map((w, i) => (
-          <div
-            key={i}
-            className={cn(
-              'flex items-center gap-2.5 py-3 pl-3.5 pr-2.5',
-              i > 0 && 'border-t border-border/60',
-              isPast && 'opacity-60',
-            )}
-          >
-            <Skeleton className={cn('h-4 rounded-full', w)} />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3', 'w-2/5'].slice(0, rows).map((w, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex items-center gap-2.5 py-3 pl-3.5 pr-2.5 md:pl-3',
+                i > 0 && 'border-t border-border/60',
+                isPast && 'opacity-60',
+              )}
+            >
+              <Skeleton className={cn('h-4 rounded-full', w)} />
+              <span className="flex-1" />
+              <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            </div>
+          ))}
+        </div>
+        {!isPast && (
+          <div className="flex items-center border-t border-border/60 py-2 pl-3.5 pr-2.5 md:pl-3">
+            <Skeleton className="h-4 w-24 rounded-full" />
             <span className="flex-1" />
-            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <span className="h-10 w-10 shrink-0 rounded-full border-[1.5px] border-dashed border-muted-foreground/25" />
           </div>
-        ))}
+        )}
+        <div className="flex items-center gap-2 border-t border-border/60 py-3 pl-3.5 pr-3 md:hidden">
+          <Skeleton className="h-[18px] w-[18px] rounded-md" />
+          <Skeleton className="h-3.5 w-14 rounded-full" />
+        </div>
       </div>
     </div>
   );
@@ -160,20 +183,35 @@ export function PlannerPageSkeleton() {
       label="Loading your planner"
       className="relative h-full w-full overflow-hidden bg-background"
     >
-      <div className="absolute left-0 right-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-10 flex flex-col items-center gap-2 px-3 md:top-[80px]">
-        <Skeleton className="hidden h-11 w-80 rounded-2xl md:block" />
-        <div className="w-full max-w-[480px] rounded-[22px] border border-border/60 bg-card px-3 pb-2 pt-2.5 md:hidden">
-          <Skeleton className="mb-3 h-5 w-36 rounded-full" />
-          <Skeleton className="h-14 w-full rounded-2xl" />
+      <div className="absolute left-0 right-0 top-[calc(0.25rem+env(safe-area-inset-top))] z-10 flex flex-col items-center gap-2 px-3 md:top-[80px]">
+        <div className="hidden items-center gap-2.5 md:flex">
+          <Skeleton className="h-11 w-80 rounded-2xl" />
+          <Skeleton className="h-11 w-28 rounded-2xl" />
+        </div>
+        <div className="w-full max-w-[480px] md:hidden">
+          <div className="flex h-10 items-center pl-3.5">
+            <Skeleton className="h-[18px] w-32 rounded-full" />
+          </div>
+          <div className="mt-1 flex h-[54px]">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex flex-1 flex-col items-center justify-center gap-[5px]"
+              >
+                <Skeleton className="h-2.5 w-2.5 rounded-sm" />
+                <Skeleton className="h-4 w-5 rounded-md" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="flex justify-center gap-3 overflow-hidden px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[140px]">
-        <PlannerColumnSkeleton rows={4} isPast className="hidden md:block" />
+      <div className="flex h-full justify-center gap-6 overflow-hidden px-3 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(112px+env(safe-area-inset-top))] md:gap-3 md:px-4 md:pb-[calc(32px+env(safe-area-inset-bottom))] md:pt-[140px]">
+        <PlannerColumnSkeleton rows={4} isPast className="hidden md:flex" />
         <PlannerColumnSkeleton rows={5} isPast />
         <PlannerColumnSkeleton rows={5} />
         <PlannerColumnSkeleton rows={5} />
-        <PlannerColumnSkeleton rows={4} className="hidden md:block" />
+        <PlannerColumnSkeleton rows={4} className="hidden md:flex" />
       </div>
     </SkeletonShell>
   );

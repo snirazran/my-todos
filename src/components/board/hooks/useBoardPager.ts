@@ -10,11 +10,10 @@ const COMMIT_FRACTION = 0.22;
 const MOMENTUM_MS = 260;
 const DESKTOP_INSET = 16;
 const WHEEL_IDLE_MS = 140;
-const DEPTH_SCALE = 0.025;
-const DEPTH_FADE = 0.45;
+const DEPTH_SCALE = 0.04;
 
 type Spring = { response: number; damping: number };
-const PAGE_SPRING: Spring = { response: 0.42, damping: 0.86 };
+const PAGE_SPRING: Spring = { response: 0.36, damping: 0.84 };
 const BAND_SPRING: Spring = { response: 0.4, damping: 1 };
 const REDUCED_SPRING: Spring = { response: 0.22, damping: 1 };
 
@@ -103,11 +102,11 @@ export function useBoardPager({
   };
 
   const positionFor = useCallback(
-    (col: HTMLElement, m: Mode = mode()) => {
+    (col: HTMLElement, m: Mode = mode(), center = false) => {
       const s = scrollerRef.current;
       if (!s) return 0;
       const raw =
-        m === "paged"
+        m === "paged" || center
           ? col.offsetLeft - (s.clientWidth - col.clientWidth) / 2
           : col.offsetLeft - DESKTOP_INSET;
       return Math.min(Math.max(0, raw), maxScroll());
@@ -147,26 +146,18 @@ export function useBoardPager({
       prefersReducedMotion() ||
       isCardDraggingRef.current();
     const center = s.scrollLeft + s.clientWidth / 2;
+    const viewLeft = s.scrollLeft - s.clientWidth;
+    const viewRight = s.scrollLeft + s.clientWidth * 2;
     for (const col of columns()) {
-      if (flat) {
-        if (col.style.transform) {
-          col.style.transform = "";
-          col.style.opacity = "";
-        }
+      const left = col.offsetLeft;
+      const width = col.clientWidth;
+      if (flat || left + width < viewLeft || left > viewRight) {
+        if (col.style.transform) col.style.transform = "";
         continue;
       }
-      const colCenter = col.offsetLeft + col.clientWidth / 2;
-      const d = Math.min(
-        1,
-        Math.abs(colCenter - center) / (col.clientWidth + 12),
-      );
-      if (d < 0.002) {
-        col.style.transform = "";
-        col.style.opacity = "";
-      } else {
-        col.style.transform = `scale(${1 - DEPTH_SCALE * d})`;
-        col.style.opacity = String(1 - DEPTH_FADE * d);
-      }
+      const d = Math.min(1, Math.abs(left + width / 2 - center) / width);
+      col.style.transform =
+        d < 0.002 ? "" : `scale(${1 - DEPTH_SCALE * d})`;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollerRef, columns]);
@@ -267,7 +258,7 @@ export function useBoardPager({
   );
 
   const animateToIndex = useCallback(
-    (index: number, velocity = 0) => {
+    (index: number, velocity = 0, center = false) => {
       const s = scrollerRef.current;
       const cols = columns();
       if (!s || cols.length === 0) return;
@@ -284,7 +275,7 @@ export function useBoardPager({
       runSpring(scrollAnim, {
         from: s.scrollLeft,
         velocity,
-        target: () => positionFor(findCol(), m),
+        target: () => positionFor(findCol(), m, center),
         write: (v) => {
           s.scrollLeft = v;
           afterWrite();

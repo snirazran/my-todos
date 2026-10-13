@@ -524,7 +524,7 @@ export function NotificationProvider({
           // regardless of any ancestor stacking context.
           <div
             ref={stackRef}
-            className={`fixed left-0 right-0 z-[1300] pointer-events-none flex flex-col gap-2 px-3 md:px-4 bottom-[calc(env(safe-area-inset-bottom)+72px)] md:bottom-[calc(env(safe-area-inset-bottom)+16px)] ${stackSuppressed ? 'hidden' : ''}`}
+            className={`fixed left-0 right-0 z-[1300] pointer-events-none flex flex-col gap-2 px-3 md:px-4 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-[calc(env(safe-area-inset-bottom)+16px)] ${stackSuppressed ? 'hidden' : ''}`}
           >
         {/* Top slot: timer pill portals in here (above all toasts) */}
         <div id="frog-bottom-stack-top" className="contents" />

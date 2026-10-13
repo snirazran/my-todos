@@ -59,7 +59,7 @@ function entryRarity(entry: ClosetEntry): Rarity {
 function FlyGlyph({ size = 20 }: { size?: number }) {
   return (
     <span aria-hidden className="relative flex shrink-0 items-center">
-      <Fly size={size} y={-3} paused interactive={false} />
+      <Fly size={size} y={-Math.round(size / 9)} paused interactive={false} />
     </span>
   );
 }

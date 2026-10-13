@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { dayLetterFromYmd, parseYmd, todayYmd, cmpYmd } from './helpers';
+import { hapticSelect } from '@/lib/haptics';
 
 const VISIBLE = 7;
 const COL_SELECTOR = '[data-col="true"]';
@@ -92,6 +93,15 @@ export default function DateStrip({
       const idx = Math.round(p);
       const cell = track.children[idx + 1] as HTMLElement | undefined;
       if (cell !== activeRef.current) {
+        if (
+          !force &&
+          activeRef.current &&
+          cell &&
+          vp.offsetParent &&
+          s.dataset.drag !== '1'
+        ) {
+          hapticSelect();
+        }
         activeRef.current?.removeAttribute('data-active');
         activeRef.current?.removeAttribute('aria-current');
         cell?.setAttribute('data-active', 'true');
@@ -132,7 +142,7 @@ export default function DateStrip({
   }, [scrollerRef, sync]);
 
   return (
-    <div ref={viewportRef} className="relative w-full overflow-hidden pb-2.5">
+    <div ref={viewportRef} className="relative w-full overflow-hidden">
       <div
         ref={trackRef}
         className="relative flex will-change-transform"
@@ -141,15 +151,15 @@ export default function DateStrip({
         <div
           ref={pillRef}
           aria-hidden
-          className="pointer-events-none absolute left-0 top-0 flex h-[58px] justify-center will-change-transform"
+          className="pointer-events-none absolute left-0 top-0 flex h-[54px] justify-center will-change-transform"
           style={{ width: `${100 / VISIBLE}%` }}
         >
-          <span className="h-[58px] w-[44px] rounded-[16px] bg-primary shadow-[0_6px_14px_-6px_rgba(79,145,73,0.65)]" />
+          <span className="h-[54px] w-[42px] rounded-2xl bg-primary/10" />
         </div>
         {dates.map((d) => {
           const isToday = d === today;
           const isPast = cmpYmd(d, today) < 0;
-          const load = Math.min(3, counts?.get(d) ?? 0);
+          const busy = (counts?.get(d) ?? 0) > 0;
           return (
             <button
               key={d}
@@ -160,41 +170,41 @@ export default function DateStrip({
                 month: 'long',
                 day: 'numeric',
               })}
-              className="group relative flex h-[58px] shrink-0 flex-col items-center justify-center gap-1 outline-none"
+              className="group relative flex h-[54px] shrink-0 flex-col items-center justify-center gap-[5px] outline-none"
               style={{ width: `${100 / VISIBLE}%` }}
             >
               <span
-                className={`text-[11px] font-bold uppercase leading-none tracking-wide transition-colors duration-150 group-data-[active=true]:text-primary-foreground/85 ${
+                className={`text-[10.5px] font-bold uppercase leading-none tracking-wide transition-colors duration-150 group-data-[active=true]:text-primary ${
                   isToday
                     ? 'text-primary'
                     : isPast
-                      ? 'text-muted-foreground/40'
-                      : 'text-muted-foreground'
+                      ? 'text-muted-foreground/35'
+                      : 'text-muted-foreground/70'
                 }`}
               >
                 {dayLetterFromYmd(d)}
               </span>
               <span
-                className={`text-[18px] font-black leading-none tabular-nums transition-colors duration-150 group-data-[active=true]:text-primary-foreground ${
+                className={`text-[16px] font-extrabold leading-none tabular-nums transition-colors duration-150 ${
                   isToday
                     ? 'text-primary'
                     : isPast
-                      ? 'text-muted-foreground/45'
-                      : 'text-foreground'
+                      ? 'text-muted-foreground/45 group-data-[active=true]:text-foreground/70'
+                      : 'text-foreground/85 group-data-[active=true]:text-foreground'
                 }`}
               >
                 {parseYmd(d).getDate()}
               </span>
-              <span className="absolute -bottom-2 flex h-1 items-center gap-[3px]">
-                {Array.from({ length: load }).map((_, n) => (
-                  <span
-                    key={n}
-                    className={`h-1 w-1 rounded-full ${
-                      isPast ? 'bg-muted-foreground/30' : 'bg-primary/55'
-                    }`}
-                  />
-                ))}
-              </span>
+              <span
+                aria-hidden
+                className={`h-1 w-1 rounded-full transition-colors duration-150 ${
+                  !busy
+                    ? 'bg-transparent'
+                    : isPast
+                      ? 'bg-muted-foreground/20'
+                      : 'bg-muted-foreground/35 group-data-[active=true]:bg-primary/60'
+                }`}
+              />
             </button>
           );
         })}

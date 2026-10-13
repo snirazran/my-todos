@@ -95,6 +95,7 @@ import { pactViewKey } from '@/lib/pact/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
+import { markFreshTasks } from '@/lib/taskEntrance';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -1054,7 +1055,8 @@ export default function HomeDashboard() {
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] md:h-12 md:w-12"
+                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-12 md:w-12"
+                        data-fly-slot
                         data-hint="task-fly"
                         data-tag-ids={task.tags?.join(',') || undefined}
                       >
@@ -1316,6 +1318,7 @@ export default function HomeDashboard() {
             throw new Error(payload.error ?? 'Could not add these tasks.');
           }
 
+          markFreshTasks(payload.ids);
           await Promise.all([mutateToday(), mutateBacklog()]);
           void notifyQuestClaims(showNotification);
           showNotification(
@@ -1381,6 +1384,11 @@ export default function HomeDashboard() {
               }),
             });
             const data = await res.json();
+            if (data?.ok) {
+              markFreshTasks(
+                data.ids ?? data.tasks?.map((t: { id?: string }) => t.id),
+              );
+            }
 
             if (user && data.ok && data.tasks) {
               const newTasks = data.tasks;
@@ -1433,9 +1441,11 @@ export default function HomeDashboard() {
               if (isBacklog) mutateBacklog();
               else mutateToday();
             } else {
+              const guestId = randomUUID();
+              markFreshTasks([guestId]);
               setGuestTasks((prev) => [
                 ...prev,
-                { id: randomUUID(), text, completed: false, tags },
+                { id: guestId, text, completed: false, tags },
               ]);
             }
             if (user) void notifyQuestClaims(showNotification);
@@ -1510,7 +1520,7 @@ export default function HomeDashboard() {
             '--fab-bottom': 'calc(env(safe-area-inset-bottom) + 92px)',
             '--fab-bottom-md': 'calc(env(safe-area-inset-bottom) + 24px)',
             translate: `0 ${
-              notificationStackHeight > 0 ? -(notificationStackHeight - 4) : 0
+              notificationStackHeight > 0 ? -(notificationStackHeight + 12) : 0
             }px`,
             transition:
               'translate 320ms cubic-bezier(0.22,1,0.36,1), transform 240ms cubic-bezier(0.32,0.72,0,1), opacity 180ms ease',

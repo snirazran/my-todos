@@ -18,6 +18,7 @@ import {
   relativeDayLabel,
 } from '@/components/board/helpers';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import { markFreshTasks } from '@/lib/taskEntrance';
 
 type DateRangeResponse = {
   byDate: Record<string, Task[]>;
@@ -103,27 +104,41 @@ export default function ManageTasksPage() {
   const fullFetchSeqRef = useRef(0);
   const pendingWritesRef = useRef(0);
   const writeActivityRef = useRef(0);
-  const fetchRange = useCallback(
-    async (from: string, to: string, mergeOnly = false) => {
-      const seq = mergeOnly ? 0 : ++fullFetchSeqRef.current;
-      const activityAtStart = writeActivityRef.current;
+  const loadRange = useCallback(
+    async (from: string, to: string) => {
       const res = await fetch(
         `/api/tasks?view=dateRange&from=${from}&to=${to}&timezone=${encodeURIComponent(tz)}`,
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = (await res.json()) as DateRangeResponse;
-      if (!mergeOnly) {
-        if (seq !== fullFetchSeqRef.current) return;
-        if (pendingWritesRef.current > 0) return;
-        if (writeActivityRef.current !== activityAtStart) return;
-      }
+      return (await res.json()) as DateRangeResponse;
+    },
+    [tz],
+  );
+
+  const applyRange = useCallback(
+    (data: DateRangeResponse, mergeOnly: boolean) => {
       setTasksByDate((prev) =>
         mergeOnly ? { ...prev, ...data.byDate } : data.byDate,
       );
       setBacklog(data.backlog ?? []);
       if (data.accountCreatedAt) setAccountCreatedAt(data.accountCreatedAt);
     },
-    [tz],
+    [],
+  );
+
+  const fetchRange = useCallback(
+    async (from: string, to: string, mergeOnly = false) => {
+      const seq = mergeOnly ? 0 : ++fullFetchSeqRef.current;
+      const activityAtStart = writeActivityRef.current;
+      const data = await loadRange(from, to);
+      if (!mergeOnly) {
+        if (seq !== fullFetchSeqRef.current) return;
+        if (pendingWritesRef.current > 0) return;
+        if (writeActivityRef.current !== activityAtStart) return;
+      }
+      applyRange(data, mergeOnly);
+    },
+    [loadRange, applyRange],
   );
 
   // Initial load
@@ -210,7 +225,7 @@ export default function ManageTasksPage() {
   // Window expansion (called when user nears edge or jumps via calendar)
   const extendingRef = useRef(false);
   const onExtendWindow = useCallback(
-    async (direction: 'past' | 'future') => {
+    async (direction: 'past' | 'future', whenIdle?: () => Promise<void>) => {
       if (extendingRef.current) return true;
       extendingRef.current = true;
       try {
@@ -220,11 +235,15 @@ export default function ManageTasksPage() {
           const newStart = addDays(windowStart, -EXTEND_STEP);
           const clamped = cmpYmd(newStart, minBound) < 0 ? minBound : newStart;
           if (clamped === windowStart) return true;
-          await fetchRange(clamped, addDays(windowStart, -1), true);
+          const data = await loadRange(clamped, addDays(windowStart, -1));
+          await whenIdle?.();
+          applyRange(data, true);
           setWindowStart(clamped);
         } else {
           const newEnd = addDays(windowEnd, EXTEND_STEP);
-          await fetchRange(addDays(windowEnd, 1), newEnd, true);
+          const data = await loadRange(addDays(windowEnd, 1), newEnd);
+          await whenIdle?.();
+          applyRange(data, true);
           setWindowEnd(newEnd);
         }
         return true;
@@ -235,7 +254,7 @@ export default function ManageTasksPage() {
         extendingRef.current = false;
       }
     },
-    [accountCreatedAt, fetchRange, windowStart, windowEnd],
+    [accountCreatedAt, loadRange, applyRange, windowStart, windowEnd],
   );
 
   // Jump to an arbitrary date: rebuild the window centered on it (±7) and fetch
@@ -470,7 +489,7 @@ export default function ManageTasksPage() {
       sectionId?: string | null;
     }) => {
       try {
-        await fetch('/api/tasks?view=board', {
+        const res = await fetch('/api/tasks?view=board', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -492,6 +511,8 @@ export default function ManageTasksPage() {
             sectionId,
           }),
         });
+        const data = await res.json().catch(() => null);
+        if (data?.ok) markFreshTasks(data.ids);
       } catch (e) {
         console.error('Add failed', e);
       }

@@ -249,3 +249,58 @@ export function TaskTrailingMeta({
     </div>
   );
 }
+
+export function TaskTimeChip({
+  startTime,
+  endTime,
+  reminder,
+  isNext = false,
+  isDone = false,
+  activePhase = null,
+}: {
+  startTime?: string;
+  endTime?: string;
+  reminder?: string | boolean | null;
+  isNext?: boolean;
+  isDone?: boolean;
+  activePhase?: 'focus' | 'break' | null;
+}) {
+  if (activePhase) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 text-[12.5px] font-black leading-none',
+          activePhase === 'break'
+            ? 'text-sky-600 dark:text-sky-400'
+            : 'text-primary',
+        )}
+      >
+        <span
+          className={cn(
+            'h-1.5 w-1.5 shrink-0 animate-pulse rounded-full motion-reduce:animate-none',
+            activePhase === 'break' ? 'bg-sky-500' : 'bg-primary',
+          )}
+        />
+        {activePhase === 'break' ? 'Break' : 'Focus'}
+      </span>
+    );
+  }
+  if (!startTime) return null;
+  const highlight = isNext && !isDone;
+  const TimeIcon = reminder ? Bell : Clock;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-[12.5px] font-bold leading-none tabular-nums',
+        highlight ? 'text-primary' : 'text-muted-foreground',
+      )}
+    >
+      {highlight ? (
+        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+      ) : (
+        <TimeIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+      )}
+      {endTime && endTime !== startTime ? `${startTime}–${endTime}` : startTime}
+    </span>
+  );
+}

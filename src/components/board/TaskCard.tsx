@@ -1,6 +1,12 @@
 ﻿'use client';
 
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, {
+  useRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from 'react';
 import {
   CalendarDays,
   CheckCircle2,
@@ -8,7 +14,7 @@ import {
   Check,
   Timer,
 } from 'lucide-react';
-import { TaskTrailingMeta } from '@/components/ui/TaskMeta';
+import { TaskTimeChip } from '@/components/ui/TaskMeta';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
 import { StreakPill, formatFocusSpan } from '@/components/ui/TaskAdornments';
 import { StepsStrip } from '@/components/ui/TaskSteps';
@@ -17,6 +23,7 @@ import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 import { useLeftTongue } from './LeftTongue';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
+import { isFreshTask, playTaskEntrance } from '@/lib/taskEntrance';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
@@ -378,6 +385,17 @@ export default function TaskCard({
     [innerRef],
   );
 
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el || !isFreshTask(task.id)) return;
+    playTaskEntrance(
+      el.closest<HTMLElement>('[data-row]') ?? el,
+      task.id,
+      { moveFollowers: false },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const projectedStreak =
     isToday && isRepeating
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
@@ -486,24 +504,35 @@ export default function TaskCard({
               Practice
             </span>
           )}
-          {streak > 0 && <StreakPill count={streak} size="sm" />}
-          {(task.calendarEventId || focusSeconds > 0) && (
-            <span className="inline-flex items-center gap-1.5">
-              {task.calendarEventId && (
-                <CalendarDays
-                  aria-label="From your calendar"
-                  className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
-                />
-              )}
-              {focusSeconds > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
-                  <Timer className="h-3.5 w-3.5" />
-                  {formatFocusSpan(focusSeconds)}
-                </span>
-              )}
-            </span>
-          )}
         </span>
+        {streak > 0 ||
+        task.startTime ||
+        (!isDone && timerPhase) ||
+        task.calendarEventId ||
+        focusSeconds > 0 ? (
+          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            {streak > 0 && <StreakPill count={streak} size="sm" />}
+            <TaskTimeChip
+              startTime={task.startTime}
+              endTime={task.endTime}
+              reminder={task.reminder}
+              isDone={isDone}
+              activePhase={!isDone && timerPhase ? timerPhase : null}
+            />
+            {task.calendarEventId && (
+              <CalendarDays
+                aria-label="From your calendar"
+                className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
+              />
+            )}
+            {focusSeconds > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
+                <Timer className="h-3.5 w-3.5" />
+                {formatFocusSpan(focusSeconds)}
+              </span>
+            )}
+          </span>
+        ) : null}
         <BuddyLine
           className="mt-0.5"
           taskId={task.id}
@@ -529,17 +558,6 @@ export default function TaskCard({
           />
         )}
       </div>
-
-      <TaskTrailingMeta
-        className={`transition-opacity duration-200 ${isDone ? 'opacity-50' : ''}`}
-        startTime={task.startTime}
-        endTime={task.endTime}
-        reminder={task.reminder}
-        tags={tags}
-        isDone={isDone}
-        activePhase={!isDone && timerPhase ? timerPhase : null}
-        showTag={false}
-      />
 
       {showDoToday && (
         <button
@@ -571,7 +589,8 @@ export default function TaskCard({
         >
           <span
             ref={(el) => registerFly(dragId, el)}
-            className={`absolute inset-0 flex items-center justify-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] transition-opacity duration-200 ${
+            data-fly-slot
+            className={`absolute inset-0 flex items-center justify-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 transition-opacity duration-200 ${
               isDone || grabbing ? 'pointer-events-none opacity-0' : 'opacity-100'
             }`}
           >

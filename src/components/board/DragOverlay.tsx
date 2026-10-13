@@ -1,7 +1,7 @@
 'use client';
 import { motion } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
-import { TaskTrailingMeta } from '@/components/ui/TaskMeta';
+import { TaskTimeChip } from '@/components/ui/TaskMeta';
 import { StepPips } from '@/components/ui/TaskAdornments';
 import { ChecklistCheckbox } from './ChecklistEditor';
 import Fly from '@/components/ui/fly';
@@ -109,6 +109,15 @@ export default function DragOverlay({
             <span className="block break-words text-[16px] font-semibold leading-snug text-foreground md:text-[15px]">
               {text}
             </span>
+            {startTime && (
+              <span className="mt-1 flex">
+                <TaskTimeChip
+                  startTime={startTime}
+                  endTime={endTime}
+                  reminder={reminder}
+                />
+              </span>
+            )}
             {steps.length > 0 && (
               <span className="mt-0.5 flex h-7 min-w-0 items-center gap-2">
                 <span className="flex w-[22px] shrink-0 justify-center">
@@ -132,14 +141,7 @@ export default function DragOverlay({
               </span>
             )}
           </span>
-          <TaskTrailingMeta
-            startTime={startTime}
-            endTime={endTime}
-            reminder={reminder}
-            tags={tags}
-            showTag={false}
-          />
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted/70 ring-1 ring-inset ring-foreground/[0.07] md:h-10 md:w-10">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-10 md:w-10">
             <Fly size={36} y={-3} paused interactive={false} alwaysPlay />
           </span>
         </div>

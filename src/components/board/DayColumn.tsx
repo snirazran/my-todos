@@ -5,7 +5,12 @@ import { addDays, parseYmd, todayYmd } from './helpers';
 
 type DayLabel = { name: string; date: string | null };
 
-function labelFor(title: string, dateKey?: string, longNames = true): DayLabel {
+function labelFor(
+  title: string,
+  dateKey?: string,
+  longNames = true,
+  relativeDates = true,
+): DayLabel {
   if (dateKey) {
     const today = todayYmd();
     const d = parseYmd(dateKey);
@@ -13,7 +18,11 @@ function labelFor(title: string, dateKey?: string, longNames = true): DayLabel {
     const weekday = d.toLocaleString('en-US', {
       weekday: longNames ? 'long' : 'short',
     });
-    const relativeDate = longNames ? `${weekday.slice(0, 3)}, ${date}` : date;
+    const relativeDate = !relativeDates
+      ? null
+      : longNames
+        ? `${weekday.slice(0, 3)}, ${date}`
+        : date;
     if (dateKey === today) return { name: 'Today', date: relativeDate };
     if (dateKey === addDays(today, 1)) return { name: 'Tomorrow', date: relativeDate };
     if (dateKey === addDays(today, -1)) return { name: 'Yesterday', date: relativeDate };
@@ -28,16 +37,20 @@ function DayHeading({
   isToday,
   isPast,
   status,
+  large = false,
 }: {
   label: DayLabel;
   isToday: boolean;
   isPast: boolean;
   status?: React.ReactNode;
+  large?: boolean;
 }) {
   return (
     <h2 className="flex min-w-0 items-baseline gap-2">
       <span
-        className={`shrink-0 text-[18px] font-black leading-none tracking-tight ${
+        className={`shrink-0 font-black leading-none tracking-tight ${
+          large ? 'text-[19px]' : 'text-[18px]'
+        } ${
           isToday
             ? 'text-primary'
             : isPast
@@ -72,6 +85,8 @@ export default function DayColumn({
   footer,
   maxHeightClass = 'max-h-[65svh] md:max-h-[74svh]',
   compact = false,
+  fill = false,
+  headingOutside = false,
   isToday = false,
   isPast = false,
   headerAction,
@@ -88,6 +103,10 @@ export default function DayColumn({
   footer?: React.ReactNode;
   maxHeightClass?: string;
   compact?: boolean;
+  /** Stretch to the slide's full height instead of sizing to the list. */
+  fill?: boolean;
+  /** Mobile: the day heading sits above the card, like Home's list header. */
+  headingOutside?: boolean;
   isToday?: boolean;
   isPast?: boolean;
   headerAction?: React.ReactNode;
@@ -98,7 +117,7 @@ export default function DayColumn({
   const appliedMax = compact
     ? 'max-h-[60svh] md:max-h-[70svh]'
     : maxHeightClass;
-  const label = labelFor(title, dateKey, longNames);
+  const label = labelFor(title, dateKey, longNames, !headingOutside);
 
   const open = count ?? 0;
   const total = totalCount ?? count ?? 0;
@@ -115,27 +134,35 @@ export default function DayColumn({
       `${open} left`
     );
 
-  return (
+  const heading = (
+    <DayHeading
+      label={label}
+      isToday={isToday}
+      isPast={isPast}
+      status={status}
+      large={headingOutside}
+    />
+  );
+  const actions = headerAction ? (
+    <div className="relative flex shrink-0 items-center gap-0.5">
+      {headerAction}
+    </div>
+  ) : null;
+
+  const card = (
     <section
       className={[
         'relative flex flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
         isPast ? 'dark:bg-card/70' : '',
-        appliedMax,
+        fill ? (headingOutside ? 'min-h-0 flex-1' : 'h-full') : appliedMax,
       ].join(' ')}
     >
-      <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-border/60 py-1.5 pl-3.5 pr-1.5 md:pl-3">
-        <DayHeading
-          label={label}
-          isToday={isToday}
-          isPast={isPast}
-          status={status}
-        />
-        {headerAction ? (
-          <div className="relative flex shrink-0 items-center gap-0.5">
-            {headerAction}
-          </div>
-        ) : null}
-      </div>
+      {!headingOutside && (
+        <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-border/60 py-1.5 pl-3.5 pr-1.5 md:pl-3">
+          {heading}
+          {actions}
+        </div>
+      )}
 
       {note ? (
         <div className="shrink-0 border-b border-border/60 px-3.5 py-1.5 md:px-3">
@@ -160,33 +187,16 @@ export default function DayColumn({
       ) : null}
     </section>
   );
-}
 
-export function DayColumnShell({
-  title,
-  dateKey,
-  isToday = false,
-  isPast = false,
-  longNames = true,
-}: {
-  title: string;
-  dateKey?: string;
-  isToday?: boolean;
-  isPast?: boolean;
-  longNames?: boolean;
-}) {
+  if (!headingOutside) return card;
+
   return (
-    <section
-      aria-hidden
-      className="flex min-h-[200px] flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
-    >
-      <div className="flex min-h-[52px] items-center border-b border-border/60 pl-3.5 md:pl-3">
-        <DayHeading
-          label={labelFor(title, dateKey, longNames)}
-          isToday={isToday}
-          isPast={isPast}
-        />
+    <div className={fill ? 'flex h-full flex-col' : 'flex flex-col'}>
+      <div className="flex min-h-9 shrink-0 items-center justify-between gap-2 pb-1.5 pl-3.5 pr-0.5">
+        {heading}
+        {actions}
       </div>
-    </section>
+      {card}
+    </div>
   );
 }
