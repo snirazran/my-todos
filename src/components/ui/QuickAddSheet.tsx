@@ -240,8 +240,11 @@ export default function QuickAddSheet({
   const backdropOpacity = useMotionValue(0);
   useRegisterOpenSheet(open);
 
+  const submitLockRef = useRef(false);
   useEffect(() => {
-    if (open) dragExitRef.current = { velocity: 0, offset: 0 };
+    if (!open) return;
+    dragExitRef.current = { velocity: 0, offset: 0 };
+    submitLockRef.current = false;
   }, [open]);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -979,12 +982,13 @@ export default function QuickAddSheet({
   };
 
   const doSubmit = async (removeSavedTask: boolean) => {
-    if (isSubmitting) return;
+    if (isSubmitting || submitLockRef.current) return;
     const submitData = submitDataFor(
       nlTokens.length > 0 ? stripNaturalTokens(text, nlTokens) || text : text,
       true,
     );
     if (!submitData) return;
+    submitLockRef.current = true;
     const savedTaskId = removeSavedTask ? pickedBacklogTaskId : null;
 
     hapticSuccess();
@@ -1029,13 +1033,14 @@ export default function QuickAddSheet({
   };
 
   const submitBulkTasks = async (taskTexts: string[]) => {
-    if (isSubmitting) return;
+    if (isSubmitting || submitLockRef.current) return;
     const tasks = taskTexts
       .map((taskText) => submitDataFor(taskText, false))
       .filter((task): task is QuickAddSubmit => !!task);
     if (tasks.length === 0) return;
 
     hapticTick();
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       if (onBulkSubmit) {
@@ -1046,6 +1051,7 @@ export default function QuickAddSheet({
       setBulkInitialTasks(null);
       onOpenChange(false);
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
