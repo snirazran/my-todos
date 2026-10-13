@@ -1302,8 +1302,19 @@ body.dragging {
 }
 
 .plus-paywall :is(button, a):focus-visible {
-  outline: 2px solid #648b4c;
+  outline: 2px solid hsl(var(--primary));
   outline-offset: 3px;
+}
+
+@keyframes plus-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* The same solid, raised edge as our account-backup card, shared by Plus CTAs. */
@@ -2451,5 +2462,15 @@ body.dragging {
   .journey-pulse {
     animation: none;
     opacity: 0;
+  }
+}
+
+@keyframes streak-frog-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
   }
 }

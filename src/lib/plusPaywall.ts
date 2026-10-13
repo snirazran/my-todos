@@ -8,8 +8,6 @@ export type PaywallContext = {
   accent: string;
   sub: string;
   benefits: PlusBenefit[];
-  proof?: { label: string; free: string; plus: string; caption: string };
-  proofKind?: 'leap';
 };
 
 const REWARDS: PlusBenefit = {
@@ -42,7 +40,6 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     accent: 'Keep your favorites.',
     sub: 'More room for the outfits you’ve made your own.',
     benefits: [{ icon: 'saved', title: `Save up to ${SAVED_LOOKS_PLUS} favorite looks`, body: 'Switch outfits with a tap.' }, REWARDS, GIFTS],
-    proof: { label: 'Favorite outfits saved', free: '3', plus: String(SAVED_LOOKS_PLUS), caption: 'A look for every mood' },
   };
   if (placement === 'gift_double') return {
     ...context,
@@ -50,7 +47,6 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     accent: 'In every gift.',
     sub: 'Open a second prize from this gift—and every gift after it.',
     benefits: [GIFTS, REWARDS, STREAK],
-    proof: { label: 'Open a gift', free: '1', plus: '2', caption: 'Prizes in every gift box' },
   };
   if (placement === 'season_plus_track') return {
     ...context,
@@ -62,14 +58,12 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
       REWARDS,
       GIFTS,
     ],
-    proof: { label: 'Reach a season tier', free: '1', plus: '2', caption: 'Reward tracks: Free + Plus' },
   };
   if (placement === 'leap_leagues') return {
     ...context,
     headline: 'Same habits.',
     accent: 'Bigger league prizes.',
     sub: 'Turn every habit into more outfits, faster.',
-    proofKind: 'leap',
     benefits: [
       { icon: 'leap', title: 'Bonus prizes in every league', body: 'Extra gifts on unlock and every week.' },
       { icon: 'x2', title: '2× flies from every habit', body: 'Every repeating task pays double.' },

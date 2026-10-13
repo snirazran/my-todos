@@ -6,6 +6,7 @@ module.exports = {
   future: {
     hoverOnlyWhenSupported: true,
   },
+  safelist: [],
   content: [
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',

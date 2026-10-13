@@ -178,6 +178,7 @@ function PledgeRewardTiles({
   isPremium,
   hydrateDelayMs = 0,
   paused = false,
+  still = false,
 }: {
   rewards: LoginStreakReward[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -186,6 +187,7 @@ function PledgeRewardTiles({
   hydrateDelayMs?: number;
   /** Only the selected tier animates; the rest hold a still frame. */
   paused?: boolean;
+  still?: boolean;
 }) {
   const itemRewards = rewards.filter(
     (reward) =>
@@ -213,6 +215,7 @@ function PledgeRewardTiles({
           flySize={30}
           hydrateDelayMs={hydrateDelayMs + index * 90}
           paused={paused}
+          still={still}
           giftAnimation={index === 0 ? 'box_shake' : undefined}
         />
       ),
@@ -1222,6 +1225,7 @@ function HomeStep({
   onGoToTasks: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const [frogDressed, setFrogDressed] = useState(false);
   const atRisk = !view.checkedInToday && view.count > 0;
   const toBeat = view.longestStreak - view.count + 1;
   const goal = view.goal;
@@ -1270,18 +1274,30 @@ function HomeStep({
             </p>
           ) : null}
 
-          <motion.div
+          <div
             aria-hidden
-            animate={reduceMotion ? undefined : { y: [0, -5, 0] }}
-            transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-            className="mb-1 -mt-14 short-screen:-mt-16"
+            className="relative mb-1 -mt-14 h-[196px] w-[196px] motion-safe:animate-[streak-frog-bob_3.2s_ease-in-out_infinite] short-screen:-mt-16"
           >
-            {frogReady ? (
-              <Frog width={196} height={196} indices={indices} emote="love" />
-            ) : (
-              <div style={{ width: 196, height: 196 }} />
+            {frogReady && (
+              <Frog
+                width={196}
+                height={196}
+                indices={indices}
+                emote="love"
+                onDressed={() => setFrogDressed(true)}
+              />
             )}
-          </motion.div>
+            {!frogDressed && (
+              <div className="pointer-events-none absolute inset-0">
+                <FrogSnapshot
+                  indices={indices}
+                  width={196}
+                  height={196}
+                  cachedOnly={!frogReady}
+                />
+              </div>
+            )}
+          </div>
 
           <WeekStrip view={view} />
 
@@ -1376,6 +1392,8 @@ function HomeStep({
                       }
                       rewardCatalog={rewardCatalog}
                       isPremium={isPremium}
+                      hydrateDelayMs={650}
+                      still
                     />
                   </div>
                 </>
@@ -1460,6 +1478,20 @@ export function StreakSheet({
   const [step, setStep] = useState<Step>('home');
   const [buyOpen, setBuyOpen] = useState(false);
   const [frogReady, setFrogReady] = useState(false);
+  const [openSeen, setOpenSeen] = useState(open);
+  if (open !== openSeen) {
+    setOpenSeen(open);
+    if (open) {
+      setStep(
+        commitIntent && !liveView?.goal
+          ? 'commit'
+          : celebration?.extended
+            ? 'reveal'
+            : 'home',
+      );
+      setFrogReady(false);
+    }
+  }
 
   useRegisterOpenSheet(open);
 
@@ -1472,14 +1504,19 @@ export function StreakSheet({
           ? 'reveal'
           : 'home',
     );
-    const t = window.setTimeout(() => setFrogReady(true), 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebration, commitIntent]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => setFrogReady(true), 420);
     document.body.style.overflow = 'hidden';
     return () => {
       window.clearTimeout(t);
       setFrogReady(false);
       document.body.style.overflow = '';
     };
-  }, [open, celebration, commitIntent, liveView?.goal]);
+  }, [open]);
 
   const close = () => onOpenChange(false);
 
@@ -1528,13 +1565,12 @@ export function StreakSheet({
       {open && view && (
         <motion.div
           key="streak-overlay"
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.22 }}
-          className="pointer-events-auto fixed inset-0 z-[1400] overflow-hidden"
+          exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
+          className="sheet-backdrop-in pointer-events-auto fixed inset-0 z-[1400] overflow-hidden"
         >
-          <div className="absolute inset-0 bg-background md:bg-black/60 md:backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-background md:bg-black/60" />
 
           <div
             className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6"

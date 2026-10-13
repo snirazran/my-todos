@@ -338,7 +338,7 @@ export default function GiftBoxOpening({
                         intent="another"
                         rarity={giftDef?.rarity}
                         visual={
-                          <span className="pointer-events-none absolute -top-8 left-1/2 h-[80px] w-[60px] -translate-x-1/2">
+                          <span className="pointer-events-none absolute -top-[26px] left-1/2 h-[72px] w-[54px] -translate-x-1/2">
                             <GiftRive color={giftColor} className="h-full w-full" />
                           </span>
                         }
