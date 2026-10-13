@@ -29,8 +29,10 @@ export function LeapPlusButton({
     >
       <Icon name="frogPlus" label="Plus" className="h-10 w-10 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]" />
       <span className="min-w-0 flex-1">
-        <span className="block text-[14px] font-black leading-tight">{title}</span>
-        <span className="mt-0.5 block text-[11.5px] font-bold leading-tight text-[#6b4a12]">
+        <span className="block whitespace-normal break-words text-clip text-[14px] font-black leading-tight [overflow:visible]">
+          {title}
+        </span>
+        <span className="mt-0.5 block whitespace-normal break-words text-clip text-[11.5px] font-bold leading-tight text-[#6b4a12] [overflow:visible]">
           {subtitle}
         </span>
       </span>
