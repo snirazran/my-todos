@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Check, Loader2, Lock, Sparkles, X } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
@@ -467,7 +467,9 @@ export function TryOnBar({
   onTradeUp: () => void;
   onClose: () => void;
 }) {
-  const short = Math.max(0, price - balance);
+  const balanceAtBuy = useRef(balance);
+  if (!busy) balanceAtBuy.current = balance;
+  const short = Math.max(0, price - balanceAtBuy.current);
   return (
     <div className="tryon-bar-enter fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[45] mx-auto max-w-md md:bottom-6">
       <div className="flex items-center gap-3 rounded-[22px] bg-card py-2.5 pl-2.5 pr-2.5 shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/70">

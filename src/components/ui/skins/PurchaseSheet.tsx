@@ -62,7 +62,7 @@ export function PurchaseSheet({
   onClose,
   target,
   preview,
-  balance,
+  balance: liveBalance,
   ownedCount,
   isGuest,
   isPremium = false,
@@ -90,6 +90,7 @@ export function PurchaseSheet({
 }) {
   const [phase, setPhase] = useState<'confirm' | 'success'>('confirm');
   const [busy, setBusy] = useState(false);
+  const [buying, setBuying] = useState<{ balance: number; ownedCount: number } | null>(null);
   const [tradeInfoOpen, setTradeInfoOpen] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const tileRef = useRef<HTMLDivElement>(null);
@@ -145,13 +146,15 @@ export function PurchaseSheet({
     if (open) {
       setPhase('confirm');
       setBusy(false);
+      setBuying(null);
       setTradeInfoOpen(false);
     }
   }, [open, target?.id]);
 
   const rarity = target ? RARITY[target.rarity] : RARITY.common;
   const price = target?.price ?? 0;
-  const owned = ownedCount > 0;
+  const balance = buying ? buying.balance : liveBalance;
+  const owned = (buying ? buying.ownedCount : ownedCount) > 0;
   const tradeOnly = !!target && isTradeOnlyRarity(target.rarity);
   const canAfford = !isGuest && balance >= price;
   const shortBy = Math.max(0, price - balance);
@@ -176,8 +179,10 @@ export function PurchaseSheet({
   const handleBuy = async () => {
     if (busy) return;
     setBusy(true);
+    setBuying({ balance: liveBalance, ownedCount });
     const ok = await onBuy();
     setBusy(false);
+    setBuying(null);
     if (ok && target) {
       celebratePurchase(
         { id: target.id, name: target.name, rarity: target.rarity },
