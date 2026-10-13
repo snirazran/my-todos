@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppImage } from '@/components/ui/AppImage';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { useSettled } from '@/hooks/useSettled';
 import {
   Check,
   Gift,
@@ -12,16 +11,17 @@ import {
   X,
 } from 'lucide-react';
 import useSWR from 'swr';
-import Fly from '@/components/ui/fly';
-import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
-import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
+import { GiftOutfitPreview } from '@/components/ui/friends/GiftOutfitPreview';
+import { RarityBadge } from '@/components/ui/skins/RarityBadge';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuestReward } from '@/lib/quests/types';
-import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import type { ItemDef } from '@/lib/skins/catalog';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { shareLink } from '@/lib/share';
+import { POND_PRIMARY } from '@/components/ui/friends/PondSocial';
+import { cn } from '@/lib/utils';
+import { giftPreviewIndices } from '@/lib/friends/social';
 
 type CatalogItem = {
   id: string;
@@ -74,6 +74,8 @@ export function InviteFriendsModal({
 }) {
   useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
+  const [entered, setEntered] = useState(false);
+  const reduceMotion = useReducedMotion();
   useEffect(() => setMounted(true), []);
 
   const { data: config } = useSWR<InviteConfig>(
@@ -90,6 +92,7 @@ export function InviteFriendsModal({
   const [step, setStep] = useState<Step>('overview');
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const closeInvite = React.useCallback(() => {
     onClose();
   }, [onClose]);
@@ -114,6 +117,7 @@ export function InviteFriendsModal({
   );
 
   useEffect(() => {
+    if (!open) setEntered(false);
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeInvite();
@@ -130,6 +134,7 @@ export function InviteFriendsModal({
   useEffect(() => {
     if (!open) return;
     setStep('overview');
+    setInviteError(null);
     setSelectedGiftId(null);
     autoSkippedRef.current = false;
   }, [open]);
@@ -162,6 +167,7 @@ export function InviteFriendsModal({
   const handleSendInvite = async () => {
     if (!selectedGiftId) return;
     setCreatingInvite(true);
+    setInviteError(null);
     try {
       const res = await fetch('/api/invite/create', {
         method: 'POST',
@@ -179,6 +185,7 @@ export function InviteFriendsModal({
       await shareInviteUrl(url);
     } catch (err) {
       console.error(err);
+      setInviteError('Could not create your gift invite. Try again.');
     } finally {
       setCreatingInvite(false);
     }
@@ -200,29 +207,37 @@ export function InviteFriendsModal({
             className="fixed inset-0 z-[1400] bg-black/70"
           />
           <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%', transition: { type: 'spring', damping: 34, stiffness: 380 } }}
-            transition={{ type: 'spring', damping: 27, stiffness: 260, mass: 0.9 }}
+            variants={{ hidden: { y: reduceMotion ? 0 : '100%', opacity: 0 }, visible: { y: 0, opacity: 1 }, exit: { y: reduceMotion ? 0 : '100%', opacity: 0 } }}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            transition={{ type: 'tween', duration: reduceMotion ? 0.1 : 0.36, ease: [0.32, 0.72, 0, 1] }}
+            onAnimationComplete={(definition) => { if (definition === 'visible') setEntered(true); }}
             className="pointer-events-none fixed inset-0 z-[1401] flex will-change-transform md:items-center md:justify-center md:p-4 lg:p-6"
           >
             <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[min(100vw-2rem,32rem)] md:rounded-[32px] md:shadow-2xl lg:max-h-[calc(100dvh-3rem)] lg:w-[min(100vw-3rem,32rem)]">
               <AnimatePresence mode="wait">
                 {step === 'overview' && (
                   <StepShell key="overview">
+                    {(stepEntered) => (
                     <OverviewStep
+                      ready={entered && stepEntered}
                       config={config}
                       claimedCount={claimedCount}
                       totalTiers={totalTiers}
                       onClose={closeInvite}
                       onInviteFriends={() => setStep('pick')}
                     />
+                    )}
                   </StepShell>
                 )}
 
                 {step === 'pick' && (
                   <StepShell key="pick">
+                    {(stepEntered) => (
                     <PickStep
+                      ready={entered && stepEntered}
+                      error={inviteError}
                       config={config}
                       selectedGiftId={selectedGiftId}
                       onSelect={setSelectedGiftId}
@@ -233,6 +248,7 @@ export function InviteFriendsModal({
                       onSend={handleSendInvite}
                       creating={creatingInvite}
                     />
+                    )}
                   </StepShell>
                 )}
               </AnimatePresence>
@@ -245,17 +261,20 @@ export function InviteFriendsModal({
   );
 }
 
-function StepShell({ children }: { children: React.ReactNode }) {
+function StepShell({ children }: { children: (entered: boolean) => React.ReactNode }) {
+  const [entered, setEntered] = useState(false);
   const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 32 }}
-      animate={{ opacity: 1, x: 0 }}
+      variants={{ hidden: { opacity: 0, x: reduceMotion ? 0 : 32 }, visible: { opacity: 1, x: 0 } }}
+      initial="hidden"
+      animate="visible"
+      onAnimationComplete={(definition) => { if (definition === 'visible') setEntered(true); }}
       exit={{ opacity: 0, transition: { duration: 0.09, ease: 'easeIn' } }}
-      transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
+      transition={{ type: 'tween', duration: reduceMotion ? 0.1 : 0.22, ease: 'easeOut' }}
       className="relative flex h-full min-h-0 flex-1 flex-col will-change-transform"
     >
-      {children}
+      {children(entered)}
     </motion.div>
   );
 }
@@ -295,12 +314,14 @@ function OverviewStep({
   totalTiers,
   onClose,
   onInviteFriends,
+  ready,
 }: {
   config?: InviteConfig;
   claimedCount: number;
   totalTiers: number;
   onClose: () => void;
   onInviteFriends: () => void;
+  ready: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   if (!config) return <Loading onClose={onClose} />;
@@ -354,6 +375,7 @@ function OverviewStep({
               rewards={config.rewards}
               claimedCount={claimedCount}
               totalTiers={totalTiers}
+              ready={ready}
             />
           </Reveal>
         )}
@@ -381,12 +403,14 @@ function RewardProgressTrack({
   rewards,
   claimedCount,
   totalTiers,
+  ready,
 }: {
   rewards: RewardTier[];
   claimedCount: number;
   totalTiers: number;
+  ready: boolean;
 }) {
-  const settled = useSettled();
+  const reduceMotion = useReducedMotion();
   const progressPct =
     totalTiers > 0 ? Math.min(100, Math.max(0, (claimedCount / totalTiers) * 100)) : 0;
   const firstPos = milestonePositionPct(0, rewards.length);
@@ -415,7 +439,6 @@ function RewardProgressTrack({
       <div className="relative mx-auto h-[clamp(9rem,26dvh,14rem)] [--card-size:clamp(3.75rem,20vw,7rem)] [--label-top:calc(var(--rail-top)+1.75rem)] [--rail-top:calc(var(--card-size)+1.1rem)] min-[380px]:h-[clamp(10.25rem,28dvh,14rem)] min-[380px]:[--card-size:clamp(4.5rem,13dvh,7rem)] min-[380px]:[--label-top:calc(var(--rail-top)+2rem)] min-[380px]:[--rail-top:calc(var(--card-size)+1.35rem)]">
         {rewards.map((reward, index) => {
           const pos = milestonePositionPct(index, rewards.length);
-          const isLastReward = index === rewards.length - 1;
           return (
             <div
               key={`reward-card-${reward.tier}`}
@@ -428,13 +451,11 @@ function RewardProgressTrack({
                 }`}
               >
                 <div className="h-full w-full scale-[0.92] min-[380px]:scale-[0.9] sm:scale-95 min-[900px]:scale-100">
-                  {settled && (
                     <RewardPreview
                       reward={reward.rewards?.[0] ?? legacyReward(reward)}
                       fallbackItem={reward.item ?? null}
-                      active={isLastReward}
+                      ready={ready}
                     />
-                  )}
                 </div>
               </div>
             </div>
@@ -451,7 +472,7 @@ function RewardProgressTrack({
         >
           <motion.div
             className="h-full w-full rounded-full bg-primary shadow-sm"
-            animate={{
+            animate={reduceMotion ? undefined : {
               filter: ['brightness(1)', 'brightness(1.08)', 'brightness(1)'],
               boxShadow: [
                 '0 1px 2px rgba(0,0,0,0.08)',
@@ -496,6 +517,7 @@ function RewardProgressTrack({
                 <p className="w-20 text-center text-xs font-black text-muted-foreground min-[380px]:w-24 min-[380px]:text-sm min-[900px]:text-[15px]">
                   {reward.label}
                 </p>
+                <div className="mt-1 flex justify-center"><RarityBadge rarity={reward.item?.rarity} /></div>
               </div>
             );
         })}
@@ -509,6 +531,7 @@ function RewardProgressTrack({
           <p className="mx-auto mt-2 max-w-sm text-base font-medium leading-snug text-foreground">
             {rewardSentence(nextReward)}
           </p>
+          <RarityBadge rarity={nextReward.item?.rarity} className="mt-2" />
         </div>
       )}
     </div>
@@ -538,133 +561,40 @@ function rewardSentence(reward: RewardTier): string {
   return `Earn ${earned} when your ${ordinal} friend joins Frogress!`;
 }
 
-function PickStep({
-  config,
-  selectedGiftId,
-  onSelect,
-  onClose,
-  onBack,
-  onSend,
-  creating,
-}: {
-  config?: InviteConfig;
-  selectedGiftId: string | null;
-  onSelect: (id: string) => void;
-  onClose: () => void;
-  onBack: () => void;
-  onSend: () => void;
-  creating: boolean;
+function PickStep({ ready, config, selectedGiftId, onSelect, onClose, onBack, onSend, creating, error }: {
+  ready: boolean; config?: InviteConfig; selectedGiftId: string | null; onSelect: (id: string) => void;
+  onClose: () => void; onBack: () => void; onSend: () => void; creating: boolean; error?: string | null;
 }) {
-  const settled = useSettled();
-  // The six stamps queue behind the hero's own instance, so they start after it
-  // rather than contending with it.
-  const previewsReady = useSettled(320);
   if (!config) return <Loading onClose={onClose} />;
-  const selected = config.giftOptions.find((g) => g.id === selectedGiftId) ?? null;
-
+  const selected = config.giftOptions.find((gift) => gift.id === selectedGiftId) ?? null;
   return (
-    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto bg-[#8fc36d] px-5 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)] text-center text-white overscroll-contain md:h-auto md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)] md:pt-4">
-      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-3xl flex-col md:min-h-0">
-        <CloseButton
-          onClose={onBack}
-          className="left-[-0.5rem] top-2 text-white"
-        />
-
-        <Reveal
-          delay={0.05}
-          className="relative mx-auto mt-4 flex h-44 w-full max-w-md shrink-0 items-center justify-center overflow-visible rounded-[28px] [@media(max-height:620px)]:h-36 sm:mt-10 sm:h-56 sm:[@media(max-height:850px)]:mt-4 sm:[@media(max-height:850px)]:h-40 md:mt-4 md:h-40">
-          <div className="pointer-events-none absolute inset-x-[-5rem] bottom-[-5rem] top-[-5rem] transform-gpu bg-[radial-gradient(ellipse_at_center,rgba(225,255,194,0.58)_0%,rgba(190,235,151,0.3)_45%,rgba(133,190,92,0)_76%)]" />
-          {settled && (
-            <div className="absolute inset-[-72px] transform-gpu opacity-40 will-change-transform [mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)]">
-              <RotatingRays colorClass="text-white/14" />
-            </div>
-          )}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: settled ? 1 : 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="relative z-10 -translate-y-3 scale-[0.82] sm:scale-100"
-          >
-            {settled && (
-              <>
-                <Frog
-                  className="-translate-y-16 sm:-translate-y-20"
-                  width={250}
-                  height={281}
-                  paused={false}
-                />
-                <div className="absolute right-0 top-16 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem] sm:top-14">
-                  Ooh, a gift for me?
-                  <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
-                </div>
-              </>
-            )}
-          </motion.div>
-        </Reveal>
-
-        <Reveal delay={0.12}>
-          <h2 className="mx-auto mt-4 max-w-lg text-xl font-black tracking-tight [@media(max-height:620px)]:mt-2 [@media(max-height:620px)]:text-lg sm:mt-8 sm:text-2xl sm:[@media(max-height:850px)]:mt-3 sm:[@media(max-height:850px)]:text-xl md:mt-3 md:text-xl">
-            Select a gift for your friend!
-          </h2>
-          <p className="mx-auto mt-1.5 max-w-md text-sm font-medium leading-snug text-white/85 [@media(max-height:620px)]:text-xs sm:mt-2 sm:text-base sm:[@media(max-height:850px)]:text-sm md:text-sm">
-            Choose the gift they will receive when they join.
-          </p>
-        </Reveal>
-
-        <Reveal
-          delay={0.2}
-          className="mt-4 min-h-0 shrink-0 [@media(max-height:620px)]:mt-3 sm:mt-7 sm:[@media(max-height:850px)]:mt-4">
-          <div className="mx-auto grid max-w-2xl grid-cols-3 gap-2 min-[380px]:gap-3 sm:[@media(max-height:850px)]:max-w-[28rem]">
-            {config.giftOptions.map((gift) => {
-              const isSelected = selectedGiftId === gift.id;
-              return (
-                <button
-                  key={gift.id}
-                  type="button"
-                  onClick={() => onSelect(gift.id)}
-                  className={`aspect-square w-full touch-manipulation overflow-hidden rounded-[18px] border-4 bg-[#8fc36d] p-1 transition-all active:scale-95 min-[380px]:rounded-[22px] ${
-                    isSelected
-                      ? 'border-white ring-4 ring-inset ring-white/25'
-                      : 'border-white/15 hover:border-white/70'
-                  }`}
-                >
-                  <span className="pointer-events-none block h-full w-full">
-                    {previewsReady && (
-                      <GiftPreview item={gift.item ?? null} active={isSelected} />
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {selected && (
-            <div className="mt-3 hidden text-center min-[380px]:block">
-              <p className="text-[12px] font-black text-white/60">
-                Selected
-              </p>
-              <p className="mt-0.5 text-sm font-bold">
-                {selected.name || selected.item?.name || selected.itemId}
-              </p>
-            </div>
-          )}
-        </Reveal>
-
-        <div
-          className="mt-auto"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.75rem)' }}
-        >
-          <Reveal delay={0.28}>
-            <button
-              onClick={onSend}
-              disabled={!selectedGiftId || creating}
-              className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white font-black tracking-tight text-[#4f8f28] shadow-[0_5px_0_rgba(52,100,31,0.2)] transition-colors active:translate-y-0.5 disabled:opacity-60"
-            >
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Send Invitation
-            </button>
-          </Reveal>
+    <div role="dialog" aria-modal="true" aria-label="Choose a welcome gift" className="flex h-full min-h-0 flex-col bg-background text-foreground md:max-h-[calc(100dvh-2rem)]">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-5">
+        <div><p className="text-[11px] font-bold text-primary">A welcome gift, from you</p><h2 className="mt-1 text-xl font-black tracking-tight">Pick their first look</h2></div>
+        <button type="button" onClick={onClose} aria-label="Close gift picker" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X className="h-5 w-5" aria-hidden /></button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
+        <div className="relative mt-4 flex h-[146px] items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-b from-primary/10 to-primary/[0.03]">
+          <div className="h-full w-[160px]">{selected ? <GiftOutfitPreview item={selected.item} ready={ready} /> : <FrogSnapshot width={160} height={150} indices={giftPreviewIndices(null)} visualOffsetY={0} cachedOnly={!ready} />}</div>
+          <div className="absolute bottom-3 right-3 flex max-w-[50%] flex-col items-end gap-1"><RarityBadge rarity={selected?.item?.rarity} /><span className="rounded-full border border-border/50 bg-card px-2.5 py-1.5 text-[11px] font-bold text-primary">Their new pond look</span></div>
         </div>
+        <p className="mb-4 mt-4 text-[13px] font-medium leading-relaxed text-muted-foreground">Choose an outfit, then share their gift invite. It’s free for them to claim when they join.</p>
+        <div role="group" aria-label="Welcome outfits" className="grid grid-cols-2 gap-3 min-[440px]:grid-cols-3">
+          {config.giftOptions.map((gift) => {
+            const chosen = gift.id === selectedGiftId;
+            return <button key={gift.id} type="button" aria-pressed={chosen} aria-label={'Choose ' + (gift.name || gift.item?.name || 'this outfit') + (gift.item?.rarity ? ', ' + gift.item.rarity : '')} onClick={() => onSelect(gift.id)} className={cn('relative flex min-w-0 touch-manipulation flex-col overflow-hidden rounded-2xl border-2 p-2 text-left transition-[border-color,background-color,transform] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2', chosen ? 'border-primary bg-primary/5' : 'border-border/60 bg-card hover:border-primary/40')}>
+              <span className="pointer-events-none block aspect-square w-full overflow-hidden rounded-xl bg-muted/40"><GiftOutfitPreview item={gift.item} ready={ready} /></span>
+              <span className="mt-2 text-[12px] font-black leading-tight">{gift.name || gift.item?.name || 'Welcome outfit'}</span><RarityBadge rarity={gift.item?.rarity} className="mt-1.5" />
+              {chosen && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /></span>}
+            </button>;
+          })}
+        </div>
+        {!config.giftOptions.length && <p role="status" className="py-8 text-center text-[13px] font-medium text-muted-foreground">Welcome gifts are being restocked. Try again a little later.</p>}
+        <button type="button" onClick={onBack} className="mt-4 min-h-11 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">See your invite rewards</button>
+      </div>
+      <div className="shrink-0 border-t border-border/50 bg-card px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4">
+        {error && <p role="alert" className="mb-3 text-[12px] font-bold text-destructive">{error}</p>}
+        <button type="button" onClick={onSend} disabled={!selected || creating} className={cn(POND_PRIMARY, 'min-h-12 w-full rounded-2xl text-[14px]')}>{creating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Gift className="h-4 w-4" aria-hidden />}{creating ? 'Preparing their gift…' : selected ? 'Share this gift invite' : 'Choose an outfit above'}</button>
       </div>
     </div>
   );
@@ -704,65 +634,20 @@ function CloseButton({
   );
 }
 
-function GiftPreview({
-  item,
-  active = false,
-}: {
-  item: CatalogItem | null;
-  active?: boolean;
+function RewardPreview({ reward, fallbackItem, ready }: {
+  reward: QuestReward | null; fallbackItem: CatalogItem | null; ready: boolean;
 }) {
-  if (!item) {
-    return (
-      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-        <Gift className="h-7 w-7" />
-      </div>
-    );
-  }
-
-  if (item.slot === 'container') {
-    return (
-      <div className="flex h-full w-full items-center justify-center overflow-visible">
-        <div className="h-[170%] w-[170%]">
-          <GiftRive color={item.riveIndex} isMilestone={false} paused={!active} />
-        </div>
-      </div>
-    );
-  }
-
-  const indices = itemToIndices(item);
-  return (
-    <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <FrogSnapshot
-        className="h-full w-full"
-        width={300}
-        height={338}
-        indices={indices}
-        visualOffsetY={0}
-      />
-    </div>
-  );
-}
-
-function RewardPreview({
-  reward,
-  fallbackItem,
-  active = false,
-}: {
-  reward: QuestReward | null;
-  fallbackItem: CatalogItem | null;
-  active?: boolean;
-}) {
-  if (!reward) return <GiftPreview item={fallbackItem} active={active} />;
-  if (reward.type === 'FLIES') {
+  if (fallbackItem) return <GiftOutfitPreview item={fallbackItem} ready={ready} />;
+  if (reward?.type === 'FLIES') {
     const amount = reward.amountMode === 'random' ? reward.maxAmount : reward.amount;
     return (
-      <div className="flex flex-col items-center gap-1">
-        <Fly size={42} y={-2} paused />
+      <div className="flex h-full flex-col items-center justify-center gap-1">
+        <img src="/fly.svg" width={42} height={42} alt="" />
         <span className="text-xs font-black text-foreground">+{amount ?? 0}</span>
       </div>
     );
   }
-  return <GiftPreview item={fallbackItem} active={active} />;
+  return <GiftOutfitPreview item={null} ready={ready} />;
 }
 
 function Loading({ onClose }: { onClose: () => void }) {
@@ -792,12 +677,4 @@ function milestonePositionPct(index: number, total: number) {
   if (total <= 1) return 50;
   const clampedIndex = Math.max(0, Math.min(index, total - 1));
   return 18 + (clampedIndex / (total - 1)) * 64;
-}
-
-function itemToIndices(item: CatalogItem): Partial<Record<WardrobeSlot, number>> {
-  if (item.slot === 'skin') return { skin: item.riveIndex };
-  if (item.slot === 'hat') return { hat: item.riveIndex };
-  if (item.slot === 'body') return { body: item.riveIndex };
-  if (item.slot === 'hand_item') return { hand_item: item.riveIndex };
-  return {};
 }

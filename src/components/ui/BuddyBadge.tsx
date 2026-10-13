@@ -17,10 +17,12 @@ export function BuddyFrogFace({
   indices,
   size = 24,
   className,
+  cachedOnly = false,
 }: {
   indices?: FrogIndices;
   size?: number;
   className?: string;
+  cachedOnly?: boolean;
 }) {
   const w = size * FACE_ZOOM;
   const h = (w * 144) / 128;
@@ -37,6 +39,7 @@ export function BuddyFrogFace({
         style={{ left: (size - w) / 2, top: size / 2 - h * FACE_CENTER_Y }}
       >
         <FrogSnapshot
+          cachedOnly={cachedOnly}
           indices={indices}
           width={w}
           height={h}

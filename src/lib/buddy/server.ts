@@ -17,6 +17,7 @@ import {
   settleFlyGrant,
 } from '@/lib/economy/ledger';
 import { creditDuoWeek } from '@/lib/economy/socialRewards';
+import { awardBuddyKeepsakes } from '@/lib/friends/pondServer';
 import { ONE_TIME_OCCURRENCE, isOneTimeParams } from '@/lib/buddy/bond';
 
 function dowYMD(ymd: string): number {
@@ -272,6 +273,9 @@ export async function handleBuddyCompletion(opts: {
   bond.streak = computeStreak(bond.createParams, bond.activeSince ?? null, today, both);
 
   await bond.save();
+  if (completed && bothNow) {
+    await awardBuddyKeepsakes(bond).catch((error) => console.error('Buddy keepsake failed:', error));
+  }
   void notifyFriendUpdate(partnerId);
 
   // Push the partner when I finish today's shared occurrence.

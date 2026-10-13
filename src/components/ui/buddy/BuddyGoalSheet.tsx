@@ -8,9 +8,9 @@ import React, {
   useState,
 } from 'react';
 import { ChevronLeft, Loader2, Gift } from 'lucide-react';
-import Frog from '@/components/ui/frog';
-import Fly from '@/components/ui/fly';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
+import { GiftOutfitPreview } from '@/components/ui/friends/GiftOutfitPreview';
+import { RarityBadge } from '@/components/ui/skins/RarityBadge';
+import type { Rarity } from '@/lib/skins/catalog';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
@@ -41,6 +41,7 @@ export type BuddyGiftOption = {
   item?: {
     slot: 'skin' | 'hat' | 'body' | 'hand_item' | 'container';
     riveIndex: number;
+    rarity?: Rarity;
     icon?: string;
   } | null;
 };
@@ -208,6 +209,7 @@ export function BuddyGoalSheet({
                 <BuddyFrogFace
                   indices={recipientIndices}
                   size={34}
+                  cachedOnly={!entered}
                   className="shrink-0 ring-2 ring-inset ring-[#447d3f]/40"
                 />
               ) : (
@@ -368,18 +370,19 @@ export function BuddyGoalSheet({
                       <button
                         key={g.id}
                         type="button"
+                        aria-pressed={selected}
+                        aria-label={'Choose ' + g.name + (g.item?.rarity ? ', ' + g.item.rarity : '')}
                         onClick={() => setGiftId(g.id)}
                         className={cn(
-                          'aspect-square overflow-hidden rounded-[18px] border-4 bg-muted/40 p-1 transition-all active:scale-95',
+                          'flex min-w-0 flex-col overflow-hidden rounded-[18px] border-2 bg-card p-1.5 text-left transition-[border-color,background-color,transform] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                           selected
                             ? 'border-[#447d3f] ring-4 ring-inset ring-[#447d3f]/20'
                             : 'border-border/50 hover:border-[#447d3f]/50',
                         )}
                       >
-                        <GiftPreview
-                          item={g.item ?? null}
-                          active={selected && entered}
-                        />
+                        <span className="block aspect-square w-full overflow-hidden rounded-xl bg-muted/40"><GiftOutfitPreview item={g.item} ready={entered} /></span>
+                        <span className="mt-1.5 text-[11px] font-black leading-tight text-foreground">{g.name}</span>
+                        <RarityBadge rarity={g.item?.rarity} className="mt-1" />
                       </button>
                     );
                   })}
@@ -394,7 +397,7 @@ export function BuddyGoalSheet({
 
             <div className="mt-5 flex items-center gap-3 rounded-2xl border border-[#447d3f]/25 bg-[#447d3f]/[0.07] px-3.5 py-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/80 dark:bg-card">
-                <Fly size={30} interactive={false} paused />
+                <img src="/fly.svg" width={30} height={30} alt="" />
               </span>
               <p className="text-[13px] font-semibold leading-snug text-foreground">
                 <span className="font-black">You both check it off</span> →{' '}
@@ -435,49 +438,5 @@ export function BuddyGoalSheet({
         </div>
       )}
     </BaseSheet>
-  );
-}
-
-function GiftPreview({
-  item,
-  active = false,
-}: {
-  item: BuddyGiftOption['item'];
-  active?: boolean;
-}) {
-  if (!item) {
-    return (
-      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-        <Gift className="h-7 w-7" />
-      </div>
-    );
-  }
-  if (item.slot === 'container') {
-    return (
-      <div className="flex h-full w-full items-center justify-center overflow-visible">
-        <div className="h-[170%] w-[170%]">
-          <GiftRive color={item.riveIndex} isMilestone={false} paused={!active} />
-        </div>
-      </div>
-    );
-  }
-  const indices =
-    item.slot === 'skin'
-      ? { skin: item.riveIndex }
-      : item.slot === 'hat'
-        ? { hat: item.riveIndex }
-        : item.slot === 'body'
-          ? { body: item.riveIndex }
-          : { hand_item: item.riveIndex };
-  return (
-    <div className="flex h-full w-full items-center justify-center overflow-hidden">
-      <Frog
-        className="-translate-y-12"
-        width={300}
-        height={338}
-        indices={indices}
-        paused={!active}
-      />
-    </div>
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   requestFrogStamp,
+  drawCachedFrogStamp,
   type FrogStampIndices,
 } from '@/lib/frogStampEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
@@ -18,14 +19,18 @@ export function FrogSnapshot({
   height = 270,
   className = '',
   visualOffsetY,
+  cachedOnly = false,
 }: {
   indices?: FrogStampIndices;
   width?: number | string;
   height?: number | string;
   className?: string;
   visualOffsetY?: number;
+  /** During a sheet transition, use a saved frame and do no Rive work. */
+  cachedOnly?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hasCachedFrame, setHasCachedFrame] = useState(false);
   const indicesRef = useRef(indices);
   indicesRef.current = indices;
   const resolvedVisualOffsetY =
@@ -48,10 +53,15 @@ export function FrogSnapshot({
       const w = Math.max(1, Math.round(boxWidth * dpr));
       const h = Math.max(1, Math.round(boxHeight * dpr));
       if (canvas.width === w && canvas.height === h && cancelStamp) return;
-      canvas.width = w;
-      canvas.height = h;
+      // Setting either backing dimension clears the bitmap, even when the
+      // value is unchanged. Keep the old look visible until its replacement
+      // is ready instead of flashing an empty canvas on each selection.
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
       cancelStamp?.();
-      cancelStamp = requestFrogStamp(canvas, indicesRef.current ?? {});
+      const cached = drawCachedFrogStamp(canvas, indicesRef.current ?? {});
+      setHasCachedFrame(cached);
+      if (!cachedOnly) cancelStamp = requestFrogStamp(canvas, indicesRef.current ?? {});
     };
     applySize();
     const observer = new ResizeObserver(() => applySize());
@@ -61,13 +71,14 @@ export function FrogSnapshot({
       cancelStamp?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [indicesKey]);
+  }, [indicesKey, cachedOnly]);
 
   return (
     <div
       className={className}
       style={{ width, height, position: 'relative', overflow: 'visible' }}
     >
+      {cachedOnly && !hasCachedFrame && <img src="/frog.png" alt="" width={240} height={270} className="absolute inset-0 h-full w-full object-contain" />}
       <canvas
         ref={canvasRef}
         style={{

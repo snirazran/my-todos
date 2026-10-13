@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyAmount, FlyIcon } from '@/components/ui/FlyAmount';
@@ -17,14 +17,24 @@ const DEFAULT_KIND: LookReactionKind = 'fire';
 export function CheerButton({
   toUserId,
   className,
+  compact = false,
+  onSent,
 }: {
   toUserId: string;
   className?: string;
+  compact?: boolean;
+  onSent?: (kind: LookReactionKind) => void;
 }) {
   const { sentToday, react } = useLookReactions();
   const sent = sentToday[toUserId];
   const [picking, setPicking] = React.useState(false);
   const [earned, setEarned] = React.useState(0);
+  const [sending, setSending] = React.useState(false);
+  const [error, setError] = React.useState(false);
+  const [alignRight, setAlignRight] = React.useState(false);
+  const reduceMotion = useReducedMotion();
+  const earnedTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (earnedTimer.current) clearTimeout(earnedTimer.current); }, []);
   const wrapRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -37,11 +47,18 @@ export function CheerButton({
   }, [picking]);
 
   const send = async (kind: LookReactionKind) => {
+    if (sending) return;
     setPicking(false);
+    setSending(true);
+    setError(false);
     const gained = await react(toUserId, kind);
+    setSending(false);
+    if (gained < 0) { setError(true); return; }
+    onSent?.(kind);
     if (gained > 0) {
       setEarned(gained);
-      window.setTimeout(() => setEarned(0), 1400);
+      if (earnedTimer.current) clearTimeout(earnedTimer.current);
+      earnedTimer.current = setTimeout(() => setEarned(0), 1400);
     }
   };
 
@@ -51,20 +68,23 @@ export function CheerButton({
         type="button"
         aria-label={sent ? 'Change your cheer' : 'Cheer this friend'}
         aria-expanded={picking}
+        disabled={sending}
         onClick={(e) => {
           e.stopPropagation();
+          const rect = wrapRef.current?.getBoundingClientRect();
+          setAlignRight(!!rect && rect.left + 250 > window.innerWidth - 12);
           setPicking((v) => !v);
         }}
         className={cn(
-          'relative flex h-10 touch-manipulation items-center justify-center gap-1 rounded-full transition-[transform,background-color,border-color] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f] focus-visible:ring-offset-2',
+          'relative flex h-11 touch-manipulation items-center justify-center gap-1 rounded-xl transition-[transform,background-color,border-color] active:scale-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
           sent
-            ? 'w-10 bg-[#447d3f]/12 text-lg'
-            : 'border border-[#447d3f]/30 bg-[#447d3f]/[.06] pl-2.5 pr-3 text-[13px] font-black text-[#447d3f] hover:bg-[#447d3f]/12',
+            ? 'w-11 bg-primary/10 text-lg'
+            : compact ? 'px-2 text-[11px] font-black text-foreground hover:bg-accent' : 'border border-primary/20 bg-primary/[.06] pl-2.5 pr-3 text-[13px] font-black text-primary hover:bg-primary/10',
         )}
       >
         <motion.span
           key={sent ?? 'empty'}
-          initial={sent ? { scale: 0.4 } : false}
+          initial={sent && !reduceMotion ? { scale: 0.4 } : false}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 520, damping: 14 }}
           className={cn(!sent && 'text-base')}
@@ -78,13 +98,14 @@ export function CheerButton({
           </span>
         )}
       </button>
+      {error && <span role="status" className="absolute left-0 top-full z-40 mt-1 whitespace-nowrap rounded-lg border border-border bg-popover px-2 py-1 text-[10px] font-bold text-destructive">Could not cheer. Try again.</span>}
 
       <AnimatePresence>
         {earned > 0 && (
           <motion.span
-            initial={{ opacity: 0, y: 0, scale: 0.7 }}
-            animate={{ opacity: 1, y: -26, scale: 1 }}
-            exit={{ opacity: 0, y: -38 }}
+            initial={{ opacity: 0, y: 0, scale: reduceMotion ? 1 : 0.7 }}
+            animate={{ opacity: 1, y: reduceMotion ? 0 : -26, scale: 1 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : -38 }}
             className="pointer-events-none absolute right-0 top-0 z-30 flex items-center whitespace-nowrap rounded-full bg-[#447d3f] py-0.5 pl-2 pr-2 font-black text-white shadow-lg"
           >
             <FlyAmount amount={`+${earned}`} size={11} />
@@ -95,12 +116,13 @@ export function CheerButton({
       <AnimatePresence>
         {picking && (
           <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.85 }}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 8, scale: reduceMotion ? 1 : 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.85 }}
             transition={{ type: 'spring', stiffness: 520, damping: 30 }}
             style={{ transformOrigin: 'bottom right' }}
-            className="absolute bottom-full right-0 z-40 mb-2 rounded-2xl border border-border/60 bg-popover p-1.5 shadow-xl"
+            onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setPicking(false); wrapRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); } }}
+            className={cn('absolute bottom-full z-40 mb-2 rounded-2xl border border-border/60 bg-popover p-1.5 shadow-xl', compact && !alignRight ? 'left-0' : 'right-0')}
           >
             <p className="px-1.5 pb-1 text-[11px] font-black text-muted-foreground">
               {sent ? 'Change your cheer' : 'Send a cheer'}
@@ -111,7 +133,7 @@ export function CheerButton({
                   key={kind}
                   type="button"
                   aria-label={`Send ${kind}`}
-                  initial={{ scale: 0.4, opacity: 0 }}
+                  initial={{ scale: reduceMotion ? 1 : 0.4, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{
                     type: 'spring',
@@ -119,8 +141,8 @@ export function CheerButton({
                     damping: 20,
                     delay: i * 0.03,
                   }}
-                  whileHover={{ scale: 1.15, y: -2 }}
-                  whileTap={{ scale: 0.85 }}
+                  whileHover={reduceMotion ? undefined : { scale: 1.15, y: -2 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.85 }}
                   onClick={(e) => {
                     e.stopPropagation();
                     void send(kind);

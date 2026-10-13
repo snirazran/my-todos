@@ -35,6 +35,7 @@ import { computeGap, readLoginStreakState } from '@/lib/streak/loginStreak';
 import { readShieldState } from '@/lib/shields/engine';
 import type { DailyFlyProgress, FriendFlyDaily } from '@/lib/types/UserDoc';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { backgroundFileUrl } from '@/lib/backgrounds/constants';
 
 function fliesEarnedOn(
   flyDaily: DailyFlyProgress | undefined,
@@ -70,12 +71,12 @@ export async function GET(req: NextRequest) {
     const [users, me, catalog] = await Promise.all([
       UserModel.find({ _id: { $in: friendIds } })
         .select(
-          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped statistics.daily activeFrogodoroTimer.status activeFrogodoroTimer.phase activeFrogodoroTimer.endsAt',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped statistics.daily activeFrogodoroTimer.status activeFrogodoroTimer.phase activeFrogodoroTimer.endsAt social.pinnedKeepsakeId',
         )
         .lean(),
       UserModel.findById(userId)
         .select(
-          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped statistics.daily',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped statistics.daily activeFrogodoroTimer.status activeFrogodoroTimer.phase activeFrogodoroTimer.endsAt social.pinnedKeepsakeId',
         )
         .lean(),
       getCachedCatalog(),
@@ -91,12 +92,13 @@ export async function GET(req: NextRequest) {
     );
     const backgroundDocs = backgroundIds.length
       ? await BackgroundModel.find({ id: { $in: backgroundIds } })
-          .select('id rarity')
+          .select('id rarity images.mobile imageFiles.mobile')
           .lean()
       : [];
     const backgroundRarityById = new Map<string, Rarity>(
       backgroundDocs.map((b) => [b.id, b.rarity as Rarity]),
     );
+    const backgroundPreviewById = new Map(backgroundDocs.map((b) => [b.id, b.imageFiles?.mobile?.storagePath ? backgroundFileUrl(b.id, 'mobile') : b.images?.mobile || null]));
 
     const aliveStreakOf = (
       u: unknown,
@@ -119,6 +121,7 @@ export async function GET(req: NextRequest) {
       name?: string;
       frogName?: string;
       premiumUntil?: Date | string | null;
+      social?: { pinnedKeepsakeId?: string | null };
       statistics?: { daily?: { date?: string; dailyTasksCount?: number } };
       wardrobe?: {
         equipped?: Partial<Record<string, string | null>>;
@@ -161,6 +164,8 @@ export async function GET(req: NextRequest) {
         tasksToday,
         givesYou: pondFliesFrom(tasksToday, economyConfig),
         backgroundId,
+        backgroundPreview: backgroundId ? backgroundPreviewById.get(backgroundId) ?? null : null,
+        pinnedKeepsakeId: u.social?.pinnedKeepsakeId ?? null,
         streak: streak.count,
         streakToday: streak.today,
         premium: u.premiumUntil ? new Date(u.premiumUntil) > new Date() : false,

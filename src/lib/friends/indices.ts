@@ -36,6 +36,9 @@ export type FriendSummary = {
   givesYou?: number;
   /** The friend's equipped background id (resolved to images on the client). */
   backgroundId?: string | null;
+  /** Small preview of the friend's own pond, already resolved by the API. */
+  backgroundPreview?: string | null;
+  pinnedKeepsakeId?: string | null;
   /** Lifetime flies this friend has contributed to you (claimed). */
   sharedTotal?: number;
   /** Current alive login-streak count (0 when broken/none). */

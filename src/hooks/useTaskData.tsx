@@ -326,7 +326,7 @@ export function useTaskData({
    */
   const toggleTask = useCallback(
     async (taskId: string, forceState?: boolean) => {
-      if (!todayData || !backlogData) return;
+      if (!todayData || (includeBacklog && !backlogData)) return;
       const task = (todayData.tasks || []).find((t) => t.id === taskId);
       if (!task) return;
 
@@ -580,7 +580,7 @@ export function useTaskData({
         mutateToday(prevToday, { revalidate: false });
       }
     },
-    [dateStr, todayData, backlogData, mutateToday, tz, sortTasks],
+    [dateStr, todayData, backlogData, includeBacklog, mutateToday, tz, sortTasks],
   );
 
   /**

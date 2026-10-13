@@ -54,6 +54,10 @@ export function useLookReactions(enabled: boolean = true) {
           body: JSON.stringify({ toUserId, kind, tz }),
         });
         const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          await mutate();
+          return -1;
+        }
         const earned = Math.max(0, Math.floor(body?.earned ?? 0));
         if (earned > 0) {
           markFlyEarn();
@@ -62,7 +66,7 @@ export function useLookReactions(enabled: boolean = true) {
         return earned;
       } catch {
         mutate();
-        return 0;
+        return -1;
       }
     },
     [data?.sentToday, mutate, tz],

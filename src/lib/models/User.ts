@@ -25,6 +25,7 @@ const UserSchema = new Schema<UserDoc>(
     excludeFromStats: { type: Boolean, default: undefined },
     friendCode: { type: String, required: false, unique: true, index: true, sparse: true },
     suggestionsDismissed: { type: [String], default: [] },
+    social: { type: Schema.Types.Mixed, default: undefined },
     suggestionSnoozes: {
       type: [
         {

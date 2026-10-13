@@ -1,197 +1,61 @@
 'use client';
-
 import React from 'react';
-import { Flame } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Icon } from '@/components/ui/Icon';
-import Fly from '@/components/ui/fly';
-import Frog from '@/components/ui/frog';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { ArrowUpRight, Handshake } from 'lucide-react';
+import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
+import { CheerButton } from './CheerButton';
+import { keepsakeEmoji } from '@/lib/friends/social';
+import { REACTION_EMOJI, type LookReactionKind } from '@/lib/friends/lookReactions';
+import type { FriendSummary } from '@/lib/friends/indices';
+import { cn } from '@/lib/utils';
 import { hapticTick } from '@/lib/haptics';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { rarityRank } from '@/lib/skins/catalog';
-import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
-import { CheerButton } from '@/components/ui/friends/CheerButton';
-import { LookLovedChip } from '@/components/ui/LookReactions';
 
 export type FriendRowEntry = FriendSummary & { isYou?: boolean };
-
-const MEDAL = [
-  'bg-amber-400 text-amber-950',
-  'bg-slate-300 text-slate-800',
-  'bg-amber-700 text-amber-50',
-];
-
-export function FriendRow({
-  entry,
-  onOpen,
-  rank,
-  buddyInvites = 0,
-  paused = false,
-  animate = false,
-}: {
-  entry: FriendRowEntry;
-  onOpen: () => void;
-  /** Set only in ranking mode; drives the podium medal. */
-  rank?: number;
-  buddyInvites?: number;
-  paused?: boolean;
-  /** Live Rive frog instead of a stamped frame. Reserved for the top row. */
-  animate?: boolean;
+export function FriendRow({ entry, onOpen, onBuddyUp, buddyInvites = 0, paused = false }: {
+  entry: FriendRowEntry; onOpen: () => void; onBuddyUp: () => void; buddyInvites?: number; paused?: boolean; animate?: boolean;
 }) {
-  const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
-  const look = entry.flexRarity ? RARITY_CONFIG[entry.flexRarity] : null;
-  const flex =
-    entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.epic
-      ? RARITY_CONFIG[entry.flexRarity]
-      : null;
-  const medal =
-    entry.fliesToday > 0 && rank && rank <= 3 ? MEDAL[rank - 1] : null;
-  const hasLook =
-    (entry.equippedItems?.length ?? 0) > 0 || !!entry.backgroundRarity;
-
+  const reduceMotion = useReducedMotion();
+  const frogRef = React.useRef<FrogHandle | null>(null);
+  const [reaction, setReaction] = React.useState<LookReactionKind | null>(null);
+  const [reacting, setReacting] = React.useState(false);
+  const reactionTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (reactionTimer.current) clearTimeout(reactionTimer.current); }, []);
+  const celebrate = (kind: LookReactionKind) => {
+    if (!reduceMotion) frogRef.current?.fireEmote('love');
+    setReaction(kind);
+    setReacting(true);
+    if (reactionTimer.current) clearTimeout(reactionTimer.current);
+    reactionTimer.current = setTimeout(() => { setReaction(null); setReacting(false); }, 1600);
+  };
+  const pin = keepsakeEmoji(entry.pinnedKeepsakeId);
   return (
-    <li
-      className={cn(
-        'relative flex items-center gap-1 rounded-2xl border bg-card pr-2.5 shadow-sm transition-[border-color,box-shadow]',
-        entry.isYou
-          ? 'border-[#447d3f]/35 bg-[#447d3f]/[.04]'
-          : flex
-            ? cn('border-2', flex.border, flex.glow)
-            : 'border-border/50 hover:border-[#447d3f]/40',
-      )}
-    >
-      {buddyInvites > 0 && (
-        <span className="absolute -left-1 -top-1 z-20 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-background bg-rose-500 px-1 text-[10px] font-black text-white">
-          {buddyInvites > 9 ? '9+' : buddyInvites}
-        </span>
-      )}
-
-      <button
-        type="button"
-        onClick={() => {
-          hapticTick();
-          onOpen();
-        }}
-        className="flex min-h-[76px] min-w-0 flex-1 touch-manipulation items-center gap-2 rounded-2xl py-1.5 pl-1.5 text-left transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-[360px]:gap-3"
-      >
-        <div className="relative flex aspect-[6/5] w-[76px] shrink-0 items-end justify-center self-center overflow-hidden sm:w-[88px]">
-          {animate ? (
-            <Frog
-              className="translate-y-[15%]"
-              width="145%"
-              height="145%"
-              indices={entry.indices}
-              paused={paused}
-            />
-          ) : (
-            <FrogSnapshot
-              className="translate-y-[15%]"
-              width="145%"
-              height="145%"
-              indices={entry.indices}
-              visualOffsetY={0}
-            />
-          )}
-          {medal && (
-            <span
-              className={cn(
-                'absolute left-0 top-0 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card text-[10px] font-black shadow-sm',
-                medal,
-              )}
-            >
-              {rank}
-            </span>
-          )}
-          <PremiumFrogAura show={!!entry.premium} compact flySize={22} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-1 text-[15px] font-black leading-tight tracking-tight text-foreground">
-            <span
-              className={cn('truncate', entry.premium && 'plus-name-shimmer')}
-            >
-              {entry.name || entry.frogName}
-            </span>
-            {entry.isYou && (
-              <span className="shrink-0 rounded-full bg-[#447d3f]/12 px-1.5 py-0.5 text-[10px] font-black text-[#447d3f]">
-                You
-              </span>
-            )}
-            {entry.premium && (
-              <Icon
-                name="frogPlus"
-                label="Frogress Plus"
-                className="h-5 w-5 shrink-0"
-              />
-            )}
-          </p>
-
-          {entry.focusing ? (
-            <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-primary">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              Focusing now
-            </p>
-          ) : (
-            <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-              {entry.isYou
-                ? `${entry.fliesToday} caught today`
-                : shared > 0
-                  ? `Sent you ${shared} ${shared === 1 ? 'fly' : 'flies'}`
-                  : (entry.tasksToday ?? 0) > 0
-                    ? `${entry.tasksToday} done today`
-                    : 'Nothing yet today'}
-            </p>
-          )}
-
-          <div className="mt-1 flex flex-wrap items-center gap-1 empty:hidden">
-            {entry.isYou && <LookLovedChip />}
-            {(entry.streak ?? 0) > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-orange-500">
-                <Flame className="h-3 w-3 fill-orange-400" />
-                {entry.streak}
-              </span>
-            )}
-            {flex && look && hasLook && (
-              <span
-                className={cn(
-                  'max-w-full truncate whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-black',
-                  look.bg,
-                  look.text,
-                )}
-              >
-                {look.label}
-              </span>
-            )}
+    <motion.li initial={reduceMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }}
+      className="group relative min-w-0 rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow] hover:border-primary/25">
+      <button type="button" onClick={() => { hapticTick(); onOpen(); }} aria-label={'Visit ' + (entry.name || entry.frogName) + "'s pond and see their outfit"} className="block w-full touch-manipulation rounded-t-[19px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+        <div className="relative h-[144px] overflow-hidden rounded-t-[19px] bg-gradient-to-b from-primary/10 to-primary/[0.03] sm:h-[170px]">
+          {entry.backgroundPreview ? <img src={entry.backgroundPreview} alt="" width={320} height={180} loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" /> : null}
+          <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-card/70 via-transparent to-transparent" />
+          <span className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-card/80 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"><ArrowUpRight className="h-3.5 w-3.5" aria-hidden /></span>
+          {buddyInvites > 0 ? <span className="absolute left-2 top-2 z-10 rounded-full bg-primary px-2 py-1 text-[10px] font-black text-primary-foreground">Buddy invite</span> : null}
+          <div className="absolute inset-x-0 bottom-0 flex justify-center">
+            <FrogSnapshot width={164} height={156} indices={entry.indices} visualOffsetY={0} />
+            {reacting && !reduceMotion && <div className="absolute inset-0 flex justify-center"><Frog ref={frogRef} width={164} height={156} indices={entry.indices} visualOffsetY={0} paused={paused} onDressed={() => frogRef.current?.fireEmote('love')} /></div>}
           </div>
+          {pin ? <span aria-label="Friendship keepsake" className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full border border-border/50 bg-card/95 text-lg shadow-sm">{pin}</span> : null}
+          <AnimatePresence>{reaction ? <motion.span key={reaction} aria-hidden initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 35, scale: 0.5 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: reduceMotion ? 0 : -20 }} className="pointer-events-none absolute inset-x-0 top-5 z-20 text-center text-4xl drop-shadow-md">{REACTION_EMOJI[reaction]}</motion.span> : null}</AnimatePresence>
         </div>
-
-        <span
-          aria-label={`${entry.fliesToday} flies today`}
-          className={cn(
-            'flex shrink-0 flex-col items-center rounded-xl px-1.5 py-1',
-            entry.fliesToday > 0 ? 'text-foreground' : 'text-muted-foreground/60',
-          )}
-        >
-          <span className="flex items-center gap-0.5">
-            <span className={cn(entry.fliesToday <= 0 && 'grayscale opacity-50')}>
-              <Fly size={18} y={-2} interactive={false} paused={paused} />
-            </span>
-            <span className="text-base font-black tabular-nums leading-none">
-              {entry.fliesToday}
-            </span>
-          </span>
-          <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wide opacity-70">
-            today
-          </span>
-        </span>
+        <div className="min-w-0 px-3 pb-2.5 pt-2.5">
+          <p className="truncate text-[14px] font-black tracking-tight text-foreground">{entry.name || entry.frogName}</p>
+          <p className={cn('mt-1 flex min-h-4 items-center gap-1.5 text-[11px] font-semibold', entry.focusing ? 'text-primary' : 'text-muted-foreground')}>
+            {entry.focusing ? <><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />Focusing now</> : (entry.tasksToday ?? 0) > 0 ? entry.tasksToday + (entry.tasksToday === 1 ? ' little win today' : ' little wins today') : 'Going at their own pace'}
+          </p>
+        </div>
       </button>
-
-      {!entry.isYou && <CheerButton toUserId={entry.userId} />}
-    </li>
+      <div className="flex items-center justify-between gap-1 border-t border-border/40 px-2 py-2">
+        <CheerButton toUserId={entry.userId} compact onSent={celebrate} />
+        <button type="button" onClick={onBuddyUp} aria-label={'Start a buddy habit with ' + (entry.name || entry.frogName)} className="flex min-h-11 min-w-0 touch-manipulation items-center gap-1 rounded-xl px-2 text-[11px] font-black text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Handshake className="h-4 w-4 shrink-0" aria-hidden />Buddy up</button>
+      </div>
+    </motion.li>
   );
 }

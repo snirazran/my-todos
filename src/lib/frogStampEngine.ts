@@ -57,6 +57,34 @@ let riveFile: RiveFile | null = null;
 let fileReady = false;
 let creating = false;
 let current: Job | null = null;
+const frameCache = new Map<string, HTMLCanvasElement>();
+const frameKey = (indices: FrogStampIndices) => SLOTS.map((slot) => indices[slot] ?? 0).join(':');
+
+/** Copy an existing frame without initializing or advancing Rive. */
+export function drawCachedFrogStamp(target: HTMLCanvasElement, indices: FrogStampIndices): boolean {
+  const source = frameCache.get(frameKey(indices));
+  const ctx = target.getContext('2d');
+  if (!source || !ctx) return false;
+  const scale = Math.min(source.width / ARTBOARD_WIDTH, source.height / ARTBOARD_HEIGHT);
+  const sw = ARTBOARD_WIDTH * scale, sh = ARTBOARD_HEIGHT * scale;
+  const fit = Math.min(target.width / ARTBOARD_WIDTH, target.height / ARTBOARD_HEIGHT);
+  const dw = ARTBOARD_WIDTH * fit, dh = ARTBOARD_HEIGHT * fit;
+  ctx.clearRect(0, 0, target.width, target.height);
+  ctx.drawImage(source, (source.width - sw) / 2, (source.height - sh) / 2, sw, sh, (target.width - dw) / 2, (target.height - dh) / 2, dw, dh);
+  return true;
+}
+
+function cacheFrame(job: Job) {
+  if (job.cancelled || !masterCanvas) return;
+  const key = frameKey(job.indices);
+  const previous = frameCache.get(key);
+  if (previous && previous.width * previous.height >= masterCanvas.width * masterCanvas.height) return;
+  const frame = document.createElement('canvas');
+  frame.width = masterCanvas.width; frame.height = masterCanvas.height;
+  frame.getContext('2d')?.drawImage(masterCanvas, 0, 0);
+  frameCache.delete(key); frameCache.set(key, frame);
+  if (frameCache.size > 24) frameCache.delete(frameCache.keys().next().value!);
+}
 
 function applyIndices(stamper: Rive, indices: FrogStampIndices) {
   const vmi = stamper.viewModelInstance;
@@ -128,7 +156,7 @@ function stamp(job: Job) {
 }
 
 function finishJob(stamper: Rive) {
-  if (current) stamp(current);
+  if (current) { stamp(current); cacheFrame(current); }
   // Runs inside the Advance event — still within Rive's draw loop. cleanup()
   // must not destroy the instances the in-flight draw call is using, so hop
   // out of the loop first. `current` stays held until then so no new job can

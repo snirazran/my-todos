@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   MoreVertical,
   X,
@@ -46,6 +46,8 @@ import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import type { Rarity } from '@/lib/skins/catalog';
 import { RarityCornerBadge } from '@/components/ui/skins/RarityCornerBadge';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
+import { keepsakeEmoji } from '@/lib/friends/social';
+import { POND_PRIMARY } from '@/components/ui/friends/PondSocial';
 
 type PeekTarget =
   | {
@@ -127,14 +129,21 @@ export function FriendDetailModal({
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyBond, setBusyBond] = useState<string | null>(null);
   const [peekTarget, setPeekTarget] = useState<PeekTarget | null>(null);
-  const [entered, setEntered] = useState(false);
+  const [enteredFor, setEnteredFor] = useState<string | null>(null);
+  const [dressedFor, setDressedFor] = useState<string | null>(null);
+  const entryFrames = React.useRef<number[]>([]);
+  const reduceMotion = useReducedMotion();
+  const entered = !!entry && enteredFor === entry.userId;
+  const liveReady = !!entry && dressedFor === entry.userId;
 
   useEffect(() => {
     if (!entry) {
       setPeekTarget(null);
-      setEntered(false);
+      setEnteredFor(null);
+      setDressedFor(null);
     }
   }, [entry]);
+  useEffect(() => () => { entryFrames.current.forEach(cancelAnimationFrame); entryFrames.current = []; }, [entry?.userId]);
 
   const friendBackground = useMemo<BackgroundItem | null>(() => {
     if (!entry?.backgroundId || !data?.catalog) return null;
@@ -270,15 +279,24 @@ export function FriendDetailModal({
           />
           <div className="pointer-events-none fixed inset-0 z-[1501] flex items-stretch justify-center md:items-center md:p-6">
             <motion.div
-              initial={{ opacity: 0, y: '100%' }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: '100%' }}
-              transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-              onAnimationComplete={() => setEntered(true)}
+              key={entry.userId}
+              variants={{ hidden: { opacity: reduceMotion ? 0 : 1, y: reduceMotion ? 0 : '100%' }, visible: { opacity: 1, y: 0 }, exit: { opacity: reduceMotion ? 0 : 1, y: reduceMotion ? 0 : '100%' } }}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={reduceMotion ? { duration: 0.1 } : { type: 'tween', duration: 0.36, ease: [0.32, 0.72, 0, 1] }}
+              onAnimationComplete={(definition) => {
+                if (definition !== 'visible') return;
+                entryFrames.current.push(requestAnimationFrame(() => {
+                  entryFrames.current.push(requestAnimationFrame(() => setEnteredFor(entry.userId)));
+                }));
+              }}
+              data-friend-motion-ready={entered}
+              data-friend-rive-ready={liveReady}
               className="pointer-events-auto relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,26rem)] md:rounded-[28px] md:shadow-2xl lg:max-h-[calc(100dvh-4rem)] lg:w-[min(100vw-4rem,40rem)]"
             >
               {/* Banner: friend's background with the frog sitting on it */}
-              <div className="relative h-[300px] shrink-0 md:h-[280px] lg:h-[340px]">
+              <div className="relative h-[238px] shrink-0 md:h-[260px] lg:h-[300px]">
                 <div className="absolute inset-0 z-0 overflow-hidden">
                   <BackgroundPicture images={images} />
                   <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/10" />
@@ -336,12 +354,12 @@ export function FriendDetailModal({
                 </div>
 
                 {/* Focusing right now — flies + tongue lunges over the banner */}
-                <FriendFocusScene
+                {liveReady && !reduceMotion && <FriendFocusScene
                   frogRef={friendFrogRef}
                   frogBoxRef={friendFrogBoxRef}
                   active={entered && !!entry.focusing}
                   onGrabActive={setFriendMouthOpen}
-                />
+                />}
 
                 {/* Frog — sits above the white sheet below it */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center">
@@ -349,22 +367,20 @@ export function FriendDetailModal({
                     ref={friendFrogBoxRef}
                     className="relative -translate-y-[26px] lg:origin-bottom lg:scale-110"
                   >
-                    {entered ? (
+                    {!liveReady && <FrogSnapshot width={230} height={210} indices={entry.indices} cachedOnly={!entered} />}
+                    {entered && !reduceMotion ? (
+                      <div className={cn(!liveReady && 'absolute inset-0 opacity-0')}>
                       <Frog
                         ref={friendFrogRef}
                         width={230}
                         height={210}
                         indices={entry.indices}
                         mouthOpen={friendMouthOpen}
+                        onDressed={() => setDressedFor(entry.userId)}
                       />
-                    ) : (
-                      <FrogSnapshot
-                        width={230}
-                        height={210}
-                        indices={entry.indices}
-                      />
-                    )}
-                    <PremiumFrogAura show={!!entry.premium} alwaysPlay />
+                      </div>
+                    ) : null}
+                    {liveReady && !reduceMotion && <PremiumFrogAura show={!!entry.premium} alwaysPlay />}
                   </div>
                 </div>
               </div>
@@ -394,6 +410,8 @@ export function FriendDetailModal({
                 </div>
 
                 <LookReactionRow toUserId={entry.userId} />
+                {keepsakeEmoji(entry.pinnedKeepsakeId) && <p className="flex items-center justify-center gap-2 text-[12px] font-bold text-muted-foreground"><span className="text-xl" aria-hidden>{keepsakeEmoji(entry.pinnedKeepsakeId)}</span>A little memory from showing up with friends</p>}
+                <button type="button" onClick={() => onBuddyUp(entry)} className={cn(POND_PRIMARY, 'w-full')}><Users className="h-4 w-4" aria-hidden />Start a habit with {entry.name || entry.frogName}</button>
 
                 {/* Live focus presence — indicator only for now */}
                 {entry.focusing && (
@@ -417,13 +435,13 @@ export function FriendDetailModal({
                   <ProfileStat
                     label="Caught today"
                     value={entry.fliesToday}
-                    icon={<Fly size={24} y={-3} interactive={false} paused />}
+                    icon={<img src="/fly.svg" alt="" width={24} height={24} />}
                   />
                   <ProfileStat
                     label="Sent to you"
                     value={total}
                     hint={today > 0 ? `+${today} today` : undefined}
-                    icon={<Fly size={24} y={-3} interactive={false} paused />}
+                    icon={<img src="/fly.svg" alt="" width={24} height={24} />}
                   />
                 </div>
 
@@ -442,6 +460,7 @@ export function FriendDetailModal({
                           rarity={item.rarity}
                           preview={
                             <FrogSnapshot
+                              cachedOnly={!entered}
                               className="h-[125%] w-[125%] object-contain"
                               indices={{ [item.slot]: item.riveIndex }}
                               width={180}
@@ -552,28 +571,7 @@ export function FriendDetailModal({
                   </div>
                 )}
 
-                <div className="rounded-[20px] border border-[#447d3f]/25 bg-[#447d3f]/[.06] p-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#447d3f]/15 text-[#447d3f]">
-                      <Users className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[15px] font-black leading-tight tracking-tight text-foreground">
-                        Buddy up with {entry.name || entry.frogName}
-                      </p>
-                      <p className="mt-0.5 text-[13px] font-medium leading-snug text-muted-foreground">
-                        Share a task and keep each other going.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onBuddyUp(entry)}
-                    className="mt-3 h-12 w-full rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
-                  >
-                    Start a buddy task
-                  </button>
-                </div>
+
               </div>
             </motion.div>
           </div>
@@ -736,7 +734,7 @@ function ItemPeekSheet({
                   type="button"
                   onClick={handleEquip}
                   disabled={equipping}
-                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-[background-color,transform,box-shadow,opacity] hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none disabled:opacity-60"
                 >
                   {equipping ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -771,7 +769,7 @@ function ItemPeekSheet({
                         `/wardrobe?tab=shop&item=${encodeURIComponent(target.id)}&kind=${target.kind === 'bg' ? 'background' : 'item'}`,
                       )
                     }
-                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
+                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-[background-color,transform,box-shadow,opacity] hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
                   >
                     Get it in your shop
                   </button>
@@ -780,7 +778,7 @@ function ItemPeekSheet({
                     <button
                       type="button"
                       onClick={() => openFlyShop(shortfall)}
-                      className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
+                      className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-[background-color,transform,box-shadow,opacity] hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
                     >
                       Get
                       <Fly size={28} y={-2} alwaysPlay />

@@ -153,6 +153,11 @@ export type UserDoc = {
   isGuest?: boolean;
   excludeFromStats?: boolean;
   friendCode?: string;
+  social?: {
+    pinnedKeepsakeId?: string | null;
+    focusRoomId?: string | null;
+    focusRoomEndsAt?: Date | null;
+  };
   /** Legacy permanent dismissals — still honoured, no longer written to. */
   suggestionsDismissed?: string[];
   suggestionSnoozes?: { userId: string; until: Date }[];
