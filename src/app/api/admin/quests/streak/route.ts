@@ -17,7 +17,7 @@ import {
   clampMegaEveryDays,
   normalizeSweepConfig,
 } from '@/lib/quests/streak';
-import type { PactRarity } from '@/lib/pact/types';
+import type { BonusRarity } from '@/lib/leap/types';
 import type { QuestAmountMode, QuestReward, QuestRewardType } from '@/lib/quests/types';
 
 const VALID_REWARD_TYPES = new Set<QuestRewardType>([
@@ -27,7 +27,7 @@ const VALID_REWARD_TYPES = new Set<QuestRewardType>([
   'BACKGROUND',
 ]);
 const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
-const RARITIES: PactRarity[] = [
+const RARITIES: BonusRarity[] = [
   'common',
   'uncommon',
   'rare',

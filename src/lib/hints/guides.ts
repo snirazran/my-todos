@@ -310,23 +310,12 @@ const GUIDES: Record<string, HintGuide> = {
   },
   'take-leap': {
     id: 'take-leap',
-    goal: 'Pick this week’s area and commit to one thing',
-    beats: [
-      {
-        anchor: 'pact-pick-area',
-        say: 'Take your Leap — pick the one area you want this week',
-      },
-    ],
-  },
-  'pact-session': {
-    id: 'pact-session',
-    goal: 'Finish this week’s session',
+    goal: 'Tick off a task that repeats',
     beats: [
       {
         href: '/',
         anchor: 'task-fly',
-        matchTagIds: true,
-        say: 'Tap the fly to finish this week’s session',
+        say: 'Tick off a task that repeats. Every one is a hop toward your Leap',
       },
     ],
   },

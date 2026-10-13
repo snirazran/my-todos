@@ -57,11 +57,13 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
 
   const objectives = context.metric('quest_objective_claimed');
   const swaps = context.metric('daily_quest_swapped');
-  const committed = context.metric('pact_committed');
-  const claimed = context.metric('pact_claimed');
-  const skipped = context.metric('pact_skipped');
-  const dropped = context.metric('pact_dropped');
-  const retro = context.metric('pact_retro_claimed');
+  const settled = context.metric('leap_week_settled');
+  const held = context.metric('leap_hold_reached');
+  const landed = context.metric('leap_landed');
+  const lucky = context.metric('leap_lucky_drop');
+  const comebacks = context.metric('leap_comeback');
+  const lilies = context.metric('leap_lily_reached');
+  const retro = context.metric('leap_retro_claimed');
   const dailyReward = context.metric('daily_reward_claimed');
   const seasonReward = context.metric('season_reward_claimed');
 
@@ -96,29 +98,31 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
     note: 'A shape with a high target and few claims is too hard. A shape with a low target and heavy claims is where the flies leak.',
   };
 
-  const pactFunnel: StatTable = {
-    key: 'quests.pact_funnel',
+  const leapFunnel: StatTable = {
+    key: 'quests.leap_funnel',
     title: 'Leap outcomes',
-    question: 'Of the weekly Leaps people commit to, how many actually land?',
+    question: 'Of the weeks people have habits scheduled, how far do they get?',
     columns: [
       { key: 'outcome', label: 'Outcome' },
       { key: 'events', label: 'Events', format: 'integer' },
       { key: 'users', label: 'Users', format: 'integer' },
-      { key: 'of_committed', label: '% of committed', format: 'percent' },
+      { key: 'of_weeks', label: '% of habit weeks', format: 'percent' },
     ],
     rows: [
-      { label: 'Committed', total: committed },
-      { label: 'Claimed', total: claimed },
-      { label: 'Skipped a session', total: skipped },
-      { label: 'Dropped', total: dropped },
-      { label: 'Claimed retroactively', total: retro },
-      { label: 'Sessions removed', total: context.metric('pact_sessions_removed') },
+      { label: 'Habit weeks settled', total: settled },
+      { label: 'Hold reached', total: held },
+      { label: 'Leap landed', total: landed },
+      { label: 'Lucky drops', total: lucky },
+      { label: 'Comeback bonuses', total: comebacks },
+      { label: 'New Lily leagues reached', total: lilies },
+      { label: 'Plus back-pay collected', total: retro },
     ].map((row) => ({
       outcome: row.label,
       events: row.total.events,
       users: row.total.users,
-      of_committed: rate(row.total.events, committed.events),
+      of_weeks: rate(row.total.events, settled.events),
     })),
+    note: 'Hold and Leap fire mid-week the moment they are crossed; habit weeks count at settlement, so the newest week lags.',
   };
 
   const seasonTable: StatTable = {
@@ -166,12 +170,12 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
         detail: `${swaps.events} swaps by ${swaps.users} users`,
         sample: objectives.users,
       }),
-      kpi('pact_committed', committed.events, { sparkline: context.seriesFor('pact_committed') }),
-      kpi('pact_completion_rate', rate(claimed.events, committed.events), {
-        sample: committed.events,
+      kpi('leap_landed', landed.events, { sparkline: context.seriesFor('leap_landed') }),
+      kpi('leap_land_rate', rate(landed.events, settled.events), {
+        sample: settled.events,
       }),
-      kpi('pact_drop_rate', rate(dropped.events + skipped.events, committed.events), {
-        sample: committed.events,
+      kpi('leap_hold_rate', rate(held.events, settled.events), {
+        sample: settled.events,
       }),
     ],
     series: [
@@ -182,13 +186,13 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
         lines: [
           { key: 'objectives', label: 'Objectives claimed', format: 'integer' },
           { key: 'daily_reward', label: 'Daily rewards', format: 'integer' },
-          { key: 'pact', label: 'Leaps committed', format: 'integer' },
+          { key: 'leap', label: 'Leaps landed', format: 'integer' },
         ],
         points: context.dates.map((date, index) => ({
           date,
           objectives: context.seriesFor('quest_objective_claimed')[index] ?? 0,
           daily_reward: context.seriesFor('daily_reward_claimed')[index] ?? 0,
-          pact: context.seriesFor('pact_committed')[index] ?? 0,
+          leap: context.seriesFor('leap_landed')[index] ?? 0,
         })),
       },
     ],
@@ -219,7 +223,7 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
         question: 'Is the average objective priced right for the effort it asks?',
         rows: objectiveMix,
       }),
-      pactFunnel,
+      leapFunnel,
       seasonTable,
       {
         key: 'quests.reward_surfaces',
@@ -235,7 +239,7 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
           { surface: 'Quest objectives', total: objectives },
           { surface: 'Login calendar', total: dailyReward },
           { surface: 'Season track', total: seasonReward },
-          { surface: 'Leaps', total: claimed },
+          { surface: 'Leaps', total: landed },
         ].map((row) => ({
           surface: row.surface,
           claims: row.total.events,

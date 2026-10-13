@@ -1,20 +1,58 @@
 import { Flame } from 'lucide-react';
 import type { ChecklistItem } from '@/lib/checklist';
+import { useLeapView } from '@/components/leap/useLeapView';
+import { leagueArt } from '@/components/leap/leapCopy';
+import { LILY_ART_BOTTOM, LILY_ART_TOP } from '@/components/leap/LeapRail';
+import { cn } from '@/lib/utils';
+
+const LILY_MARK_INK = 17;
+
+export function LeapStageMark({ className }: { className?: string }) {
+  const { data } = useLeapView();
+  if (!data?.enabled) return null;
+  const index = Math.min(Math.max(0, data.league), LILY_ART_TOP.length - 1);
+  const top = LILY_ART_TOP[index];
+  const height = LILY_MARK_INK / (LILY_ART_BOTTOM - top);
+  const label = data.leagues[data.league]?.label;
+  return (
+    <span
+      title={label ? `Counts toward ${label}` : undefined}
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none relative inline-block h-[17px] w-[23px] shrink-0 select-none align-middle',
+        className,
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={leagueArt(index)}
+        alt=""
+        draggable={false}
+        className="absolute left-1/2 max-w-none -translate-x-1/2"
+        style={{ height, width: (height * 500) / 430, top: -top * height }}
+      />
+    </span>
+  );
+}
 
 export function StreakPill({
   count,
   size = 'md',
+  className,
 }: {
   count: number;
   size?: 'md' | 'sm';
+  className?: string;
 }) {
   return (
     <span
       aria-label={`${count} in a row`}
       title={`${count} in a row`}
-      className={`inline-flex shrink-0 items-center gap-0.5 font-black tabular-nums leading-none text-orange-500 dark:text-orange-400 ${
-        size === 'sm' ? 'text-[13px]' : 'text-[14px]'
-      }`}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-0.5 font-black tabular-nums leading-none text-orange-500 dark:text-orange-400',
+        size === 'sm' ? 'text-[13px]' : 'text-[14px]',
+        className,
+      )}
     >
       <Flame
         className={size === 'sm' ? 'h-4 w-4' : 'h-[18px] w-[18px]'}

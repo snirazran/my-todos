@@ -7,7 +7,7 @@ import { mutate } from 'swr';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Heart, Pause, Play, Loader2, ShieldAlert, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Pause, Play, Loader2, ShieldAlert, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { CATALOG, rarityRank, type ItemDef, type Rarity } from '@/lib/skins/catalog';
@@ -41,6 +41,7 @@ import {
 } from '@/lib/appleAuth';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
+import { LeapPlusProof } from '@/components/leap/LeapPlusProof';
 
 type View = 'offer' | 'compare';
 type PlanId = 'yearly' | 'monthly';
@@ -656,12 +657,12 @@ function CollectionPreview({ desktop, paused, onTogglePause }: {
       hop.set({ scaleX: 1, scaleY: 1, y: 0 });
     }
   }, [paused, reduceMotion, hop]);
-  const size = desktop ? 250 : 164;
+  const size = desktop ? 250 : 176;
   const height = Math.round(size * 1.125);
   const sparkleColor = shownLook.rarity === 'legendary' ? '#fcd34d' : shownLook.rarity === 'epic' ? '#d8b4fe' : '#93c5fd';
   return (
-    <div className={desktop ? 'mt-5 w-full' : 'w-[46%] shrink-0'}>
-      <div aria-hidden className={`relative mx-auto flex items-center justify-center ${desktop ? 'h-56 w-64' : 'h-[116px] w-full'}`}>
+    <div className={desktop ? 'mt-5 w-full' : 'relative w-[46%] shrink-0'}>
+      <div aria-hidden className={`relative mx-auto flex items-center justify-center ${desktop ? 'h-56 w-64' : 'h-[140px] w-full'}`}>
         {/* A loading silhouette, not an empty frog that flashes between outfits. */}
         {!dressed ? <Icon name="frogPlus" className="absolute h-14 w-14 opacity-35" /> : null}
         <motion.div animate={hop} className={`absolute origin-[50%_77%] ${dressed ? '' : 'invisible'}`}>
@@ -685,16 +686,18 @@ function CollectionPreview({ desktop, paused, onTogglePause }: {
           </span>
         ) : null}
       </div>
-      <div className="flex flex-col items-center text-center">
-        <p className={`font-medium leading-snug text-[#deead9] ${desktop ? 'text-xs' : 'text-[10px]'}`}>Looks to collect</p>
-        {!reduceMotion ? <button type="button" onClick={onTogglePause}
-          aria-label={paused ? 'Play outfit preview' : 'Pause outfit preview'}
-          aria-pressed={paused}
-          className="inline-flex min-h-7 items-center gap-1 rounded-full px-2 text-[10px] font-semibold text-[#deead9] hover:bg-white/10">
-          {paused ? <Play className="h-2.5 w-2.5" aria-hidden /> : <Pause className="h-2.5 w-2.5" aria-hidden />}
-          {paused ? 'Play' : 'Pause'}
-        </button> : null}
-      </div>
+      {!reduceMotion ? (
+        <div className={desktop ? 'mt-1 flex justify-center' : 'absolute bottom-1 left-1'}>
+          <button type="button" onClick={onTogglePause}
+            aria-label={paused ? 'Play outfit preview' : 'Pause outfit preview'}
+            aria-pressed={paused}
+            className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-white shadow-[0_2px_8px_rgba(0,0,0,0.18)] ring-1 ring-white/30 backdrop-blur-sm transition-[background-color,transform] hover:bg-white/25 active:scale-90">
+            {paused
+              ? <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" strokeWidth={0} aria-hidden />
+              : <Pause className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} aria-hidden />}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -705,6 +708,17 @@ function OfferHero({ context, desktop = false }: {
 }) {
   const [previewPaused, setPreviewPaused] = useState(false);
   const proof = context.proof ?? { label: 'Daily quest complete', free: '1×', plus: '2×', caption: 'Flies toward your next look' };
+  const proofCard = (
+    <div className={`min-w-0 rounded-2xl border border-white/15 bg-white/[0.08] p-3 ${desktop ? 'mt-5 w-full' : 'flex-1'}`}>
+      <p className="flex items-center gap-1.5 text-[11px] font-bold text-[#e0eadb]"><Check className="h-3.5 w-3.5 shrink-0 text-[#ffe399]" strokeWidth={3} aria-hidden /> {proof.label}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="opacity-75"><span className="block text-[10px] font-bold text-[#d1dfca]">FREE</span><span className="text-xl font-black">{proof.free}</span></div>
+        <ArrowRight className="h-4 w-4 text-white/50" aria-hidden />
+        <div className="rounded-xl bg-[#ffe399] px-3.5 py-1 text-[#493610] shadow-[0_0_18px_rgba(255,227,153,0.35)]"><span className="block text-[10px] font-black">PLUS</span><span className="text-2xl font-black leading-tight">{proof.plus}</span></div>
+      </div>
+      <p className="mt-1.5 text-[11px] font-medium text-[#e0eadb]">{proof.caption}</p>
+    </div>
+  );
   return (
     <section className={`relative overflow-hidden rounded-[24px] bg-[#284d38] text-white ${desktop ? 'flex w-full flex-col justify-center px-7 py-8' : 'px-4 pb-4 pt-4'}`}>
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(173,209,128,0.22),transparent_65%)]" />
@@ -712,40 +726,27 @@ function OfferHero({ context, desktop = false }: {
         <h2 className={`text-balance font-black leading-[1.1] tracking-tight ${desktop ? 'text-[30px]' : 'text-[23px]'}`}>
           {context.headline}<br /><span className="text-[#ffe399]">{context.accent}</span>
         </h2>
-        <p className={`mt-2 text-pretty font-medium leading-snug text-[#e0eadb] ${desktop ? 'text-[15px]' : 'text-[13px]'}`}>{context.sub}</p>
+        {desktop ? <p className="mt-2 text-pretty text-[15px] font-medium leading-snug text-[#e0eadb]">{context.sub}</p> : null}
       </div>
       <div className={`relative ${desktop ? 'flex flex-col items-center' : 'mt-1 flex items-center gap-3'}`}>
         <CollectionPreview desktop={desktop} paused={previewPaused} onTogglePause={() => setPreviewPaused((value) => !value)} />
-        <div className={`min-w-0 rounded-2xl border border-white/15 bg-white/[0.08] p-3 ${desktop ? 'mt-5 w-full' : 'flex-1'}`}>
-          <p className="flex items-center gap-1.5 text-[11px] font-bold text-[#e0eadb]"><Check className="h-3.5 w-3.5 shrink-0 text-[#ffe399]" strokeWidth={3} aria-hidden /> {proof.label}</p>
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <div><span className="block text-[10px] font-bold text-[#d1dfca]">FREE</span><span className="text-xl font-black">{proof.free}</span></div>
-            <ArrowRight className="h-4 w-4 text-white/50" aria-hidden />
-            <div className="rounded-xl bg-[#ffe399] px-3 py-1 text-[#493610]"><span className="block text-[10px] font-black">PLUS</span><span className="text-xl font-black">{proof.plus}</span></div>
-          </div>
-          <p className="mt-1.5 text-[11px] font-medium text-[#e0eadb]">{proof.caption}</p>
-        </div>
+        {context.proofKind === 'leap' ? <LeapPlusProof fallback={proofCard} className={desktop ? 'mt-5 w-full' : 'flex-1'} /> : proofCard}
       </div>
     </section>
   );
 }
 
 function OfferBenefits({ context }: { context: PaywallContext }) {
-  const benefits = [...context.benefits, {
-    icon: 'heart' as const,
-    title: 'Support our cause',
-    body: 'Help our small team make building habits a little more fun.',
-  }];
   return (
-    <ul className="mt-4 space-y-3 md:mt-3 md:space-y-4">
-      {benefits.map((benefit) => (
-        <li key={benefit.title} className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#edf2e6]">
-            {benefit.icon === 'store' ? <span aria-hidden className="h-14 w-14 shrink-0 -translate-y-2"><GiftRive color={0} paused /></span> : benefit.icon === 'heart' ? <Heart aria-hidden className="h-6 w-6 fill-[#eea7a4] text-[#c96768]" strokeWidth={2} /> : <Icon name={benefit.icon} className="h-7 w-7" />}
+    <ul className="mt-4 divide-y divide-[#e7ecdf] rounded-[22px] border border-[#e3e8dd] bg-white md:mt-3">
+      {context.benefits.map((benefit, index) => (
+        <li key={benefit.title} className="flex items-center gap-3 px-3.5 py-3">
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${index === 0 ? 'bg-[#fff0bd]' : 'bg-[#edf2e6]'}`}>
+            {benefit.icon === 'store' ? <span aria-hidden className="h-14 w-14 shrink-0 -translate-y-2"><GiftRive color={0} paused /></span> : <Icon name={benefit.icon} className="h-7 w-7" />}
           </span>
-          <span className="min-w-0">
-            <span className="block text-[14px] font-black leading-tight md:text-[15px]">{benefit.title}</span>
-            <span className="mt-0.5 block text-[12px] font-medium leading-snug text-[#60705c] md:text-[13px]">{benefit.body}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-black leading-tight md:text-[16px]">{benefit.title}</span>
+            <span className="mt-0.5 block text-[12.5px] font-semibold leading-snug text-[#60705c] md:text-[13px]">{benefit.body}</span>
           </span>
         </li>
       ))}
@@ -800,6 +801,11 @@ function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRetry }: {
                 <span className="mt-1 block text-[13px] font-black tabular-nums [overflow-wrap:anywhere]">
                   {price ? <>{price.priceString}<span className="text-[11px] font-medium text-[#60705c]">/{id === 'yearly' ? 'year' : 'month'}</span></> : unavailable ? 'Unavailable' : '—'}
                 </span>
+                {id === 'yearly' && price?.pricePerMonthString ? (
+                  <span className="mt-0.5 block text-[11px] font-bold tabular-nums text-[#42682e]">
+                    {price.pricePerMonthString}/month
+                  </span>
+                ) : null}
               </span>
             </label>
           );
@@ -840,52 +846,96 @@ function PlanFooter({ plan, selected, busy, error, onRestore }: {
   );
 }
 
-const COMPARISON_GROUPS = [
-  { title: 'Grow your collection', rows: [
+const COMPARISON_GROUPS: Array<{
+  title: string;
+  icon: 'x2' | 'leap' | 'wardrobe' | 'planner';
+  rows: Array<{ label: string; free: string; plus: string }>;
+}> = [
+  { title: 'Quests & gifts', icon: 'x2', rows: [
     { label: 'Flies from daily quests', free: '1×', plus: '2×' },
     { label: 'Prizes in each gift', free: '1', plus: '2' },
     { label: 'Season Plus reward track', free: '—', plus: 'Included' },
+    { label: 'Golden fly companion', free: '—', plus: 'Included' },
+  ] },
+  { title: 'Habits & Leap', icon: 'leap', rows: [
+    { label: 'Flies from every habit', free: '1×', plus: '2×' },
+    { label: 'Prizes at each new league', free: '1', plus: '2' },
+    { label: 'Weekly league gifts', free: '1', plus: '2' },
+    { label: 'Free Lily Pad', free: '—', plus: '1 / month' },
+    { label: 'Lily Pads you can keep', free: '2', plus: '3' },
+  ] },
+  { title: 'Wardrobe & shop', icon: 'wardrobe', rows: [
     { label: 'Wishlist slots', free: '4', plus: '10' },
     { label: 'Saved looks', free: String(SAVED_LOOKS_FREE), plus: String(SAVED_LOOKS_PLUS) },
-    { label: 'Golden fly companion', free: '—', plus: 'Included' },
     { label: 'Trade reward rerolls', free: 'With ads', plus: 'No ads' },
     { label: 'Daily shop rerolls', free: 'With ads', plus: 'No ads' },
   ] },
-  { title: 'Keep your routine flexible', rows: [
-    { label: 'Free streak-saving Lily Pad', free: '—', plus: '1 / month' },
-    { label: 'Lily Pads you can keep', free: '2', plus: '3' },
-    { label: 'Weekly session moves', free: '1', plus: '2' },
-    { label: 'Mid-week area change', free: '—', plus: 'Included' },
-  ] },
-  { title: 'Make space for your plans', rows: [
+  { title: 'Planning', icon: 'planner', rows: [
     { label: 'Tags for your tasks', free: String(FREE_TAG_LIMIT), plus: String(PREMIUM_TAG_LIMIT) },
   ] },
 ];
 
+function CompareValue({ value, plus = false }: { value: string; plus?: boolean }) {
+  if (value === 'Included') {
+    return (
+      <span className="inline-grid h-6 w-6 place-items-center rounded-full bg-[#f5c451] text-[#493610]">
+        <Check className="h-3.5 w-3.5" strokeWidth={3.5} aria-hidden />
+        <span className="sr-only">Included</span>
+      </span>
+    );
+  }
+  if (value === '—') {
+    return (
+      <span className="text-[#c5cdbf]">
+        <span aria-hidden>—</span>
+        <span className="sr-only">Not included</span>
+      </span>
+    );
+  }
+  return <span className={plus ? 'text-[13px] font-black text-[#77500d]' : ''}>{value}</span>;
+}
+
 function CompareView() {
   return (
     <div className="mx-auto w-full max-w-xl pb-4 pt-2">
-      <h2 className="text-2xl font-black tracking-tight">A little more Frogress.</h2>
-      <p className="mt-1 text-sm text-[#60705c]">Your free experience stays. Plus adds these extras.</p>
-      <table className="mt-5 w-full table-fixed border-separate border-spacing-0 text-left text-[13px]">
-        <caption className="sr-only">Compare free Frogress and Plus benefits</caption>
-        <colgroup><col className="w-[55%]" /><col className="w-[20%]" /><col className="w-[25%]" /></colgroup>
-        <thead><tr>
-          <th scope="col"><span className="sr-only">Benefit</span></th>
-          <th scope="col" className="py-2 text-center text-xs text-[#60705c]">Free</th>
-          <th scope="col" className="rounded-t-xl bg-[#fff0bd] py-2 text-center text-xs text-[#77500d]">Plus</th>
-        </tr></thead>
+      <h2 className="text-[26px] font-black leading-tight tracking-tight">Everything in Plus</h2>
+      <p className="mt-1 text-sm font-medium text-[#60705c]">Your free experience stays. Plus adds these extras and supports our small team.</p>
+
+      <div className="sticky top-0 z-10 -mx-1 mt-4 grid grid-cols-[minmax(0,1fr)_64px_84px] items-end bg-[#fcfcf7] px-1 pb-2 pt-2">
+        <span />
+        <span className="text-center text-[11px] font-black uppercase tracking-[0.08em] text-[#60705c]">Free</span>
+        <span className="flex flex-col items-center gap-0.5 text-[11px] font-black uppercase tracking-[0.08em] text-[#77500d]">
+          <Icon name="frogPlus" className="h-7 w-7" />
+          Plus
+        </span>
+      </div>
+
+      <div className="space-y-3">
         {COMPARISON_GROUPS.map((group) => (
-          <tbody key={group.title}>
-            <tr><th colSpan={3} scope="rowgroup" className="border-b border-[#dce4d5] pb-2 pt-5 text-xs font-black text-[#50733e]">{group.title}</th></tr>
-            {group.rows.map((row) => <tr key={row.label}>
-              <th scope="row" className="border-b border-[#e7ebdf] py-3 pr-2 font-semibold leading-snug">{row.label}</th>
-              <td className="border-b border-[#e7ebdf] px-1 py-3 text-center text-xs font-medium tabular-nums text-[#60705c]">{row.free}</td>
-              <td className="border-b border-[#f0e4be] bg-[#fffaea] px-1 py-3 text-center text-xs font-black tabular-nums text-[#77500d]">{row.plus}</td>
-            </tr>)}
-          </tbody>
+          <section key={group.title} className="overflow-hidden rounded-[20px] border border-[#e3e8dd] bg-white">
+            <h3 className="flex items-center gap-2 px-3.5 pb-1.5 pt-3 text-[13px] font-black text-[#284d38]">
+              <span className="grid h-7 w-7 place-items-center rounded-xl bg-[#edf2e6]">
+                <Icon name={group.icon} className="h-5 w-5" />
+              </span>
+              {group.title}
+            </h3>
+            <table className="w-full table-fixed border-collapse text-left text-[13px]">
+              <caption className="sr-only">{group.title}: Free compared with Plus</caption>
+              <colgroup><col /><col className="w-16" /><col className="w-[84px]" /></colgroup>
+              <thead className="sr-only"><tr><th scope="col">Benefit</th><th scope="col">Free</th><th scope="col">Plus</th></tr></thead>
+              <tbody>
+                {group.rows.map((row) => (
+                  <tr key={row.label} className="border-t border-[#eef1ea]">
+                    <th scope="row" className="py-3 pl-3.5 pr-2 font-semibold leading-snug">{row.label}</th>
+                    <td className="px-1 py-3 text-center text-xs font-semibold tabular-nums text-[#60705c]"><CompareValue value={row.free} /></td>
+                    <td className="bg-[#fff8e1] px-1 py-3 text-center tabular-nums"><CompareValue value={row.plus} plus /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
         ))}
-      </table>
+      </div>
     </div>
   );
 }

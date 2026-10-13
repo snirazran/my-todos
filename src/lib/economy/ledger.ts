@@ -17,6 +17,7 @@ export const FLY_SOURCES = [
   'daily_reward',
   'login_streak',
   'pact',
+  'leap',
   'invite',
   'rewarded_ad',
   'fly_game',

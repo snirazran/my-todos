@@ -18,6 +18,7 @@ const ALREADY_LEDGERED = new Set([
   'focus_session',
   'deep_focus',
   'shop_gift',
+  'leap',
 ]);
 
 /**

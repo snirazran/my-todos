@@ -26,11 +26,11 @@ function headline(offer: ShieldOffer | null) {
   if (!offer) return 'Lily Pad';
   if (offer.reason === 'missed') {
     return offer.system === 'pact'
-      ? 'Your week broke'
+      ? 'Your Leap streak broke'
       : `Your ${offer.atStake}-day streak broke`;
   }
   return offer.system === 'pact'
-    ? 'Nothing is holding your week up'
+    ? 'Nothing is holding your Leap streak up'
     : `Nothing is holding your ${offer.atStake}-day streak up`;
 }
 

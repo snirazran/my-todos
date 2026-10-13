@@ -13,7 +13,7 @@ export const BENEFITS: { icon: IconName; title: string; body: string }[] = [
   },
   {
     icon: 'leap',
-    title: 'Plans that flex with your week',
-    body: 'Move Leap sessions when plans change.',
+    title: 'Double flies from every habit',
+    body: 'Plus a prize at every new Lily league.',
   },
 ];

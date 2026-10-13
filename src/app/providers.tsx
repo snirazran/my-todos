@@ -17,6 +17,7 @@ import { DeepLinkHandler } from '@/components/providers/DeepLinkHandler';
 import { TaskSyncProvider } from '@/components/providers/TaskSyncProvider';
 import { StreakCheckInProvider } from '@/components/providers/StreakCheckInProvider';
 import { CrossGiftProvider } from '@/components/providers/CrossGiftProvider';
+import { LeapHost } from '@/components/leap/LeapHost';
 import { OnboardingGate } from '@/components/providers/OnboardingGate';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { AdPixels } from '@/components/providers/AdPixels';
@@ -68,6 +69,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <BuddyApprovalBanner />
             <DeepLinkHandler />
             <StreakCheckInProvider />
+            <LeapHost />
             <CrossGiftProvider />
             <OnboardingGate />
             <HintCoach />

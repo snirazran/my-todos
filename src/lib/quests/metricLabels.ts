@@ -66,10 +66,10 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
       n === 1 ? '1 more new look to go' : `${n} more new looks to go`,
   },
   focus_tag_linked: {
-    adminLabel: 'Weekly Leaps started',
-    label: (n) => (n === 1 ? "Take this week's Leap" : `Take ${n} Leaps`),
+    adminLabel: 'Leap hops (habit ticks)',
+    label: (n) => (n === 1 ? 'Tick off a habit' : `Tick off ${n} habits`),
     remaining: (n) =>
-      n === 1 ? 'Your Leap is waiting' : `${n} more Leaps to take`,
+      n === 1 ? '1 habit to tick off' : `${n} more habits to tick off`,
   },
   focus_started: {
     adminLabel: 'Focus timers started',
@@ -136,7 +136,7 @@ const METRIC_HINT_COPY: Record<string, string> = {
   skin_equipped:
     'In the Wardrobe, tap an outfit or a background you own to put it on.',
   focus_tag_linked:
-    'Pick this week’s area on the Quests page and commit to one thing.',
+    'Tick off a task that repeats. Every one is a hop toward your Leap.',
   focus_started: 'Start the focus timer on any task. Any length counts.',
   frog_fed_full:
     'Tick off tasks on Home until the belly bar is completely full.',

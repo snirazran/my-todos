@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useSWRConfig } from 'swr';
 import TaskCard, { type SelectModifiers } from './TaskCard';
 import TaskMenu from './TaskMenu';
 import TaskDetailSheet from './TaskDetailSheet';
@@ -16,12 +15,6 @@ import {
   relativeDayLabel,
 } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
-import {
-  LeapSessionDeleteSheet,
-  useLeapDelete,
-  type LeapDeleteImpact,
-} from '@/components/pact/LeapSessionDeleteSheet';
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import Fly from '@/components/ui/fly';
@@ -33,6 +26,7 @@ import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { notifyQuestClaims } from '@/lib/questClaims';
+import { announceLeapHop } from '@/components/leap/leapHopToast';
 import { useLeftTongue } from './LeftTongue';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -345,6 +339,7 @@ export default React.memo(function TaskList({
         .then((json) => {
           refresh();
         void notifyQuestClaims(showNotification);
+        if (completing) announceLeapHop(json?.leap, showNotification);
         if (typeof json?.flyStatus?.balance === 'number') {
           patchInventoryFlies(json.flyStatus.balance);
         }
@@ -489,30 +484,8 @@ export default React.memo(function TaskList({
     ? variantFor(dialog.task)
     : 'regular';
 
-  // Deleting a Leap session changes a goal, a reward and possibly a streak, so
-  // it asks with those numbers in hand before the ordinary delete runs.
-  const { mutate } = useSWRConfig();
-  const leap = useLeapDelete();
-  const [leapPending, setLeapPending] = useState<{
-    impact: LeapDeleteImpact;
-    run: () => Promise<void>;
-  } | null>(null);
-  const [leapPlusOpen, setLeapPlusOpen] = useState(false);
-  const askLeap = (taskIds: string[], run: () => Promise<void>) => {
-    const impact = leap.impactFor(taskIds);
-    if (!impact) return false;
-    setLeapPending({ impact, run });
-    return true;
-  };
-
   const handleDeleteToday = async () => {
     if (!dialog || busy) return;
-    if (
-      dialogVariant === 'weekly' &&
-      askLeap([dialog.task.id], () => runDeleteToday())
-    ) {
-      return;
-    }
     await runDeleteToday();
   };
 
@@ -542,7 +515,6 @@ export default React.memo(function TaskList({
 
   const handleDeleteAll = async () => {
     if (!dialog || busy) return;
-    if (askLeap([dialog.task.id], () => runDeleteAll())) return;
     await runDeleteAll();
   };
 
@@ -562,14 +534,6 @@ export default React.memo(function TaskList({
   // lone weekly task across all weeks.
   const handleDeleteSeries = async () => {
     if (!dialog || busy) return;
-    if (
-      askLeap(
-        leap.seriesIdsFor(dialog.task.id, dialog.task.repeatGroupId),
-        () => runDeleteSeries(),
-      )
-    ) {
-      return;
-    }
     await runDeleteSeries();
   };
 
@@ -1037,31 +1001,6 @@ export default React.memo(function TaskList({
               ? handleDeleteToday
               : undefined
         }
-      />
-
-      <LeapSessionDeleteSheet
-        open={!!leapPending}
-        impact={leapPending?.impact ?? null}
-        busy={busy}
-        onClose={() => setLeapPending(null)}
-        onConfirm={async () => {
-          const pending = leapPending;
-          setLeapPending(null);
-          await pending?.run();
-          void mutate(
-            (key) => typeof key === 'string' && key.startsWith('/api/pact'),
-          );
-        }}
-        onUpgrade={() => {
-          setLeapPending(null);
-          setLeapPlusOpen(true);
-        }}
-      />
-
-      <PlusUpgradeModal
-        open={leapPlusOpen}
-        onClose={() => setLeapPlusOpen(false)}
-        placement="leap_task_delete"
       />
 
       <TaskDetailSheet

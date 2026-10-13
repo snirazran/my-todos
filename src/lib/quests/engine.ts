@@ -100,9 +100,6 @@ const isSeededForUser = (task: {
   isTutorial?: boolean;
 }) => !!task.isStarter || !!task.isSeededPlan || !!task.isTutorial;
 
-/** The onboarding objective that introduces the weekly Leap. */
-const LEAP_ONBOARDING_METRIC = 'focus_tag_linked';
-
 // One swap a day, matching Fortnite's single daily reroll: enough agency that a
 // rolled objective is never an order, not enough to shop for the cheapest one.
 export const DAILY_QUEST_REROLLS_PER_DAY = 1;
@@ -1169,58 +1166,6 @@ function isQuestDocFullyClaimed(doc: {
       (doc.claimedObjectiveIds ?? []).includes(block.id),
     )
   );
-}
-
-/**
- * The Leap is the reward for reaching its own onboarding step. Before that the
- * roster is still teaching the basics, and a "pick your area" banner competing
- * with "finish 1 task" asks a brand-new user to commit to a week before they
- * have finished anything.
- *
- * The step lives inside First Hops rather than being its own quest, so this
- * resolves at objective granularity using the same rule the UI uses to pick the
- * active onboarding objective: the first rewarded block not yet claimed.
- * Reaching it is enough — clearing it is not required, or the very objective
- * telling you to take a Leap would point at something hidden.
- */
-export async function hasReachedLeapOnboardingStep(
-  userId: string,
-): Promise<boolean> {
-  const [templates, docs] = await Promise.all([
-    QuestTemplateModel.find({ isActive: true, placement: 'onboarding' })
-      .sort({ createdAt: 1 })
-      .lean<QuestTemplateDoc[]>(),
-    QuestModel.find({ userId, placement: 'onboarding' })
-      .select('templateId logic claimedObjectiveIds')
-      .lean<
-        { templateId: string; logic?: any[]; claimedObjectiveIds?: string[] }[]
-      >(),
-  ]);
-
-  const rewardedBlocks = (template: QuestTemplateDoc) =>
-    (template.logic ?? []).filter((block) => (block.rewards?.length ?? 0) > 0);
-  const isLeapBlock = (block: { type?: string; metricKey?: string }) =>
-    block.type === 'metric_count' && block.metricKey === LEAP_ONBOARDING_METRIC;
-
-  // A roster that never asks for a Leap must not lock it away forever.
-  if (!templates.some((template) => rewardedBlocks(template).some(isLeapBlock))) {
-    return true;
-  }
-
-  const byTemplate = new Map(docs.map((doc) => [doc.templateId, doc]));
-  for (const template of templates) {
-    const blocks = rewardedBlocks(template);
-    const leapIndex = blocks.findIndex(isLeapBlock);
-    const doc = byTemplate.get(template.templateId);
-    if (leapIndex >= 0) {
-      const claimed = doc?.claimedObjectiveIds ?? [];
-      return blocks
-        .slice(0, leapIndex)
-        .every((block) => claimed.includes(block.id));
-    }
-    if (!doc || !isQuestDocFullyClaimed(doc)) return false;
-  }
-  return true;
 }
 
 function comparableQuestValue(value: unknown): unknown {

@@ -9,6 +9,7 @@ import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
 import {
   CalendarDays,
   Check,
+  ChevronRight,
   Clock,
   Gift,
   Lock,
@@ -56,7 +57,7 @@ import {
 import { SingleRewardCard } from './daily-reward/RewardCard';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
-import { PactAreaPanel } from '@/components/pact/PactAreaPanel';
+import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 
 type QuestsResponse = {
@@ -675,7 +676,6 @@ export function QuestsPanel({
                                 earlyObjectiveSteps={completedEarlyObjectives}
                                 unlockTarget={EARLY_UNLOCK_STEP_TARGET}
                                 dailyGated={!!data.dailyQuestsGated}
-                                leapUnlocked={leapUnlocked}
                                 rewardCatalog={data.rewardCatalog}
                                 isPremium={data.isPremium}
                                 claimingObjectiveId={claimingObjectiveId}
@@ -683,6 +683,7 @@ export function QuestsPanel({
                               />
                             )}
                             {dailyCard}
+                            <LeapLeagueCard />
                             {data.moveToWeb && (
                               <MoveToWebCard
                                 moveToWeb={data.moveToWeb}
@@ -692,7 +693,6 @@ export function QuestsPanel({
                                 onClaim={handleClaimMoveToWeb}
                               />
                             )}
-                            {leapUnlocked && <PactAreaPanel />}
                             {!journeyMode && onboardingQuests.length > 0 && (
                               <SideQuestsCard
                                 quests={onboardingQuests}
@@ -993,21 +993,36 @@ function QuestSeasonBanner({
               </div>
             </>
           )}
-          <div className="relative flex w-[6.25rem] shrink-0 items-center min-[360px]:w-[6.75rem] sm:w-[9.5rem]">
-            <button
-              type="button"
-              onClick={onView}
-              className={cn(
-                'w-full whitespace-nowrap rounded-2xl px-2 pb-3.5 pt-[1.125rem] text-[11px] font-black text-white transition active:translate-y-1 active:shadow-none min-[360px]:px-2.5 min-[360px]:text-[13px] sm:px-5 sm:text-base',
-                season.claimable
-                  ? 'bg-amber-500 shadow-[0_5px_0_#b45309]'
-                  : 'bg-lime-600 shadow-[0_5px_0_#3f6212]',
-              )}
-            >
-              {season.claimable
-                ? 'Claim Rewards'
-                : 'See Rewards'}
-            </button>
+          <div className="relative w-[4.75rem] shrink-0 sm:w-[7.5rem]">
+            <span className={cn('block', season.claimable && 'claim-wobble')}>
+              <button
+                type="button"
+                onClick={onView}
+                aria-label={season.claimable ? 'Claim season rewards' : 'See season rewards'}
+                className={cn(
+                  'relative flex h-[60px] w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl text-white transition active:translate-y-1 active:shadow-none sm:h-[68px]',
+                  season.claimable
+                    ? 'bg-gradient-to-b from-amber-400 to-amber-500 shadow-[0_5px_0_#b45309]'
+                    : 'bg-gradient-to-b from-[#4f9149] to-[#447d3f] shadow-[0_5px_0_#2c511a]',
+                )}
+              >
+                <span
+                  aria-hidden
+                  className="animate-promo-shine pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/45 to-transparent"
+                />
+                <span className="gift-badge-wiggle relative inline-flex">
+                  <Gift className="h-6 w-6 drop-shadow-[0_1px_0_rgba(0,0,0,0.2)] sm:h-7 sm:w-7" strokeWidth={2.5} />
+                </span>
+                <span className="relative text-[12.5px] font-black leading-none drop-shadow-[0_1px_0_rgba(0,0,0,0.2)] sm:text-sm">
+                  {season.claimable ? 'Claim' : 'Rewards'}
+                </span>
+              </button>
+            </span>
+            {season.claimable && season.claimableCount > 0 && (
+              <span className="pointer-events-none absolute -right-1.5 -top-1.5 z-10 grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-black tabular-nums leading-none text-white ring-2 ring-background">
+                {season.claimableCount}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1633,17 +1648,26 @@ function QuestSeasonEventOverlay({
               type="button"
               onClick={onUpgrade}
               aria-label={`Unlock the season Plus reward track. ${waitingPlusTiers > 0 ? `Plus rewards at ${waitingPlusTiers} reached tiers are ready to claim after upgrading.` : 'Earn extra rewards as you complete tasks and reach tiers.'}`}
-              className="plus-upgrade-button pointer-events-auto inline-flex min-h-12 min-w-0 max-w-[240px] items-center gap-2 rounded-2xl border border-amber-200 bg-gradient-to-b from-[#ffdf83] to-[#f3bd48] px-3 py-2 text-left text-[#49320f] shadow-[0_3px_0_#c58c31] transition-[transform,box-shadow] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100 focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-900"
+              style={{ ['--plus-button-base' as string]: '#b7791f' }}
+              className="plus-upgrade-button pointer-events-auto inline-flex h-12 min-w-0 max-w-[236px] items-center gap-2 rounded-full border border-amber-100/90 bg-gradient-to-b from-[#ffe28d] to-[#f2b83d] py-1 pl-1 pr-3 text-left text-[#49320f] hover:brightness-105 focus-visible:outline-none"
             >
-              <Icon name="frogPlus" className="hidden h-9 w-9 shrink-0 min-[400px]:block" />
+              <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/75 ring-1 ring-white">
+                <Icon name="frogPlus" className="h-8 w-8" />
+                {waitingPlusTiers > 0 && (
+                  <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-black tabular-nums leading-none text-white ring-2 ring-[#ffe28d]">
+                    {waitingPlusTiers}
+                  </span>
+                )}
+              </span>
               <span className="min-w-0">
-                <span className="block text-[12px] font-black leading-tight sm:text-sm">Unlock Plus rewards</span>
-                <span className="mt-0.5 block text-[10px] font-semibold leading-tight sm:text-xs">
+                <span className="block text-[14px] font-black leading-tight">Unlock Plus</span>
+                <span className="mt-0.5 block truncate text-[11px] font-bold leading-tight text-[#6b4a12]">
                   {waitingPlusTiers > 0
-                    ? `${waitingPlusTiers} reached ${waitingPlusTiers === 1 ? 'tier' : 'tiers'} ready to claim`
-                    : 'More to collect at every tier'}
+                    ? `${waitingPlusTiers} ${waitingPlusTiers === 1 ? 'tier' : 'tiers'} ready to claim`
+                    : 'More at every tier'}
                 </span>
               </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[#6b4a12]" strokeWidth={3} />
             </button>
           )}
         </div>

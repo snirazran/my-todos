@@ -16,8 +16,8 @@ import QuestStreakConfigModel, {
 } from '@/lib/models/QuestStreakConfig';
 import { getZonedToday } from '@/lib/utils';
 import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
-import { applyPactBonusRewards } from '@/lib/pact/grant';
-import type { PactBonusReward } from '@/lib/pact/types';
+import { applyBonusRewards } from '@/lib/leap/rewards';
+import type { BonusReward } from '@/lib/leap/types';
 import {
   loadShieldConfig,
   readShieldState,
@@ -340,9 +340,9 @@ export function drawRollReward(table: SweepRollEntry[]): SweepReward | null {
 /**
  * A guaranteed rarity the admin pinned to one outfit is just that outfit, so it
  * is handed over as a plain item grant instead of a draw. Left unpinned it goes
- * through as the rarity draw the pact ladder uses.
+ * through as the rarity draw the Leap ladder uses.
  */
-function toPactBonusReward(reward: SweepReward): PactBonusReward {
+function toBonusReward(reward: SweepReward): BonusReward {
   if (reward.type === 'RARITY_ITEM') {
     const { itemId, rarity, amount } = reward as SweepRarityReward;
     if (itemId) {
@@ -350,7 +350,7 @@ function toPactBonusReward(reward: SweepReward): PactBonusReward {
     }
     return { type: 'RARITY_ITEM', rarity, amount };
   }
-  return reward as PactBonusReward;
+  return reward as BonusReward;
 }
 
 export async function claimSweepRoll(args: {
@@ -397,9 +397,9 @@ export async function claimSweepRoll(args: {
 
   const shieldConfig = await loadShieldConfig();
   const flyBalanceBefore = Math.max(0, Number(user.wardrobe?.flies) || 0);
-  const bonus = await applyPactBonusRewards({
+  const bonus = await applyBonusRewards({
     user,
-    rewards: rewards.map(toPactBonusReward),
+    rewards: rewards.map(toBonusReward),
     isPremium,
     doubles: true,
     shieldState: readShieldState(user),

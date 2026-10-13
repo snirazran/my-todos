@@ -64,7 +64,7 @@ export const FIRST_HOPS_QUEST: OnboardingQuestDef = {
       tagMode: 'ignore',
       metricKey: 'focus_tag_linked',
       helpText:
-        'Pick this week’s area on the Quests page and commit to one thing in it.',
+        'Tick off a task that repeats. Every one is a hop toward your Leap.',
       rewards: fixedFlies(15),
     },
   ],

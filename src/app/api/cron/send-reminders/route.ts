@@ -221,51 +221,63 @@ async function countUnclaimedFriendFlies(
   return owed;
 }
 
-/**
- * The week's pact, when it still needs work. Ranks above generic open tasks:
- * a named commitment with a streak on it is the strongest evening message
- * the app has. Returns null when there is nothing pact-shaped to say.
- */
-async function pactMessage(
+async function leapMessage(
   userId: string,
   tz: string,
-  frog: string,
+  slot: 'morning' | 'evening',
 ): Promise<PushMessage | null> {
   try {
-    const { getPactView } = await import('@/lib/pact/engine');
-    const { dowFromYMD } = await import('@/lib/weekStart');
-    const view = await getPactView({ userId, timezone: tz });
-    if (!view.enabled || view.needsAreas) return null;
-    const isWeekStartDay =
-      dowFromYMD(getTodayInTz(tz)) === view.weekStartsOn;
+    const { getLeapView } = await import('@/lib/leap/view');
+    const { view } = await getLeapView({ userId, timezone: tz });
+    if (!view.enabled || view.week.scheduled === 0) return null;
+    const league = (index: number) => view.leagues[index]?.label ?? 'Lily';
 
-    if (!view.active) {
-      // Only nudge on the user's own week-start day. Any other day they can
-      // still start one — we just don't interrupt them about it.
-      if (!isWeekStartDay) return null;
-      return {
-        title: 'A fresh week',
-        body: `Pick one area to push. ${frog} is ready when you are.`,
-        data: { type: 'pact_pick', path: '/' },
-      };
+    if (slot === 'morning') {
+      const result = view.weekResult;
+      if (!result) return null;
+      if (result.outcome === 'up') {
+        return {
+          title: `You moved up to ${league(result.leagueAfter)}`,
+          body: 'Your habits did it. Every hop now pays more.',
+          data: { type: 'leap_day', path: '/quests#leap' },
+        };
+      }
+      if (result.outcome === 'covered') {
+        return {
+          title: 'A Lily Pad caught you',
+          body: `You stay at ${league(result.leagueAfter)}. A fresh week starts now.`,
+          data: { type: 'leap_day', path: '/quests#leap' },
+        };
+      }
+      return null;
     }
 
-    const active = view.active;
-    if (active.progress >= active.target) return null;
-
-    const left = Math.max(1, active.target - active.progress);
-    const title =
-      view.streak.atRisk && view.streak.weeks > 0
-        ? `${view.streak.weeks}-week streak on the line`
-        : `${active.categoryName} this week`;
-    return {
-      title,
-      body:
-        left === 1
-          ? `One left: ${active.commitmentText}`
-          : `${left} left: ${active.commitmentText}`,
-      data: { type: 'pact_reminder', path: '/' },
-    };
+    const { week } = view;
+    if (week.openToday === 0 || week.leap.reached || !week.leap.available) return null;
+    const habits = (n: number) => `${n} habit${n === 1 ? '' : 's'}`;
+    const holdLeft = Math.max(0, week.hold.target - week.hops);
+    if (
+      view.league > 0 &&
+      week.hold.available &&
+      !week.hold.reached &&
+      holdLeft <= week.openToday
+    ) {
+      return {
+        title: `${habits(holdLeft)} to stay at ${league(view.league)}`,
+        body: 'Tick them off tonight and you keep your Lily.',
+        data: { type: 'leap_reminder', path: '/' },
+      };
+    }
+    const left = Math.max(1, week.leap.target - week.hops);
+    const next = view.leagues[view.league + 1]?.label;
+    if (next && left <= Math.min(2, week.openToday)) {
+      return {
+        title: `${habits(left)} to move up`,
+        body: `Land your Leap tonight and ${next} is next.`,
+        data: { type: 'leap_reminder', path: '/' },
+      };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -430,21 +442,18 @@ export async function GET(req: NextRequest) {
         });
         isRoutine = true;
       } else {
-        const pactNudge = await pactMessage(userId, tz, frog);
-        if (pactNudge) {
-          message = pactNudge;
+        const leapNudge = await leapMessage(userId, tz, 'evening');
+        if (leapNudge) {
+          message = leapNudge;
         } else {
           message = routineNudge('evening');
           isRoutine = message !== null;
         }
       }
     } else {
-      // On the first day of the user's own week, the pick nudge takes the
-      // morning slot instead of the routine one — a fresh week is the moment
-      // the ritual is asking for, and it costs no extra notification.
-      const pactNudge = await pactMessage(userId, tz, frog);
-      if (pactNudge && pactNudge.data.type === 'pact_pick') {
-        message = pactNudge;
+      const leapNudge = await leapMessage(userId, tz, 'morning');
+      if (leapNudge) {
+        message = leapNudge;
       } else {
         message = routineNudge('morning');
         isRoutine = message !== null;

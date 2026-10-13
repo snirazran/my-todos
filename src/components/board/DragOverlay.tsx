@@ -1,8 +1,8 @@
 'use client';
 import { motion } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
-import { TaskTimeChip } from '@/components/ui/TaskMeta';
-import { StepPips } from '@/components/ui/TaskAdornments';
+import { TaskMetaLine } from '@/components/ui/TaskMeta';
+import { LeapStageMark, StepPips } from '@/components/ui/TaskAdornments';
 import { ChecklistCheckbox } from './ChecklistEditor';
 import Fly from '@/components/ui/fly';
 
@@ -18,8 +18,8 @@ export default function DragOverlay({
   tags,
   startTime,
   endTime,
-  reminder,
   checklist,
+  taskType,
   bundleCount = 1,
   compact = false,
 }: {
@@ -108,16 +108,15 @@ export default function DragOverlay({
           <span className="min-w-0 flex-1">
             <span className="block break-words text-[16px] font-semibold leading-snug text-foreground md:text-[15px]">
               {text}
+              {taskType === 'weekly' && (
+                <LeapStageMark className="ml-1.5 -translate-y-px" />
+              )}
             </span>
-            {startTime && (
-              <span className="mt-1 flex">
-                <TaskTimeChip
-                  startTime={startTime}
-                  endTime={endTime}
-                  reminder={reminder}
-                />
-              </span>
-            )}
+            <TaskMetaLine
+              tags={tags}
+              startTime={startTime}
+              endTime={endTime}
+            />
             {steps.length > 0 && (
               <span className="mt-0.5 flex h-7 min-w-0 items-center gap-2">
                 <span className="flex w-[22px] shrink-0 justify-center">

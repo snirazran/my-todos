@@ -13,6 +13,8 @@ import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
 import { recordTaskCompleted } from '@/lib/widget/prompt';
+import { announceLeapHop } from '@/components/leap/leapHopToast';
+import type { LeapHopResult } from '@/lib/leap/types';
 import { HUNGER_FULL_SNAP_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 
 // --- Types ---
@@ -571,6 +573,9 @@ export function useTaskData({
               },
               { revalidate: false },
             );
+          }
+          if (nextCompleted) {
+            announceLeapHop(json.leap as LeapHopResult | undefined, showNotification);
           }
         } else {
           throw new Error(json.error || 'Failed to toggle');
@@ -1284,11 +1289,9 @@ export function useTaskData({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId, text: newText, scope, timezone: tz }),
         });
-        // Renaming a whole series restates a Leap's commitment, so the card
-        // quoting it has to refetch.
         if (scope === 'all') {
           void mutate(
-            (key) => typeof key === 'string' && key.startsWith('/api/pact'),
+            (key) => typeof key === 'string' && key.startsWith('/api/leap'),
           );
         }
       } catch (e) {

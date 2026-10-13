@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Sparkles,
   Sprout,
+  Star,
   TriangleAlert,
   Trophy,
   X,
@@ -158,6 +159,17 @@ const REWARD_TILE_TONE: Record<
   },
 };
 
+
+function lightTileTone(tone: { border: string; bg: string; shadow: string }) {
+  const light = (classes: string) =>
+    classes
+      .split(' ')
+      .filter((name) => !name.startsWith('dark:'))
+      .join(' ')
+      .replace('bg-muted', 'bg-white')
+      .replace('border-border/40', 'border-white/70');
+  return { border: light(tone.border), bg: light(tone.bg), shadow: light(tone.shadow) };
+}
 
 // "worth 🪰 190" — the fly with its total, number nudged down to sit level
 // with the fly's visual center.
@@ -1135,8 +1147,8 @@ function SweepOddsPopup({
         </div>
         <p className="mt-2 text-[11px] font-bold leading-tight text-muted-foreground">
           {tab === 'golden'
-            ? `Finish ${sweep.goldenEveryDays} days in a row and you win from here instead.`
-            : 'One prize every day you finish all 3 quests.'}
+            ? `Finish all daily quests ${sweep.goldenEveryDays} days in a row to win from here.`
+            : 'Win one of these each day you finish all daily quests.'}
         </p>
 
         <div className="mt-3 divide-y divide-border/40">
@@ -1167,7 +1179,7 @@ function SweepOddsPopup({
               Every {sweep.megaEveryDays} days in a row
             </p>
             <p className="mt-0.5 text-[12px] font-bold text-foreground">
-              Yours for sure, on top of the golden prize.
+              A guaranteed gift on top of the golden prize.
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {sweep.megaRewards.map((reward, index) => (
@@ -1254,24 +1266,26 @@ function CleanSweepCard({
           <p className="text-[12px] font-black leading-tight text-foreground">
             {sweep.claimable
               ? sweep.nextMega
-                ? 'Mega prize ready!'
+                ? 'Your mega prize is ready'
                 : golden
-                  ? 'Golden prize ready!'
-                  : 'Prize ready!'
+                  ? 'Your golden prize is ready'
+                  : 'Your daily prize is ready'
               : sweep.todayComplete
-                ? 'All 3 done — nice one!'
-                : `${remaining} quest${remaining === 1 ? '' : 's'} to go`}
+                ? 'All daily quests done'
+                : remaining === 1
+                  ? '1 daily quest left'
+                  : 'Finish all daily quests'}
           </p>
           <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
             {sweep.claimable
               ? sweep.nextMega
-                ? 'The golden prize, plus a guaranteed gift'
+                ? 'Golden odds + a guaranteed gift'
                 : golden
-                  ? 'The rare stuff lives in this one'
-                  : 'Open it and see what you got'
+                  ? 'Better odds of rare outfits'
+                  : 'A surprise prize inside'
               : sweep.todayComplete
-                ? 'Fresh quests tomorrow'
-                : `Finish all 3 to win ${sweep.cleanSweepFlies} flies + a prize`}
+                ? 'New quests tomorrow'
+                : `Win ${sweep.cleanSweepFlies} flies + a surprise prize`}
           </p>
         </div>
 
@@ -1376,38 +1390,48 @@ function SweepStreakCard({
         />
 
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[12px] font-black leading-tight text-foreground">
-            {sweep.count === 0
-              ? 'Start a streak'
-              : `${sweep.count}-day streak`}
-            {goldenNext && (
-              <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[11px] font-black tracking-wide text-amber-950">
-                {megaNext ? 'Mega next' : 'Golden next'}
-              </span>
-            )}
+          <p className="text-[12px] font-black leading-tight text-foreground">
+            {megaNext
+              ? 'Mega prize next'
+              : goldenNext
+                ? 'Golden prize next'
+                : `Golden prize in ${sweep.sweepsToGolden} days`}
           </p>
           <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
-            {megaNext
-              ? 'Finish today for the mega prize'
-              : goldenNext
-                ? 'Finish today for a golden prize'
-                : `${sweep.sweepsToGolden} days in a row = a golden prize`}
+            {goldenNext
+              ? 'Finish all daily quests to win it'
+              : sweep.count === 0
+                ? `Finish all daily quests ${every} days in a row`
+                : 'Finish all daily quests every day'}
           </p>
         </div>
 
         {every <= 7 ? (
           <div className="flex shrink-0 items-center gap-1" aria-hidden>
-            {Array.from({ length: every }, (_, i) => (
-              <span
-                key={i}
-                className={cn(
-                  'h-2 w-4 rounded-full',
-                  i < cycleDay
-                    ? 'bg-amber-400'
-                    : 'border border-border/60 bg-muted',
-                )}
-              />
-            ))}
+            {Array.from({ length: every }, (_, i) =>
+              i === every - 1 ? (
+                <Star
+                  key={i}
+                  className={cn(
+                    'h-4 w-4',
+                    i < cycleDay
+                      ? 'fill-amber-400 text-amber-500'
+                      : 'fill-amber-100 text-amber-400 dark:fill-amber-500/20',
+                  )}
+                  strokeWidth={2.5}
+                />
+              ) : (
+                <span
+                  key={i}
+                  className={cn(
+                    'h-2 w-4 rounded-full',
+                    i < cycleDay
+                      ? 'bg-amber-400'
+                      : 'border border-border/60 bg-muted',
+                  )}
+                />
+              ),
+            )}
           </div>
         ) : (
           <span className="shrink-0 text-[11px] font-black tabular-nums text-amber-600 dark:text-amber-400">
@@ -1648,7 +1672,6 @@ export function JourneyCard({
   earlyObjectiveSteps,
   unlockTarget,
   dailyGated,
-  leapUnlocked,
   rewardCatalog,
   isPremium,
   claimingObjectiveId,
@@ -1658,7 +1681,6 @@ export function JourneyCard({
   earlyObjectiveSteps: number;
   unlockTarget: number;
   dailyGated: boolean;
-  leapUnlocked: boolean;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   claimingObjectiveId?: string | null;
@@ -1666,7 +1688,6 @@ export function JourneyCard({
 }) {
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
   const steps: Extract<JourneyItem, { kind: 'step' }>[] = [];
-  let firstHopsEnd = -1;
   for (const quest of quests) {
     const claimedIds = quest.claimedObjectiveIds ?? [];
     for (const block of quest.logic) {
@@ -1679,7 +1700,6 @@ export function JourneyCard({
         done: isObjectiveDone(block, claimedIds),
       });
     }
-    if (quest.id.startsWith('onboard:first-hops')) firstHopsEnd = steps.length - 1;
   }
   if (steps.length === 0) return null;
 
@@ -1694,17 +1714,6 @@ export function JourneyCard({
 
   steps.forEach((step, index) => {
     items.push(step);
-    if (index === firstHopsEnd && !leapUnlocked) {
-      items.push({
-        kind: 'gate',
-        key: 'gate-leap',
-        title: 'The Leap unlocks',
-        detail: 'A weekly promise, bonus flies',
-        unlocked: false,
-        stepsAway: steps.slice(0, index + 1).filter((s) => !s.done).length,
-        icon: <Icon name="leap" className="h-6 w-6" />,
-      });
-    }
     if (index === dailyGateAfter) {
       items.push({
         kind: 'gate',
@@ -2495,6 +2504,7 @@ export const RewardTile = memo(function RewardTile({
   flySize,
   flyOversample,
   still = false,
+  lightTone = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -2515,6 +2525,7 @@ export const RewardTile = memo(function RewardTile({
   flyOversample?: number;
   /** Draw outfits as a one-frame snapshot instead of a live Rive frog. */
   still?: boolean;
+  lightTone?: boolean;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -2522,13 +2533,14 @@ export const RewardTile = memo(function RewardTile({
   const lookupId = reward.itemId ?? reward.backgroundId;
   const item = lookupId ? rewardCatalog[lookupId] : null;
   const isShield = reward.type === 'SHIELD';
-  const tone = item
+  const baseTone = item
     ? REWARD_TILE_TONE[item.rarity]
     : reward.type === 'FLIES'
       ? REWARD_TILE_TONE.flies
       : isShield
         ? REWARD_TILE_TONE.uncommon
         : REWARD_TILE_TONE.default;
+  const tone = lightTone ? lightTileTone(baseTone) : baseTone;
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
   const previewIndices = item
     ? {

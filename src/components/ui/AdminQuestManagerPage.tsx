@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/Icon';
-import { AdminPactManager } from '@/components/ui/AdminPactManager';
+import { AdminLeapManager } from '@/components/ui/AdminLeapManager';
 import { AdminSeasonManager } from '@/components/ui/AdminSeasonManager';
 import {
   AdminStarterPlanConfigCard,
@@ -789,11 +789,11 @@ export function AdminQuestManagerPage() {
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
-        <p className="mt-5 text-lg font-black text-foreground">Weekly Leap</p>
-        <p className="mt-1 text-sm text-muted-foreground">One area a week, written into the user&apos;s real task list.</p>
+        <p className="mt-5 text-lg font-black text-foreground">Areas &amp; Leap</p>
+        <p className="mt-1 text-sm text-muted-foreground">Focus areas, the starter plan, and the Leap: hops, marks, streak and Lilies.</p>
         <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
         <p className="text-xs text-muted-foreground">
-          focus area{adminCategories.length !== 1 ? 's' : ''} · ideas, rewards, shields
+          focus area{adminCategories.length !== 1 ? 's' : ''} · Leap rewards
         </p>
       </button>
 
@@ -1015,7 +1015,7 @@ export function AdminQuestManagerPage() {
               </p>
               <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
                 Auto-consumes on a miss — never equipped, never armed. Protects
-                the login streak and the weekly leap. It is not sold in the
+                the login streak and the Leap streak. It is not sold in the
                 shop: the only place to buy one is the offer that appears when a
                 user holds none and has something on the line.
               </p>
@@ -1089,13 +1089,6 @@ export function AdminQuestManagerPage() {
               'Free ones handed to Plus each calendar month. 0 turns it off.',
               0,
               capMax,
-            )}
-            {shieldField(
-              'Earn every N Leap weeks',
-              'earnEveryPactWeeks',
-              'Kept weeks that hand one back. 0 (the default) turns it off — the Leap milestones issue Lily Pads now, and against this cap a second faucet oversupplies.',
-              0,
-              52,
             )}
           </div>
 
@@ -2546,8 +2539,6 @@ export function AdminQuestManagerPage() {
     );
   };
 
-  // Focus areas and the weekly leap are one screen: an area only exists so a
-  // pact can be made in it, so authoring them apart invited them to drift.
   const renderPact = () => (
     <div className="space-y-8">
       <AdminStarterPlanConfigCard />
@@ -2557,7 +2548,7 @@ export function AdminQuestManagerPage() {
           <div>
             <p className="text-sm font-black text-foreground">Focus areas</p>
             <p className="text-xs text-muted-foreground">
-              The areas a user picks between each week.
+              The areas a user picks at onboarding. They seed the starter plan and the area quests.
             </p>
           </div>
           <Button size="sm" className="rounded-xl" onClick={() => openCategoryDialog()}>
@@ -2633,7 +2624,7 @@ export function AdminQuestManagerPage() {
       </div>
       </div>
 
-      <AdminPactManager />
+      <AdminLeapManager />
     </div>
   );
 
@@ -2862,7 +2853,7 @@ export function AdminQuestManagerPage() {
           <h1 className="text-2xl font-black tracking-tight text-foreground">
             {view === 'home' && 'Quest Manager'}
             {view === 'daily' && 'Daily Quests'}
-            {view === 'pact' && 'Weekly Leap'}
+            {view === 'pact' && 'Areas & Leap'}
             {view === 'onboarding' && 'Onboarding Quests'}
             {view === 'streaks' && 'Streak Manager'}
             {view === 'shields' && 'Shields'}

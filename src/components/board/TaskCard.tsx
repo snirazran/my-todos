@@ -8,15 +8,16 @@ import React, {
   useState,
 } from 'react';
 import {
-  CalendarDays,
   CheckCircle2,
   Plus,
   Check,
-  Timer,
 } from 'lucide-react';
-import { TaskTimeChip } from '@/components/ui/TaskMeta';
+import { TaskMetaLine } from '@/components/ui/TaskMeta';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
-import { StreakPill, formatFocusSpan } from '@/components/ui/TaskAdornments';
+import {
+  LeapStageMark,
+  StreakPill,
+} from '@/components/ui/TaskAdornments';
 import { StepsStrip } from '@/components/ui/TaskSteps';
 import { checklistPayout } from '@/lib/checklist';
 import type { Task } from './helpers';
@@ -498,6 +499,16 @@ export default function TaskCard({
             }`}
           >
             {task.text}
+            {isRepeating && (
+              <LeapStageMark className="ml-1.5 -translate-y-px" />
+            )}
+            {streak > 0 && (
+              <StreakPill
+                count={streak}
+                size="sm"
+                className="ml-1.5 translate-y-[-1px] align-middle"
+              />
+            )}
           </span>
           {task.isTutorial && (
             <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary">
@@ -505,34 +516,15 @@ export default function TaskCard({
             </span>
           )}
         </span>
-        {streak > 0 ||
-        task.startTime ||
-        (!isDone && timerPhase) ||
-        task.calendarEventId ||
-        focusSeconds > 0 ? (
-          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            {streak > 0 && <StreakPill count={streak} size="sm" />}
-            <TaskTimeChip
-              startTime={task.startTime}
-              endTime={task.endTime}
-              reminder={task.reminder}
-              isDone={isDone}
-              activePhase={!isDone && timerPhase ? timerPhase : null}
-            />
-            {task.calendarEventId && (
-              <CalendarDays
-                aria-label="From your calendar"
-                className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
-              />
-            )}
-            {focusSeconds > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
-                <Timer className="h-3.5 w-3.5" />
-                {formatFocusSpan(focusSeconds)}
-              </span>
-            )}
-          </span>
-        ) : null}
+        <TaskMetaLine
+          tags={tags}
+          startTime={task.startTime}
+          endTime={task.endTime}
+          isDone={isDone}
+          activePhase={!isDone && timerPhase ? timerPhase : null}
+          fromCalendar={!!task.calendarEventId}
+          focusSeconds={focusSeconds}
+        />
         <BuddyLine
           className="mt-0.5"
           taskId={task.id}

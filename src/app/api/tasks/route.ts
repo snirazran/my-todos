@@ -6,11 +6,8 @@ import { requireUserId } from '@/lib/auth';
 import { Types } from 'mongoose';
 import { v4 as uuid } from 'uuid';
 import connectMongo from '@/lib/mongoose';
-import { syncPactCommitmentText } from '@/lib/pact/renameCommitment';
-import {
-  applyPactTaskRemoval,
-  type PactTaskRemovalResult,
-} from '@/lib/pact/taskLifecycle';
+import { creditLeapHops } from '@/lib/leap/view';
+import type { LeapHopResult } from '@/lib/leap/types';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import TaskModel, {
   type TaskDoc,
@@ -2454,9 +2451,6 @@ export async function PUT(req: NextRequest) {
   // New: Handle text update
   if (typeof body.text === 'string' && body.text.trim()) {
     await scopeApply({ $set: { text: body.text } });
-    if (body.scope === 'all' && taskId) {
-      await syncPactCommitmentText({ userId: uid, taskId, text: body.text });
-    }
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
@@ -2613,6 +2607,20 @@ export async function PUT(req: NextRequest) {
     milestone = result?.paid ?? undefined;
     milestonesQueued = result?.queued ?? 0;
   }
+  let leap: LeapHopResult | null = null;
+  if (
+    completed &&
+    !alreadyCompletedForDate &&
+    doc.type === 'weekly' &&
+    !lateForStreak
+  ) {
+    leap = await creditLeapHops({ userId: uid, timezone: tz }).catch(
+      (error) => {
+        console.error('Leap hop failed:', error);
+        return null;
+      },
+    );
+  }
   let streakExtended = false;
   if (completed && !alreadyCompletedForDate && isTodayCompletion) {
     const extension = await extendStreakForCompletion({
@@ -2669,6 +2677,7 @@ export async function PUT(req: NextRequest) {
     jar,
     milestone,
     milestonesQueued: milestonesQueued || undefined,
+    leap: leap ?? undefined,
     lateForStreak: lateForStreak && doc.type === 'weekly' ? true : undefined,
   }, streakExtended ? { headers: { [STREAK_EXTENDED_HEADER]: '1' } } : undefined);
 }
@@ -2744,13 +2753,6 @@ export async function DELETE(req: NextRequest) {
       ? { userId: uid, repeatGroupId: doc.repeatGroupId }
       : { userId: uid, id: body.taskId };
     const seriesDocs = await TaskModel.find(seriesFilter).lean<TaskDoc[]>();
-    // Before anything is removed: a Leap reads its own tasks to decide what
-    // this deletion costs the week, and nothing can be read once they are gone.
-    const pactChange = await applyPactTaskRemoval({
-      userId: uid,
-      timezone: tz,
-      taskIds: seriesDocs.map((s) => s.id),
-    });
     const now = new Date();
     const toInsert: Record<string, unknown>[] = [];
     for (const s of seriesDocs) {
@@ -2808,7 +2810,7 @@ export async function DELETE(req: NextRequest) {
     await recordTaskDeleted(uid, seriesDocs, 'series');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true, pact: pactChange });
+    return NextResponse.json({ ok: true });
   }
 
   if (body && Object.prototype.hasOwnProperty.call(body, 'day'))
@@ -2826,11 +2828,6 @@ export async function DELETE(req: NextRequest) {
     )
       .lean<TaskDoc>()
       .exec();
-    const pactChange = await applyPactTaskRemoval({
-      userId: uid,
-      timezone: tz,
-      taskIds: [taskId],
-    });
     if (doc?.type === 'regular') {
       await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
       if (doc.bondId) await severBond(doc.bondId, uid);
@@ -2843,7 +2840,7 @@ export async function DELETE(req: NextRequest) {
     }
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true, pact: pactChange });
+    return NextResponse.json({ ok: true });
   }
   const { date, taskId } = body ?? {};
   if (!date || !taskId)
@@ -2858,11 +2855,6 @@ export async function DELETE(req: NextRequest) {
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   if (doc.type === 'weekly') {
-    const pactChange = await applyPactTaskRemoval({
-      userId: uid,
-      timezone: tz,
-      taskIds: [taskId],
-    });
     await TaskModel.updateOne(
       { userId: uid, id: taskId },
       { $addToSet: { suppressedDates: date } },
@@ -2870,7 +2862,7 @@ export async function DELETE(req: NextRequest) {
     await recordTaskDeleted(uid, [doc], 'occurrence');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true, pact: pactChange });
+    return NextResponse.json({ ok: true });
   }
   if (doc.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, id: taskId, date });
@@ -4069,13 +4061,7 @@ async function handleBoardDelete(
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
-  let pactChange: PactTaskRemovalResult | undefined;
   if (doc?.type === 'weekly') {
-    pactChange = await applyPactTaskRemoval({
-      userId: uid,
-      timezone: tz,
-      taskIds: [taskId],
-    });
     await TaskModel.updateOne(
       { userId: uid, type: doc.type, id: taskId },
       { $set: { deletedAt: new Date() } },
@@ -4091,7 +4077,7 @@ async function handleBoardDelete(
   if (doc?.bondId) await severBond(doc.bondId, uid);
   await syncGamification(uid, tz);
   await notifyTaskChanged(uid);
-  return NextResponse.json({ ok: true, pact: pactChange });
+  return NextResponse.json({ ok: true });
 }
 
 async function nextOrderForDay(userId: string, weekday: Weekday, date: string) {

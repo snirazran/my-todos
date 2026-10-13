@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { QuestReward } from '@/lib/quests/types';
-import type { PactRarity, PactShieldReward } from '@/lib/pact/types';
+import type { BonusRarity, ShieldReward } from '@/lib/leap/types';
 
 /**
  * A guaranteed rarity. `itemId` pins it to one outfit; without it the tier is
@@ -9,18 +9,18 @@ import type { PactRarity, PactShieldReward } from '@/lib/pact/types';
  */
 export type SweepRarityReward = {
   type: 'RARITY_ITEM';
-  rarity: PactRarity;
+  rarity: BonusRarity;
   amount?: number;
   itemId?: string;
 };
 
 /**
- * What one outcome on a Reward Roll table pays. Mostly the pact bonus
+ * What one outcome on a Reward Roll table pays. Mostly the bonus reward
  * vocabulary — it already covers the two entries the plain quest reward type
  * cannot express, a Lily Pad and a guaranteed-rarity draw, and
- * `applyPactBonusRewards` already knows how to grant all of them.
+ * `applyBonusRewards` already knows how to grant all of them.
  */
-export type SweepReward = QuestReward | PactShieldReward | SweepRarityReward;
+export type SweepReward = QuestReward | ShieldReward | SweepRarityReward;
 
 /** `chance` is a percentage of the table; the table is normalised by its sum. */
 export type SweepRollEntry = {

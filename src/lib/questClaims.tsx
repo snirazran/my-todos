@@ -13,7 +13,7 @@ import {
   type RevealCatalog,
 } from '@/components/ui/questRewardReveal';
 import { useDismissNotification } from '@/components/providers/NotificationProvider';
-import { pactViewKey } from '@/lib/pact/viewKey';
+import { leapViewKey } from '@/lib/leap/viewKey';
 import { useUIStore } from '@/lib/uiStore';
 import type { RatingMoment } from '@/lib/rateApp';
 
@@ -99,7 +99,7 @@ export function sweepClaimLabels(claimable: Claimable) {
         ? 'Mega prize ready'
         : claimable.sweepTier === 'golden'
           ? 'Golden prize ready'
-          : 'Prize ready';
+          : 'Daily prize ready';
   return {
     pending,
     eyebrow,
@@ -241,7 +241,7 @@ function syncLeapUnlock(data: HomeData): void {
     data.claimables.some((entry) => entry.placement === 'onboarding') ||
     data.trackables.some((entry) => entry.placement === 'onboarding');
   if (!rosterRunning) return;
-  void mutate(pactViewKey());
+  void mutate(leapViewKey());
 }
 
 // Silently re-sync the home-view cache and baselines after quest state
@@ -409,12 +409,14 @@ export function QuestRewardTileBadge({
   catalog,
   isPremium,
   small,
+  light,
 }: {
   reward?: any;
   rewards?: any[];
   catalog: Catalog;
   isPremium: boolean;
   small?: boolean;
+  light?: boolean;
 }) {
   const all = (rewards?.length ? rewards : reward ? [reward] : []).filter(
     Boolean,
@@ -446,6 +448,7 @@ export function QuestRewardTileBadge({
               flySize={small ? 28 : 30}
               flyOversample={1.25}
               giftAnimation={i === 0 ? 'box_shake' : undefined}
+              lightTone={light}
             />
             {hasRewardQuantityBadge(item) && (
               <span
@@ -879,6 +882,7 @@ function ClaimRewardToast({
         rewards={claimable.rewards}
         catalog={catalog}
         isPremium={isPremium}
+        light
       />
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="truncate text-[13px] font-black text-foreground">
@@ -886,14 +890,14 @@ function ClaimRewardToast({
         </span>
         {claimable.kind === 'objective' ? (
           <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-emerald-500" />
+            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-lime-300" />
             <span className="min-w-0 flex-1 truncate">
               <ObjectiveLabel label={claimable.objectiveLabel} strikeText />
             </span>
           </span>
         ) : claimable.kind === 'sweep' ? (
           <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-emerald-500" />
+            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-lime-300" />
             <span className="min-w-0 flex-1 truncate">
               {sweepClaimLabels(claimable).title}
             </span>

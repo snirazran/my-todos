@@ -108,8 +108,8 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'When an objective is complete, a Claim button appears. Daily rewards can be claimed once their day arrives.',
       },
       {
-        q: 'What is the weekly leap?',
-        a: 'Each week you pick one life area and one thing you will actually do. We add it to your task list at the times you choose, and you keep a weekly streak for every week you finish it. One area at a time is the point — it is what makes the habit stick.',
+        q: 'What is a Leap?',
+        a: 'Leap is your weekly habit league. Every task that repeats is a habit, and every one you tick off pays flies right away, sometimes with a gift. Finish enough habits in a week to reach the promotion zone and you advance to the next league: Lily Leaf, Lily Bud, Lily Bloom, Lily Bouquet, then Lily Garden. Each league has its own prizes, and higher leagues pay more for every habit. Finish too few and you land in the demotion zone and drop one league, unless a Lily Pad saves you. Tap any lily on the Leap card to see its prizes.',
       },
     ],
   },

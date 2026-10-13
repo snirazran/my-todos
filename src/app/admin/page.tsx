@@ -207,10 +207,10 @@ function AdminPageContent() {
   const handleResetPacts = () =>
     runConfirmed(
       'reset-pacts',
-      '/api/admin/reset-pacts',
+      '/api/admin/reset-leap',
       { method: 'POST', credentials: 'include' },
       () => {
-        mutate((key) => typeof key === 'string' && key.startsWith('/api/pact'));
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/leap'));
         window.location.reload();
       },
     );
@@ -314,7 +314,7 @@ function AdminPageContent() {
               icon={<FlaskConical className="w-5 h-5" />}
               accent="bg-teal-500/10 text-teal-600 dark:text-teal-400"
               title="Leap Lab"
-              description="Every Leap state and its popups, rendered by the real card. Read-only."
+              description="Every Leap surface, toast and recap with sample data. Read-only."
             />
             <ManagerLinkCard
               href="/admin/popups"
@@ -427,10 +427,10 @@ function AdminPageContent() {
               accent="bg-sky-500/10 text-sky-600 dark:text-sky-400"
               warningAccent="bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-900 text-sky-600 dark:text-sky-400"
               title="Reset Leaps"
-              description="Delete every Leap, its scheduled tasks, and the streak"
+              description="Clear your Leap streak, weeks and Lily progress"
               isConfirming={confirmAction === 'reset-pacts'}
               loading={loading === 'reset-pacts'}
-              warningText="Warning: This deletes every Leap, removes the session tasks they wrote to your list, and clears your Leap streak, shields and swaps. Click again to confirm."
+              warningText="Warning: This clears your Leap streak, every recorded Leap week, your Lily progress and old weekly-pact history. Your tasks stay. Click again to confirm."
               onClick={handleResetPacts}
             />
             <ConfirmActionRow

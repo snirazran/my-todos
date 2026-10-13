@@ -21,10 +21,7 @@ import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useIntros } from '@/hooks/useIntros';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
-import {
-  BellyFullIntroSheet,
-  SavedTaskIntroSheet,
-} from '@/components/ui/FirstTimeIntros';
+import { SavedTaskIntroSheet } from '@/components/ui/FirstTimeIntros';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -90,8 +87,7 @@ import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import { useFirstRun } from '@/hooks/useFirstRun';
 import { useQuestRevealQueueLength } from '@/components/ui/questRewardReveal';
-import { PactCard } from '@/components/pact/PactCard';
-import { pactViewKey } from '@/lib/pact/viewKey';
+import { leapViewKey } from '@/lib/leap/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
@@ -215,8 +211,6 @@ export default function HomeDashboard() {
   /* State */
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [isBacklogOpen, setIsBacklogOpen] = useState(false);
-  const [bellyIntroOpen, setBellyIntroOpen] = useState(false);
-  const scheduledBellyIntroRef = useRef(false);
   const [savedIntroOpen, setSavedIntroOpen] = useState(false);
   const {
     filters,
@@ -306,31 +300,6 @@ export default function HomeDashboard() {
     window.addEventListener(TASK_SAVED_EVENT, onSaved);
     return () => window.removeEventListener(TASK_SAVED_EVENT, onSaved);
   }, [user]);
-
-  // First time the belly is full (wherever it was filled — planner completes
-  // count too), explain the hunger mechanic on the next home visit.
-  useEffect(() => {
-    if (!user || bellyIntroOpen) return;
-    if (!seenIntros || seenIntros.bellyFull) return;
-    const max = hungerStatus.maxHunger;
-    if (!max || hungerStatus.hunger < max) return;
-    if (scheduledBellyIntroRef.current) return;
-    scheduledBellyIntroRef.current = true;
-    whenScreenIsFree(
-      () => {
-        setBellyIntroOpen(true);
-        markIntroSeen('bellyFull');
-      },
-      { initialDelayMs: 1200 },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    user,
-    bellyIntroOpen,
-    seenIntros,
-    hungerStatus.hunger,
-    hungerStatus.maxHunger,
-  ]);
 
   useEffect(() => {
     const persistApi = useFrogodoroStore.persist;
@@ -701,7 +670,7 @@ export default function HomeDashboard() {
         await toggleTask(taskId, false);
         await mutateQuests();
         void swrMutate(getQuestsUrl(timezone));
-        void swrMutate(pactViewKey(timezone));
+        void swrMutate(leapViewKey(timezone));
       } else {
         persistGuestTask(taskId, false);
       }
@@ -759,7 +728,7 @@ export default function HomeDashboard() {
           await toggleTask(taskId, true);
           await mutateQuests();
           void swrMutate(getQuestsUrl(timezone));
-          void swrMutate(pactViewKey(timezone));
+          void swrMutate(leapViewKey(timezone));
         } else {
           persistGuestTask(taskId, true);
         }
@@ -964,7 +933,6 @@ export default function HomeDashboard() {
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
-              onPress={user ? () => setBellyIntroOpen(true) : undefined}
               className="rounded-[19px] md:h-auto md:min-h-12 md:w-[300px] md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
             />
             {user && (
@@ -1005,7 +973,6 @@ export default function HomeDashboard() {
           >
             <div className="flex w-full flex-col gap-2 md:gap-5">
               {!firstRun.active && <GuestAccountBanner />}
-              {user && !firstRun.active && <PactCard />}
               <div
                 className={taskListHidden ? 'pb-16 md:pb-4' : 'min-h-[360px] pb-16 md:pb-4'}
                 ref={taskListRef}
@@ -1557,11 +1524,6 @@ export default function HomeDashboard() {
           <Plus className="h-6 w-6 stroke-[3]" />
         </button>
       </div>
-
-      <BellyFullIntroSheet
-        open={bellyIntroOpen}
-        onClose={() => setBellyIntroOpen(false)}
-      />
 
       <SavedTaskIntroSheet
         open={savedIntroOpen}

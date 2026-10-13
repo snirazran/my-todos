@@ -1,11 +1,9 @@
 import {
-  CalendarDays,
   Check,
   CheckCircle2,
   ChevronDown,
   Circle,
   EllipsisVertical,
-  Timer,
   CalendarCheck,
   CalendarClock,
   Filter,
@@ -17,8 +15,12 @@ import {
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
-import { TaskTimeChip, TaskTrailingMeta } from '@/components/ui/TaskMeta';
-import { StepPips, StreakPill, formatFocusSpan } from '@/components/ui/TaskAdornments';
+import { TaskMetaLine } from '@/components/ui/TaskMeta';
+import {
+  LeapStageMark,
+  StepPips,
+  StreakPill,
+} from '@/components/ui/TaskAdornments';
 import { StepsStrip } from '@/components/ui/TaskSteps';
 import {
   hapticGrab,
@@ -43,7 +45,7 @@ import {
   playTaskEntrance,
 } from '@/lib/taskEntrance';
 import { useRouter } from 'next/navigation';
-import useSWR, { useSWRConfig } from 'swr';
+import useSWR from 'swr';
 import {
   DndContext,
   closestCenter,
@@ -77,12 +79,6 @@ import {
   type AnimateLayoutChanges,
 } from '@dnd-kit/sortable';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
-import {
-  LeapSessionDeleteSheet,
-  useLeapDelete,
-  type LeapDeleteImpact,
-} from '@/components/pact/LeapSessionDeleteSheet';
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
 import TaskDetailSheet from '../board/TaskDetailSheet';
@@ -256,20 +252,23 @@ function TaskDragPreview({
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="text-[17px] font-semibold leading-snug text-foreground md:text-[17.5px]">
             {task.text}
+            {task.type === 'weekly' && (
+              <LeapStageMark className="ml-1.5 -translate-y-px" />
+            )}
+            {(task.streak ?? 0) > 0 && (
+              <StreakPill
+                count={task.streak ?? 0}
+                size="sm"
+                className="ml-1.5 translate-y-[-1px] align-middle"
+              />
+            )}
           </span>
         </span>
-        {((task.streak ?? 0) > 0 || task.startTime) && (
-          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            {(task.streak ?? 0) > 0 && (
-              <StreakPill count={task.streak ?? 0} size="sm" />
-            )}
-            <TaskTimeChip
-              startTime={task.startTime}
-              endTime={task.endTime}
-              reminder={task.reminder}
-            />
-          </span>
-        )}
+        <TaskMetaLine
+          tags={tags}
+          startTime={task.startTime}
+          endTime={task.endTime}
+        />
         <BuddyLine
           className="mt-0.5"
           taskId={task.id}
@@ -296,7 +295,6 @@ function TaskDragPreview({
           </span>
         )}
       </span>
-      <TaskTrailingMeta tags={tags} />
       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-12 md:w-12">
         <Fly size={40} y={-3} paused interactive={false} alwaysPlay />
       </span>
@@ -1029,39 +1027,28 @@ const TaskRowBody = React.memo(function TaskRowBody(
                     transition={{ duration: 0.2 }}
                   >
                     {task.text}
-                  </motion.span>
-                </span>
-                {((task.streak ?? 0) > 0 && !isDone) ||
-                task.startTime ||
-                (!isDone && timerPhase) ||
-                task.calendarEventId ||
-                focusSecondsToday > 0 ? (
-                  <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                    {(task.streak ?? 0) > 0 && !isDone && (
-                      <StreakPill count={task.streak ?? 0} size="sm" />
+                    {isRepeating && !isDone && (
+                      <LeapStageMark className="ml-1.5 -translate-y-px" />
                     )}
-                    <TaskTimeChip
-                      startTime={task.startTime}
-                      endTime={task.endTime}
-                      reminder={task.reminder}
-                      isNext={isNextTimed}
-                      isDone={isDone}
-                      activePhase={!isDone && timerPhase ? timerPhase : null}
-                    />
-                    {task.calendarEventId && (
-                      <CalendarDays
-                        aria-label="From your calendar"
-                        className="h-3.5 w-3.5 text-blue-500/80 dark:text-blue-400/80"
+                    {(task.streak ?? 0) > 0 && !isDone && (
+                      <StreakPill
+                        count={task.streak ?? 0}
+                        size="sm"
+                        className="ml-1.5 translate-y-[-1px] align-middle"
                       />
                     )}
-                    {focusSecondsToday > 0 && (
-                      <span className="inline-flex items-center gap-0.5 text-[12px] font-bold tabular-nums text-primary/80">
-                        <Timer className="h-3.5 w-3.5" />
-                        {formatFocusSpan(focusSecondsToday)}
-                      </span>
-                    )}
-                  </span>
-                ) : null}
+                  </motion.span>
+                </span>
+                <TaskMetaLine
+                  tags={metaTags}
+                  startTime={task.startTime}
+                  endTime={task.endTime}
+                  isNext={isNextTimed}
+                  isDone={isDone}
+                  activePhase={!isDone && timerPhase ? timerPhase : null}
+                  fromCalendar={!!task.calendarEventId}
+                  focusSeconds={focusSecondsToday}
+                />
 
                 <BuddyLine
                   className="mt-0.5"
@@ -1140,11 +1127,6 @@ const TaskRowBody = React.memo(function TaskRowBody(
                 )}
               </div>
             )}
-
-            <TaskTrailingMeta
-              className={`relative z-10 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-50' : ''}`}
-              tags={metaTags}
-            />
 
             {/* Completion indicator (right) — only this toggles completion */}
             <div
@@ -2047,37 +2029,11 @@ export default function TaskList({
     return weeklyIds.has(t.id) ? 'weekly' : 'regular';
   };
 
-  // Deleting a Leap session changes a goal, a reward and possibly a streak, so
-  // it asks with those numbers in hand before the ordinary delete runs.
-  const { mutate: mutateSWR } = useSWRConfig();
-  const leap = useLeapDelete();
-  const [leapPending, setLeapPending] = useState<{
-    impact: LeapDeleteImpact;
-    run: () => Promise<void>;
-  } | null>(null);
-  const [leapPlusOpen, setLeapPlusOpen] = useState(false);
-  const askLeap = (taskIds: string[], run: () => Promise<void>) => {
-    const impact = leap.impactFor(taskIds);
-    if (!impact) return false;
-    setLeapPending({ impact, run });
-    return true;
-  };
-
-  // "Skip today" on a Leap session removes that session outright — its only
-  // occurrence is this week — so it asks the same question the dialog does.
   const requestSkipToday = (taskId: string) => {
-    if (askLeap([taskId], async () => void onDeleteToday(taskId))) return;
     void onDeleteToday(taskId);
   };
 
   const confirmDeleteToday = async () => {
-    if (!dialog) return;
-    if (
-      dialogVariant === 'weekly' &&
-      askLeap([dialog.task.id], () => runDeleteToday())
-    ) {
-      return;
-    }
     await runDeleteToday();
   };
 
@@ -2095,15 +2051,6 @@ export default function TaskList({
   };
 
   const confirmDeleteWeek = async () => {
-    if (!dialog) return;
-    if (
-      askLeap(
-        leap.seriesIdsFor(dialog.task.id, dialog.task.repeatGroupId),
-        () => runDeleteWeek(),
-      )
-    ) {
-      return;
-    }
     await runDeleteWeek();
   };
 
@@ -3217,31 +3164,6 @@ export default function TaskList({
           pendingScope?.run(scope);
           setPendingScope(null);
         }}
-      />
-
-      <LeapSessionDeleteSheet
-        open={!!leapPending}
-        impact={leapPending?.impact ?? null}
-        busy={busy}
-        onClose={() => setLeapPending(null)}
-        onConfirm={async () => {
-          const pending = leapPending;
-          setLeapPending(null);
-          await pending?.run();
-          void mutateSWR(
-            (key) => typeof key === 'string' && key.startsWith('/api/pact'),
-          );
-        }}
-        onUpgrade={() => {
-          setLeapPending(null);
-          setLeapPlusOpen(true);
-        }}
-      />
-
-      <PlusUpgradeModal
-        open={leapPlusOpen}
-        onClose={() => setLeapPlusOpen(false)}
-        placement="leap_task_delete"
       />
 
       <DeleteDialog
