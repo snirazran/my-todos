@@ -66,7 +66,7 @@ function HopToast({
       </motion.div>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-baseline justify-between gap-2">
-          <span className="truncate text-[14px] font-black leading-tight text-foreground">
+          <span className="min-w-0 text-[14px] font-black leading-tight text-foreground">
             {title}
           </span>
           <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
@@ -85,7 +85,7 @@ function HopToast({
           />
         </span>
         {detail && (
-          <span className="mt-1 truncate text-[12px] font-bold text-muted-foreground">
+          <span className="mt-1 text-[12px] font-bold leading-tight text-muted-foreground">
             {detail}
           </span>
         )}

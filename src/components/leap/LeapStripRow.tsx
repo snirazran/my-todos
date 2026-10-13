@@ -45,7 +45,7 @@ export function LeapStripRow({ view }: { view: LeapView }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <Icon name="leap" className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 truncate text-[14px] font-bold leading-tight text-foreground">
+          <span className="min-w-0 text-[14px] font-bold leading-tight text-foreground">
             {leapStatus(view)}
           </span>
         </span>

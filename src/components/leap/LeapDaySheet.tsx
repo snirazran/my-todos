@@ -5,12 +5,19 @@ import confetti from 'canvas-confetti';
 import { motion, useReducedMotion } from 'framer-motion';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { FlyAmount } from '@/components/ui/FlyAmount';
+import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { hapticCelebrate } from '@/lib/haptics';
 import type { LeapView, LeapWeekResult } from '@/lib/leap/types';
 import { cn } from '@/lib/utils';
 import { leagueArt } from './leapCopy';
 
 const SPRING = { type: 'spring' as const, stiffness: 260, damping: 18 };
+
+const GIFT_RIVE_FALLBACKS: Record<string, number> = {
+  gift_box_1: 0,
+  gift_box_rare: 1,
+  gift_box_legendary: 2,
+};
 
 function labelFor(view: LeapView | undefined, index: number) {
   return view?.leagues[index]?.label ?? 'Lily';
@@ -90,7 +97,14 @@ export function LeapDayContent({
   const climbed = result.outcome === 'up';
   const celebrate = climbed || result.outcome === 'top';
   const { title, body } = copyFor(result, view);
-  const gifts = result.grantedItemIds.filter((id) => id.startsWith('gift_box')).length;
+  const giftIds = result.grantedItemIds.filter((id) => id.startsWith('gift_box'));
+  const giftCatalogItem = view?.rewardCatalog[giftIds[0]] as
+    | { riveIndex?: unknown }
+    | undefined;
+  const giftRiveIndex =
+    typeof giftCatalogItem?.riveIndex === 'number'
+      ? giftCatalogItem.riveIndex
+      : (GIFT_RIVE_FALLBACKS[giftIds[0]] ?? 0);
 
   useEffect(() => {
     if (!active || !celebrate || quiet) return;
@@ -148,11 +162,9 @@ export function LeapDayContent({
               'drop-shadow-[0_0_14px_rgba(202,138,4,0.55)] dark:drop-shadow-[0_0_12px_rgba(245,179,1,0.45)]',
           )}
           initial={
-            reduceMotion
+            reduceMotion || !climbed
               ? false
-              : climbed
-                ? { scale: 0.4, opacity: 0, y: 24 }
-                : { scale: 0.85, opacity: 0 }
+              : { scale: 0.4, opacity: 0, y: 24 }
           }
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ ...SPRING, delay: climbed ? 1 : 0.15 }}
@@ -176,11 +188,26 @@ export function LeapDayContent({
         {body}
       </motion.p>
 
-      {(result.fliesGranted > 0 || gifts > 0) && (
+      {(result.fliesGranted > 0 || giftIds.length > 0) && (
         <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-muted/60 px-3.5 py-1.5 text-[13px] font-black text-foreground">
           <span className="text-muted-foreground">Last week</span>
           {result.fliesGranted > 0 && <FlyAmount amount={result.fliesGranted} />}
-          {gifts > 0 && <span>+ {gifts} gift{gifts === 1 ? '' : 's'}</span>}
+          {giftIds.length > 0 && (
+            <span
+              className="inline-flex items-center gap-0.5"
+              aria-label={`${giftIds.length} gift${giftIds.length === 1 ? '' : 's'}`}
+            >
+              <span aria-hidden="true" className="-my-2 h-8 w-8 shrink-0 -translate-y-1">
+                <GiftRive
+                  className="h-full w-full"
+                  color={giftRiveIndex}
+                  paused={!active || !!reduceMotion}
+                  ambient="jump"
+                />
+              </span>
+              <span aria-hidden="true" className="tabular-nums">{giftIds.length}</span>
+            </span>
+          )}
         </div>
       )}
 

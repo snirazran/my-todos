@@ -200,7 +200,7 @@ export function LeapLeagueCard() {
                   <Check className="h-2.5 w-2.5" strokeWidth={4} />
                 </span>
               )}
-              <span className="min-w-0 truncate">{leapStatus(view)}</span>
+              <span className="min-w-0">{leapStatus(view)}</span>
             </span>
             {hasHabits && (
               <QuestTrack progress={view.week.hops} target={leapTarget(view)} />

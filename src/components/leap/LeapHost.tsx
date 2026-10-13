@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
+import { warmImage } from '@/lib/imageWarmup';
 import { useAutoPopupHold, whenScreenIsFree } from '@/lib/popupGate';
 import type { LeapWeekResult } from '@/lib/leap/types';
+import { leagueArt } from './leapCopy';
 import { LeapDaySheet } from './LeapDaySheet';
 import { patchLeap, useLeapView } from './useLeapView';
 
@@ -17,6 +19,12 @@ export function LeapHost() {
   const shownRef = useRef<string | null>(null);
 
   const pending = view?.enabled ? view.weekResult : null;
+  useEffect(() => {
+    if (!pending) return;
+    warmImage(leagueArt(pending.leagueBefore), 'high');
+    warmImage(leagueArt(pending.leagueAfter), 'high');
+  }, [pending]);
+
   useEffect(() => {
     if (!pending || shownRef.current === pending.weekKey) return;
     return whenScreenIsFree(
