@@ -364,8 +364,9 @@ const GUIDES: Record<string, HintGuide> = {
     beats: [
       {
         href: '/wardrobe',
-        anchor: 'wardrobe-inventory-tab',
-        say: 'Tap an outfit you own to put it on',
+        anchor: 'wardrobe-shuffle',
+        selector: '[data-hint="wardrobe-shuffle"], [data-hint="wardrobe-inventory-tab"]',
+        say: 'Shuffle for a surprise look, or tap an outfit you own',
       },
     ],
   },

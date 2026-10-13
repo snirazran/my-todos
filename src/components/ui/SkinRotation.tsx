@@ -5,21 +5,25 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Bookmark,
   BookmarkCheck,
+  ChevronDown,
   ChevronRight,
   Lock,
   LockOpen,
+  Sun,
   Undo2,
 } from 'lucide-react';
-import useSWR from 'swr';
-import { useRouter } from 'next/navigation';
+import useSWR, { mutate as mutateSWR } from 'swr';
+import { create } from 'zustand';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { cn } from '@/lib/utils';
-import { hapticImpact, hapticTick } from '@/lib/haptics';
+import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { Icon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { CloseButton } from '@/components/ui/CloseButton';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { PurchaseBurst } from '@/components/ui/skins/PurchaseBurst';
 import { HEADER_CONTROL_ICON_BUTTON } from '@/components/ui/MobileHeaderActions';
 import {
   beginEquipMutation,
@@ -43,6 +47,65 @@ import {
 } from '@/lib/skins/styleShuffle';
 
 const SHUFFLE_API = '/api/skins/shuffle';
+
+const useStyleShuffleOpen = create<{ open: boolean }>(() => ({ open: false }));
+
+export function openStyleShuffle() {
+  useStyleShuffleOpen.setState({ open: true });
+}
+
+type FrameIndices = { skin: number; hat: number; body: number; hand_item: number };
+const FRAME_SLOTS: (keyof FrameIndices)[] = ['skin', 'hat', 'body', 'hand_item'];
+const FRAME_COUNT = 6;
+const SPIN_STEP_MS = 75;
+const SPIN_SLOW_STEP_MS = 200;
+const SPIN_HAPTIC_CAP_MS = 1800;
+const SETTLE_STEPS_MS = [110, 145, 190];
+
+function buildFrames(
+  catalog: { id: string; slot: string; riveIndex: number }[] | undefined,
+  inventory: Record<string, number> | undefined,
+  current: FrameIndices,
+  locked: Set<string>,
+): FrameIndices[] {
+  const pools: Record<string, number[]> = { skin: [], hat: [], body: [], hand_item: [] };
+  for (const item of catalog ?? []) {
+    if ((inventory?.[item.id] ?? 0) > 0 && pools[item.slot]) {
+      pools[item.slot].push(item.riveIndex);
+    }
+  }
+  return Array.from({ length: FRAME_COUNT }, () => {
+    const frame = { ...current };
+    for (const slot of FRAME_SLOTS) {
+      if (locked.has(slot)) continue;
+      const options = [0, ...pools[slot]];
+      frame[slot] = options[Math.floor(Math.random() * options.length)];
+    }
+    return frame;
+  });
+}
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const MAX_SPIN_MS = 3500;
+const REFRESH_WAIT_MS = 3000;
+const SHUFFLE_TIMEOUT_MS = 12000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        window.clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
 const LEGACY_STORAGE_KEY = 'skinRotationInterval';
 const AUTO_CHECK_MS = 15 * 60 * 1000;
 
@@ -386,6 +449,10 @@ export function SkinRotationDialog({
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const [shuffling, setShuffling] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [activeFrame, setActiveFrame] = useState<number | null>(null);
+  const [frameSeed, setFrameSeed] = useState(0);
+  const [burstKey, setBurstKey] = useState(0);
   const [status, setStatus] = useState<{
     msg: string;
     tone: 'info' | 'error';
@@ -420,6 +487,8 @@ export function SkinRotationDialog({
   useEffect(() => {
     if (open) {
       setStatus(null);
+      setMoreOpen(false);
+      setActiveFrame(null);
       void refresh();
     }
   }, [open, refresh]);
@@ -443,6 +512,14 @@ export function SkinRotationDialog({
     shuffleableSlots.every((slot) => locked.has(slot));
   const canShuffle = eligible && !allLocked;
 
+  const inventory = (wardrobeData?.wardrobe as { inventory?: Record<string, number> } | undefined)
+    ?.inventory;
+  const frames = React.useMemo(
+    () => buildFrames(wardrobeData?.catalog, inventory, ownedIndices, locked),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [frameSeed, wardrobeData?.catalog, inventory, lockedSlots.join(',')],
+  );
+
   const toggleLock = (slot: ShuffleLock) => {
     hapticTick();
     const next = new Set(locked);
@@ -456,15 +533,52 @@ export function SkinRotationDialog({
     setShuffling(true);
     setStatus(null);
     hapticImpact();
-    const result = await rotateOnce();
-    await refresh();
+    let settled = false;
+    const failed: RotateResult = { ok: false, shuffled: false, tryOn: null };
+    const request = withTimeout(rotateOnce(), SHUFFLE_TIMEOUT_MS, failed).then(
+      async (result) => {
+        if (result.ok) {
+          await withTimeout<unknown>(
+            Promise.all([refresh(), mutateSWR('/api/skins/inventory?view=summary')]),
+            REFRESH_WAIT_MS,
+            null,
+          );
+        }
+        settled = true;
+        return result;
+      },
+    );
+    if (!reduceMotion) {
+      let step = 0;
+      const spinStarted = performance.now();
+      while (
+        (!settled && performance.now() - spinStarted < MAX_SPIN_MS) ||
+        step < 3
+      ) {
+        const long = performance.now() - spinStarted > SPIN_HAPTIC_CAP_MS;
+        setActiveFrame(step % FRAME_COUNT);
+        if (!long) hapticTick();
+        step += 1;
+        await sleep(long ? SPIN_SLOW_STEP_MS : SPIN_STEP_MS);
+      }
+      for (const delay of SETTLE_STEPS_MS) {
+        setActiveFrame(step % FRAME_COUNT);
+        hapticTick();
+        step += 1;
+        await sleep(delay);
+      }
+    }
+    const result = await request;
+    setActiveFrame(null);
     setShuffling(false);
+    setFrameSeed((seed) => seed + 1);
     if (!result.ok) {
       setStatus({ msg: "Couldn't shuffle — check your connection.", tone: 'error' });
     } else if (!result.shuffled) {
       setStatus({ msg: 'Nothing new to try with these locks.', tone: 'info' });
     } else {
-      setStatus({ msg: 'New look on!', tone: 'info' });
+      setBurstKey((key) => key + 1);
+      hapticSuccess();
     }
   };
 
@@ -473,13 +587,19 @@ export function SkinRotationDialog({
     setShuffling(true);
     setStatus(null);
     hapticTick();
-    const result = await rotateOnce({ undo: true });
-    await refresh();
+    const result = await withTimeout(
+      rotateOnce({ undo: true }),
+      SHUFFLE_TIMEOUT_MS,
+      { ok: false, shuffled: false, tryOn: null } as RotateResult,
+    );
+    await withTimeout<unknown>(
+      Promise.all([refresh(), mutateSWR('/api/skins/inventory?view=summary')]),
+      REFRESH_WAIT_MS,
+      null,
+    );
     setShuffling(false);
     if (!result.ok) {
       setStatus({ msg: "Couldn't undo — try again.", tone: 'error' });
-    } else {
-      setStatus({ msg: 'Previous look restored.', tone: 'info' });
     }
   };
 
@@ -488,7 +608,7 @@ export function SkinRotationDialog({
     setStatus(null);
     const result = await saveLook();
     if (result.ok) {
-      setStatus({ msg: 'Look saved to your wardrobe.', tone: 'info' });
+      hapticSuccess();
       void refresh();
     } else if (result.error) {
       setStatus({ msg: result.error, tone: 'error' });
@@ -499,6 +619,7 @@ export function SkinRotationDialog({
     ...opt,
     disabled: opt.value === 'looks' && looksCount < 2,
   }));
+  const autoOn = interval !== 'disabled';
 
   return (
     <BaseSheet
@@ -514,7 +635,6 @@ export function SkinRotationDialog({
           role="dialog"
           aria-modal="true"
           aria-labelledby="style-shuffle-title"
-          aria-describedby="style-shuffle-desc"
           tabIndex={-1}
           className="relative flex max-h-[88dvh] flex-col outline-none sm:max-h-[calc(100dvh-3rem)]"
         >
@@ -523,33 +643,20 @@ export function SkinRotationDialog({
             ref={bindScroll}
             className="overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-0.5 sm:px-5 sm:pt-4"
           >
-            <div className="flex items-center gap-2 pr-12">
-              <Icon
-                name="shuffle"
-                className={cn('h-8 w-8 shrink-0', SHUFFLE_ICON_ON_DARK)}
-              />
-              <div className="min-w-0">
-                <h2
-                  id="style-shuffle-title"
-                  className="text-lg font-black leading-tight tracking-tight text-foreground"
-                >
-                  Style Shuffle
-                </h2>
-                <p
-                  id="style-shuffle-desc"
-                  className="text-xs font-medium leading-snug text-muted-foreground"
-                >
-                  A fresh outfit pulled from your own wardrobe.
-                </p>
-              </div>
+            <div className="flex h-11 items-center gap-2 pr-12">
+              <Icon name="shuffle" className={cn('h-8 w-8 shrink-0', SHUFFLE_ICON_ON_DARK)} />
+              <h2
+                id="style-shuffle-title"
+                className="text-lg font-black leading-tight tracking-tight text-foreground"
+              >
+                Style Shuffle
+              </h2>
             </div>
 
             {loaded && !eligible ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/40 p-5 text-center">
+              <div className="mt-3 rounded-2xl border border-dashed border-border bg-muted/40 p-5 text-center">
                 <p className="text-sm font-black text-foreground">
-                  {ownedCount > 0
-                    ? 'Only one outfit so far'
-                    : 'Your wardrobe is empty'}
+                  {ownedCount > 0 ? 'One more outfit to go' : 'Your wardrobe is empty'}
                 </p>
                 <p className="mt-1 text-[13px] font-medium text-muted-foreground">
                   Collect a second piece and shuffling unlocks.
@@ -560,84 +667,81 @@ export function SkinRotationDialog({
                     onClose();
                     router.push('/wardrobe?tab=shop');
                   }}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#3f7d39] px-5 text-sm font-black tracking-wide text-white shadow-[0_3px_0_0_#2c5a22] transition-transform active:translate-y-0.5 active:shadow-none"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#447d3f] px-5 text-sm font-black tracking-wide text-white shadow-[0_3px_0_0_#2c511a] transition-transform active:translate-y-0.5 active:shadow-none"
                 >
                   Browse the shop
                 </button>
               </div>
             ) : (
               <>
-                <div className="relative mt-3 h-40">
-                  <div
-                    role="img"
-                    aria-label="Preview of your frog's current look"
-                    className="pointer-events-none absolute inset-0"
-                  >
-                    <div className="absolute inset-0 overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-b from-[#e8f3e4] to-[#cfe6c6] dark:from-[#1d2a1f] dark:to-[#142016]">
-                      {bgImage && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={bgImage}
-                          alt=""
-                          className="absolute inset-0 h-full w-full object-cover object-[50%_70%]"
-                        />
-                      )}
-                    </div>
-                    <AnimatePresence initial={false} mode="popLayout">
-                      <motion.div
-                        key={lookKey}
-                        initial={
-                          reduceMotion
-                            ? { opacity: 0 }
-                            : { opacity: 0, scale: 0.85, y: 8 }
-                        }
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={
-                          reduceMotion
-                            ? { opacity: 0 }
-                            : { opacity: 0, scale: 1.08 }
-                        }
-                        transition={
-                          reduceMotion
-                            ? { duration: 0.15 }
-                            : { type: 'spring', damping: 18, stiffness: 320 }
-                        }
-                        className="absolute inset-x-0 -bottom-2 z-10 flex justify-center"
+                <div className="relative mt-2 h-52 overflow-hidden rounded-[28px] border border-border/50 bg-gradient-to-b from-[#e8f3e4] to-[#cfe6c6] dark:from-[#1d2a1f] dark:to-[#142016]">
+                  {bgImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={bgImage}
+                      alt=""
+                      className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[50%_70%]"
+                    />
+                  )}
+                  {burstKey > 0 && (
+                    <PurchaseBurst key={burstKey} rarity="rare" size={300} className="top-[62%]" />
+                  )}
+                  <div role="img" aria-label="Your frog's current look" className="pointer-events-none absolute inset-0">
+                    {frames.map((frame, index) => (
+                      <div
+                        key={`${frameSeed}-${index}`}
+                        className="absolute inset-x-0 bottom-3 z-10 flex justify-center"
+                        style={{ visibility: activeFrame === index ? 'visible' : 'hidden' }}
                       >
-                        <FrogSnapshot indices={ownedIndices} width={208} height={232} />
-                      </motion.div>
-                    </AnimatePresence>
+                        <FrogSnapshot indices={frame} width={224} height={250} />
+                      </div>
+                    ))}
+                    <div
+                      className="absolute inset-x-0 bottom-3 z-10 flex justify-center"
+                      style={{ visibility: activeFrame === null ? 'visible' : 'hidden' }}
+                    >
+                      <AnimatePresence initial={false} mode="popLayout">
+                        <motion.div
+                          key={lookKey}
+                          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.86, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.06 }}
+                          transition={reduceMotion ? { duration: 0.15 } : { type: 'spring', damping: 14, stiffness: 340 }}
+                        >
+                          <FrogSnapshot indices={ownedIndices} width={224} height={250} />
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
                   </div>
 
-                  {canUndo && (
+                  {canUndo && !shuffling && (
                     <button
                       type="button"
                       onClick={undo}
-                      disabled={shuffling}
-                      className="absolute z-20 left-2 top-2 flex min-h-10 items-center gap-1.5 rounded-full bg-card/90 px-3.5 text-xs font-black text-foreground shadow-sm backdrop-blur transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3f7d39] disabled:opacity-50"
+                      className="absolute left-2.5 top-2.5 z-20 flex min-h-10 items-center gap-1.5 rounded-full bg-card/90 px-3.5 text-xs font-black text-foreground shadow-sm backdrop-blur transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]"
                     >
                       <Undo2 aria-hidden className="h-4 w-4" />
                       Undo
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={handleSaveLook}
-                    disabled={savingLook || alreadySaved || looksFull}
-                    className={cn(
-                      'absolute z-20 right-2 top-2 flex min-h-10 items-center gap-1.5 rounded-full bg-card/90 px-3.5 text-xs font-black shadow-sm backdrop-blur transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3f7d39] disabled:cursor-default',
-                      alreadySaved
-                        ? ACCENT_TEXT
-                        : 'text-foreground disabled:opacity-60',
-                    )}
-                  >
-                    {alreadySaved ? (
-                      <BookmarkCheck aria-hidden className="h-4 w-4" />
-                    ) : (
-                      <Bookmark aria-hidden className="h-4 w-4" />
-                    )}
-                    {alreadySaved ? 'Saved' : looksFull ? 'Looks full' : 'Save look'}
-                  </button>
+                  {!shuffling && (
+                    <button
+                      type="button"
+                      onClick={handleSaveLook}
+                      disabled={savingLook || alreadySaved || looksFull}
+                      className={cn(
+                        'absolute right-2.5 top-2.5 z-20 flex min-h-10 items-center gap-1.5 rounded-full bg-card/90 px-3.5 text-xs font-black shadow-sm backdrop-blur transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f] disabled:cursor-default',
+                        alreadySaved ? ACCENT_TEXT : 'text-foreground disabled:opacity-60',
+                      )}
+                    >
+                      {alreadySaved ? (
+                        <BookmarkCheck aria-hidden className="h-4 w-4" />
+                      ) : (
+                        <Bookmark aria-hidden className="h-4 w-4" />
+                      )}
+                      {alreadySaved ? 'Kept' : looksFull ? 'Looks full' : 'Keep look'}
+                    </button>
+                  )}
                 </div>
 
                 <button
@@ -645,16 +749,16 @@ export function SkinRotationDialog({
                   onClick={shuffleNow}
                   disabled={shuffling || !canShuffle}
                   aria-busy={shuffling}
-                  className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#3f7d39] text-[15px] font-black tracking-wide text-white shadow-[0_4px_0_0_#2c5a22] transition-all active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3f7d39] focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50 disabled:shadow-none"
+                  className="mt-4 flex min-h-14 w-full items-center justify-center gap-2.5 rounded-[22px] bg-[#447d3f] text-[17px] font-black tracking-wide text-white shadow-[0_5px_0_0_#2c511a] transition-all active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f] focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-60 disabled:shadow-none"
                 >
                   <Icon
                     name="shuffle"
                     className={cn(
-                      'h-6 w-6 shrink-0 [&_path:first-child]:fill-[#a8d98c]',
+                      'h-7 w-7 shrink-0 [&_path:first-child]:fill-[#a8d98c]',
                       shuffling && 'motion-safe:animate-spin',
                     )}
                   />
-                  {shuffling ? 'Shuffling…' : canUndo ? 'Shuffle again' : 'Shuffle now'}
+                  {shuffling ? 'Shuffling…' : 'Shuffle'}
                 </button>
 
                 <p
@@ -668,117 +772,154 @@ export function SkinRotationDialog({
                   )}
                 >
                   {status?.msg ??
-                    (allLocked ? 'Everything is locked — unlock a piece to shuffle.' : '')}
+                    (allLocked ? 'Everything is locked — unlock a piece in More options.' : '')}
                 </p>
 
-                <div className="mb-1.5 mt-4 flex items-baseline justify-between gap-2 px-1">
-                  <h3 className="text-[13px] font-black text-foreground">
-                    Keep these
-                  </h3>
-                  <p
-                    id="style-shuffle-locks-hint"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Locked pieces stay on
-                  </p>
-                </div>
-                <div
-                  role="group"
-                  aria-label="Keep these — locked pieces stay on when you shuffle"
-                  className="grid grid-cols-2 gap-1.5"
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoOn}
+                  onClick={() => {
+                    hapticTick();
+                    void setInterval(autoOn ? 'disabled' : '1d');
+                  }}
+                  className="mt-3 flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left ring-1 ring-inset ring-border/70 transition-colors active:bg-muted/50"
                 >
-                  {SLOT_LABELS.map(({ slot, label }) => {
-                    const isLocked = locked.has(slot);
-                    const usable = shuffleableSlots.includes(slot) || isLocked;
-                    const piece = pieces.find((p) => p.slot === slot);
-                    return (
-                      <button
-                        key={slot}
-                        type="button"
-                        aria-pressed={isLocked}
-                        disabled={!usable}
-                        onClick={() => toggleLock(slot)}
-                        className={cn(
-                          'flex min-h-12 items-center gap-2 rounded-2xl border-2 px-2.5 py-1.5 text-left transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3f7d39] disabled:cursor-not-allowed',
-                          slot === 'background' && 'col-span-2',
-                          !usable
-                            ? 'border-dashed border-border/60 opacity-60'
-                            : isLocked
-                              ? ACCENT_SELECTED
-                              : 'border-border/70 hover:border-border',
-                        )}
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300">
+                    <Sun className="h-5 w-5" strokeWidth={2.5} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-black text-foreground">
+                      Surprise me every morning
+                    </span>
+                    <span className="block truncate text-xs font-medium text-muted-foreground">
+                      {interval === '1h' ? 'On — a new look every hour' : autoOn ? autoStatus(interval, lastAutoAt) : 'Wake up to a fresh look'}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'relative h-7 w-12 shrink-0 rounded-full transition-colors',
+                      autoOn ? 'bg-[#447d3f]' : 'bg-muted-foreground/25',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform',
+                        autoOn ? 'translate-x-[22px]' : 'translate-x-0.5',
+                      )}
+                    />
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  aria-expanded={moreOpen}
+                  onClick={() => setMoreOpen((value) => !value)}
+                  className="mx-auto mt-2 flex min-h-10 items-center gap-1 rounded-xl px-3 text-[13px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  More options
+                  <ChevronDown
+                    className={cn('h-4 w-4 transition-transform', moreOpen && 'rotate-180')}
+                    strokeWidth={2.75}
+                  />
+                </button>
+
+                {moreOpen && (
+                  <div className="mt-1 space-y-3">
+                    <div>
+                      <div className="mb-1.5 flex items-baseline justify-between gap-2 px-1">
+                        <h3 className="text-[13px] font-black text-foreground">Keep these</h3>
+                        <p className="text-xs font-medium text-muted-foreground">Locked pieces stay on</p>
+                      </div>
+                      <div
+                        role="group"
+                        aria-label="Keep these — locked pieces stay on when you shuffle"
+                        className="grid grid-cols-2 gap-1.5"
                       >
-                        <span
-                          aria-hidden
-                          className={cn(
-                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                            isLocked
-                              ? 'bg-[#3f7d39] text-white dark:bg-[#6fbf69] dark:text-[#10210f]'
-                              : 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {isLocked ? (
-                            <Lock className="h-3.5 w-3.5" />
-                          ) : (
-                            <LockOpen className="h-3.5 w-3.5" />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1 leading-tight">
-                          <span
-                            className={cn(
-                              'block text-[13px] font-black',
-                              isLocked ? ACCENT_TEXT : 'text-foreground',
-                            )}
-                          >
-                            {label}
-                          </span>
-                          <span className="block truncate text-xs font-medium text-muted-foreground">
-                            {pieceHint(piece, usable)}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {SLOT_LABELS.map(({ slot, label }) => {
+                          const isLocked = locked.has(slot);
+                          const usable = shuffleableSlots.includes(slot) || isLocked;
+                          const piece = pieces.find((p) => p.slot === slot);
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              aria-pressed={isLocked}
+                              disabled={!usable}
+                              onClick={() => toggleLock(slot)}
+                              className={cn(
+                                'flex min-h-12 items-center gap-2 rounded-2xl border-2 px-2.5 py-1.5 text-left transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f] disabled:cursor-not-allowed',
+                                slot === 'background' && 'col-span-2',
+                                !usable
+                                  ? 'border-dashed border-border/60 opacity-60'
+                                  : isLocked
+                                    ? ACCENT_SELECTED
+                                    : 'border-border/70 hover:border-border',
+                              )}
+                            >
+                              <span
+                                aria-hidden
+                                className={cn(
+                                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+                                  isLocked
+                                    ? 'bg-[#447d3f] text-white dark:bg-[#6fbf69] dark:text-[#10210f]'
+                                    : 'bg-muted text-muted-foreground',
+                                )}
+                              >
+                                {isLocked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
+                              </span>
+                              <span className="min-w-0 flex-1 leading-tight">
+                                <span className={cn('block text-[13px] font-black', isLocked ? ACCENT_TEXT : 'text-foreground')}>
+                                  {label}
+                                </span>
+                                <span className="block truncate text-xs font-medium text-muted-foreground">
+                                  {pieceHint(piece, usable)}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="divide-y divide-border/60 rounded-2xl border border-border/60">
+                      <SettingRow
+                        title="Shuffle from"
+                        hintId="style-shuffle-source-hint"
+                        hint={
+                          looksCount < 2
+                            ? 'Keep 2 looks to shuffle between favourites.'
+                            : source === 'looks'
+                              ? `Rotates between your ${looksCount} kept looks.`
+                              : 'Any piece you own, favouring ones you wear often.'
+                        }
+                      >
+                        <Segmented
+                          label="Shuffle from"
+                          value={looksCount < 2 ? 'wardrobe' : source}
+                          options={sourceOptions}
+                          onChange={(v) => void setSource(v)}
+                          describedBy="style-shuffle-source-hint"
+                        />
+                      </SettingRow>
+                      <SettingRow
+                        title="How often"
+                        hintId="style-shuffle-auto-hint"
+                        hint={autoStatus(interval, lastAutoAt)}
+                      >
+                        <Segmented
+                          label="How often"
+                          value={interval}
+                          options={OPTIONS.map((o) => ({ value: o.value, label: o.short }))}
+                          onChange={(v) => void setInterval(v)}
+                          describedBy="style-shuffle-auto-hint"
+                        />
+                      </SettingRow>
+                    </div>
+                  </div>
+                )}
               </>
             )}
-
-            <div className="mt-4 divide-y divide-border/60 rounded-2xl border border-border/60">
-              {eligible && (
-                <SettingRow
-                  title="Shuffle from"
-                  hintId="style-shuffle-source-hint"
-                  hint={
-                    looksCount < 2
-                      ? 'Save 2 looks to shuffle between favourites.'
-                      : source === 'looks'
-                        ? `Rotates between your ${looksCount} saved looks.`
-                        : 'Any piece you own, favouring ones you wear often.'
-                  }
-                >
-                  <Segmented
-                    label="Shuffle from"
-                    value={looksCount < 2 ? 'wardrobe' : source}
-                    options={sourceOptions}
-                    onChange={(v) => void setSource(v)}
-                    describedBy="style-shuffle-source-hint"
-                  />
-                </SettingRow>
-              )}
-              <SettingRow
-                title="Auto-shuffle"
-                hintId="style-shuffle-auto-hint"
-                hint={autoStatus(interval, lastAutoAt)}
-              >
-                <Segmented
-                  label="Auto-shuffle"
-                  value={interval}
-                  options={OPTIONS.map((o) => ({ value: o.value, label: o.short }))}
-                  onChange={(v) => void setInterval(v)}
-                  describedBy="style-shuffle-auto-hint"
-                />
-              </SettingRow>
-            </div>
           </div>
         </div>
       )}
@@ -809,11 +950,14 @@ async function rotateOnce({
   let spinStarted = !auto;
   if (spinStarted) window.dispatchEvent(new Event('style-shuffle-start'));
   beginEquipMutation();
+  const controller = new AbortController();
+  const abortTimer = window.setTimeout(() => controller.abort(), SHUFFLE_TIMEOUT_MS);
   try {
     const res = await fetch(SHUFFLE_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ auto, undo, localDay: localDayKey() }),
+      signal: controller.signal,
     });
     if (!res.ok) return { ok: false, shuffled: false, tryOn: null };
     const data = (await res.json()) as {
@@ -837,6 +981,7 @@ async function rotateOnce({
   } catch {
     return { ok: false, shuffled: false, tryOn: null };
   } finally {
+    window.clearTimeout(abortTimer);
     endEquipMutation();
     if (spinStarted) window.dispatchEvent(new Event('style-shuffle-end'));
   }
@@ -847,7 +992,7 @@ export function StyleShuffleHeaderButton({
 }: {
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
   const { eligible, loaded } = useShuffleInterval();
   const [spinning, setSpinning] = useState(false);
   const [ring, setRing] = useState(false);
@@ -884,12 +1029,13 @@ export function StyleShuffleHeaderButton({
   // Nothing to shuffle between yet — don't spend a header slot on a control
   // that can't do anything. It appears on its own once a 2nd piece is owned.
   if (loaded && !eligible) return null;
+  if (pathname?.startsWith('/wardrobe')) return null;
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openStyleShuffle}
         aria-label="Style Shuffle"
         aria-haspopup="dialog"
         className={cn(
@@ -921,8 +1067,30 @@ export function StyleShuffleHeaderButton({
           <Icon name="shuffle" className={cn('h-7 w-7', SHUFFLE_ICON_ON_DARK)} />
         </span>
       </button>
-      <SkinRotationDialog open={open} onClose={() => setOpen(false)} />
     </>
+  );
+}
+
+export function StyleShufflePill({ className }: { className?: string }) {
+  const { eligible, loaded } = useShuffleInterval();
+  if (!loaded || !eligible) return null;
+  return (
+    <button
+      type="button"
+      data-hint="wardrobe-shuffle"
+      aria-haspopup="dialog"
+      onClick={() => {
+        hapticTick();
+        openStyleShuffle();
+      }}
+      className={cn(
+        'inline-flex min-h-9 items-center gap-1 rounded-full border border-border/60 bg-background/90 pl-1.5 pr-3 text-xs font-bold text-foreground shadow-sm backdrop-blur-md transition-[background-color,transform] hover:bg-background active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        className,
+      )}
+    >
+      <Icon name="shuffle" className={cn('h-6 w-6', SHUFFLE_ICON_ON_DARK)} />
+      Shuffle
+    </button>
   );
 }
 
@@ -994,5 +1162,11 @@ export function GlobalSkinRotation() {
     };
   }, [user, interval, refresh, showNotification]);
 
-  return null;
+  const open = useStyleShuffleOpen((state) => state.open);
+  return (
+    <SkinRotationDialog
+      open={open}
+      onClose={() => useStyleShuffleOpen.setState({ open: false })}
+    />
+  );
 }

@@ -50,6 +50,7 @@ import { WishlistShelf } from './WishlistShelf';
 import { WishlistSheet } from './WishlistSheet';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
 import { SavedLooksButton } from './LooksRow';
+import { StyleShufflePill } from '@/components/ui/SkinRotation';
 import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { WardrobeEmptyState } from './WardrobeEmptyState';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
@@ -1158,6 +1159,9 @@ function WardrobeManagerContent({
         >
           {embedded && !isGuest && activeTab === 'inventory' && data && (
             <div className="relative z-50 h-0 shrink-0">
+              <div className="absolute left-0 top-[calc(80px+env(safe-area-inset-top))] md:top-6">
+                <StyleShufflePill />
+              </div>
               <div className="absolute right-0 top-[calc(80px+env(safe-area-inset-top))] md:top-6">
                 <SavedLooksButton
                   enabled={open}
