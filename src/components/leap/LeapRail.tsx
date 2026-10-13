@@ -143,7 +143,15 @@ const PAD_PERSPECTIVE = '220px';
  * SVG stretched to fill one squashes its own stroke and turns round dots into
  * ellipses. A dot placed by percentage stays a dot at every width.
  */
-function HopTrail({ count, filled }: { count: number; filled: number }) {
+function HopTrail({
+  count,
+  filled,
+  locked,
+}: {
+  count: number;
+  filled: number;
+  locked?: boolean;
+}) {
   return (
     // Stretched to the pad row, then the arc is drawn above the waterline only,
     // so the trail's bottom edge lands on the pads' own centre line whatever
@@ -199,7 +207,9 @@ function HopTrail({ count, filled }: { count: number; filled: number }) {
                 // feature already runs on.
                 landed
                   ? 'bg-amber-400 shadow-[0_0_5px_rgba(245,179,1,0.6)]'
-                  : 'bg-[#6FBF5F]',
+                  : locked
+                    ? 'bg-muted-foreground/60'
+                    : 'bg-[#6FBF5F]',
               )}
             />
           );
@@ -218,9 +228,7 @@ function Pad({
 }) {
   const [broken, setBroken] = useState(false);
   const next = stop.state === 'next';
-  // Everything past the one you are climbing toward recedes a little — but
-  // never the destination, which is the whole reason to look at the rail.
-  const ahead = stop.state === 'locked' && !stop.isDestination;
+  const locked = stop.state === 'locked';
   const src = broken ? LILY_PLAIN : (stop.art ?? LILY_PLAIN);
 
   return (
@@ -252,14 +260,8 @@ function Pad({
         stop.isDestination
           ? 'absolute bottom-0 h-auto'
           : 'absolute inset-0',
-        // Only slightly. Enough to put the far stops behind the near ones, not
-        // enough to throw away the metal that says what a rung is worth.
-        //
-        // Lower on dark, for the same apparent recession. Opacity composites
-        // toward whatever is behind it: on a white card it washes a pad out,
-        // on a dark one it only dims a mid-toned green that was already close
-        // to the surface. One number cannot fade equally against both grounds.
-        ahead && 'opacity-75 dark:opacity-55',
+        locked &&
+          'opacity-50 grayscale contrast-75 brightness-110 dark:opacity-40 dark:brightness-90',
         // The pads are wide ellipses, so a circular ring cannot hug one. A glow
         // marks the target without fighting the silhouette.
         //
@@ -386,6 +388,33 @@ function artSide(stop: LeapStop) {
   return LILY_ART_SIDE[artIndex(stop)] ?? 0;
 }
 
+function artMiddle(stop: LeapStop) {
+  const middle = (artTop(stop) + LILY_ART_BOTTOM) / 2;
+  if (!stop.isDestination) return middle;
+  return 1 - (parseFloat(DEST_SCALE) / 100) * (1 - middle);
+}
+
+function PadLock({ stop }: { stop: LeapStop }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ top: `${artMiddle(stop) * 100}%` }}
+      className="absolute left-1/2 z-10 grid h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-muted-foreground text-card shadow-[0_2px_4px_rgba(0,0,0,0.18)] ring-2 ring-card"
+    >
+      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5">
+        <path
+          d="M8 11V8a4 4 0 0 1 8 0v3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+        <rect x="4.5" y="10" width="15" height="11.5" rx="3" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
+
 export function LeapRail({
   stops,
   /** How far into the leap toward the next pad the user stands, 0–1. */
@@ -460,6 +489,7 @@ export function LeapRail({
                   <HopTrail
                     count={dotsInto(index)}
                     filled={filledInto(index, dotsInto(index))}
+                    locked={stop.state === 'locked'}
                   />
                 )}
                 {/* Aspect ratio, not a height: the cell's height follows its
@@ -470,7 +500,7 @@ export function LeapRail({
                 <button
                   type="button"
                   disabled={!onSelect}
-                  aria-label={`${stop.label} prizes`}
+                  aria-label={`${stop.label} prizes${stop.state === 'locked' ? ', locked' : ''}`}
                   onClick={() => {
                     if (!wasDrag()) onSelect?.(index);
                   }}
@@ -508,6 +538,7 @@ export function LeapRail({
                       ?
                     </span>
                   )}
+                  {stop.state === 'locked' && <PadLock stop={stop} />}
                 </button>
               </Fragment>
             ))}

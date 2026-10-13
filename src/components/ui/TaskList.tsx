@@ -4,12 +4,13 @@ import {
   ChevronDown,
   Circle,
   EllipsisVertical,
+  MoreHorizontal,
   CalendarCheck,
   CalendarClock,
   Filter,
-  Pencil,
   Plus,
   ListChecks,
+  ListPlus,
   EyeOff,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
@@ -40,9 +41,13 @@ import {
 } from 'framer-motion';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import {
+  captureListFlip,
   hasPendingFreshTasks,
   isFreshTask,
+  playListFlip,
   playTaskEntrance,
+  revealRows,
+  type FlipSnapshot,
 } from '@/lib/taskEntrance';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
@@ -53,6 +58,7 @@ import {
   MouseSensor,
   useSensor,
   useSensors,
+  useDroppable,
   DragEndEvent,
   DragMoveEvent,
   DragOverEvent,
@@ -151,6 +157,12 @@ export interface TaskListSection {
 }
 
 const SECTION_PREFIX = 'section:';
+const EMPTY_SLOT_PREFIX = 'empty:';
+const emptySlotId = (id: string) => `${EMPTY_SLOT_PREFIX}${id}`;
+const sectionIdFromEmptySlot = (id: string | number) =>
+  typeof id === 'string' && id.startsWith(EMPTY_SLOT_PREFIX)
+    ? id.slice(EMPTY_SLOT_PREFIX.length)
+    : null;
 const sectionSortableId = (id: string) => `${SECTION_PREFIX}${id}`;
 const sectionIdFromSortable = (id: string | number) =>
   typeof id === 'string' && id.startsWith(SECTION_PREFIX)
@@ -161,10 +173,13 @@ type ListRow =
   | { kind: 'task'; task: Task }
   | { kind: 'header'; section: TaskListSection; count: number; doneCount: number };
 
+let flipOwnsLayout = false;
+const revealingRowIds = new Set<string>();
+
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
   args.isSorting || args.wasDragging
     ? defaultAnimateLayoutChanges(args)
-    : !hasPendingFreshTasks();
+    : !flipOwnsLayout && !hasPendingFreshTasks();
 
 const pointerMidpointCollision: CollisionDetection = (args) => {
   const {
@@ -179,8 +194,27 @@ const pointerMidpointCollision: CollisionDetection = (args) => {
     : pointerCoordinates?.y;
   if (probeY == null) return closestCenter(args);
 
+  for (const slot of droppableContainers) {
+    const sectionId = sectionIdFromEmptySlot(slot.id);
+    if (!sectionId || slot.disabled) continue;
+    const header = droppableRects.get(sectionSortableId(sectionId));
+    const slotRect = droppableRects.get(slot.id);
+    if (!header || !slotRect) continue;
+    if (
+      probeY >= header.bottom - slotRect.height - 12 &&
+      probeY <= header.bottom + 12
+    ) {
+      return [{ id: slot.id, data: { droppableContainer: slot } }];
+    }
+  }
+
   const rows = droppableContainers
-    .filter((c) => !c.disabled && droppableRects.get(c.id))
+    .filter(
+      (c) =>
+        !c.disabled &&
+        sectionIdFromEmptySlot(c.id) === null &&
+        droppableRects.get(c.id),
+    )
     .map((c) => ({ container: c, rect: droppableRects.get(c.id)! }))
     .sort((a, b) => a.rect.top - b.rect.top);
 
@@ -299,16 +333,16 @@ function TaskDragPreview({
 
 function SectionDragPreview({ name }: { name: string }) {
   return (
-    <div className="h-full w-full pt-2">
+    <div className="h-full w-full pt-3">
     <div
       data-drag-lift
-      className="relative flex h-full w-full items-center gap-1 rounded-xl bg-card pl-2.5 pr-2 ring-1 ring-black/[0.06] dark:ring-white/10 md:pl-3"
+      className={`relative flex h-full w-full items-center gap-2 pl-3.5 pr-3 md:pl-4 ${HOME_CARD_SURFACE}`}
     >
-      <span className="-ml-1 grid h-7 w-5 shrink-0 place-items-center text-muted-foreground/70">
-        <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-black text-foreground/70 md:text-[14px]">
+      <span className="min-w-0 truncate text-[16px] font-black tracking-tight text-foreground md:text-[17px]">
         {name}
+      </span>
+      <span className="grid h-6 w-5 shrink-0 place-items-center text-muted-foreground/60">
+        <ChevronDown className="h-4 w-4" strokeWidth={3} />
       </span>
     </div>
     </div>
@@ -390,6 +424,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
       onSwipeOpenChange,
     }: TaskRowBodyProps,
   ) {
+    const [skipMountFade] = useState(() => revealingRowIds.has(task.id));
     const checklist = task.checklist ?? [];
     const checklistPayoutState = React.useMemo(
       () => checklistPayout(checklist),
@@ -825,14 +860,14 @@ const TaskRowBody = React.memo(function TaskRowBody(
         ref={containerRef}
         style={{ overflow: isDragging ? 'visible' : 'hidden' }}
         className={`relative w-full ${isDragging ? `${HOME_CARD_RADIUS} bg-muted/60` : HOME_CARD_SURFACE} ${hintRowGlow ? 'hint-row-glow' : ''}`}
-        initial={{ opacity: 0 }}
+        initial={skipMountFade ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={isExitingLater ? { opacity: 1 } : { opacity: 0 }}
         transition={{ opacity: { duration: 0.2, ease: 'easeOut' } }}
       >
         <motion.div
           layout={false}
-          initial={{ opacity: 0 }}
+          initial={skipMountFade ? false : { opacity: 0 }}
           animate={{ opacity: 1, x: 0, y: 0 }}
           transition={{
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
@@ -1254,6 +1289,7 @@ const SortableTaskItem = React.forwardRef<
   return (
     <div
       data-row
+      data-task-id={task.id}
       ref={(node: HTMLDivElement | null) => {
         rowRef.current = node;
         setNodeRef(node);
@@ -1319,6 +1355,8 @@ function SortableSectionHeader({
   section,
   count,
   doneCount,
+  isDropTarget = false,
+  slotDroppable = true,
   onToggleCollapsed,
   onEdit,
   onAddTask,
@@ -1326,6 +1364,8 @@ function SortableSectionHeader({
   section: TaskListSection;
   count: number;
   doneCount: number;
+  isDropTarget?: boolean;
+  slotDroppable?: boolean;
   onToggleCollapsed: () => void;
   onEdit: () => void;
   onAddTask?: () => void;
@@ -1340,6 +1380,11 @@ function SortableSectionHeader({
   } = useSortable({
     id: sectionSortableId(section.id),
     animateLayoutChanges,
+  });
+  const showSlot = count === 0 && !section.collapsed;
+  const { setNodeRef: setSlotRef, isOver: slotOver } = useDroppable({
+    id: emptySlotId(section.id),
+    disabled: !showSlot || !slotDroppable,
   });
   // dnd-kit's Mouse/Touch sensors listen on mousedown/touchstart (not
   // pointerdown), so interactive children must stop those to avoid the held
@@ -1361,50 +1406,52 @@ function SortableSectionHeader({
         zIndex: isDragging ? 30 : 1,
       }}
       data-is-active="true"
-      data-section-header="true"
-      className={`relative w-full select-none pt-2 ${
-        isDragging ? 'rounded-xl bg-muted/70' : ''
+      data-section-header={section.id}
+      className={`relative w-full select-none pt-3 ${
+        isDragging ? `${HOME_CARD_RADIUS} bg-muted/60` : ''
       }`}
     >
       <div
         {...attributes}
         {...listeners}
         onClick={onToggleCollapsed}
-        className={`group flex min-h-[40px] cursor-pointer items-center gap-1 py-1 pl-2.5 pr-0.5 transition-colors md:pl-3 ${
+        aria-expanded={!section.collapsed}
+        className={`group flex min-h-[40px] cursor-pointer items-center gap-2 pl-3.5 pr-1 md:pl-4 ${
           isDragging ? 'invisible' : ''
         }`}
       >
-        <motion.span
-          initial={false}
-          animate={{ rotate: section.collapsed ? -90 : 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-          className="-ml-1 grid h-7 w-5 shrink-0 place-items-center text-muted-foreground/70"
+        <span
+          className={`min-w-0 truncate text-[16px] font-black tracking-tight transition-colors duration-150 md:text-[17px] ${
+            isDropTarget ? 'text-primary' : 'text-foreground'
+          }`}
         >
-          <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
-        </motion.span>
-
-        <span className="min-w-0 truncate text-[14px] font-black text-foreground/75 md:text-[15px]">
           {section.name}
         </span>
 
+        {count > 0 &&
+          (remaining === 0 ? (
+            <Check
+              aria-label="All done"
+              className="h-4 w-4 shrink-0 text-primary"
+              strokeWidth={3.5}
+            />
+          ) : (
+            <span className="shrink-0 text-[13px] font-bold tabular-nums text-muted-foreground">
+              {remaining}
+            </span>
+          ))}
+
         <span
-          aria-hidden
-          className="mx-1.5 h-px min-w-3 flex-1 bg-border/80"
-        />
+          className={`-ml-0.5 grid h-6 w-5 shrink-0 place-items-center transition-[transform,color] duration-[520ms] ease-[cubic-bezier(0.2,0.25,0.15,1)] [@media(hover:hover)]:group-hover:text-foreground ${
+            section.collapsed ? '-rotate-90' : ''
+          } ${isDropTarget ? 'text-primary' : 'text-muted-foreground/60'}`}
+        >
+          <ChevronDown className="h-4 w-4" strokeWidth={3} />
+        </span>
 
-        {count > 0 && (
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums leading-none ${
-              remaining === 0
-                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                : 'bg-muted text-muted-foreground'
-            }`}
-          >
-            {remaining === 0 ? '✓' : remaining}
-          </span>
-        )}
+        <span aria-hidden className="min-w-2 flex-1" />
 
-        {onAddTask && (
+        {!section.collapsed && onAddTask && (
           <button
             type="button"
             aria-label={`Add a task to ${section.name}`}
@@ -1414,9 +1461,9 @@ function SortableSectionHeader({
               e.stopPropagation();
               onAddTask();
             }}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:bg-primary/10 [@media(hover:hover)]:hover:text-primary"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-[transform,background-color,color] active:scale-90 [@media(hover:hover)]:hover:bg-primary/10 [@media(hover:hover)]:hover:text-primary"
           >
-            <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
+            <Plus className="h-[18px] w-[18px]" strokeWidth={2.75} />
           </button>
         )}
 
@@ -1424,30 +1471,37 @@ function SortableSectionHeader({
           <button
             type="button"
             aria-label={`Edit section ${section.name}`}
+            title="Edit section"
             {...stopDndActivation}
             onClick={(e) => {
               e.stopPropagation();
               onEdit();
             }}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-[transform,background-color,color] active:scale-90 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
           >
-            <Pencil className="h-4 w-4" />
+            <MoreHorizontal className="h-5 w-5" strokeWidth={2.5} />
           </button>
         )}
       </div>
-      {count === 0 && !section.collapsed && !isDragging && (
-        <button
-          type="button"
-          {...stopDndActivation}
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddTask?.();
-          }}
-          disabled={!onAddTask}
-          className={`mb-2 flex w-full items-center border-[1.5px] border-dashed border-border px-3.5 py-3 text-left text-[13px] font-semibold text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-4 [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-foreground ${HOME_CARD_RADIUS}`}
-        >
-          No tasks yet · tap to add, or drag one in
-        </button>
+      {showSlot && !isDragging && (
+        <div ref={setSlotRef} className="pb-2 pt-1">
+          <button
+            type="button"
+            {...stopDndActivation}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddTask?.();
+            }}
+            disabled={!onAddTask}
+            className={`flex h-11 w-full items-center pl-3.5 text-left text-[14px] font-semibold transition-[background-color,color,box-shadow] duration-150 disabled:pointer-events-none md:pl-4 ${HOME_CARD_RADIUS} ${
+              slotOver
+                ? 'bg-primary/[0.1] text-primary shadow-[inset_0_0_0_2px_hsl(var(--primary)/0.35)]'
+                : 'bg-foreground/[0.035] text-muted-foreground/70 shadow-[inset_0_2px_0_rgba(15,23,42,0.04)] dark:bg-white/[0.04] dark:shadow-[inset_0_2px_0_rgba(0,0,0,0.25)] [@media(hover:hover)]:hover:bg-foreground/[0.06] [@media(hover:hover)]:hover:text-muted-foreground'
+            }`}
+          >
+            {slotOver ? 'Drop here' : 'No tasks yet'}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -1465,10 +1519,36 @@ function AddSectionRow({
       type="button"
       onClick={onOpen}
       disabled={disabled}
-      className="group mt-1 flex min-h-[40px] items-center gap-1 rounded-xl px-3.5 text-[13px] font-bold text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-4 [@media(hover:hover)]:hover:text-primary"
+      className="mt-2.5 inline-flex h-9 items-center gap-1.5 rounded-full bg-muted/70 pl-3 pr-3.5 text-[13px] font-black text-muted-foreground transition-[transform,background-color,color,opacity] active:scale-95 disabled:pointer-events-none disabled:opacity-0 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
     >
-      <Plus className="-ml-0.5 h-4 w-4" strokeWidth={2.75} />
-      <span className="shrink-0">New section</span>
+      <ListPlus className="h-4 w-4" strokeWidth={2.5} />
+      New section
+    </button>
+  );
+}
+
+function AddTaskComposerRow({
+  label = 'Add a task',
+  disabled,
+  onClick,
+}: {
+  label?: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`group relative flex w-full items-center gap-3 py-2 pl-3.5 pr-2.5 text-left transition-[transform,opacity] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-0 md:pl-4 md:pr-3 ${HOME_CARD_SURFACE}`}
+    >
+      <span className="min-w-0 flex-1 text-[17px] font-semibold leading-snug text-muted-foreground/80 transition-colors md:text-[17.5px] [@media(hover:hover)]:group-hover:text-foreground">
+        {label}
+      </span>
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.12] text-primary ring-1 ring-inset ring-primary/20 transition-colors md:h-12 md:w-12 [@media(hover:hover)]:group-hover:bg-primary/[0.2]">
+        <Plus className="h-5 w-5" strokeWidth={3} />
+      </span>
     </button>
   );
 }
@@ -1579,18 +1659,11 @@ function EmptyAddRow({
       animate={{ opacity: quickAddOpen ? 0 : 1 }}
       transition={{ duration: quickAddOpen ? 0 : 0.5 }}
     >
-      <button
-        onClick={onClick}
-        className="group flex w-full cursor-pointer items-center gap-3 py-2 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 disabled:pointer-events-none md:pl-4 md:pr-3 [@media(hover:hover)]:hover:bg-muted/40"
+      <AddTaskComposerRow
+        label={label}
         disabled={quickAddOpen}
-      >
-        <p className="min-w-0 flex-1 text-[15px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground md:text-[16px]">
-          {label}
-        </p>
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </span>
-      </button>
+        onClick={onClick}
+      />
     </motion.div>
   );
 }
@@ -1871,6 +1944,40 @@ export default function TaskList({
     bottom: number;
   } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const listRootRef = React.useRef<HTMLDivElement>(null);
+  const pendingFlipRef = React.useRef<{
+    snap: FlipSnapshot;
+    reveal: string[];
+    exclude?: string;
+  } | null>(null);
+  const flipReleaseRef = React.useRef<number | null>(null);
+  const [dropSectionId, setDropSectionId] = useState<string | null | undefined>(
+    undefined,
+  );
+  const flipNext = (reveal: string[] = [], exclude?: string) => {
+    pendingFlipRef.current = {
+      snap: captureListFlip(listRootRef.current),
+      reveal,
+      exclude,
+    };
+    reveal.forEach((id) => revealingRowIds.add(id));
+    flipOwnsLayout = true;
+    if (flipReleaseRef.current !== null)
+      window.clearTimeout(flipReleaseRef.current);
+    flipReleaseRef.current = window.setTimeout(() => {
+      flipReleaseRef.current = null;
+      flipOwnsLayout = false;
+      pendingFlipRef.current = null;
+      revealingRowIds.clear();
+    }, 1000);
+  };
+  useEffect(
+    () => () => {
+      if (flipReleaseRef.current !== null)
+        window.clearTimeout(flipReleaseRef.current);
+    },
+    [],
+  );
 
   React.useEffect(() => {
     if (isAnyDragging) {
@@ -2250,6 +2357,38 @@ export default function TaskList({
   // Unsectioned tasks first (no header), then each section in order. Completed
   // tasks keep sinking to the single bottom pile regardless of section.
   const sectionsSorted = [...sections].sort((a, b) => a.order - b.order);
+  const collapseSignature = sectionsSorted
+    .map((s) => `${s.id}:${s.collapsed ? 1 : 0}`)
+    .join('|');
+  const rowSignature = tasks
+    .map((t) => `${t.id}:${t.sectionId ?? ''}`)
+    .join('|');
+  useLayoutEffect(() => {
+    const pending = pendingFlipRef.current;
+    if (!pending) return;
+    pendingFlipRef.current = null;
+    if (pending.exclude) {
+      pending.snap.forEach((_, el) => {
+        if (el.dataset.taskId === pending.exclude) pending.snap.delete(el);
+      });
+    }
+    playListFlip(pending.snap);
+    if (pending.reveal.length) {
+      const root = listRootRef.current;
+      const revealed = pending.reveal
+        .map((id) =>
+          root?.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(id)}"]`),
+        )
+        .filter((el): el is HTMLElement => !!el);
+      revealRows(revealed);
+    }
+    pending.reveal.forEach((id) => revealingRowIds.delete(id));
+    flipOwnsLayout = false;
+    if (flipReleaseRef.current !== null) {
+      window.clearTimeout(flipReleaseRef.current);
+      flipReleaseRef.current = null;
+    }
+  }, [collapseSignature, rowSignature]);
   const hasSections = sectionsSorted.length > 0;
   const knownSectionIds = new Set(sectionsSorted.map((s) => s.id));
   const rows: ListRow[] = (() => {
@@ -2336,7 +2475,7 @@ export default function TaskList({
   const computeActiveAreaLimits = (headersOnly = false) => {
     const activeNodes = Array.from(
       document.querySelectorAll(
-        headersOnly ? '[data-section-header="true"]' : '[data-is-active="true"]',
+        headersOnly ? '[data-section-header]' : '[data-is-active="true"]',
       ),
     ).filter((n) => getComputedStyle(n as HTMLElement).position !== 'absolute');
     const container = scrollContainerRef.current;
@@ -2408,6 +2547,7 @@ export default function TaskList({
 
   const handleDragCancel = () => {
     if (maxDragDistRef.current >= 5) lastSortDragAt = performance.now();
+    setDropSectionId(undefined);
     setIsAnyDragging(false);
     setDragActiveId(null);
     setCollapsedForDrag(false);
@@ -2418,6 +2558,25 @@ export default function TaskList({
   const lastDragOverIdRef = useRef<string | number | null>(null);
   const handleDragOver = (event: DragOverEvent) => {
     const overId = event.over?.id;
+    const slotSectionId = overId != null ? sectionIdFromEmptySlot(overId) : null;
+    if (slotSectionId) {
+      setDropSectionId(slotSectionId);
+    } else if (hasSections && draggingSectionId === null && overId != null) {
+      const from = rowIds.indexOf(String(event.active.id));
+      const to = rowIds.indexOf(String(overId));
+      if (from !== -1 && to !== -1) {
+        const projected = arrayMove(rows, from, to);
+        let target: string | null = null;
+        for (let i = to - 1; i >= 0; i--) {
+          const row = projected[i];
+          if (row.kind === 'header') {
+            target = row.section.id;
+            break;
+          }
+        }
+        setDropSectionId(target);
+      }
+    }
     if (
       overId != null &&
       overId !== event.active.id &&
@@ -2435,6 +2594,7 @@ export default function TaskList({
       Math.abs(event.delta.y),
     );
     if (travelled >= 5) lastSortDragAt = performance.now();
+    setDropSectionId(undefined);
     setIsAnyDragging(false);
     setDragActiveId(null);
     setCollapsedForDrag(false);
@@ -2464,7 +2624,19 @@ export default function TaskList({
     }
 
     const oldIndex = rowIds.indexOf(String(active.id));
-    const newIndex = rowIds.indexOf(String(over.id));
+    const slotSectionId = activeSectionId
+      ? null
+      : sectionIdFromEmptySlot(over.id);
+    const slotHeaderIndex = slotSectionId
+      ? rowIds.indexOf(sectionSortableId(slotSectionId))
+      : -1;
+    const newIndex = slotSectionId
+      ? slotHeaderIndex === -1
+        ? -1
+        : oldIndex < slotHeaderIndex
+          ? slotHeaderIndex
+          : slotHeaderIndex + 1
+      : rowIds.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
       clearDraggingSection();
       return;
@@ -2525,6 +2697,7 @@ export default function TaskList({
       ...hiddenTasks,
     ];
     hapticImpact();
+    if (slotSectionId) flipNext([], String(active.id));
     onReorder(finalOrder);
   };
 
@@ -2613,7 +2786,11 @@ export default function TaskList({
   };
   return (
     <>
-      <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
+      <div
+        ref={listRootRef}
+        dir="ltr"
+        className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4"
+      >
         <div className="w-full" data-hint="task-list">
         {header}
         <div
@@ -2622,19 +2799,26 @@ export default function TaskList({
         >
           {tasks.length === 0 && !exitAction ? (
             /* Empty State: No Tasks at all */
-            <div className={`overflow-hidden ${HOME_CARD_SURFACE}`}>
+            <EmptyAddRow
+              label="Add your first task"
+              quickAddOpen={quickAddOpen}
+              onClick={() =>
+                onAddRequested('', null, { preselectToday: true })
+              }
+            />
+          ) : tasks.length > 0 &&
+            sortedVisibleTasks.length === 0 &&
+            !exitAction ? (
+            /* Empty State: Tasks exist but all filtered/completed */
+            !(allTasksCompleted || filtersActive) ? (
               <EmptyAddRow
-                label="Add your first task"
+                label="Add another task"
                 quickAddOpen={quickAddOpen}
                 onClick={() =>
                   onAddRequested('', null, { preselectToday: true })
                 }
               />
-            </div>
-          ) : tasks.length > 0 &&
-            sortedVisibleTasks.length === 0 &&
-            !exitAction ? (
-            /* Empty State: Tasks exist but all filtered/completed */
+            ) : (
             <div className={`overflow-hidden ${HOME_CARD_SURFACE}`}>
             {allTasksCompleted && !filtersActive ? (
               <DayClearedState
@@ -2647,21 +2831,14 @@ export default function TaskList({
                 onShowCompleted={onShowCompleted}
                 addDisabled={quickAddOpen}
               />
-            ) : filtersActive ? (
+            ) : (
               <FilteredEmptyState
                 hidden={tasks.length}
                 onClearAll={onClearFilters}
               />
-            ) : (
-              <EmptyAddRow
-                label="Add another task"
-                quickAddOpen={quickAddOpen}
-                onClick={() =>
-                  onAddRequested('', null, { preselectToday: true })
-                }
-              />
             )}
             </div>
+            )
           ) : (
             /* List Content */
             <DndContext
@@ -2700,12 +2877,13 @@ export default function TaskList({
                         return (
                           <div
                             key="completed-divider"
-                            className="relative flex items-center gap-2 px-3 pb-2 pt-3 md:px-3.5"
+                            data-completed-divider
+                            className="relative flex min-h-[40px] items-center gap-2 pl-3.5 pr-1 pt-3 md:pl-4"
                           >
-                            <span className="text-[13px] font-black text-muted-foreground/70">
+                            <span className="text-[16px] font-black tracking-tight text-muted-foreground md:text-[17px]">
                               Completed
                             </span>
-                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">
+                            <span className="text-[13px] font-bold tabular-nums text-muted-foreground/80">
                               {completedTasks.length}
                             </span>
                           </div>
@@ -2719,8 +2897,17 @@ export default function TaskList({
                             section={s}
                             count={row.count}
                             doneCount={row.doneCount}
+                            isDropTarget={dropSectionId === s.id}
+                            slotDroppable={draggingSectionId === null}
                             onToggleCollapsed={() => {
                               hapticTick();
+                              flipNext(
+                                s.collapsed
+                                  ? sortedActiveTasks
+                                      .filter((t) => t.sectionId === s.id)
+                                      .map((t) => t.id)
+                                  : [],
+                              );
                               onSetSectionCollapsed?.(s.id, !s.collapsed);
                             }}
                             onEdit={() =>
@@ -2826,36 +3013,23 @@ export default function TaskList({
           {/* Show Finished Toggle (Removed from bottom) */}
         </div>
 
-        {/* Add Task footer at the end of the list */}
         {!hideAddControls &&
           (exitAction ||
           (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-          <div>
-            <button
-              onClick={() => onAddRequested('', null, { preselectToday: true })}
+          <div data-list-footer className={hasSections ? 'pt-4' : 'pt-1'}>
+            <AddTaskComposerRow
               disabled={quickAddOpen}
-              className={`group relative flex w-full items-center gap-3 py-1.5 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/60 disabled:pointer-events-none disabled:opacity-0 md:pl-4 md:pr-3 [@media(hover:hover)]:hover:bg-muted/50 ${HOME_CARD_RADIUS}`}
-            >
-              <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-muted-foreground transition-colors group-hover:text-foreground md:text-[16px]">
-                Add a task
-              </span>
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
-                <Plus className="h-5 w-5" strokeWidth={2.5} />
-              </span>
-            </button>
+              onClick={() => onAddRequested('', null, { preselectToday: true })}
+            />
+            {onCreateSection && sections.length < 10 && (
+              <AddSectionRow
+                onOpen={() => setSectionEditor({ mode: 'create' })}
+                disabled={quickAddOpen}
+              />
+            )}
           </div>
         )}
         </div>
-        {!hideAddControls &&
-          onCreateSection &&
-          sections.length < 10 &&
-          (exitAction ||
-            (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-            <AddSectionRow
-              onOpen={() => setSectionEditor({ mode: 'create' })}
-              disabled={quickAddOpen}
-            />
-          )}
       </div>
 
       <TaskMenu

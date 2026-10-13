@@ -62,9 +62,16 @@ function supportsLinear() {
     linearSupported =
       typeof CSS !== 'undefined' &&
       typeof CSS.supports === 'function' &&
-      CSS.supports('animation-timing-function', 'linear(0, 0.5, 1)');
+      CSS.supports('animation-timing-function', 'linear(0, 0.5, 1)') &&
+      !isWebKit();
   }
   return linearSupported;
+}
+
+function isWebKit() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /AppleWebKit/.test(ua) && !/(Chrome|Chromium|Edg|OPR|Android)\//.test(ua);
 }
 
 function springPosition(stiffness: number, damping: number, t: number) {
@@ -116,6 +123,10 @@ export const listSlide = () =>
   springCurve(380, 36, 'cubic-bezier(0.2, 0, 0, 1)');
 export const morphPop = () =>
   springCurve(260, 21, 'cubic-bezier(0.34, 1.3, 0.64, 1)');
+export const SMOOTH_SPRING: Curve = {
+  easing: 'cubic-bezier(0.2, 0.25, 0.15, 1)',
+  duration: 520,
+};
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -275,6 +286,71 @@ export function slideFollowers(row: HTMLElement, delta: number) {
       },
     );
   }
+}
+
+const FLIP_SELECTOR =
+  '[data-row],[data-section-header],[data-completed-divider],[data-list-footer]';
+
+export type FlipSnapshot = Map<HTMLElement, number>;
+
+export function captureListFlip(root: HTMLElement | null): FlipSnapshot {
+  const snap: FlipSnapshot = new Map();
+  if (!root || typeof root.animate !== 'function') return snap;
+  root.querySelectorAll<HTMLElement>(FLIP_SELECTOR).forEach((el) => {
+    if (isInFlow(el)) snap.set(el, el.getBoundingClientRect().top);
+  });
+  for (const el of followersOf(root, scrollParent(root))) {
+    snap.set(el, el.getBoundingClientRect().top);
+  }
+  return snap;
+}
+
+export function playListFlip(
+  snap: FlipSnapshot,
+  curve: Curve = SMOOTH_SPRING,
+) {
+  if (snap.size === 0 || prefersReducedMotion()) return;
+  const moves: [HTMLElement, number][] = [];
+  snap.forEach((before, el) => {
+    if (!el.isConnected || !isInFlow(el)) return;
+    const delta = before - el.getBoundingClientRect().top;
+    if (Math.abs(delta) >= 0.5) moves.push([el, delta]);
+  });
+  for (const [el, delta] of moves) {
+    el.animate(
+      [
+        { transform: `translate3d(0, ${delta}px, 0)` },
+        { transform: 'translate3d(0, 0, 0)' },
+      ],
+      { duration: curve.duration, easing: curve.easing, composite: 'add' },
+    );
+  }
+}
+
+export function revealRows(rows: HTMLElement[], curve: Curve = SMOOTH_SPRING) {
+  if (prefersReducedMotion()) return;
+  rows.forEach((el, i) => {
+    const delay = Math.min(i, 6) * 28;
+    el.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 260,
+      delay,
+      easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      fill: 'backwards',
+    });
+    el.animate(
+      [
+        { transform: 'translate3d(0, -10px, 0) scale(0.98)' },
+        { transform: 'translate3d(0, 0, 0) scale(1)' },
+      ],
+      {
+        duration: curve.duration,
+        delay,
+        easing: curve.easing,
+        composite: 'add',
+        fill: 'backwards',
+      },
+    );
+  });
 }
 
 export function playTaskEntrance(

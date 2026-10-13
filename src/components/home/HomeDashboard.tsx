@@ -962,6 +962,10 @@ export default function HomeDashboard() {
             className="relative z-20 -mx-3 -mt-12 flex flex-col gap-2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pb-8 md:pt-5 xl:px-10"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-14 bottom-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_72px)] md:block"
+            />
             <div className="flex w-full flex-col gap-2 md:gap-5">
               {!firstRun.active && <GuestAccountBanner />}
               <div
