@@ -56,10 +56,10 @@ export function FriendRow({
       className={cn(
         'relative flex items-center gap-1 rounded-2xl border bg-card pr-2.5 shadow-sm transition-[border-color,box-shadow]',
         entry.isYou
-          ? 'border-[#4f9149]/35 bg-[#4f9149]/[.04]'
+          ? 'border-[#447d3f]/35 bg-[#447d3f]/[.04]'
           : flex
             ? cn('border-2', flex.border, flex.glow)
-            : 'border-border/50 hover:border-[#4f9149]/40',
+            : 'border-border/50 hover:border-[#447d3f]/40',
       )}
     >
       {buddyInvites > 0 && (
@@ -115,7 +115,7 @@ export function FriendRow({
               {entry.name || entry.frogName}
             </span>
             {entry.isYou && (
-              <span className="shrink-0 rounded-full bg-[#4f9149]/12 px-1.5 py-0.5 text-[10px] font-black text-[#4f9149]">
+              <span className="shrink-0 rounded-full bg-[#447d3f]/12 px-1.5 py-0.5 text-[10px] font-black text-[#447d3f]">
                 You
               </span>
             )}

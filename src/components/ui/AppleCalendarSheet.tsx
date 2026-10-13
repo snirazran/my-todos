@@ -132,7 +132,7 @@ export default function AppleCalendarSheet({
             type="button"
             disabled={busy || !appleId || appPassword.replace(/-/g, '').length < 16}
             onClick={connect}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3 text-sm font-black text-white transition-colors hover:bg-[#3d7038] disabled:opacity-50"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             Start syncing

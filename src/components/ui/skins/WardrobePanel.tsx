@@ -69,6 +69,7 @@ import {
   type WishlistEntry,
 } from '@/lib/skins/wishlist';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { celebratePurchase } from '@/lib/purchaseCelebration';
 import {
   rewardedAdsAvailable,
   rewardedAdFailureMessage,
@@ -81,6 +82,7 @@ import {
   DealTileRow,
   RarityRail,
   TryOnBar,
+  YoursCard,
   summarizeCloset,
   type ClosetSlot,
 } from './DressingRoom';
@@ -556,6 +558,14 @@ function WardrobeManagerContent({
     window.dispatchEvent(new Event(WARDROBE_EQUIPPED_EVENT));
 
   const [tryBuying, setTryBuying] = useState(false);
+  const [justBought, setJustBought] = useState<
+    | { kind: 'item'; item: ItemDef }
+    | { kind: 'bg'; bg: BackgroundItem }
+    | null
+  >(null);
+  const clearJustBought = React.useCallback(() => setJustBought(null), []);
+  const stageAnchor = () =>
+    document.querySelector<HTMLElement>('[data-fly-hero-frog]');
   const buyTriedOn = async () => {
     if (!tryTarget || tryBuying) return;
     setTryBuying(true);
@@ -569,6 +579,15 @@ function WardrobeManagerContent({
           clearTryOn();
           applyEquip(tryTarget.item.slot, tryTarget.item.id);
           announceEquip();
+          setJustBought({ kind: 'item', item: tryTarget.item });
+          celebratePurchase(
+            {
+              id: tryTarget.item.id,
+              name: tryTarget.item.name,
+              rarity: tryTarget.item.rarity,
+            },
+            stageAnchor(),
+          );
         }
       } else {
         const ok = await bg.buyNow(tryTarget.bg);
@@ -576,6 +595,15 @@ function WardrobeManagerContent({
           clearTryOn();
           await bg.handleEquip(tryTarget.bg);
           announceEquip();
+          setJustBought({ kind: 'bg', bg: tryTarget.bg });
+          celebratePurchase(
+            {
+              id: tryTarget.bg.id,
+              name: tryTarget.bg.name,
+              rarity: tryTarget.bg.rarity as Rarity,
+            },
+            stageAnchor(),
+          );
         }
       }
     } finally {
@@ -686,7 +714,6 @@ function WardrobeManagerContent({
       });
 
       if (!res.ok) throw new Error('Failed');
-      setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
       refreshInventory();
       return true;
     } catch (e) {
@@ -1538,6 +1565,46 @@ function WardrobeManagerContent({
         }}
       />
 
+      {justBought && !tryTarget && !purchaseCard && activeTab === 'inventory' && (() => {
+        const rarity = (
+          justBought.kind === 'item' ? justBought.item.rarity : justBought.bg.rarity
+        ) as Rarity;
+        const collected =
+          summarizeCloset(
+            'all',
+            data?.catalog ?? [],
+            bg.catalog,
+            data?.wardrobe?.inventory ?? {},
+            bg.inventory,
+          ).find((row) => row.rarity === rarity) ?? null;
+        return (
+          <YoursCard
+            key={justBought.kind === 'item' ? justBought.item.id : justBought.bg.id}
+            name={justBought.kind === 'item' ? justBought.item.name : justBought.bg.name}
+            rarity={rarity}
+            collected={collected}
+            onDone={clearJustBought}
+            thumb={
+              justBought.kind === 'item' ? (
+                <FrogSnapshot
+                  className="pointer-events-none shrink-0"
+                  indices={{ [justBought.item.slot as WardrobeSlot]: justBought.item.riveIndex }}
+                  width="124%"
+                  height="124%"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={backgroundPreview(justBought.bg)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              )
+            }
+          />
+        );
+      })()}
+
       {tryTarget && !purchaseCard && activeTab === 'inventory' && (() => {
         const isItem = tryTarget.kind === 'item';
         const rarity = (isItem ? tryTarget.item.rarity : tryTarget.bg.rarity) as Rarity;
@@ -1680,7 +1747,7 @@ function WardrobeRowCard({
             </span>
           )}
           {equipped && (
-            <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 p-0.5 text-white shadow-md">
+            <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-[#447d3f] p-0.5 text-white shadow-md">
               <Check className="h-3 w-3 stroke-[4]" />
             </span>
           )}

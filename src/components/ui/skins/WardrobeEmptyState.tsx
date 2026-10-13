@@ -46,7 +46,7 @@ export function WardrobeEmptyState({
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-4 inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] px-5 text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+          className="mt-4 inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-5 text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
         >
           {action.icon}
           {action.label}

@@ -241,3 +241,49 @@ export function playComboChime(combo: number) {
     // ignore
   }
 }
+
+const FANFARE_STEPS = [0, 4, 7, 12, 16, 19];
+
+export function playPurchaseFanfare(tier: number) {
+  if (!catchSoundsEnabled()) return;
+  try {
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const count = 3 + Math.max(0, Math.min(tier, FANFARE_STEPS.length - 3));
+    const base = 587.33;
+    for (let i = 0; i < count; i++) {
+      const offset = i * 0.075;
+      const last = i === count - 1;
+      const hold = last ? 0.42 : 0.16;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(base * semitone(FANFARE_STEPS[i]), now + offset);
+      gain.gain.setValueAtTime(0.001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(last ? 0.1 : 0.075, now + offset + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + hold);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + hold + 0.02);
+    }
+    if (tier >= 3) {
+      const start = now + count * 0.075;
+      for (let i = 0; i < 6; i++) {
+        const offset = start + i * 0.045;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(base * 4 * semitone(FANFARE_STEPS[i % 4]), offset);
+        gain.gain.setValueAtTime(0.001, offset);
+        gain.gain.exponentialRampToValueAtTime(0.035, offset + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, offset + 0.12);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(offset);
+        osc.stop(offset + 0.14);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}

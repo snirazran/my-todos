@@ -31,7 +31,7 @@ import {
   type FocusSubjectKind,
 } from '@/lib/focusSubject';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
-import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import {
   playTimerSound,
@@ -324,7 +324,14 @@ export default function FrogodoroSheet({
   onMutateToday,
   onSubjectChange,
 }: Props) {
+  const [openSeen, setOpenSeen] = useState(false);
+  const [backdropHandoff, setBackdropHandoff] = useState(false);
+  if (open !== openSeen) {
+    setOpenSeen(open);
+    if (open) setBackdropHandoff(useSheetStore.getState().count > 0);
+  }
   useRegisterOpenSheet(open);
+  const [chipFlyDrawn, setChipFlyDrawn] = useState(false);
   const taskDisplayName = task ? getTaskDisplayName(task) : '';
   const subjectChipLabel = task
     ? subjectHeadline(task.subjectKind ?? subjectKindOf(task.id), taskDisplayName)
@@ -529,7 +536,10 @@ export default function FrogodoroSheet({
   };
 
   useEffect(() => {
-    if (!open) setSheetEntered(false);
+    if (!open) {
+      setSheetEntered(false);
+      setChipFlyDrawn(false);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -1044,20 +1054,26 @@ export default function FrogodoroSheet({
       {open && (
         <>
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 z-[999] bg-black/80"
+            style={{ zIndex: backdropHandoff ? 1060 : 999 }}
+            className={`fixed inset-0 bg-black/80 ${
+              backdropHandoff ? '' : 'sheet-backdrop-in'
+            }`}
           />
 
-          <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none px-3 pb-4 sm:items-center sm:p-6">
+          <div
+            style={{ zIndex: backdropHandoff ? 1061 : 1000 }}
+            className="fixed inset-0 flex items-end justify-center pointer-events-none px-3 pb-4 sm:items-center sm:p-6"
+          >
             <motion.div
               variants={
                 isDesktop
                   ? {
-                      hidden: { opacity: 0, scale: 0.98 },
-                      visible: { opacity: 1, scale: 1 },
+                      hidden: { opacity: 0, y: 12 },
+                      visible: { opacity: 1, y: 0 },
                     }
                   : {
                       hidden: { y: '100%', opacity: 0 },
@@ -1106,7 +1122,7 @@ export default function FrogodoroSheet({
                 )}
 
                 {/* Help Sub-View */}
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="wait" initial={false}>
                   {showPond ? (
                     <motion.div
                       key="pond"
@@ -1215,7 +1231,7 @@ export default function FrogodoroSheet({
                                     <span
                                       className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                                         isToday
-                                          ? 'bg-primary text-white'
+                                          ? 'bg-primary text-primary-foreground'
                                           : 'text-muted-foreground/70'
                                       }`}
                                     >
@@ -1346,21 +1362,28 @@ export default function FrogodoroSheet({
                                 aria-label="Fly catches this week"
                                 className="flex h-8 items-center gap-1 rounded-full bg-black/25 pl-1 pr-2.5 shadow-inner transition-colors hover:bg-black/35 active:scale-95"
                               >
-                                {/* Same handoff as the frog: a flat mark holds
-                                    the slot so no Rive canvas is attached while
-                                    the sheet is still sliding in. Fixed box +
-                                    leading-none on every sibling is what keeps
-                                    the row on one optical centre line. */}
-                                <span className="flex h-8 w-8 shrink-0 -translate-y-1 items-center justify-center">
-                                  {sheetEntered ? (
-                                    <Fly size={34} interactive={false} alwaysPlay paused />
-                                  ) : (
+                                {/* Fixed box + leading-none on every sibling is
+                                    what keeps the row on one optical centre line. */}
+                                <span className="relative flex h-8 w-8 shrink-0 -translate-y-1 items-center justify-center">
+                                  {!chipFlyDrawn && (
                                     <img
                                       src="/fly.svg"
                                       alt=""
                                       width={30}
                                       height={30}
                                       aria-hidden
+                                      className="absolute"
+                                    />
+                                  )}
+                                  {sheetEntered && (
+                                    <Fly
+                                      size={34}
+                                      interactive={false}
+                                      alwaysPlay
+                                      paused
+                                      onLoad={() =>
+                                        window.setTimeout(() => setChipFlyDrawn(true), 120)
+                                      }
                                     />
                                   )}
                                 </span>

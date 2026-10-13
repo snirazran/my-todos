@@ -232,7 +232,7 @@ function SummaryHero({ data }: { data: InsightData }) {
   const rate = data.summary.completionRate;
   const rangeLabel = data.range.days === 7 ? 'this week' : `in the last ${data.range.days} days`;
   return (
-    <section className="relative overflow-hidden rounded-[24px] bg-[#4f9149] px-5 py-6 text-white md:px-8 md:py-8" aria-labelledby="summary-heading">
+    <section className="relative overflow-hidden rounded-[24px] bg-[#447d3f] px-5 py-6 text-white md:px-8 md:py-8" aria-labelledby="summary-heading">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(134,239,172,0.24),transparent_35%),linear-gradient(135deg,transparent,rgba(255,255,255,0.04))]" aria-hidden="true" />
       <div className="relative grid items-center gap-6 md:grid-cols-[1fr_auto]">
         <div>
@@ -256,7 +256,7 @@ function SummaryHero({ data }: { data: InsightData }) {
           className="relative mx-auto grid h-36 w-36 shrink-0 place-items-center rounded-full md:h-40 md:w-40"
           style={{ background: `conic-gradient(#86efac ${rate * 3.6}deg, rgba(255,255,255,0.13) 0deg)` }}
         >
-          <div className="grid h-[116px] w-[116px] place-items-center rounded-full bg-[#4f9149] text-center md:h-[132px] md:w-[132px]">
+          <div className="grid h-[116px] w-[116px] place-items-center rounded-full bg-[#447d3f] text-center md:h-[132px] md:w-[132px]">
             <div>
               <span className="block text-4xl font-black tabular-nums tracking-[-0.05em]">{rate}%</span>
               <span className="mt-0.5 block text-[12px] font-black text-emerald-100/70">Completed</span>
@@ -365,7 +365,7 @@ function ProgressChart({ data, days }: { data: InsightData; days: 7 | 30 | 90 })
             <div key={point.from} className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch" title={`${fullLabel}: ${point.completed} of ${point.planned} completed`}>
               <span className="mb-1 text-[10px] font-black tabular-nums text-muted-foreground">{point.completed || ''}</span>
               <div className="relative w-full max-w-9 overflow-hidden rounded-t-lg bg-muted" style={{ height: plannedHeight }}>
-                <div className="absolute inset-x-0 bottom-0 rounded-t-lg bg-gradient-to-t from-[#4f9149] to-[#7cc06f]" style={{ height: completedHeight }} />
+                <div className="absolute inset-x-0 bottom-0 rounded-t-lg bg-gradient-to-t from-[#447d3f] to-[#7cc06f]" style={{ height: completedHeight }} />
               </div>
               <span className="mt-2 max-w-full truncate text-[9px] font-black text-muted-foreground md:text-[10px]">{dateLabel}</span>
             </div>
@@ -390,7 +390,7 @@ function SignalsSection({ signals, patternDays }: { signals: InsightData['signal
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         {signals.map((signal) => {
           const styles = {
-            positive: { card: 'border-emerald-200/80 bg-emerald-50/90 dark:border-emerald-400/20 dark:bg-emerald-500/10', icon: 'bg-emerald-500 text-white', Icon: TrendingUp },
+            positive: { card: 'border-emerald-200/80 bg-emerald-50/90 dark:border-emerald-400/20 dark:bg-emerald-500/10', icon: 'bg-[#447d3f] text-white', Icon: TrendingUp },
             watch: { card: 'border-amber-200/80 bg-amber-50/90 dark:border-amber-400/20 dark:bg-amber-500/10', icon: 'bg-amber-400 text-amber-950', Icon: CircleAlert },
             neutral: { card: 'border-sky-200/80 bg-sky-50/90 dark:border-sky-400/20 dark:bg-sky-500/10', icon: 'bg-sky-500 text-white', Icon: Lightbulb },
           }[signal.tone];
@@ -526,7 +526,7 @@ function TagSection({ tags, patternDays }: { tags: InsightData['tags']; patternD
 function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
   return (
     <section className="relative overflow-hidden rounded-[26px] border border-emerald-200 bg-[linear-gradient(120deg,#effdf1,#e6f8e8)] p-5 shadow-sm dark:border-emerald-400/20 dark:bg-[linear-gradient(120deg,rgba(34,197,94,0.13),rgba(16,185,129,0.06))] md:flex md:items-center md:gap-6 md:p-7" aria-labelledby="next-step-heading">
-      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#4f9149] text-white">
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#447d3f] text-white">
         <Lightbulb className="h-6 w-6" aria-hidden="true" />
       </div>
       <div className="mt-4 min-w-0 flex-1 md:mt-0">
@@ -536,7 +536,7 @@ function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
       </div>
       <Link
         href={nextStep.href}
-        className="mt-5 inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,background-color] hover:bg-[#478442] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:mt-0 md:w-auto"
+        className="mt-5 inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,background-color] hover:bg-[#3d7038] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:mt-0 md:w-auto"
       >
         {nextStep.action}
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -585,7 +585,7 @@ function DailyHistory({ daily }: { daily: DailyPoint[] }) {
 function SectionHeading({ icon, eyebrow, title, description, id }: { icon: React.ReactNode; eyebrow: string; title: string; description: string; id: string }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#4f9149]/10 text-primary">{icon}</div>
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#447d3f]/10 text-primary">{icon}</div>
       <div className="min-w-0">
         <p className="text-[12px] font-black text-primary">{eyebrow}</p>
         <h2 id={id} className="mt-0.5 text-lg font-black tracking-[-0.025em] text-foreground">{title}</h2>
@@ -606,7 +606,7 @@ function EmptyInsights() {
       <p className="mx-auto mt-2 max-w-md text-pretty text-sm font-medium leading-relaxed text-muted-foreground">
         Add a few tasks and check them off as you go. This page will turn that history into gentle, useful patterns.
       </p>
-      <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,background-color] hover:bg-[#478442] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+      <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,background-color] hover:bg-[#3d7038] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
         Plan My First Win
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </Link>

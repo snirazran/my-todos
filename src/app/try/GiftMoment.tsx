@@ -135,7 +135,7 @@ export function GiftMoment({
                   type="button"
                   onClick={wear}
                   autoFocus
-                  className="mt-5 flex h-[56px] w-full items-center justify-center rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_5px_0_0_#34631f] transition-all hover:brightness-110 active:translate-y-[4px] active:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f9149]/40"
+                  className="mt-5 flex h-[56px] w-full items-center justify-center rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white shadow-[0_5px_0_0_#2c511a] transition-all hover:brightness-110 active:translate-y-[4px] active:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#447d3f]/40"
                 >
                   Put it on
                 </button>

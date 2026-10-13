@@ -52,7 +52,7 @@ export function WishlistButton({
           className={cn(
             'absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black tabular-nums shadow-sm',
             hot
-              ? 'bg-emerald-500 text-white shadow-[0_0_0_3px_rgba(16,185,129,0.18)]'
+              ? 'bg-[#447d3f] text-white shadow-[0_0_0_3px_rgba(68,125,63,0.2)]'
               : 'border border-border/60 bg-background text-muted-foreground',
           )}
         >

@@ -902,7 +902,7 @@ export function StyleShuffleHeaderButton({
           <span
             key={ringKey}
             onAnimationEnd={() => setRing(false)}
-            className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#4f9149] [animation:shuffle-ping_0.9s_cubic-bezier(0,0,0.2,1)_both] motion-reduce:hidden"
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#447d3f] [animation:shuffle-ping_0.9s_cubic-bezier(0,0,0.2,1)_both] motion-reduce:hidden"
           />
         )}
         <span

@@ -259,7 +259,7 @@ function TextEditDialog({
             if (e.key === 'Enter') submit();
           }}
           maxLength={maxLength}
-          className="h-12 w-full rounded-2xl border border-border/60 bg-muted/30 px-4 pr-10 text-base font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-[#4f9149]/40"
+          className="h-12 w-full rounded-2xl border border-border/60 bg-muted/30 px-4 pr-10 text-base font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-[#447d3f]/40"
         />
         {value && (
           <button
@@ -276,7 +276,7 @@ function TextEditDialog({
         type="button"
         onClick={submit}
         disabled={!canSave || saving}
-        className="mt-4 h-12 w-full rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
+        className="mt-4 h-12 w-full rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
       >
         {saving ? 'Saving…' : 'Done'}
       </button>
@@ -347,7 +347,7 @@ function BirthdayDialog({
         type="button"
         onClick={submit}
         disabled={saving}
-        className="mt-5 h-12 w-full rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
+        className="mt-5 h-12 w-full rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
       >
         {saving ? 'Saving…' : 'Save'}
       </button>

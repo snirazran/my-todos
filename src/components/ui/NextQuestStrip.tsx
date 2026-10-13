@@ -74,6 +74,9 @@ function hoursUntilStartTime(startTime: string, now: Date): number {
   return (at.getTime() - now.getTime()) / 3_600_000;
 }
 
+const seenClaimIds = new Set<string>();
+let claimBaselineTaken = false;
+
 export function NextQuestStrip({
   claimables,
   trackables,
@@ -82,6 +85,7 @@ export function NextQuestStrip({
   introFill = false,
   introHold = false,
   loading = false,
+  bellyRatio,
 }: {
   claimables?: Claimable[];
   trackables?: Trackable[];
@@ -90,6 +94,7 @@ export function NextQuestStrip({
   introFill?: boolean;
   introHold?: boolean;
   loading?: boolean;
+  bellyRatio?: number;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -205,6 +210,32 @@ export function NextQuestStrip({
   const displayNextUp = introTrackable ?? fillingTrackable ?? nextUp;
   const showClaimable = !!claimable && !fillingTrackable && !introTrackable;
   const readyClaim = showClaimable ? claimable ?? null : null;
+
+  if (!claimBaselineTaken && claimables && !loading) {
+    claimBaselineTaken = true;
+    claimables.forEach((c) => seenClaimIds.add(c.id));
+  }
+  const [freshClaimId, setFreshClaimId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!readyClaim || seenClaimIds.has(readyClaim.id)) return;
+    seenClaimIds.add(readyClaim.id);
+    setFreshClaimId(readyClaim.id);
+  }, [readyClaim]);
+  const claimEntrance =
+    !!readyClaim &&
+    !reduceMotion &&
+    (freshClaimId === readyClaim.id || !seenClaimIds.has(readyClaim.id));
+
+  const bellyLinked =
+    !readyClaim &&
+    displayNextUp?.metricKey === 'frog_fed_full' &&
+    typeof bellyRatio === 'number';
+  const trackProgress = bellyLinked
+    ? Math.min(
+        (displayNextUp?.progress ?? 0) + Math.max(0, Math.min(0.97, bellyRatio)),
+        Math.max(1, displayNextUp?.target ?? 1) - 0.03,
+      )
+    : (displayNextUp?.progress ?? 1);
 
   // One slot, one winner. Rewards outrank work, so a finished pact week comes
   // first and a quest claimable second; below that the pact holds the slot for
@@ -480,7 +511,7 @@ export function NextQuestStrip({
               <>
                 <span className="flex min-w-0 items-center gap-1.5 truncate text-[14px] font-bold leading-tight text-foreground">
                   {readyClaim && (
-                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#4f9149] text-white">
+                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white">
                       <Check className="h-2.5 w-2.5" strokeWidth={4} />
                     </span>
                   )}
@@ -505,8 +536,9 @@ export function NextQuestStrip({
                   </span>
                 </span>
                 <QuestTrack
-                  progress={displayNextUp?.progress ?? 1}
-                  target={displayNextUp?.target ?? 1}
+                  progress={readyClaim ? 1 : trackProgress}
+                  target={readyClaim ? 1 : (displayNextUp?.target ?? 1)}
+                  entrance={claimEntrance}
                   action={
                     readyClaim
                       ? {

@@ -86,7 +86,7 @@ export function BuddyUpFlow({
         ? { x: (rect.left + rect.width / 2) / window.innerWidth, y: 0.4 }
         : { y: 0.4 },
       zIndex: 99999,
-      colors: ['#4f9149', '#8fc36d', '#ffd166', '#ffffff'],
+      colors: ['#447d3f', '#8fc36d', '#ffd166', '#ffffff'],
     });
   }, [phase]);
 
@@ -156,7 +156,7 @@ export function BuddyUpFlow({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[1600] flex items-end justify-center bg-[#4f9149]/95 backdrop-blur-sm sm:items-center"
+              className="fixed inset-0 z-[1600] flex items-end justify-center bg-[#447d3f]/95 backdrop-blur-sm sm:items-center"
               onClick={onClose}
             >
               <motion.div
@@ -185,7 +185,7 @@ export function BuddyUpFlow({
                     ref={sentBtnRef}
                     type="button"
                     onClick={onClose}
-                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
                   >
                     <Check className="h-5 w-5" strokeWidth={3} />
                     Done
@@ -199,7 +199,7 @@ export function BuddyUpFlow({
                         await requestNotif();
                         onClose();
                       }}
-                      className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+                      className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
                     >
                       <Bell className="h-5 w-5" />
                       Tell me when they accept

@@ -325,7 +325,7 @@ export function SingleRewardCard({
           )}
           previewTopLeftBadge={
             isClaimed ? (
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#447d3f] text-white shadow-md ring-2 ring-white">
                 <Check className="h-3.5 w-3.5" strokeWidth={4} />
               </span>
             ) : lockOverlay ? (

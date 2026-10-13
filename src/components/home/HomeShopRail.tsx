@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Bookmark, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
@@ -12,12 +12,13 @@ import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/components/auth/AuthContext';
+import { useScrollTapGuard } from '@/hooks/useScrollTapGuard';
 import {
   buildWishlistEntries,
   type WishlistEntry,
   type WishlistView,
 } from '@/lib/skins/wishlist';
-import { rarityRank, type ItemDef } from '@/lib/skins/catalog';
+import type { ItemDef } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
@@ -89,7 +90,7 @@ export function HomeShopRail() {
   const { user } = useAuth();
   const router = useRouter();
   const { data } = useInventory(!!user, true);
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const tapGuard = useScrollTapGuard<HTMLElement>();
   const seenRef = React.useRef(false);
 
   const balance = data?.wardrobe?.flies ?? 0;
@@ -121,19 +122,18 @@ export function HomeShopRail() {
     }
     if (!candidates.length) return [];
 
-    // Today's discounts lead, then whatever you can afford, so the rail opens
-    // on something attainable rather than a wall of locked prices.
-    const rank = (a: ShopPick, b: ShopPick) =>
-      Number(b.onSale) - Number(a.onSale) ||
-      rarityRank[b.item.rarity] - rarityRank[a.item.rarity];
-    const affordable = candidates.filter((c) => c.price <= balance).sort(rank);
-    const rest = candidates.filter((c) => c.price > balance).sort(rank);
+    const affordable = candidates
+      .filter((c) => c.price <= balance)
+      .sort((a, b) => Number(b.onSale) - Number(a.onSale) || b.price - a.price);
+    const rest = candidates
+      .filter((c) => c.price > balance)
+      .sort((a, b) => a.price - b.price);
     return [...affordable, ...rest];
   }, [data?.catalog, deals, balance]);
 
   React.useEffect(() => {
     if (!picks.length || seenRef.current) return;
-    const node = rootRef.current;
+    const node = tapGuard.ref.current;
     if (!node) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -150,7 +150,7 @@ export function HomeShopRail() {
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [picks, balance, savedCount]);
+  }, [picks, balance, savedCount, tapGuard.ref]);
 
   if (!user || !picks.length) return null;
 
@@ -169,7 +169,12 @@ export function HomeShopRail() {
   };
 
   return (
-    <section ref={rootRef} className="mx-1.5 mt-7 md:mx-4 md:mt-10">
+    <section
+      ref={tapGuard.ref}
+      onPointerDownCapture={tapGuard.onPointerDownCapture}
+      onClickCapture={tapGuard.onClickCapture}
+      className="mx-1.5 mt-7 md:mx-4 md:mt-10"
+    >
       <div className="mb-2 flex min-h-9 items-center justify-between gap-2 pl-3.5 pr-1 md:pl-4">
         <div className="flex min-w-0 items-baseline gap-2">
           <h2 className="text-[19px] font-black tracking-tight text-foreground md:text-[21px]">
@@ -238,10 +243,11 @@ export function HomeShopRail() {
                 </span>
               </span>
               {!focus.affordable && (
-                <span className="inline-flex shrink-0 items-center text-[11px] font-black tabular-nums text-muted-foreground">
-                  <Fly size={20} paused y={-3} x={2} />
-                  {focus.remaining.toLocaleString()}
-                </span>
+                <FlyAmount
+                  amount={focus.remaining}
+                  size={11}
+                  className="shrink-0 font-black text-muted-foreground"
+                />
               )}
             </span>
           </span>
@@ -281,16 +287,17 @@ export function HomeShopRail() {
                   {config.label}
                 </span>
                 {onSale && (
-                  <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+                  <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950">
                     -{discountPercent}%
                   </span>
                 )}
               </span>
               <span className="flex items-center justify-between gap-1 px-1 pb-0.5 pt-1.5">
-                <span className="inline-flex items-center text-[14px] font-black tabular-nums text-foreground">
-                  <Fly size={22} paused y={-2} />
-                  {price.toLocaleString()}
-                </span>
+                <FlyAmount
+                  amount={price}
+                  size={14}
+                  className="pl-0.5 font-black text-foreground"
+                />
                 {onSale && (
                   <span className="text-[11px] font-bold tabular-nums text-muted-foreground/70 line-through">
                     {wasPrice.toLocaleString()}

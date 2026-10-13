@@ -55,7 +55,7 @@ export function NudgeBannerCard({
       <button
         type="button"
         onClick={onCta}
-        className="shrink-0 rounded-xl bg-[#4f9149] px-3 py-2 text-xs font-black text-white"
+        className="shrink-0 rounded-xl bg-[#447d3f] px-3 py-2 text-xs font-black text-white"
       >
         {campaign.copy.ctaLabel}
       </button>

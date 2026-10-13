@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import Frog from '@/components/ui/frog';
 import { useWishlist } from '@/hooks/useWishlist';
 import { hapticTick } from '@/lib/haptics';
@@ -101,10 +101,11 @@ export function WishlistGoalCard({
                 </span>
               </>
             )}
-            <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-foreground">
-              <Fly size={22} paused y={-3} />
-              {pricing.price.toLocaleString()}
-            </span>
+            <FlyAmount
+              amount={pricing.price}
+              size={14}
+              className="font-black text-foreground"
+            />
           </span>
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -129,16 +130,17 @@ export function WishlistGoalCard({
           <button
             type="button"
             onClick={() => go(itemPath)}
-            className="mt-2.5 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+            className="mt-2.5 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
           >
             You can afford it — get it now
           </button>
         ) : (
           <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground">
-            <Fly size={26} paused y={-3} oversample={1.25} />
-            <span className="tabular-nums text-foreground">
-              {progress.remaining.toLocaleString()}
-            </span>
+            <FlyAmount
+              amount={progress.remaining}
+              size={12}
+              className="font-black text-foreground"
+            />
             to go
           </p>
         )}

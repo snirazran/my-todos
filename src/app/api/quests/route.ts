@@ -139,6 +139,7 @@ type TrackableEntry = {
   objectiveLabel: string;
   remainingLabel: string;
   objectiveType?: string;
+  metricKey?: string;
   actionKey?: string;
   questDone?: number;
   questTotal?: number;
@@ -605,6 +606,7 @@ export async function GET(req: Request) {
           objectiveLabel: objectiveSummaryLabel(block),
           remainingLabel: objectiveRemainingLabel(block),
           objectiveType: block.type,
+          metricKey: block.type === 'metric_count' ? block.metricKey : undefined,
           // Where this objective sits in its ladder, so a surface can show the
           // whole arc without re-deriving it from a list that omits finished
           // tiers by design.

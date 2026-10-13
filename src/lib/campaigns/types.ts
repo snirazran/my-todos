@@ -727,7 +727,7 @@ export function createElement(type: ElementType, z: number): CampaignElement {
         text: 'Get it',
         y: 72,
         h: 11,
-        background: '#4f9149',
+        background: '#447d3f',
         radius: 16,
         shadow: true,
         action: 'open_fly_shop',

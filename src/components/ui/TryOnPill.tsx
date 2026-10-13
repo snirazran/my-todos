@@ -4,7 +4,7 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { useTryOnStore } from '@/lib/tryOnStore';
 import { useInventory, mutateInventoryCaches } from '@/hooks/useInventory';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -132,18 +132,12 @@ export function TryOnPill({ className }: { className?: string }) {
             ) : canAfford ? (
               <>
                 Keep it for
-                <Fly size={13} paused y={-1} />
-                <span className="tabular-nums">
-                  {offer.price.toLocaleString()}
-                </span>
+                <FlyAmount amount={offer.price} size={11} className="text-foreground" />
                 ?
               </>
             ) : (
               <>
-                <Fly size={13} paused y={-1} />
-                <span className="tabular-nums">
-                  {offer.price.toLocaleString()}
-                </span>
+                <FlyAmount amount={offer.price} size={11} className="text-foreground" />
                 — save up for it?
               </>
             )}
@@ -155,7 +149,7 @@ export function TryOnPill({ className }: { className?: string }) {
             type="button"
             onClick={keep}
             disabled={busy}
-            className="flex h-9 shrink-0 items-center justify-center rounded-xl bg-[#4f9149] px-3 text-xs font-black tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+            className="flex h-9 shrink-0 items-center justify-center rounded-xl bg-[#447d3f] px-3 text-xs font-black tracking-wide text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-60"
           >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" />

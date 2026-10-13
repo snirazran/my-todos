@@ -11,7 +11,7 @@ import {
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
@@ -228,10 +228,11 @@ export function DailyDealsShelf({
                     {deal.priceFlies.toLocaleString()}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-foreground">
-                  <Fly size={26} paused y={-2} />
-                  {deal.dealPrice.toLocaleString()}
-                </span>
+                <FlyAmount
+                  amount={deal.dealPrice}
+                  size={14}
+                  className="font-black text-foreground"
+                />
               </div>
               {/* Held even when there is no sale, so the cards in a row keep
                   one baseline instead of jumping by a line. */}

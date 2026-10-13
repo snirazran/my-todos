@@ -134,7 +134,7 @@ function NewTokenPanel({
       <button
         type="button"
         onClick={onDone}
-        className="w-full rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600"
+        className="w-full rounded-2xl bg-[#447d3f] py-3 text-sm font-black text-white transition-colors hover:bg-[#3d7038]"
       >
         Done
       </button>
@@ -363,7 +363,7 @@ export default function AiConnectionsSection() {
           href={claudeInstallUrl}
           target="_blank"
           rel="noreferrer noopener"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3 text-sm font-black text-white transition-colors hover:bg-[#3d7038]"
         >
           {connections.length > 0 ? 'Connect another' : 'Connect to Claude'}
           <ExternalLink className="h-4 w-4" />

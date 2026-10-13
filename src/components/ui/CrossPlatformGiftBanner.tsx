@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { X, QrCode } from 'lucide-react';
+import { X } from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import {
@@ -99,7 +99,11 @@ export function CrossPlatformGiftBanner() {
     });
   };
 
-  const showQr = async () => {
+  const toggleQr = async () => {
+    if (qrUrl) {
+      setQrUrl(null);
+      return;
+    }
     trackGrowthEvent('xplat_banner_cta', { platform, action: 'qr' });
     try {
       const { default: QRCode } = await import('qrcode');
@@ -114,121 +118,115 @@ export function CrossPlatformGiftBanner() {
   return (
     <AnimatePresence>
       {visible && (
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+        <motion.aside
+          aria-label="Get the Frogress app"
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+          exit={
+            reduceMotion
+              ? { opacity: 0 }
+              : {
+                  opacity: 0,
+                  y: -12,
+                  transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
+                }
+          }
           transition={
             reduceMotion
               ? { duration: 0.15 }
-              : { type: 'spring', stiffness: 320, damping: 26 }
+              : { type: 'spring', stiffness: 420, damping: 34 }
           }
-          className="absolute inset-x-0 top-16 z-20 hidden md:block"
+          className="pointer-events-none fixed inset-x-0 top-[76px] z-40 hidden justify-center px-6 md:flex"
         >
-          <aside
-            aria-label="Get the Frogress app"
-            className="border-b border-primary/20 bg-background/90 text-foreground shadow-sm backdrop-blur-xl dark:border-primary/30"
-          >
-            <div className="mx-auto flex min-h-14 max-w-7xl items-center gap-2.5 px-6 py-1.5 md:px-10">
-              <span
-                aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-lg ring-1 ring-primary/10"
-              >
-                🎁
-              </span>
-
-              <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <span className="shrink-0 text-[12px] font-bold text-primary">
+          <div className="pointer-events-auto relative w-full max-w-[540px] overflow-hidden rounded-[22px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_18px_40px_-20px_rgba(15,23,42,0.45)] dark:shadow-[0_18px_40px_-16px_rgba(0,0,0,0.8)]">
+            <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20" />
+            <div className="flex items-center gap-3 py-2.5 pl-3 pr-2">
+              <motion.img
+                src="/gift1.webp"
+                alt=""
+                width={42}
+                height={40}
+                className="h-10 w-[42px] shrink-0 drop-shadow-[0_5px_6px_rgba(52,99,31,0.22)]"
+                animate={
+                  reduceMotion
+                    ? undefined
+                    : { rotate: [0, -9, 7, -4, 0], y: [0, -3, 0, -1, 0] }
+                }
+                transition={{
+                  duration: 0.9,
+                  delay: 0.45,
+                  repeat: 2,
+                  repeatDelay: 5,
+                  ease: [0.32, 0.72, 0, 1],
+                }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-black uppercase tracking-[0.08em] text-primary">
                   App gift
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="h-4 w-px shrink-0 bg-border"
-                />
-                <p className="truncate text-sm font-semibold tracking-tight">
-                  A gift is waiting in the Frogress app
                 </p>
-                <p className="hidden shrink-0 text-xs font-medium text-muted-foreground xl:block">
-                  Visit your frog on your phone to unwrap it.
+                <p className="truncate text-[15px] font-black tracking-tight text-foreground">
+                  A gift is waiting on your phone
                 </p>
               </div>
-
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  onClick={() => void showQr()}
-                  aria-expanded={!!qrUrl}
-                  aria-controls="cross-gift-qr"
-                  className="flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-[background-color,transform] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
-                >
-                  <QrCode
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                    strokeWidth={3}
-                  />
-                  Get app
-                </button>
-
-                <AnimatePresence>
-                  {qrUrl && (
-                    <motion.div
-                      id="cross-gift-qr"
-                      role="dialog"
-                      aria-label="Scan to get the Frogress app"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : { opacity: 0, y: -8, scale: 0.98 }
-                      }
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                      transition={{ duration: reduceMotion ? 0.1 : 0.18 }}
-                      className="absolute right-0 top-full z-10 mt-2 w-72 rounded-2xl border border-primary/25 bg-popover p-4 text-popover-foreground shadow-2xl"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setQrUrl(null)}
-                        aria-label="Close QR code"
-                        className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <X
-                          aria-hidden="true"
-                          className="h-4 w-4"
-                          strokeWidth={3}
-                        />
-                      </button>
-                      <div className="flex flex-col items-center gap-2 pt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={qrUrl}
-                          alt="QR code to download the Frogress app"
-                          width={160}
-                          height={160}
-                          className="h-40 w-40 rounded-xl border border-border"
-                        />
-                        <p className="text-center text-sm font-black">
-                          Scan with your phone
-                        </p>
-                        <p className="text-pretty text-center text-xs font-semibold text-muted-foreground">
-                          Sign in with the same account to find your gift.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
+              <button
+                type="button"
+                onClick={() => void toggleQr()}
+                aria-expanded={!!qrUrl}
+                aria-controls="cross-gift-qr"
+                className="flex h-10 shrink-0 items-center rounded-xl bg-[#447d3f] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow,background-color] hover:-translate-y-px hover:bg-[#3d7038] hover:shadow-[0_4px_0_0_#2c511a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:translate-y-[3px] active:shadow-none"
+              >
+                {qrUrl ? 'Hide code' : 'Get the app'}
+              </button>
               <button
                 type="button"
                 onClick={dismiss}
-                aria-label="Dismiss app gift banner"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Dismiss app gift"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <X aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
+                <X aria-hidden="true" className="h-4 w-4" strokeWidth={2.75} />
               </button>
             </div>
-          </aside>
-        </motion.div>
+
+            <AnimatePresence initial={false}>
+              {qrUrl && (
+                <motion.div
+                  id="cross-gift-qr"
+                  key="qr"
+                  initial={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0.12 }
+                      : { type: 'spring', stiffness: 420, damping: 38 }
+                  }
+                  className="overflow-hidden"
+                >
+                  <div className="mx-3 mb-3 flex items-center gap-4 rounded-2xl bg-muted/50 p-3 ring-1 ring-inset ring-border/50">
+                    <div className="grid h-[112px] w-[112px] shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-border/60">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={qrUrl}
+                        alt="QR code to get the Frogress app"
+                        width={100}
+                        height={100}
+                        className="h-full w-full"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black text-foreground">
+                        Scan with your phone
+                      </p>
+                      <p className="mt-1 text-pretty text-[13px] font-semibold leading-snug text-muted-foreground">
+                        Sign in with this account and your frog will unwrap it.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.aside>
       )}
     </AnimatePresence>
   );

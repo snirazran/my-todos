@@ -123,7 +123,7 @@ export function PublicHomepage() {
               </Link>
               <Link
                 href="/welcome"
-                className="hidden h-10 items-center rounded-full bg-[#4f9149] px-4 text-sm font-black text-white shadow-[0_3px_0_#34631f] transition-colors hover:bg-[#57a050] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#34631f] sm:inline-flex"
+                className="hidden h-10 items-center rounded-full bg-[#447d3f] px-4 text-sm font-black text-white shadow-[0_3px_0_#2c511a] transition-colors hover:bg-[#57a050] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2c511a] sm:inline-flex"
               >
                 Start free
               </Link>
@@ -181,7 +181,7 @@ export function PublicHomepage() {
               >
                 {['Free on web, iPhone and Android', 'No card needed', 'Try it before you sign up'].map((item) => (
                   <li key={item} className="inline-flex items-center gap-1.5">
-                    <Check className="h-4 w-4 text-[#4f9149]" strokeWidth={3} aria-hidden />
+                    <Check className="h-4 w-4 text-[#447d3f]" strokeWidth={3} aria-hidden />
                     {item}
                   </li>
                 ))}
@@ -206,7 +206,7 @@ export function PublicHomepage() {
             <ol className="relative mt-12 grid gap-10 sm:mt-16 md:grid-cols-3 md:gap-8">
               <svg
                 aria-hidden
-                className="pointer-events-none absolute left-[16%] right-[16%] top-4 hidden h-16 w-[68%] text-[#4f9149]/40 md:block"
+                className="pointer-events-none absolute left-[16%] right-[16%] top-4 hidden h-16 w-[68%] text-[#447d3f]/40 md:block"
                 viewBox="0 0 600 60"
                 preserveAspectRatio="none"
                 fill="none"
@@ -258,7 +258,7 @@ export function PublicHomepage() {
                 tags and repeats, and park the rest in Saved Tasks. Habits earn
                 bigger flies as your streak grows.
               </p>
-              <p className="mt-6 text-sm font-black text-[#34631f] dark:text-[#9fd98f]">
+              <p className="mt-6 text-sm font-black text-[#2c511a] dark:text-[#9fd98f]">
                 Try it: drag a card to another day, or tap a fly.
               </p>
             </div>
@@ -317,7 +317,7 @@ export function PublicHomepage() {
                   outfits, hats, things to hold and whole new ponds, then show
                   your friends the look.
                 </p>
-                <p className="mt-6 text-sm font-black text-[#34631f] dark:text-[#9fd98f]">
+                <p className="mt-6 text-sm font-black text-[#2c511a] dark:text-[#9fd98f]">
                   Try it: dress the frog, or hit Shuffle.
                 </p>
               </div>

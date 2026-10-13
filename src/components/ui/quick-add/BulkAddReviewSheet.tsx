@@ -217,7 +217,7 @@ export default function BulkAddReviewSheet({
               type="button"
               onClick={submit}
               disabled={!canAdd}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-[22px] bg-[#4f9149] text-[16px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:grayscale sm:h-16 sm:text-[17px]"
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-[22px] bg-[#447d3f] text-[16px] font-black text-white shadow-[0_4px_0_0_#2c511a] transition-all active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:grayscale sm:h-16 sm:text-[17px]"
             >
               {submitting ? (
                 'Adding tasks…'

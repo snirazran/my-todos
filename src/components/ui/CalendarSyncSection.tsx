@@ -354,7 +354,7 @@ function ProviderCard({
               type="button"
               disabled={syncing}
               onClick={() => void resume()}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3 text-sm font-black text-white transition-colors hover:bg-[#3d7038] disabled:opacity-60"
             >
               {syncing && <Loader2 className="h-4 w-4 animate-spin" />}
               Resume syncing
@@ -374,7 +374,7 @@ function ProviderCard({
                 type="button"
                 disabled={connecting}
                 onClick={() => onConnect(pendingDirection)}
-                className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+                className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3 text-sm font-black text-white transition-colors hover:bg-[#3d7038] disabled:opacity-60"
               >
                 {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
                 {connecting ? 'Waiting for Google…' : `Connect ${label}`}
@@ -395,7 +395,7 @@ function ProviderCard({
                 setPendingDirection(direction);
                 setChoosingDirection(true);
               }}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3 text-sm font-black text-white transition-colors hover:bg-[#3d7038]"
             >
               {connection ? 'Reconnect' : 'Connect'}
             </button>

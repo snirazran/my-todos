@@ -293,7 +293,7 @@ export function MarketingFrogHero() {
             <button
               type="button"
               onClick={refill}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-black text-[#34631f] transition-colors hover:bg-[#4f9149]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4f9149] dark:text-[#9fd98f]"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-black text-[#2c511a] transition-colors hover:bg-[#447d3f]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#447d3f] dark:text-[#9fd98f]"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden />
               Add three more

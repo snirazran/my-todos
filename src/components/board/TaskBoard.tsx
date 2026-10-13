@@ -164,7 +164,7 @@ const DOCK_TONES = {
   green: {
     icon: 'text-primary',
     active:
-      'border-transparent bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f]',
+      'border-transparent bg-[#447d3f] text-white shadow-[0_3px_0_0_#2c511a]',
   },
 } as const;
 
@@ -393,7 +393,7 @@ function LiveTodayChip({
       aria-label="Go back to today"
       aria-hidden={!show || undefined}
       tabIndex={show ? undefined : -1}
-      className={`flex h-8 items-center gap-1 rounded-xl bg-[#4f9149] px-2.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-[opacity,transform,box-shadow] duration-200 ease-out active:translate-y-0.5 active:shadow-none ${
+      className={`flex h-8 items-center gap-1 rounded-xl bg-[#447d3f] px-2.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[opacity,transform,box-shadow] duration-200 ease-out active:translate-y-0.5 active:shadow-none ${
         show ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'
       }`}
     >
@@ -2634,7 +2634,7 @@ export default function TaskBoard({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 460, damping: 32 }}
-                className="flex h-11 items-center gap-1.5 rounded-2xl bg-[#4f9149] px-4 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,background-color] hover:bg-[#478442] active:translate-y-1 active:shadow-none"
+                className="flex h-11 items-center gap-1.5 rounded-2xl bg-[#447d3f] px-4 text-sm font-black text-white shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,background-color] hover:bg-[#3d7038] active:translate-y-1 active:shadow-none"
               >
                 <CalendarCheck className="h-4 w-4" strokeWidth={2.5} />
                 Today

@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Check, Repeat, X } from 'lucide-react';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { cn } from '@/lib/utils';
@@ -80,12 +80,12 @@ export function WishlistTile({
             />
           )}
           {entry.onDeal && (
-            <span className="absolute bottom-0 left-0 z-20 rounded-tr-xl bg-emerald-500 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
+            <span className="absolute bottom-0 left-0 z-20 rounded-tr-xl bg-[#447d3f] px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
               −{entry.discountPercent}%
             </span>
           )}
           {view.owned && (
-            <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white shadow-sm">
+            <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-[#447d3f] text-white shadow-sm">
               <Check className="h-3 w-3 stroke-[4]" />
             </span>
           )}
@@ -108,10 +108,11 @@ export function WishlistTile({
                   {entry.fullPrice.toLocaleString()}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-foreground">
-                <Fly size={26} paused y={-2} />
-                {entry.price.toLocaleString()}
-              </span>
+              <FlyAmount
+                amount={entry.price}
+                size={14}
+                className="font-black text-foreground"
+              />
             </>
           )}
         </div>
@@ -179,9 +180,9 @@ function WishlistTileFooter({
           style={{ width: `${Math.min(100, Math.max(4, entry.ratio * 100))}%` }}
         />
       </div>
-      <span className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] font-black tabular-nums text-muted-foreground">
-        <Fly size={18} paused y={-2} />
-        {entry.remaining.toLocaleString()} to go
+      <span className="mt-0.5 flex items-center justify-center gap-1 text-[10px] font-black tabular-nums text-muted-foreground">
+        <FlyAmount amount={entry.remaining} size={10} />
+        to go
       </span>
     </>
   );

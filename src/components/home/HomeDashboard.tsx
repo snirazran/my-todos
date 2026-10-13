@@ -982,6 +982,11 @@ export default function HomeDashboard() {
                   introFill={guided}
                   introHold={questIntroHeld}
                   loading={questsData === undefined && !questsError}
+                  bellyRatio={
+                    user && hungerStatus.maxHunger > 0
+                      ? hungerStatus.hunger / hungerStatus.maxHunger
+                      : undefined
+                  }
                 />
               </motion.div>
             )}

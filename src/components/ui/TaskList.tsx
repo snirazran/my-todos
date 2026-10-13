@@ -859,7 +859,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
               onPointerDown={(event) => event.stopPropagation()}
               onClick={handleTimerAction}
               style={{ width: timerTrayWidth }}
-              className="absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden bg-emerald-600 text-white"
+              className="absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden bg-[#447d3f] text-white"
             >
               <motion.span
                 className="flex w-[88px] shrink-0 flex-col items-center justify-center gap-0.5"
@@ -1279,6 +1279,7 @@ const SortableTaskItem = React.forwardRef<
 
   return (
     <div
+      data-row
       ref={(node: HTMLDivElement | null) => {
         rowRef.current = node;
         setNodeRef(node);
@@ -1527,12 +1528,12 @@ function DayClearedState({
                 {
                   '--spark-angle': `${angle}deg`,
                   animationDelay: `${120 + i * 18}ms`,
-                  backgroundColor: i % 2 ? '#f59e0b' : '#4f9149',
+                  backgroundColor: i % 2 ? '#f59e0b' : '#447d3f',
                 } as React.CSSProperties
               }
             />
           ))}
-          <span className="day-cleared-seal relative grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#68b85c] to-[#4f9149] text-white shadow-[0_8px_18px_-8px_rgba(79,145,73,0.8),inset_0_-2px_0_rgba(0,0,0,0.12)]">
+          <span className="day-cleared-seal relative grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#68b85c] to-[#447d3f] text-white shadow-[0_8px_18px_-8px_rgba(79,145,73,0.8),inset_0_-2px_0_rgba(0,0,0,0.12)]">
             <Check className="h-7 w-7" strokeWidth={3.5} />
           </span>
         </span>

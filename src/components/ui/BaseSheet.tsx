@@ -197,13 +197,13 @@ export function BaseSheet({
   if (!mounted) return null;
 
   const sheetVariants = {
-    hidden: isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' },
-    visible: isDesktop ? { opacity: 1, scale: 1 } : { y: 0 },
+    hidden: isDesktop ? { opacity: 0, y: 12 } : { y: '100%' },
+    visible: isDesktop ? { opacity: 1, y: 0 } : { y: 0 },
     exit: ({ velocity, offset }: DragExitInfo) => {
       if (isDesktop) {
         return {
           opacity: 0,
-          scale: 0.98,
+          y: 8,
           transition: defaultDesktopTransition,
         };
       }

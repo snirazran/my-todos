@@ -14,6 +14,10 @@ import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 import { useUIStore } from '@/lib/uiStore';
 import { WardrobePageSkeleton } from '@/components/ui/Skeleton';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
+import {
+  PurchaseBurst,
+  usePurchaseCelebration,
+} from '@/components/ui/skins/PurchaseBurst';
 
 function WardrobePageInner() {
   const router = useRouter();
@@ -70,6 +74,8 @@ function WardrobePageInner() {
   }, [bgData?.equipped, bgData?.catalog]);
   const stageImages = tryOn?.kind === 'bg' ? tryOn.images : equippedBgImages;
 
+  const purchaseBurst = usePurchaseCelebration();
+
   useEffect(() => {
     const onEquipped = () => frogRef.current?.fireEmote('love');
     window.addEventListener(WARDROBE_EQUIPPED_EVENT, onEquipped);
@@ -91,13 +97,22 @@ function WardrobePageInner() {
             frogBoxRef={frogBoxRef}
             onGrabActive={setFrogMouthOpen}
           />
-          <div data-fly-hero-frog>
-            <Frog
-              ref={frogRef}
-              mouthOpen={frogMouthOpen}
-              indices={stageIndices}
-              paused={false}
+          {purchaseBurst && (
+            <PurchaseBurst
+              key={purchaseBurst.key}
+              rarity={purchaseBurst.rarity}
+              className="top-[38%]"
             />
+          )}
+          <div data-fly-hero-frog>
+            <div className={purchaseBurst ? 'purchase-hop' : undefined}>
+              <Frog
+                ref={frogRef}
+                mouthOpen={frogMouthOpen}
+                indices={stageIndices}
+                paused={false}
+              />
+            </div>
           </div>
           <PremiumFrogAura />
         </div>

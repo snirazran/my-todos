@@ -24,7 +24,7 @@ import {
 import type { FrogIndices } from '@/lib/friends/indices';
 import { cn } from '@/lib/utils';
 
-const BUDDY = '#4f9149';
+const BUDDY = '#447d3f';
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export type BuddyGoalDraft = {
@@ -208,15 +208,15 @@ export function BuddyGoalSheet({
                 <BuddyFrogFace
                   indices={recipientIndices}
                   size={34}
-                  className="shrink-0 ring-2 ring-inset ring-[#4f9149]/40"
+                  className="shrink-0 ring-2 ring-inset ring-[#447d3f]/40"
                 />
               ) : (
-                <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[#4f9149]/10 text-[#4f9149]">
+                <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[#447d3f]/10 text-[#447d3f]">
                   <Gift className="h-4 w-4" />
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-black text-[#4f9149]">
+                <p className="text-[12px] font-black text-[#447d3f]">
                   Goal buddy · Step 2 of 2
                 </p>
                 <p className="truncate text-[15px] font-black tracking-tight text-foreground">
@@ -246,7 +246,7 @@ export function BuddyGoalSheet({
               onBlur={() => setInputFocused(false)}
               enterKeyHint="done"
               placeholder="What will you both do?"
-              className="w-full rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5 text-[17px] font-bold tracking-tight text-foreground placeholder:font-semibold placeholder:text-muted-foreground/60 focus:border-[#4f9149]/50 focus:outline-none focus:ring-2 focus:ring-[#4f9149]/20"
+              className="w-full rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5 text-[17px] font-bold tracking-tight text-foreground placeholder:font-semibold placeholder:text-muted-foreground/60 focus:border-[#447d3f]/50 focus:outline-none focus:ring-2 focus:ring-[#447d3f]/20"
             />
 
             <div
@@ -293,7 +293,7 @@ export function BuddyGoalSheet({
                     className={cn(
                       'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-black tracking-tight transition-colors',
                       presetId === p.id
-                        ? 'border-[#4f9149] bg-[#4f9149]/10 text-[#4f9149]'
+                        ? 'border-[#447d3f] bg-[#447d3f]/10 text-[#447d3f]'
                         : 'border-border/60 bg-card text-muted-foreground hover:text-foreground',
                     )}
                   >
@@ -323,7 +323,7 @@ export function BuddyGoalSheet({
                   className={cn(
                     'h-11 rounded-2xl border text-[13px] font-black tracking-tight transition-colors',
                     choice === value
-                      ? 'border-[#4f9149] bg-[#4f9149]/10 text-[#4f9149]'
+                      ? 'border-[#447d3f] bg-[#447d3f]/10 text-[#447d3f]'
                       : 'border-border/60 bg-card text-muted-foreground hover:text-foreground',
                   )}
                 >
@@ -343,7 +343,7 @@ export function BuddyGoalSheet({
                     className={cn(
                       'h-10 flex-1 rounded-xl text-[13px] font-black transition-colors',
                       customDays.includes(d)
-                        ? 'bg-[#4f9149] text-white'
+                        ? 'bg-[#447d3f] text-white'
                         : 'bg-muted/60 text-muted-foreground hover:text-foreground',
                     )}
                   >
@@ -372,8 +372,8 @@ export function BuddyGoalSheet({
                         className={cn(
                           'aspect-square overflow-hidden rounded-[18px] border-4 bg-muted/40 p-1 transition-all active:scale-95',
                           selected
-                            ? 'border-[#4f9149] ring-4 ring-inset ring-[#4f9149]/20'
-                            : 'border-border/50 hover:border-[#4f9149]/50',
+                            ? 'border-[#447d3f] ring-4 ring-inset ring-[#447d3f]/20'
+                            : 'border-border/50 hover:border-[#447d3f]/50',
                         )}
                       >
                         <GiftPreview
@@ -392,7 +392,7 @@ export function BuddyGoalSheet({
               </>
             )}
 
-            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-[#4f9149]/25 bg-[#4f9149]/[0.07] px-3.5 py-3">
+            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-[#447d3f]/25 bg-[#447d3f]/[0.07] px-3.5 py-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/80 dark:bg-card">
                 <Fly size={30} interactive={false} paused />
               </span>
@@ -425,7 +425,7 @@ export function BuddyGoalSheet({
               onClick={() =>
                 onSubmit({ text: text.trim(), choice, days, giftOptionId: giftId })
               }
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:pointer-events-none disabled:opacity-50"
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none disabled:pointer-events-none disabled:opacity-50"
             >
               {sending && <Loader2 className="h-5 w-5 animate-spin" />}
               {submitLabel ??

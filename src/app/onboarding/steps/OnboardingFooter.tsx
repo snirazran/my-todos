@@ -143,7 +143,7 @@ export function OnboardingButton({
         'relative flex w-full select-none items-center justify-center gap-2 font-black tracking-tight transition-all duration-150 [-webkit-tap-highlight-color:transparent] md:w-80',
         'focus-visible:outline-none focus-visible:ring-4',
         variant === 'primary' &&
-          'h-14 rounded-2xl bg-[#4f9149] text-[17px] text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 focus-visible:ring-[#4f9149]/40 active:translate-y-1 active:shadow-none [@media(hover:hover)]:hover:brightness-110',
+          'h-14 rounded-2xl bg-[#447d3f] text-[17px] text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 focus-visible:ring-[#447d3f]/40 active:translate-y-1 active:shadow-none [@media(hover:hover)]:hover:brightness-110',
         variant === 'primary' &&
           'disabled:translate-y-0 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-[0_4px_0_0_rgba(0,0,0,0.08)] disabled:ring-0',
         variant === 'secondary' &&

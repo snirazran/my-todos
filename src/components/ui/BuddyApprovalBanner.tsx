@@ -45,7 +45,7 @@ export function BuddyApprovalBanner() {
           exit={{ opacity: 0, y: -12 }}
           className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[1400] mx-auto flex w-[min(100%-1.5rem,28rem)] items-center gap-3 rounded-2xl border border-primary/30 bg-popover px-4 py-3 text-popover-foreground shadow-xl"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#4f9149]/12 text-[#4f9149]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#447d3f]/12 text-[#447d3f]">
             <Repeat className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -71,7 +71,7 @@ export function BuddyApprovalBanner() {
               onClick={() => respond('repeat-approve')}
               disabled={busy}
               aria-label="Approve"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4f9149] text-white transition-colors hover:bg-[#457f40] disabled:opacity-60"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#447d3f] text-white transition-colors hover:bg-[#3b6d37] disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

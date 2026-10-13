@@ -7,8 +7,8 @@ import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
-import Fly from '@/components/ui/fly';
-import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { FlyAmount } from '@/components/ui/FlyAmount';
+import { FlyCounter } from '@/components/ui/FlyCounter';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
@@ -161,10 +161,7 @@ export function CurrencyShop() {
           <div className="shrink-0 px-5 pb-4 pt-1 sm:px-6 sm:pt-6">
             <div className="flex items-center justify-between gap-3 pr-10">
               <h2 className="text-2xl font-black tracking-tight">{target && remaining > 0 ? 'Finish your look' : 'Fly shop'}</h2>
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted/70 px-2.5 py-1" aria-label={`Your balance: ${balance.toLocaleString()} flies`}>
-                <Fly size={26} y={-4} paused interactive={false} />
-                <AnimatedNumber value={balance} className="text-xs font-black tabular-nums" />
-              </span>
+              <FlyCounter balance={balance} variant="desktop" alwaysCelebrate />
             </div>
             {remaining > 0 && (
               <p className="mt-2 text-sm font-semibold text-muted-foreground">
@@ -219,7 +216,7 @@ export function CurrencyShop() {
             <div aria-live="polite" className="mb-2 min-h-4 text-center text-xs font-semibold">
               {status ? <span className={status.tone === 'error' ? 'text-destructive' : 'text-primary'}>{status.text}</span> : goalReached ? <span className="text-primary">You have enough for {target.name}</span> : remaining > 0 ? <span className="text-muted-foreground">{selected.amount >= remaining ? <><span className="font-black tabular-nums text-foreground">{(selected.amount - remaining).toLocaleString()}</span> flies left after your item</> : <>{(remaining - selected.amount).toLocaleString()} more still needed with this pack</>}</span> : <span className="text-muted-foreground">One-time purchase</span>}
             </div>
-            <button type="button" onClick={goalReached ? () => setOpen(false) : () => void buy()} disabled={busy || (!goalReached && !priceFor(selected.id))} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-sm font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,opacity] active:translate-y-0.5 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+            <button type="button" onClick={goalReached ? () => setOpen(false) : () => void buy()} disabled={busy || (!goalReached && !priceFor(selected.id))} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-sm font-black text-primary-foreground shadow-[0_4px_0_0_#2c511a] transition-[transform,opacity] active:translate-y-0.5 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
               {busy ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> {status?.text ?? 'Opening checkout…'}</> : goalReached ? 'Back to your item' : priceFor(selected.id) ? <>Get {selected.amount.toLocaleString()} flies <span className="opacity-60">·</span> {priceFor(selected.id)}</> : pricesLoading ? 'Loading prices…' : 'Packs unavailable'}
             </button>
           </div>
@@ -433,16 +430,15 @@ function FreeFliesCard({
               'flex h-11 min-w-[68px] shrink-0 items-center justify-center gap-1 rounded-2xl px-3 text-sm font-black tracking-wide text-white transition-all',
               waiting
                 ? 'bg-muted-foreground/40'
-                : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 group-active:translate-y-1 group-active:shadow-none',
+                : 'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 group-active:translate-y-1 group-active:shadow-none',
             )}
           >
             {waiting ? (
               <span className="tabular-nums">{cooldown}s</span>
             ) : (
-              <>
-                +{reward}
-                <Fly size={22} y={-1} paused />
-              </>
+              <span className="rounded-full bg-white py-0.5 pl-2 pr-2 text-[#24451f]">
+                <FlyAmount amount={`+${reward}`} size={14} />
+              </span>
             )}
           </span>
         )}

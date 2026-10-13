@@ -217,7 +217,7 @@ function WelcomeContent({
                     className={cn(
                       'flex h-6 w-6 items-center justify-center rounded-full',
                       step.done
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-emerald-700 text-white'
                         : 'bg-card text-amber-600 ring-1 ring-border dark:text-amber-400',
                     )}
                   >
@@ -255,7 +255,7 @@ function WelcomeContent({
                   </span>
                 </span>
                 <motion.span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white"
                   initial={reduceMotion ? false : { scale: 0 }}
                   animate={entered ? { scale: 1 } : undefined}
                   transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.35 + i * 0.12 }}

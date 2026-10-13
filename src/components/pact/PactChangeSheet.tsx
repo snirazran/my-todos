@@ -198,7 +198,7 @@ export function PactChangeSheet({
               className={cn(
                 'inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-black text-white transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60',
                 hasSwap
-                  ? 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f]'
+                  ? 'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a]'
                   : 'bg-destructive shadow-[0_4px_0_0_rgba(0,0,0,0.28)]',
               )}
             >

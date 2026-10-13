@@ -66,7 +66,7 @@ function ProviderButton({
         {label}
       </span>
       {connected ? (
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white">
           <Check className="h-4 w-4" strokeWidth={3.5} />
         </span>
       ) : busy ? (
@@ -197,7 +197,7 @@ export default function CalendarConnectSheet({
                     initial={{ scale: 0.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-                    className="grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-white shadow-[0_6px_0_#2f7d47]"
+                    className="grid h-16 w-16 place-items-center rounded-full bg-[#447d3f] text-white shadow-[0_6px_0_#2c511a]"
                   >
                     <Check className="h-8 w-8" strokeWidth={3.5} />
                   </motion.span>
@@ -265,7 +265,7 @@ export default function CalendarConnectSheet({
                       if (picking === 'google') void connectGoogle(direction);
                       else setAppleOpen(true);
                     }}
-                    className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black tracking-tight text-primary-foreground shadow-[0_3px_0_#34631f] transition-opacity hover:opacity-95 disabled:opacity-60"
+                    className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black tracking-tight text-primary-foreground shadow-[0_3px_0_#2c511a] transition-opacity hover:opacity-95 disabled:opacity-60"
                   >
                     {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
                     Connect {providerLabel(picking)}
@@ -314,7 +314,7 @@ export default function CalendarConnectSheet({
                             ease: 'easeInOut',
                             delay: 0.6,
                           }}
-                          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_3px_0_#34631f]"
+                          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_3px_0_#2c511a]"
                         >
                           <ArrowLeftRight className="h-[18px] w-[18px]" strokeWidth={3} />
                         </motion.span>

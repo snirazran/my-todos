@@ -628,7 +628,7 @@ export default function PlannerTour({
                 <button
                   type="button"
                   onClick={tour.start}
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-105 active:translate-y-[2px] active:shadow-none dark:shadow-[0_4px_0_0_#1b4a16]"
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#2c511a] transition-all hover:brightness-105 active:translate-y-[2px] active:shadow-none dark:shadow-[0_4px_0_0_#1b4a16]"
                 >
                   Show me how
                 </button>

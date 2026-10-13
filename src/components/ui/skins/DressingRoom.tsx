@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { Check, Loader2, Lock, Sparkles, X } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import Fly from '@/components/ui/fly';
+import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import {
   RARITY_ORDER,
@@ -26,7 +26,7 @@ export type ClosetSlot =
 
 const SHELF_ORDER: Rarity[] = [...RARITY_ORDER] as Rarity[];
 
-const TILE_TONE: Record<Rarity, string> = {
+export const TILE_TONE: Record<Rarity, string> = {
   common: 'bg-slate-50 ring-slate-200 dark:bg-slate-500/10 dark:ring-slate-500/30',
   uncommon:
     'bg-emerald-50 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/30',
@@ -54,14 +54,6 @@ function entryId(entry: ClosetEntry) {
 
 function entryRarity(entry: ClosetEntry): Rarity {
   return entry.kind === 'item' ? entry.item.rarity : (entry.bg.rarity as Rarity);
-}
-
-function FlyGlyph({ size = 20 }: { size?: number }) {
-  return (
-    <span aria-hidden className="relative flex shrink-0 items-center">
-      <Fly size={size} y={-Math.round(size / 9)} paused interactive={false} />
-    </span>
-  );
 }
 
 function ClosetTile({
@@ -144,7 +136,7 @@ function ClosetTile({
           </span>
         )}
         {onSale && (
-          <span className="absolute left-1 top-1 rounded-md bg-emerald-500 px-1 text-[10px] font-black leading-[16px] text-white">
+          <span className="absolute left-1 top-1 rounded-md bg-[#447d3f] px-1 text-[10px] font-black leading-[16px] text-white">
             −{Math.round((1 - entry.dealPrice! / entry.price) * 100)}%
           </span>
         )}
@@ -156,14 +148,13 @@ function ClosetTile({
             {equipped ? 'Wearing' : 'Owned'}
           </span>
         ) : entry.locked ? (
-          <span className="text-amber-600 dark:text-amber-400">Gift or trade</span>
+          <span className="text-amber-700 dark:text-amber-400">Gift or trade</span>
         ) : showPrice ? (
-          <>
-            <FlyGlyph size={20} />
-            <span className={onSale ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}>
-              {(entry.dealPrice ?? entry.price).toLocaleString()}
-            </span>
-          </>
+          <FlyAmount
+            amount={entry.dealPrice ?? entry.price}
+            size={12.5}
+            className={onSale ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground'}
+          />
         ) : null}
       </span>
     </button>
@@ -500,7 +491,7 @@ export function TryOnBar({
               </span>
             )}
             {!locked && originalPrice != null && originalPrice > price && (
-              <span className="text-emerald-600 dark:text-emerald-400">
+              <span className="text-emerald-700 dark:text-emerald-400">
                 · {Math.round((1 - price / originalPrice) * 100)}% off today
               </span>
             )}
@@ -510,7 +501,7 @@ export function TryOnBar({
           <button
             type="button"
             onClick={onTradeUp}
-            className="flex h-11 shrink-0 items-center rounded-2xl bg-amber-500 px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+            className="flex h-11 shrink-0 items-center rounded-2xl bg-amber-400 px-4 text-[14px] font-black text-amber-950 shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
           >
             Trade up
           </button>
@@ -518,32 +509,87 @@ export function TryOnBar({
           <button
             type="button"
             onClick={() => onGetFlies(short)}
-            className="flex h-11 shrink-0 flex-col items-center justify-center rounded-2xl bg-amber-500 px-3.5 text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+            className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-2xl bg-amber-400 px-3.5 text-[14px] font-black text-amber-950 shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
           >
-            <span className="text-[13px] font-black leading-none">Get flies</span>
-            <span className="mt-0.5 text-[10.5px] font-bold leading-none opacity-90">
-              {short.toLocaleString()} more
-            </span>
+            Get
+            <FlyAmount amount={short} size={14} />
+            more
           </button>
         ) : (
           <button
             type="button"
             onClick={onBuy}
             disabled={busy}
-            className="flex h-11 min-w-[104px] shrink-0 items-center justify-center gap-1 rounded-2xl bg-primary px-4 text-[14px] font-black text-primary-foreground shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:opacity-80"
+            className="flex h-11 min-w-[104px] shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#447d3f] pl-4 pr-1.5 text-[14px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:opacity-80"
           >
             {busy ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <>
                 Buy
-                <FlyGlyph size={24} />
-                <span className="tabular-nums">{price.toLocaleString()}</span>
+                <FlyPriceChip amount={price} size={14} />
               </>
             )}
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+export function YoursCard({
+  name,
+  rarity,
+  thumb,
+  collected,
+  onDone,
+}: {
+  name: string;
+  rarity: Rarity;
+  thumb: ReactNode;
+  collected?: { owned: number; total: number } | null;
+  onDone: () => void;
+}) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 2800);
+    return () => window.clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <div className="tryon-bar-enter fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[45] mx-auto max-w-md md:bottom-6">
+      <button
+        type="button"
+        onClick={onDone}
+        aria-live="polite"
+        className="flex w-full items-center gap-3 rounded-[22px] bg-card py-2.5 pl-2.5 pr-3 text-left shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/70"
+      >
+        <span
+          className={cn(
+            'relative flex h-12 w-12 shrink-0 items-end justify-center overflow-hidden rounded-2xl ring-1',
+            TILE_TONE[rarity],
+            (rarity === 'epic' || rarity === 'legendary') && 'closet-foil',
+            rarity === 'legendary' && 'closet-foil-gold',
+          )}
+        >
+          {thumb}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[17px] font-black leading-tight text-foreground">
+            It&apos;s yours!
+          </span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] font-bold leading-none">
+            <span className="truncate text-muted-foreground">{name}</span>
+            {collected && (
+              <span className={cn('shrink-0 tabular-nums', RARITY_CONFIG[rarity].text)}>
+                · {RARITY_CONFIG[rarity].label} {collected.owned}/{collected.total}
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="yours-seal grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white shadow-[0_2px_0_0_#2c511a]">
+          <Check className="h-5 w-5" strokeWidth={3.5} />
+        </span>
+      </button>
     </div>
   );
 }

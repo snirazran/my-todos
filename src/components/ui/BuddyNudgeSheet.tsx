@@ -10,7 +10,7 @@ import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import type { FriendSummary } from '@/lib/friends/indices';
 
-const BUDDY = '#4f9149';
+const BUDDY = '#447d3f';
 
 type WardrobeIndices = Partial<
   Record<'skin' | 'hat' | 'body' | 'hand_item', number>
@@ -97,7 +97,7 @@ export function BuddyNudgeSheet({
             <button
               type="button"
               onClick={() => setFlowOpen(true)}
-              className="mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-[#4f9149] text-lg font-black tracking-tight text-white shadow-[0_5px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+              className="mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-[#447d3f] text-lg font-black tracking-tight text-white shadow-[0_5px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
             >
               Find a buddy
             </button>

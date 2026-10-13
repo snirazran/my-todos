@@ -114,6 +114,8 @@ const rowPop = () => springCurve(300, 22, 'cubic-bezier(0.34, 1.36, 0.64, 1)');
 const flyPop = () => springCurve(520, 20, 'cubic-bezier(0.34, 1.8, 0.64, 1)');
 export const listSlide = () =>
   springCurve(380, 36, 'cubic-bezier(0.2, 0, 0, 1)');
+export const morphPop = () =>
+  springCurve(260, 21, 'cubic-bezier(0.34, 1.3, 0.64, 1)');
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -249,11 +251,30 @@ function sparkBurst(row: HTMLElement, fly: HTMLElement, delay: number) {
     s.className = 'task-enter-spark';
     s.style.setProperty('--spark-angle', `${i * 45 + 22}deg`);
     s.style.animationDelay = `${delay + i * 14}ms`;
-    s.style.backgroundColor = i % 2 ? '#f59e0b' : '#4f9149';
+    s.style.backgroundColor = i % 2 ? '#f59e0b' : '#447d3f';
     burst.appendChild(s);
   }
   row.appendChild(burst);
   window.setTimeout(() => burst.remove(), delay + 900);
+}
+
+export function slideFollowers(row: HTMLElement, delta: number) {
+  if (Math.abs(delta) < 1 || typeof row.animate !== 'function') return;
+  if (prefersReducedMotion()) return;
+  const slide = listSlide();
+  for (const el of followersOf(row, scrollParent(row))) {
+    el.animate(
+      [
+        { transform: `translate3d(0, ${-delta}px, 0)` },
+        { transform: 'translate3d(0, 0, 0)' },
+      ],
+      {
+        duration: slide.duration,
+        easing: slide.easing,
+        composite: 'add',
+      },
+    );
+  }
 }
 
 export function playTaskEntrance(

@@ -170,7 +170,7 @@ export default function WelcomePage() {
           <button
             onClick={handleHatch}
             disabled={loading}
-            className="flex h-14 w-full items-center justify-center rounded-2xl bg-primary text-[16px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-primary text-[16px] font-black text-primary-foreground shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

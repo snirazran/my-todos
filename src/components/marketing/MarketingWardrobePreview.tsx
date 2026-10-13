@@ -82,7 +82,7 @@ function PondImage({ src, className }: { src: string; className?: string }) {
       <div
         aria-hidden
         className={cn(
-          'bg-[linear-gradient(180deg,#bfe3f5_0%,#dcefd8_55%,#7fb86e_56%,#4f9149_100%)]',
+          'bg-[linear-gradient(180deg,#bfe3f5_0%,#dcefd8_55%,#7fb86e_56%,#447d3f_100%)]',
           className,
         )}
       />
@@ -121,9 +121,9 @@ function ItemTile({
       aria-label={`${item.name}, ${rarity.label}${selected ? ', wearing' : ''}`}
       title={item.name}
       className={cn(
-        'relative aspect-square overflow-hidden rounded-2xl border-2 bg-gradient-to-br transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4f9149]',
+        'relative aspect-square overflow-hidden rounded-2xl border-2 bg-gradient-to-br transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#447d3f]',
         rarity.gradient,
-        selected ? 'border-[#4f9149] ring-2 ring-[#4f9149]/30' : rarity.border,
+        selected ? 'border-[#447d3f] ring-2 ring-[#447d3f]/30' : rarity.border,
         className,
       )}
     >
@@ -143,7 +143,7 @@ function ItemTile({
         />
       </span>
       {selected ? (
-        <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-[#4f9149] text-white shadow">
+        <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-[#447d3f] text-white shadow">
           <Check className="h-3 w-3" strokeWidth={4} aria-hidden />
         </span>
       ) : null}
@@ -331,14 +331,14 @@ export function MarketingWardrobePreview() {
                 aria-selected={active}
                 onClick={() => selectTab(item.id)}
                 className={cn(
-                  'flex min-h-11 flex-col items-center justify-center rounded-xl px-1 text-[13px] font-black leading-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4f9149]',
+                  'flex min-h-11 flex-col items-center justify-center rounded-xl px-1 text-[13px] font-black leading-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#447d3f]',
                   active
                     ? 'bg-card text-foreground shadow-[0_2px_0_rgba(15,46,29,0.12)]'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {item.label}
-                <span className={cn('text-[10px] font-bold tabular-nums', active ? 'text-[#4f9149]' : 'opacity-70')}>
+                <span className={cn('text-[10px] font-bold tabular-nums', active ? 'text-[#447d3f]' : 'opacity-70')}>
                   {countFor(item.id)}
                 </span>
               </button>
@@ -366,7 +366,7 @@ export function MarketingWardrobePreview() {
                 setShown(PAGE_SIZE);
               }}
               aria-expanded={expanded}
-              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-black text-[#34631f] transition-colors hover:bg-[#4f9149]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4f9149] dark:text-[#9fd98f]"
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-black text-[#2c511a] transition-colors hover:bg-[#447d3f]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#447d3f] dark:text-[#9fd98f]"
             >
               {expanded ? 'Show less' : `See all ${total}`}
               <ChevronDown
@@ -394,9 +394,9 @@ export function MarketingWardrobePreview() {
                     aria-pressed={selected}
                     aria-label={background.name}
                     className={cn(
-                      'group relative aspect-square overflow-hidden rounded-2xl bg-muted ring-2 transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4f9149]',
+                      'group relative aspect-square overflow-hidden rounded-2xl bg-muted ring-2 transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#447d3f]',
                       !expanded && railTileClass,
-                      selected ? 'ring-[#4f9149]' : 'ring-transparent hover:ring-[#4f9149]/40',
+                      selected ? 'ring-[#447d3f]' : 'ring-transparent hover:ring-[#447d3f]/40',
                     )}
                   >
                     <PondImage
@@ -407,7 +407,7 @@ export function MarketingWardrobePreview() {
                       {background.name}
                     </span>
                     {selected ? (
-                      <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-[#4f9149] text-white shadow">
+                      <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-[#447d3f] text-white shadow">
                         <Check className="h-3 w-3" strokeWidth={4} aria-hidden />
                       </span>
                     ) : null}
@@ -432,7 +432,7 @@ export function MarketingWardrobePreview() {
                 <button
                   type="button"
                   onClick={() => setShown((value) => value + PAGE_SIZE)}
-                  className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-[#4f9149]/40 text-[13px] font-black text-[#34631f] transition-colors hover:bg-[#4f9149]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4f9149] dark:text-[#9fd98f]"
+                  className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-[#447d3f]/40 text-[13px] font-black text-[#2c511a] transition-colors hover:bg-[#447d3f]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#447d3f] dark:text-[#9fd98f]"
                 >
                   Show {Math.min(PAGE_SIZE, items.length - shown)} more
                   <ChevronDown className="h-4 w-4" aria-hidden />
@@ -455,7 +455,7 @@ export function MarketingWardrobePreview() {
                   type="button"
                   onClick={() => setExpanded(true)}
                   className={cn(
-                    'grid aspect-square place-items-center rounded-2xl border-2 border-dashed border-[#4f9149]/40 text-center text-[12px] font-black leading-tight text-[#34631f] transition-colors hover:bg-[#4f9149]/5 dark:text-[#9fd98f]',
+                    'grid aspect-square place-items-center rounded-2xl border-2 border-dashed border-[#447d3f]/40 text-center text-[12px] font-black leading-tight text-[#2c511a] transition-colors hover:bg-[#447d3f]/5 dark:text-[#9fd98f]',
                     railTileClass,
                   )}
                 >

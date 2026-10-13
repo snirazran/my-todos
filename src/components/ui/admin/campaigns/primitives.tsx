@@ -265,7 +265,7 @@ export function Toggle({
           'relative box-border inline-flex shrink-0 cursor-pointer items-center rounded-full border-0 outline-none transition-colors duration-200',
           'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
           checked
-            ? 'bg-[#4f9149]'
+            ? 'bg-[#447d3f]'
             : 'bg-muted-foreground/25 ring-1 ring-inset ring-muted-foreground/20',
         )}
       >

@@ -1296,7 +1296,7 @@ export default function QuickAddSheet({
                           aria-label={submitLabel}
                           className={`relative mt-1.5 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow,transform] duration-200 ease-out sm:mt-2 sm:h-[52px] sm:w-[52px] ${
                             hasTaskText
-                              ? 'bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] active:translate-y-[3px] active:shadow-none [@media(hover:hover)]:hover:bg-[#478442]'
+                              ? 'bg-[#447d3f] text-white shadow-[0_3px_0_0_#2c511a] active:translate-y-[3px] active:shadow-none [@media(hover:hover)]:hover:bg-[#3d7038]'
                               : 'cursor-default bg-primary/[0.16] ring-1 ring-inset ring-primary/25'
                           }`}
                         >
@@ -1723,7 +1723,7 @@ export default function QuickAddSheet({
                                 if (hasTaskText && !isSubmitting) void handleSubmit();
                               }}
                               disabled={!hasTaskText || isSubmitting}
-                              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#4f9149] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow,background-color,opacity] hover:-translate-y-px hover:bg-[#478442] hover:shadow-[0_4px_0_0_#34631f] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
+                              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#447d3f] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow,background-color,opacity] hover:-translate-y-px hover:bg-[#3d7038] hover:shadow-[0_4px_0_0_#2c511a] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
                             >
                               <Plus className="h-4 w-4" strokeWidth={3} />
                               {submitLabel}

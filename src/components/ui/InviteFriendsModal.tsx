@@ -307,7 +307,7 @@ function OverviewStep({
 
   return (
     <div className="flex h-full min-h-0 flex-col md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)]">
-      <div className="relative flex h-[clamp(8.5rem,36dvh,19rem)] shrink-0 flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-7 pt-6 text-center text-white sm:h-[clamp(9rem,38dvh,20rem)] md:h-[clamp(8rem,32dvh,16rem)] md:pb-6 lg:h-[clamp(8.5rem,32dvh,17rem)]">
+      <div className="relative flex h-[clamp(8.5rem,36dvh,19rem)] shrink-0 flex-col justify-end overflow-hidden bg-[#447d3f] px-6 pb-7 pt-6 text-center text-white sm:h-[clamp(9rem,38dvh,20rem)] md:h-[clamp(8rem,32dvh,16rem)] md:pb-6 lg:h-[clamp(8.5rem,32dvh,17rem)]">
         <motion.div
           className="absolute inset-0 transform-gpu will-change-transform [backface-visibility:hidden]"
           initial={reduceMotion ? undefined : { scale: 1.08 }}
@@ -367,7 +367,7 @@ function OverviewStep({
           <button
             onClick={onInviteFriends}
             disabled={!config.giftOptions?.length}
-            className="h-12 w-full rounded-2xl bg-[#4f9149] font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] transition-all hover:bg-[#5aa354] active:translate-y-1 active:shadow-none disabled:opacity-60"
+            className="h-12 w-full rounded-2xl bg-[#447d3f] font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] transition-all hover:bg-[#5aa354] active:translate-y-1 active:shadow-none disabled:opacity-60"
           >
             {config.giftOptions?.length ? 'Invite friends' : 'No gifts configured yet'}
           </button>

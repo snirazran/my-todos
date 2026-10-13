@@ -3,7 +3,7 @@
 import React from 'react';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
@@ -155,10 +155,11 @@ export function SeenOnFriendsRow({
               <p className="truncate text-[10px] font-semibold text-muted-foreground">
                 Worn by {wornBy}
               </p>
-              <span className="mt-1 inline-flex items-center gap-1 text-xs font-black tabular-nums text-foreground">
-                <Fly size={14} paused y={-1} />
-                {price.toLocaleString()}
-              </span>
+              <FlyAmount
+                amount={price}
+                size={12}
+                className="mt-1 font-black text-foreground"
+              />
             </button>
           );
         })}

@@ -170,7 +170,7 @@ export function FriendRequestsInbox({
                         key={req.id}
                         className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-base font-black text-white">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-emerald-800 text-base font-black text-white">
                           {(req.name || req.frogName || '?')
                             .charAt(0)
                             .toUpperCase()}
@@ -196,7 +196,7 @@ export function FriendRequestsInbox({
                             onClick={() => respond(req.id, 'accept')}
                             disabled={busyId === req.id}
                             aria-label="Accept"
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#447d3f] text-white transition-colors hover:bg-[#3d7038] disabled:opacity-50"
                           >
                             {busyId === req.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -211,9 +211,9 @@ export function FriendRequestsInbox({
                     {buddyInvites.map((inv) => (
                       <div
                         key={inv.bondId}
-                        className="flex items-center gap-3 rounded-2xl border border-[#4f9149]/30 bg-[#4f9149]/8 px-4 py-3"
+                        className="flex items-center gap-3 rounded-2xl border border-[#447d3f]/30 bg-[#447d3f]/8 px-4 py-3"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4f9149]/15 text-[#4f9149]">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#447d3f]/15 text-[#447d3f]">
                           <Users className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -238,7 +238,7 @@ export function FriendRequestsInbox({
                             onClick={() => respondBuddy(inv.bondId, 'accept')}
                             disabled={busyId === inv.bondId}
                             aria-label="Accept"
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4f9149] text-white transition-colors hover:bg-[#457f40] disabled:opacity-50"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#447d3f] text-white transition-colors hover:bg-[#3b6d37] disabled:opacity-50"
                           >
                             {busyId === inv.bondId ? (
                               <Loader2 className="h-4 w-4 animate-spin" />

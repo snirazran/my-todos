@@ -62,7 +62,7 @@ function GiftOutfitRoll({
   if (!active || !item)
     return (
       <span className="flex h-11 w-11 items-center justify-center">
-        <Gift className="h-6 w-6 text-[#4f9149]" strokeWidth={2.25} />
+        <Gift className="h-6 w-6 text-[#447d3f]" strokeWidth={2.25} />
       </span>
     );
 
@@ -217,7 +217,7 @@ export function AddFriendsSheet({
               <button
                 type="button"
                 onClick={() => setInviteOpen(true)}
-                className="mt-4 flex h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white ring-1 ring-[#34631f]/40 shadow-[0_4px_0_0_#34631f] transition-all [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none sm:h-[60px] sm:text-lg"
+                className="mt-4 flex h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white ring-1 ring-[#2c511a]/40 shadow-[0_4px_0_0_#2c511a] transition-all [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none sm:h-[60px] sm:text-lg"
               >
                 <Gift className="h-5 w-5" strokeWidth={2.5} />
                 Invite friends
@@ -231,10 +231,10 @@ export function AddFriendsSheet({
                     aria-valuemin={0}
                     aria-valuemax={nextReward.tier}
                     aria-valuenow={Math.min(joined, nextReward.tier)}
-                    className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#4f9149]/15"
+                    className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#447d3f]/15"
                   >
                     <span
-                      className="block h-full w-full origin-left rounded-full bg-[#4f9149] transition-transform duration-300"
+                      className="block h-full w-full origin-left rounded-full bg-[#447d3f] transition-transform duration-300"
                       style={{ transform: `scaleX(${progressPct / 100})` }}
                     />
                   </span>

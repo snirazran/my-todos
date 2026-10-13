@@ -8,7 +8,7 @@ import { Trophy } from 'lucide-react';
 import { useAutoPopupHold } from '@/lib/popupGate';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { Icon } from '@/components/ui/Icon';
 import { byId as catalogById } from '@/lib/skins/catalog';
 import { useRewardGate } from '@/hooks/useRewardGate';
@@ -35,8 +35,8 @@ function RewardChips({
   return (
     <div className="flex flex-wrap items-center justify-center gap-2.5">
       {flies > 0 && (
-        <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-lg font-black text-white backdrop-blur">
-          <Fly size={22} paused y={-2} />+{flies}
+        <span className="flex items-center rounded-full bg-white/15 py-2 pl-4 pr-4 font-black text-white backdrop-blur">
+          <FlyAmount amount={`+${flies}`} size={18} />
         </span>
       )}
       {summary.shieldsGranted > 0 && (

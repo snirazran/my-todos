@@ -272,7 +272,7 @@ export default function TryPage() {
       spread: 80,
       startVelocity: 38,
       origin: { y },
-      colors: ['#4f9149', '#5ca355', '#fbbf24', '#38bdf8', '#f472b6'],
+      colors: ['#447d3f', '#5ca355', '#fbbf24', '#38bdf8', '#f472b6'],
     });
   };
 
@@ -578,7 +578,7 @@ export default function TryPage() {
                     type="submit"
                     disabled={!draftTask.trim()}
                     aria-label="Add task"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-[2px] active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#447d3f] text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-[2px] active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
                   >
                     <ArrowUp className="h-5 w-5" strokeWidth={3} />
                   </button>
@@ -818,7 +818,7 @@ export default function TryPage() {
                             os: mobileOS,
                           })
                         }
-                        className="flex h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-110 active:translate-y-[3px] active:shadow-none"
+                        className="flex h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] transition-all hover:brightness-110 active:translate-y-[3px] active:shadow-none"
                       >
                         <Download className="h-5 w-5" strokeWidth={3} />
                         Get Frogress, it&apos;s free
@@ -992,7 +992,7 @@ function ChunkyButton({
     <button
       {...props}
       className={cn(
-        'flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-110 active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none',
+        'flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] transition-all hover:brightness-110 active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none',
         className,
       )}
     >

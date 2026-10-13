@@ -53,7 +53,7 @@ export function GuestBackupCard({
       <button
         type="button"
         onClick={onSave}
-        className="h-10 shrink-0 rounded-xl bg-primary px-3.5 text-[14px] font-black tracking-tight text-primary-foreground shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+        className="h-10 shrink-0 rounded-xl bg-primary px-3.5 text-[14px] font-black tracking-tight text-primary-foreground shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
       >
         Save it
       </button>

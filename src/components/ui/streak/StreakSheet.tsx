@@ -1071,7 +1071,7 @@ function CommitStep({
                       className="peer sr-only"
                     />
                     {tier.days === steppingUpTo && (
-                      <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
+                      <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#447d3f] px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
                         Next up
                       </span>
                     )}

@@ -246,7 +246,7 @@ export function LooksRow({
                 className={cn(
                   'relative flex items-end justify-center overflow-hidden rounded-xl border-2 bg-muted/40 transition-transform active:scale-[0.97] disabled:opacity-90',
                   inDialog ? 'aspect-square w-full' : 'h-[104px] w-[84px]',
-                  isWearing ? 'border-[#4f9149]' : 'border-border/50',
+                  isWearing ? 'border-[#447d3f]' : 'border-border/50',
                 )}
               >
                 {look.backgroundImage && (
@@ -265,7 +265,7 @@ export function LooksRow({
                   height={inDialog ? '124%' : 120}
                 />
                 {isWearing && !removing && (
-                  <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[#4f9149] text-white shadow-sm">
+                  <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[#447d3f] text-white shadow-sm">
                     <Check className="h-2.5 w-2.5 stroke-[4]" />
                   </span>
                 )}

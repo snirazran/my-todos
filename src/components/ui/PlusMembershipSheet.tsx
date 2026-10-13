@@ -288,7 +288,7 @@ function TrialTimeline({
               className={cn(
                 'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1',
                 step.done
-                  ? 'bg-emerald-500 text-white ring-emerald-500'
+                  ? 'bg-emerald-700 text-white ring-emerald-700'
                   : 'bg-card text-amber-600 ring-border dark:text-amber-400',
               )}
             >
@@ -449,7 +449,7 @@ function ManageBlock({
           className={cn(
             'mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-black transition-all active:scale-[0.98]',
             phase === 'billing_issue' || phase === 'cancelled' || phase === 'trial_cancelled'
-              ? 'bg-emerald-600 text-white shadow-[0_3px_0_0_#065f46] hover:brightness-110'
+              ? 'bg-emerald-700 text-white shadow-[0_3px_0_0_#064e3b] hover:brightness-110'
               : 'border border-border bg-card text-foreground hover:bg-muted',
           )}
         >

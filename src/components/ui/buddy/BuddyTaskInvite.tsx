@@ -24,7 +24,7 @@ type GiftOption = {
   } | null;
 };
 
-const BUDDY = '#4f9149';
+const BUDDY = '#447d3f';
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 /** Shares a task the user already has: one tap on a friend sends the invite. */
@@ -210,7 +210,7 @@ export function BuddyTaskInvite({
                 </h2>
                 <p className="relative mt-1.5 text-sm font-medium text-muted-foreground">
                   They unlock it when they join you on{' '}
-                  <span className="font-bold text-[#4f9149]">{taskText}</span>.
+                  <span className="font-bold text-[#447d3f]">{taskText}</span>.
                 </p>
               </>
             ) : (
@@ -218,7 +218,7 @@ export function BuddyTaskInvite({
                 <h2 className="relative text-xl font-black tracking-tight text-foreground">
                   Do this with a friend
                 </h2>
-                <p className="relative mt-1 line-clamp-2 text-sm font-bold tracking-tight text-[#4f9149]">
+                <p className="relative mt-1 line-clamp-2 text-sm font-bold tracking-tight text-[#447d3f]">
                   {taskText}
                 </p>
                 <p className="relative mt-1.5 text-sm font-medium text-muted-foreground">
@@ -237,7 +237,7 @@ export function BuddyTaskInvite({
                   reset();
                   onClose();
                 }}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
               >
                 <Check className="h-5 w-5" strokeWidth={3} />
                 Done
@@ -248,7 +248,7 @@ export function BuddyTaskInvite({
               <button
                 type="button"
                 onClick={() => inviteUrl && shareTaskLink(inviteUrl)}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
               >
                 <Share2 className="h-5 w-5" strokeWidth={2.5} />
                 Share the link
@@ -280,8 +280,8 @@ export function BuddyTaskInvite({
                         onClick={() => setGiftId(g.id)}
                         className={`aspect-square overflow-hidden rounded-[18px] border-4 bg-muted/40 p-1 transition-all active:scale-95 ${
                           selected
-                            ? 'border-[#4f9149] ring-4 ring-inset ring-[#4f9149]/20'
-                            : 'border-border/50 hover:border-[#4f9149]/50'
+                            ? 'border-[#447d3f] ring-4 ring-inset ring-[#447d3f]/20'
+                            : 'border-border/50 hover:border-[#447d3f]/50'
                         }`}
                       >
                         <GiftPreview
@@ -308,7 +308,7 @@ export function BuddyTaskInvite({
                   type="button"
                   disabled={!giftId || creatingLink}
                   onClick={createLink}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:pointer-events-none disabled:opacity-50"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none disabled:pointer-events-none disabled:opacity-50"
                 >
                   {creatingLink && <Loader2 className="h-5 w-5 animate-spin" />}
                   Share invite link
@@ -331,8 +331,8 @@ export function BuddyTaskInvite({
                 </div>
               )}
               {data && friends.length === 0 && (
-                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#4f9149]/40 bg-[#4f9149]/5 px-5 py-7 text-center">
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-[#4f9149]/15 text-[#4f9149]">
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#447d3f]/40 bg-[#447d3f]/5 px-5 py-7 text-center">
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-[#447d3f]/15 text-[#447d3f]">
                     <UserPlus className="h-5 w-5" strokeWidth={2.5} />
                   </span>
                   <p className="text-sm font-black tracking-tight text-foreground">
@@ -351,7 +351,7 @@ export function BuddyTaskInvite({
                       type="button"
                       disabled={!!sendingTo}
                       onClick={() => send(f)}
-                      className="flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#4f9149]/40 hover:shadow-md active:scale-[0.99] disabled:opacity-60"
+                      className="flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#447d3f]/40 hover:shadow-md active:scale-[0.99] disabled:opacity-60"
                     >
                       <span className="flex h-14 w-16 shrink-0 items-end justify-center overflow-hidden">
                         {entered && (
@@ -375,7 +375,7 @@ export function BuddyTaskInvite({
                         )}
                       </span>
                       {sendingTo === f.userId ? (
-                        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[#4f9149]" />
+                        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[#447d3f]" />
                       ) : (
                         <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
                       )}
@@ -387,9 +387,9 @@ export function BuddyTaskInvite({
               <button
                 type="button"
                 onClick={() => setView('link')}
-                className="mt-2 flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#4f9149]/40 bg-[#4f9149]/5 px-4 py-3.5 text-left transition-transform active:scale-[0.99]"
+                className="mt-2 flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#447d3f]/40 bg-[#447d3f]/5 px-4 py-3.5 text-left transition-transform active:scale-[0.99]"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#4f9149]/15 text-[#4f9149]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#447d3f]/15 text-[#447d3f]">
                   <UserPlus className="h-5 w-5" strokeWidth={2.5} />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -403,7 +403,7 @@ export function BuddyTaskInvite({
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
               </button>
 
-              <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[#4f9149]/25 bg-[#4f9149]/[0.07] px-3.5 py-3">
+              <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[#447d3f]/25 bg-[#447d3f]/[0.07] px-3.5 py-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/80 dark:bg-card">
                   <Fly size={30} interactive={false} paused />
                 </span>

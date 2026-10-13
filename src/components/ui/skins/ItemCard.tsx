@@ -4,7 +4,7 @@ import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, ChevronDown, Info, Loader2, Repeat } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { cn } from '@/lib/utils';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
@@ -281,7 +281,7 @@ function ItemCardComponent({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 550, damping: 18 }}
-            className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-1.5 right-1.5"
+            className="absolute z-30 p-1 text-white bg-[#447d3f] rounded-full shadow-md top-1.5 right-1.5"
           >
             <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
           </motion.div>
@@ -362,7 +362,7 @@ function ItemCardComponent({
 
         {mode === 'shop' ? (
           isOwned && (
-            <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md bg-green-500 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm md:top-1.5 md:right-1.5 md:text-[10px]">
+            <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md bg-[#447d3f] px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm md:top-1.5 md:right-1.5 md:text-[10px]">
               <Check className="h-2.5 w-2.5 stroke-[4]" />
               {ownedCount > 1 ? `x${ownedCount}` : 'Owned'}
             </div>
@@ -395,7 +395,7 @@ function ItemCardComponent({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 550, damping: 18 }}
-              className="absolute bottom-1 right-1 z-20 p-1 text-white bg-green-500 rounded-full shadow-md"
+              className="absolute bottom-1 right-1 z-20 p-1 text-white bg-[#447d3f] rounded-full shadow-md"
             >
               <Check className="w-3 h-3 stroke-[4]" />
             </motion.div>
@@ -436,7 +436,7 @@ function ItemCardComponent({
                   ? compact
                     ? 'text-foreground hover:brightness-110'
                     : cn(config.text, 'hover:brightness-110')
-                  : 'text-red-500 dark:text-red-400',
+                  : 'text-red-600 dark:text-red-400',
               actionLoading && 'opacity-60 cursor-wait',
             )}
           >
@@ -453,15 +453,7 @@ function ItemCardComponent({
                 Trade only
               </span>
             ) : (
-              <>
-                <Fly
-                  size={compact ? 26 : 22}
-                  className="transition-transform group-hover/buy:scale-110"
-                  y={compact ? -2 : -3}
-                  paused={true}
-                />
-                <span className="tabular-nums leading-none">{item.priceFlies}</span>
-              </>
+              <FlyAmount amount={item.priceFlies ?? 0} size={compact ? 13 : 15} />
             )}
           </button>
         )}
@@ -475,7 +467,7 @@ function ItemCardComponent({
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors duration-200',
               isEquipped
-                ? 'bg-green-500 text-white shadow-md'
+                ? 'bg-[#447d3f] text-white shadow-md'
                 : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
             )}
           >

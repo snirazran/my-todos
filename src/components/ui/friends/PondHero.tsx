@@ -99,7 +99,7 @@ export function PondHero({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 340, damping: 24 }}
-              className="relative flex min-h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-full bg-[#4f9149] px-7 text-white shadow-[0_5px_0_#34631f] transition-[filter,transform,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#4f9149]"
+              className="relative flex min-h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-full bg-[#447d3f] px-7 text-white shadow-[0_5px_0_#2c511a] transition-[filter,transform,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#447d3f]"
             >
               <span className="text-[17px] font-black tracking-tight">
                 {claiming ? 'Catching…' : `Catch ${claimable}`}
@@ -116,7 +116,7 @@ export function PondHero({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: [0.35, 0.9, 0.35] }}
                     transition={{ duration: 2.4, repeat: Infinity }}
-                    className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#4f9149]/40"
+                    className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#447d3f]/40"
                   />
                 )}
               </AnimatePresence>
@@ -139,7 +139,7 @@ export function PondHero({
                     className={cn(
                       'h-1.5 rounded-full transition-colors',
                       i < (gate?.done ?? 0)
-                        ? 'w-6 bg-[#4f9149]'
+                        ? 'w-6 bg-[#447d3f]'
                         : 'w-6 bg-border',
                     )}
                   />

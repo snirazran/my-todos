@@ -420,7 +420,7 @@ export function PlusUpgradeModal({
                     >
                       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
                         <ShieldAlert
-                          className="h-7 w-7 text-[#4f9149]"
+                          className="h-7 w-7 text-[#447d3f]"
                           strokeWidth={2.5}
                         />
                       </div>

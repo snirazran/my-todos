@@ -426,7 +426,7 @@ export default function TaskDetailSheet({
                       </span>
                     )}
                     {minimal && buddy && (
-                      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#4f9149]/10 pl-1 pr-2.5 text-[#3d7a38] dark:text-emerald-400">
+                      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#447d3f]/10 pl-1 pr-2.5 text-[#3d7a38] dark:text-emerald-400">
                         <BuddyFrogFace indices={buddy.partnerIndices} size={20} />
                         With {buddy.partnerName}
                       </span>
@@ -742,22 +742,54 @@ export default function TaskDetailSheet({
                 </button>
               )
             ) : (
-              <div className="flex shrink-0 items-stretch gap-2">
-                {!minimal && onStartTimer && (
-                  <TaskFocusButton
-                    taskId={displayTask?.id ?? ''}
-                    onClick={runAndClose(onStartTimer)}
-                  />
-                )}
+              <div className="relative flex shrink-0 flex-col gap-2.5">
+                {!minimal &&
+                  (onStartTimer || (isRepeating && onSkipToday) || onDoLater) && (
+                    <div className="relative flex overflow-hidden rounded-[20px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
+                      {onStartTimer && (
+                        <TaskFocusButton
+                          taskId={displayTask?.id ?? ''}
+                          onClick={runAndClose(onStartTimer)}
+                        />
+                      )}
+                      {onStartTimer &&
+                        ((isRepeating && onSkipToday) || onDoLater) && (
+                          <span
+                            aria-hidden
+                            className="my-3 w-px shrink-0 bg-border/80"
+                          />
+                        )}
+                      {((isRepeating && onSkipToday) || onDoLater) && (
+                        <button
+                          type="button"
+                          onClick={runAndClose(
+                            isRepeating && onSkipToday ? onSkipToday : onDoLater,
+                          )}
+                          data-hint={
+                            isRepeating && onSkipToday ? undefined : 'save-later-button'
+                          }
+                          aria-label={isRepeating && onSkipToday ? 'Skip today' : 'Save for later'}
+                          className={SIDE_ACTION_CLASS}
+                        >
+                          {isRepeating && onSkipToday ? (
+                            <SkipForward className="h-5 w-5 text-muted-foreground" strokeWidth={2.5} />
+                          ) : (
+                            <AppIcon name="saved" className="h-6 w-6" />
+                          )}
+                          {isRepeating && onSkipToday ? 'Skip today' : 'Later'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 <button
                   onClick={runAndClose(onComplete)}
                   disabled={!onComplete}
                   className={[
-                    'group relative h-14 min-w-0 flex-1 overflow-hidden rounded-[22px] text-[17px] font-black transition-all short:h-12 narrow:text-[15px] short:text-[15px]',
-                    'bg-[#4f9149] text-white',
-                    'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
-                    '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
+                    'group relative h-14 w-full overflow-hidden rounded-[22px] text-[17px] font-black transition-all short:h-12 narrow:text-[15px] short:text-[15px]',
+                    'bg-[#447d3f] text-white',
+                    'shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]/40',
+                    '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none',
                     'disabled:pointer-events-none disabled:opacity-60 disabled:grayscale',
                   ].join(' ')}
                 >
@@ -776,28 +808,6 @@ export default function TaskDetailSheet({
                     )}
                   </span>
                 </button>
-                {!minimal && ((isRepeating && onSkipToday) || onDoLater) && (
-                  <button
-                    type="button"
-                    onClick={runAndClose(
-                      isRepeating && onSkipToday ? onSkipToday : onDoLater,
-                    )}
-                    data-hint={
-                      isRepeating && onSkipToday ? undefined : 'save-later-button'
-                    }
-                    aria-label={isRepeating && onSkipToday ? 'Skip today' : 'Save for later'}
-                    className={SIDE_ACTION_CLASS}
-                  >
-                    <span className="grid h-6 place-items-center">
-                      {isRepeating && onSkipToday ? (
-                        <SkipForward className="h-5 w-5 text-muted-foreground" strokeWidth={2.5} />
-                      ) : (
-                        <AppIcon name="saved" className="h-6 w-6" />
-                      )}
-                    </span>
-                    {isRepeating && onSkipToday ? 'Skip' : 'Later'}
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -861,7 +871,7 @@ function SectionCard({
 }
 
 const SIDE_ACTION_CLASS =
-  'flex h-14 w-[60px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[22px] bg-popover text-[11px] font-black leading-none text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 short:h-12 narrow:w-[54px]';
+  'flex h-12 min-w-0 flex-1 items-center justify-center gap-2 text-[15px] font-black leading-none text-foreground transition-colors active:bg-muted/70 [@media(hover:hover)]:hover:bg-muted/40 short:h-11 short:text-[14px]';
 
 const PROPERTY_TINT = {
   sky: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
@@ -869,7 +879,7 @@ const PROPERTY_TINT = {
   green: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
   amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   violet: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
-  buddy: 'bg-[#4f9149]/15 text-[#4f9149] dark:text-emerald-400',
+  buddy: 'bg-[#447d3f]/15 text-[#447d3f] dark:text-emerald-400',
 } as const;
 
 function PropertyTile({
@@ -959,21 +969,19 @@ function TaskFocusButton({
       title="Focus timer"
       className={
         isFocusing
-          ? `flex h-14 w-[60px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[22px] text-[11px] font-black leading-none tabular-nums text-white ring-1 transition-all active:translate-y-0.5 active:shadow-none short:h-12 narrow:w-[54px] ${
+          ? `flex h-12 min-w-0 flex-1 items-center justify-center gap-2 text-[15px] font-black leading-none tabular-nums text-white transition-colors short:h-11 short:text-[14px] ${
               phase === 'focus'
-                ? 'bg-[#4f9149] ring-[#34631f]/50 shadow-[0_3px_0_0_#34631f]'
-                : 'bg-sky-500 ring-sky-700/50 shadow-[0_3px_0_0_#0369a1] dark:bg-sky-700'
+                ? 'bg-[#447d3f] active:bg-[#3b6d37]'
+                : 'bg-sky-500 active:bg-sky-600 dark:bg-sky-700'
             }`
           : SIDE_ACTION_CLASS
       }
     >
-      <span className="grid h-6 place-items-center">
-        {isFocusing ? (
-          <TimerClockIcon running={isRunning} className="h-6 w-6" />
-        ) : (
-          <AppIcon name="clock" label="Focus timer" className="h-6 w-6" />
-        )}
-      </span>
+      {isFocusing ? (
+        <TimerClockIcon running={isRunning} className="h-6 w-6" />
+      ) : (
+        <AppIcon name="clock" label="Focus timer" className="h-6 w-6" />
+      )}
       {isFocusing ? formatTimer(timeLeft) : 'Focus'}
     </button>
   );

@@ -279,7 +279,7 @@ export function ShopGiftPopup({
                     exit={{ opacity: 0, y: -10 }}
                     className="mt-4 flex w-full flex-col items-center"
                   >
-                    <p className="text-[13px] font-black uppercase tracking-wider text-[#4f9149] dark:text-emerald-400">
+                    <p className="text-[13px] font-black uppercase tracking-wider text-[#447d3f] dark:text-emerald-400">
                       {firstGift ? 'Welcome gift' : 'Daily shop gift'}
                     </p>
                     <p className="mt-1 text-[26px] font-black leading-tight tracking-tight text-foreground">
@@ -302,8 +302,8 @@ export function ShopGiftPopup({
                       disabled={phase === 'claiming'}
                       className={cn(
                         'mt-5 h-14 w-full rounded-2xl text-lg font-black tracking-tight text-white transition-[transform,box-shadow] duration-100',
-                        'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
-                        '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
+                        'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40',
+                        '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none',
                         'disabled:opacity-70',
                       )}
                     >

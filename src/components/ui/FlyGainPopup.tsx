@@ -82,7 +82,7 @@ function Sparks() {
           style={{
             ['--spark-angle' as string]: `${i * 45 + 22}deg`,
             animationDelay: `${240 + i * 14}ms`,
-            backgroundColor: i % 2 ? '#f59e0b' : '#4f9149',
+            backgroundColor: i % 2 ? '#f59e0b' : '#447d3f',
           }}
         />
       ))}
@@ -146,7 +146,7 @@ function Pill({ toast }: { toast: Toast }) {
           initial={reduce ? false : { scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 600, damping: 20, delay: 0.24 }}
-          className="grid h-[26px] place-items-center rounded-full bg-[#4f9149] px-2.5 text-[12.5px] font-black leading-none text-white shadow-[0_2px_0_0_#34631f]"
+          className="grid h-[26px] place-items-center rounded-full bg-[#447d3f] px-2.5 text-[12.5px] font-black leading-none text-white shadow-[0_2px_0_0_#2c511a]"
         >
           +{delta}
         </motion.span>

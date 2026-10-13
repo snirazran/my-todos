@@ -261,7 +261,7 @@ export function QuestOnboardingPopup({
                             className={cn(
                               'absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full border-2 backdrop-blur-md transition-all',
                               selected
-                                ? 'border-white bg-primary text-white'
+                                ? 'border-white bg-primary text-primary-foreground'
                                 : 'border-white/70 bg-black/25 text-white/80',
                             )}
                             aria-hidden

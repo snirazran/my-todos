@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
@@ -58,8 +58,6 @@ export function FlyCounter({
   const [bump, setBump] = useState<{ delta: number } | null>(null);
   const bumpTimer = useRef<number | null>(null);
   const pendingDeltaRef = useRef(0);
-  const pillControls = useAnimationControls();
-  const flyControls = useAnimationControls();
 
   useEffect(
     () => () => {
@@ -68,30 +66,67 @@ export function FlyCounter({
     [],
   );
 
+  const pillRef = useRef<HTMLDivElement>(null);
+  const padRef = useRef<HTMLSpanElement>(null);
+  const haloRef = useRef<HTMLSpanElement>(null);
+  const sparkHostRef = useRef<HTMLSpanElement>(null);
+
   const celebrate = useCallback((delta: number) => {
-    // Consecutive gains fold into one badge instead of stacking overlapping
-    // "+N" pills; the timer restarts so the running total stays readable.
     setBump((curr) => ({ delta: (curr?.delta ?? 0) + delta }));
-    // Fire the pulse + fly shimmy imperatively so it replays on every
-    // increment (framer's `animate` prop dedupes identical keyframes).
-    pillControls.start({
-      scale: [1, 1.12, 1],
-      boxShadow: [
-        '0 0 0 0 hsl(var(--primary) / 0)',
-        '0 0 0 8px hsl(var(--primary) / 0.18)',
-        '0 0 0 0 hsl(var(--primary) / 0)',
-      ],
-      transition: { duration: 0.55, ease: [0.32, 0.72, 0, 1] },
-    });
-    flyControls.start({
-      rotate: [0, -14, 14, -8, 0],
-      y: [0, -3, 0, -1, 0],
-      transition: { duration: 0.55, ease: [0.32, 0.72, 0, 1] },
-    });
     hapticTick();
     if (bumpTimer.current) window.clearTimeout(bumpTimer.current);
-    bumpTimer.current = window.setTimeout(() => setBump(null), 1200);
-  }, [pillControls, flyControls]);
+    bumpTimer.current = window.setTimeout(() => setBump(null), 1400);
+    if (
+      typeof window === 'undefined' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+    const easing = 'cubic-bezier(0.32, 0.72, 0, 1)';
+    padRef.current?.animate(
+      [
+        { transform: 'scale(1) rotate(0deg)' },
+        { transform: 'scale(1.24) rotate(-10deg)', offset: 0.28 },
+        { transform: 'scale(0.94) rotate(5deg)', offset: 0.6 },
+        { transform: 'scale(1) rotate(0deg)' },
+      ],
+      { duration: 640, easing },
+    );
+    pillRef.current?.animate(
+      [
+        { transform: 'scale(1)' },
+        { transform: 'scale(1.07)', offset: 0.3 },
+        { transform: 'scale(1)' },
+      ],
+      { duration: 520, easing },
+    );
+    haloRef.current?.animate(
+      [
+        { opacity: 0, transform: 'scale(0.85)' },
+        { opacity: 1, transform: 'scale(1.08)', offset: 0.3 },
+        { opacity: 0, transform: 'scale(1.3)' },
+      ],
+      { duration: 900, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    );
+    const host = sparkHostRef.current;
+    if (host) {
+      const burst = document.createElement('span');
+      burst.setAttribute('aria-hidden', 'true');
+      burst.className = 'task-enter-sparks';
+      burst.style.left = '50%';
+      burst.style.top = '50%';
+      for (let i = 0; i < 8; i++) {
+        const spark = document.createElement('span');
+        spark.className = 'task-enter-spark';
+        spark.style.setProperty('--spark-angle', `${i * 45 + 22}deg`);
+        spark.style.animationDelay = `${80 + i * 14}ms`;
+        spark.style.backgroundColor = i % 2 ? '#f59e0b' : '#447d3f';
+        burst.appendChild(spark);
+      }
+      host.appendChild(burst);
+      window.setTimeout(() => burst.remove(), 900);
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasMountedRef.current) {
@@ -121,76 +156,118 @@ export function FlyCounter({
   }, [anySheetOpen, celebrate]);
 
   const isMobile = variant === 'mobile';
-  const flySize = isMobile ? 28 : 24;
-  const flyY = -3;
+  const ringRatio = showGoal && wishlist && progress ? progress.ratio : null;
+  const RING = 2 * Math.PI * 15;
 
   return (
-    <motion.div
+    <div
+      ref={pillRef}
       onClick={onClick}
       aria-label={
         wishlist
           ? `${balance} flies — saving for ${wishlist.name}, ${progress?.remaining ?? 0} to go`
-          : undefined
+          : `${balance} flies`
       }
       className={cn(
-        'relative flex h-10 shrink-0 items-center gap-1.5 px-3',
+        'relative flex h-10 shrink-0 items-center gap-1.5 pl-1 pr-3',
         HEADER_CONTROL_SURFACE,
-        goalReached && 'border-emerald-500/50',
-        onClick && 'cursor-pointer transition-colors active:scale-95',
+        goalReached && 'border-amber-400/60',
+        onClick && 'cursor-pointer transition-transform active:scale-95',
       )}
-      animate={pillControls}
     >
-      <motion.div
-        animate={flyControls}
-        data-fly-counter={showGoal ? '' : undefined}
-        className="relative flex items-center"
+      <span
+        ref={haloRef}
+        aria-hidden
+        className="pointer-events-none absolute -inset-2 rounded-full bg-[radial-gradient(closest-side,rgba(245,158,11,0.32),rgba(79,145,73,0.16)_60%,transparent)] opacity-0"
+      />
+      <span
+        ref={sparkHostRef}
+        className="relative grid h-8 w-8 shrink-0 place-items-center"
       >
-        {/* Static frame — a wallet icon doesn't earn a permanent 60fps render
-            loop; the celebrate shimmy on the wrapper still sells the gain. */}
-        <Fly size={flySize} paused y={flyY} />
-      </motion.div>
+        {ringRatio !== null && (
+          <svg
+            aria-hidden
+            viewBox="0 0 32 32"
+            className="absolute inset-0 -rotate-90"
+          >
+            <circle
+              cx="16"
+              cy="16"
+              r="15"
+              fill="none"
+              strokeWidth="2"
+              className="stroke-primary/15"
+            />
+            <circle
+              cx="16"
+              cy="16"
+              r="15"
+              fill="none"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeDasharray={RING}
+              strokeDashoffset={RING * (1 - Math.max(0.04, ringRatio))}
+              className={goalReached ? 'stroke-amber-500' : 'stroke-primary'}
+              style={{
+                transition: 'stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1)',
+              }}
+            />
+          </svg>
+        )}
+        <span
+          ref={padRef}
+          data-fly-counter={showGoal ? '' : undefined}
+          className={cn(
+            'fly-purse-pad grid place-items-center rounded-full ring-1 ring-inset',
+            ringRatio !== null ? 'h-[25px] w-[25px]' : 'h-8 w-8',
+            goalReached
+              ? 'bg-amber-400/20 ring-amber-500/30'
+              : 'bg-primary/[0.16] ring-primary/25',
+          )}
+        >
+          <Fly
+            size={ringRatio !== null ? 24 : isMobile ? 30 : 28}
+            paused
+            y={-2}
+            interactive={false}
+          />
+        </span>
+      </span>
 
       <AnimatedNumber
         value={balance}
         haptics
-        className="relative text-xs font-black tabular-nums text-foreground"
+        className="relative text-[15px] font-black leading-none tabular-nums text-foreground"
       />
 
-      {/* "+" affordance — perched on the top-right corner, half in/half out, to
-          show the counter can be tapped to buy more flies. */}
       {onClick && (
         <span className="absolute -right-0.5 -top-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background">
           <Plus className="h-2.5 w-2.5 stroke-[3.5]" />
         </span>
       )}
 
-      {/* Floating "+N" badge — drops below the counter so it stays visible
-          even when the counter is anchored to the top of the viewport. */}
       <AnimatePresence>
         {bump && (
           <motion.span
             key="bump"
-            initial={{ opacity: 0, x: '-50%', y: -4, scale: 0.6 }}
-            animate={{ opacity: 1, x: '-50%', y: 10, scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: 18 }}
-            transition={{
-              duration: 0.7,
-              ease: [0.32, 0.72, 0, 1],
-            }}
-            className="pointer-events-none absolute left-1/2 top-full mt-1 rounded-full bg-primary px-2 py-0.5 text-[11px] font-black leading-none text-primary-foreground shadow-md"
+            initial={{ opacity: 0, x: '-50%', y: -6, scale: 0.5 }}
+            animate={{ opacity: 1, x: '-50%', y: 8, scale: 1 }}
+            exit={{ opacity: 0, x: '-50%', y: 16, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 26 }}
+            className="pointer-events-none absolute left-1/2 top-full z-20 mt-0.5 grid h-6 place-items-center rounded-full bg-[#447d3f] px-2.5 text-[12px] font-black leading-none text-white shadow-[0_2px_0_0_#2c511a]"
           >
             <motion.span
               key={bump.delta}
-              initial={{ scale: 1.35 }}
+              initial={{ scale: 1.4 }}
               animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-              className="inline-block"
+              transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+              className="inline-block tabular-nums"
             >
               +{bump.delta}
             </motion.span>
           </motion.span>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

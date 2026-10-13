@@ -6,7 +6,7 @@ import confetti from 'canvas-confetti';
 import { Check } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
-import Fly from '@/components/ui/fly';
+import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { Icon } from '@/components/ui/Icon';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { cn } from '@/lib/utils';
@@ -126,7 +126,7 @@ export function ShieldSheet({
             }
           : { y: 0.6 },
         zIndex: 99999,
-        colors: ['#6FBF5F', '#4F9149', '#F7A8C8'],
+        colors: ['#6FBF5F', '#447d3f', '#F7A8C8'],
       });
       hapticSuccess();
       setPhase('success');
@@ -167,7 +167,7 @@ export function ShieldSheet({
                 initial={{ scale: 0, rotate: -25 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-green-500 text-white shadow-lg"
+                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#447d3f] text-white shadow-lg"
               >
                 <Check className="h-5 w-5 stroke-[4]" />
               </motion.div>
@@ -199,21 +199,14 @@ export function ShieldSheet({
             <div className="mt-4 rounded-2xl border border-border/60 bg-muted/40 p-4 text-sm font-bold">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Price</span>
-                <span className="flex items-center gap-1.5 tabular-nums">
-                  <Fly size={18} paused y={-2} />
-                  {price.toLocaleString()}
-                </span>
+                <FlyAmount amount={price} size={14} />
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-muted-foreground">Your balance</span>
-                <span className="flex items-center gap-1.5">
-                  <Fly size={18} paused y={-2} />
-                  <AnimatedNumber
-                    value={flyBalance}
-                    haptics
-                    className="tabular-nums"
-                  />
-                </span>
+                <FlyAmount
+                  size={14}
+                  amount={<AnimatedNumber value={flyBalance} haptics />}
+                />
               </div>
             </div>
           )}
@@ -222,7 +215,7 @@ export function ShieldSheet({
             <button
               type="button"
               onClick={() => setPlusOpen(true)}
-              className="mt-3 flex items-center justify-center gap-2 text-center text-xs font-bold text-amber-600 underline decoration-amber-500/40 decoration-2 underline-offset-4 transition-colors hover:text-amber-500 dark:text-amber-400"
+              className="mt-3 flex items-center justify-center gap-2 text-center text-xs font-bold text-amber-700 underline decoration-amber-500/40 decoration-2 underline-offset-4 transition-colors hover:text-amber-600 dark:text-amber-400"
             >
               <Icon name="frogPlus" label="Plus" className="h-7 w-7 shrink-0" />
               <span>Plus holds {cap + 1} and gets one free every month</span>
@@ -230,7 +223,7 @@ export function ShieldSheet({
           )}
 
           {error && (
-            <p className="mt-3 text-center text-sm font-bold text-red-500">
+            <p className="mt-3 text-center text-sm font-bold text-red-600 dark:text-red-400">
               {error}
             </p>
           )}
@@ -247,28 +240,27 @@ export function ShieldSheet({
                     : () => openFlyShop(Math.max(0, price - flyBalance))
                 }
                 className={cn(
-                  'mt-5 flex h-12 w-full items-center justify-center rounded-2xl text-sm font-black text-white transition-all',
+                  'mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-black transition-all',
                   room < 1
-                    ? 'bg-muted-foreground/30'
-                    : !canAfford
-                      ? 'bg-primary shadow-[0_4px_0_0_hsl(var(--primary)/0.6)] active:translate-y-1 active:shadow-none'
-                      : 'bg-[#4f9149] shadow-[0_4px_0_0_#3b7a38] active:translate-y-1 active:shadow-none',
+                    ? 'bg-muted text-muted-foreground'
+                    : 'bg-[#447d3f] text-white shadow-[0_4px_0_0_#2c511a] active:translate-y-1 active:shadow-none',
                 )}
               >
                 {room < 1 ? (
                   'Your pond is full'
                 ) : !canAfford ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    Get {(price - flyBalance).toLocaleString()} more flies
-                    <Fly size={30} paused y={-4} />
-                  </span>
+                  <>
+                    Get
+                    <FlyAmount amount={price - flyBalance} size={15} />
+                    more
+                  </>
                 ) : busy === 1 ? (
                   'Buying…'
                 ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    Get a Lily Pad · {price.toLocaleString()} flies
-                    <Fly size={28} paused y={-5} />
-                  </span>
+                  <>
+                    Get a Lily Pad
+                    <FlyPriceChip amount={price} size={14} />
+                  </>
                 )}
               </button>
 
@@ -284,12 +276,9 @@ export function ShieldSheet({
                   ) : (
                     <>
                       Two for
-                      <Fly size={16} paused y={-1} />
-                      <span className="tabular-nums">
-                        {twoPackPrice.toLocaleString()}
-                      </span>
+                      <FlyAmount amount={twoPackPrice} size={14} />
                       {twoPackSaving > 0 && (
-                        <span className="text-[#4f9149]">
+                        <span className="text-[#447d3f]">
                           save {twoPackSaving.toLocaleString()}
                         </span>
                       )}

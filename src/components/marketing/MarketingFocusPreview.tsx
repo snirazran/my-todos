@@ -100,7 +100,7 @@ export function MarketingFocusPreview() {
           more it catches. On iPhone the timer stays on your Lock Screen and
           rings even on silent.
         </p>
-        <p className="mt-6 text-sm font-black text-[#34631f] dark:text-[#9fd98f]">
+        <p className="mt-6 text-sm font-black text-[#2c511a] dark:text-[#9fd98f]">
           Try it: a full session takes 25 seconds here.
         </p>
       </div>

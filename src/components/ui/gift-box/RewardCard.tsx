@@ -6,7 +6,7 @@ import {
   useReducedMotion,
   Variants,
 } from 'framer-motion';
-import { ChevronRight, Loader2, Crown, Gift } from 'lucide-react';
+import { ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
@@ -166,6 +166,12 @@ export function GoldenRewardButton({
   );
 }
 
+const AD_OFFER_PALETTE = {
+  double: { top: '#fbbf24', bottom: '#f97316', lip: '#c2410c', glow: 'rgba(251,191,36,0.6)', ink: '#c2410c' },
+  reroll: { top: '#a78bfa', bottom: '#7c3aed', lip: '#4c1d95', glow: 'rgba(167,139,250,0.6)', ink: '#6d28d9' },
+  plus: { top: '#2f7d50', bottom: '#1d5a3f', lip: '#0b271c', glow: 'rgba(251,191,36,0.45)', ink: '#3b2708' },
+} as const;
+
 export function PlusOfferButton({
   mode,
   visual,
@@ -176,6 +182,8 @@ export function PlusOfferButton({
   busy,
   disabled,
   onClick,
+  intent = 'double',
+  rarity,
 }: {
   mode: 'ad' | 'plus';
   visual: React.ReactNode;
@@ -186,6 +194,8 @@ export function PlusOfferButton({
   busy?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  intent?: 'double' | 'another' | 'reroll';
+  rarity?: Rarity;
 }) {
   const plus = mode === 'plus';
   const reduceMotion = useReducedMotion();
@@ -212,6 +222,13 @@ export function PlusOfferButton({
     return () => controls.stop();
   }, [anchorFrom, anchorTo, anchorReady, reduceMotion]);
 
+  const gift = GIFT_BUTTON_PALETTE[rarity ?? 'common'] ?? GIFT_BUTTON_PALETTE.common;
+  const palette = plus
+    ? AD_OFFER_PALETTE.plus
+    : intent === 'another'
+      ? { ...gift, ink: gift.lip }
+      : AD_OFFER_PALETTE[intent];
+
   const subline = plus ? 'Free with Plus trial' : 'Watch a short ad';
   const label = anchor
     ? `Get ${anchor.to} ${anchor.unit} instead of ${anchor.from}. ${subline}`
@@ -223,99 +240,138 @@ export function PlusOfferButton({
       onClick={onClick}
       disabled={disabled || busy}
       aria-label={label}
-      className={cn(
-        'group relative flex w-full items-center gap-3 rounded-2xl py-2.5 pl-2.5 pr-3 text-left transition-[transform,box-shadow] duration-100 active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-70',
-        plus
-          ? 'bg-[linear-gradient(135deg,#2f7d50_0%,#1d5a3f_55%,#123a2a_100%)] text-white shadow-[0_4px_0_0_#0b271c,0_14px_28px_-10px_rgba(251,191,36,0.45)] ring-1 ring-inset ring-[#fbbf24]/50 active:shadow-[0_1px_0_0_#0b271c]'
-          : 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-white shadow-[0_4px_0_0_#b45309,0_14px_28px_-10px_rgba(245,158,11,0.5)] active:shadow-[0_1px_0_0_#b45309]',
-      )}
+      data-busy={busy || undefined}
+      className="gift-open-btn group relative w-full pb-1.5 text-left text-white outline-none disabled:cursor-not-allowed disabled:opacity-70"
+      style={
+        {
+          '--gift-top': palette.top,
+          '--gift-bottom': palette.bottom,
+          '--gift-lip': palette.lip,
+          '--gift-glow': palette.glow,
+        } as React.CSSProperties
+      }
     >
+      <span aria-hidden className="gift-open-halo" />
+      <span aria-hidden className="gift-open-lip" />
       <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
-      >
-        <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shine" />
-      </span>
-
-      <span aria-hidden className="relative h-12 w-12 shrink-0">
-        <span className="grid h-full w-full place-items-center rounded-full bg-[#fff8dc] text-amber-900 shadow-[inset_0_-3px_0_rgba(180,83,9,0.22),0_2px_6px_rgba(0,0,0,0.25)] ring-2 ring-[#fbbf24]">
-          {visual}
-        </span>
-        {badge && (
-          <motion.span
-            initial={false}
-            animate={landed ? { scale: [1, 1.35, 1], rotate: [-12, 6, -8] } : { scale: 1, rotate: -8 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="absolute -bottom-1 -right-2 rounded-lg bg-gradient-to-b from-amber-300 to-amber-500 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-950 shadow-[inset_0_-2px_0_rgba(146,64,14,0.45),0_2px_4px_rgba(0,0,0,0.3)]"
-          >
-            {badge}
-          </motion.span>
-        )}
-      </span>
-
-      <span aria-hidden className="relative flex min-w-0 flex-1 flex-col leading-tight">
-        {busy ? (
-          <span className="truncate text-[17px] font-black tracking-tight">
-            {busyLabel ?? 'Loading...'}
-          </span>
-        ) : anchor ? (
-          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span
-              className={cn(
-                'text-[14px] font-black tabular-nums line-through decoration-2',
-                plus ? 'text-white/50 decoration-[#fde68a]/80' : 'text-white/70 decoration-white/80',
-              )}
-            >
-              {anchor.from}
-            </span>
-            <motion.span
-              initial={false}
-              animate={landed ? { scale: [1, 1.18, 1] } : { scale: 1 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className={cn(
-                'origin-left text-[24px] font-black tabular-nums leading-none tracking-tight',
-                plus && 'text-[#fde68a]',
-              )}
-            >
-              {shown}
-            </motion.span>
-            <span className="text-[14px] font-black">{anchor.unit}</span>
-          </span>
-        ) : (
-          <span className="truncate whitespace-nowrap text-[17px] font-black tracking-tight">
-            {title}
-          </span>
-        )}
-        <span
-          className={cn(
-            'mt-1 flex items-center gap-1 text-[12px] font-bold',
-            plus ? 'text-white/85' : 'text-white/90',
-          )}
-        >
-          {plus ? (
-            <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
-          ) : (
-            <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
-          )}
-          {subline}
-        </span>
-      </span>
-
-      <span
-        aria-hidden
         className={cn(
-          'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform duration-150 group-hover:translate-x-0.5',
-          plus
-            ? 'bg-[#fbbf24] text-[#3b2708] shadow-[inset_0_-2px_0_rgba(146,64,14,0.35)]'
-            : 'bg-white/25 text-white',
+          'gift-open-face ad-offer-face',
+          plus && 'ring-1 ring-inset ring-[#fbbf24]/60',
         )}
       >
-        {busy ? (
-          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
-        ) : (
-          <ChevronRight className="h-5 w-5" strokeWidth={3} />
-        )}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[20px]"
+        >
+          <span className="gift-open-shine" />
+        </span>
+
+        <span aria-hidden className="relative h-11 w-11 shrink-0">
+          <span
+            className={cn(
+              'grid h-full w-full place-items-center rounded-full shadow-[inset_0_-3px_0_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.22)]',
+              plus
+                ? 'bg-[#fff8dc] text-amber-900 ring-2 ring-[#fbbf24]'
+                : 'bg-white/95',
+              intent === 'reroll' && !plus && 'ad-offer-dice',
+              intent === 'another' && !plus && 'gift-open-icon',
+            )}
+            style={plus ? undefined : { color: palette.ink }}
+          >
+            {visual}
+          </span>
+          {badge && (
+            <span className="ad-offer-badge absolute -bottom-1 -right-2">
+              <motion.span
+                initial={false}
+                animate={landed ? { scale: [1, 1.35, 1], rotate: [-12, 6, -8] } : { scale: 1, rotate: -8 }}
+                transition={{ duration: 0.45, ease: 'easeOut' }}
+                className="block rounded-lg bg-white px-1.5 py-0.5 text-[12px] font-black leading-none shadow-[inset_0_-2px_0_rgba(0,0,0,0.12),0_2px_4px_rgba(0,0,0,0.3)] [text-shadow:none]"
+                style={{ color: palette.ink }}
+              >
+                {badge}
+              </motion.span>
+            </span>
+          )}
+        </span>
+
+        <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
+          {busy ? (
+            <span className="truncate text-[18px] font-black tracking-tight">
+              {busyLabel ?? 'Loading...'}
+            </span>
+          ) : anchor ? (
+            <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+              <span
+                className={cn(
+                  'text-[14px] font-black tabular-nums line-through decoration-2',
+                  plus ? 'text-white/50 decoration-[#fde68a]/80' : 'text-white/75 decoration-white/80',
+                )}
+              >
+                {anchor.from}
+              </span>
+              <motion.span
+                initial={false}
+                animate={landed ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className={cn(
+                  'origin-left text-[24px] font-black tabular-nums leading-none tracking-tight',
+                  plus && 'text-[#fde68a]',
+                )}
+              >
+                {shown}
+              </motion.span>
+              <span className="text-[14px] font-black">{anchor.unit}</span>
+            </span>
+          ) : (
+            <span className="truncate whitespace-nowrap text-[18px] font-black tracking-tight">
+              {title}
+            </span>
+          )}
+          <span className="mt-1 flex items-center gap-1 text-[12px] font-bold text-white/90">
+            {plus ? (
+              <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
+            ) : (
+              <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+            )}
+            {subline}
+          </span>
+        </span>
+
+        <span
+          aria-hidden
+          className={cn(
+            'relative grid h-10 w-10 shrink-0 place-items-center rounded-full shadow-[inset_0_-3px_0_rgba(0,0,0,0.14),0_2px_5px_rgba(0,0,0,0.2)] [text-shadow:none]',
+            !busy && 'ad-offer-play',
+            plus ? 'bg-[#fbbf24] text-[#3b2708]' : 'bg-white',
+          )}
+          style={plus ? undefined : { color: palette.ink }}
+        >
+          {busy ? (
+            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
+          ) : plus ? (
+            <ChevronRight className="h-5 w-5" strokeWidth={3} />
+          ) : (
+            <Play className="ml-0.5 h-4 w-4" fill="currentColor" strokeWidth={0} />
+          )}
+        </span>
       </span>
+      {!busy &&
+        GIFT_SPARKLES.map((sparkle) => (
+          <svg
+            key={sparkle.delay}
+            aria-hidden
+            viewBox="0 0 16 16"
+            className={cn('gift-open-sparkle absolute', sparkle.className)}
+            style={{ animationDelay: sparkle.delay }}
+          >
+            <path
+              d="M8 0c.4 3.9 1.1 4.6 5 5-3.9.4-4.6 1.1-5 5-.4-3.9-1.1-4.6-5-5 3.9-.4 4.6-1.1 5-5Z"
+              transform="translate(0 3)"
+              fill="#fff"
+            />
+          </svg>
+        ))}
     </button>
   );
 }
@@ -665,6 +721,7 @@ export const RewardCard = ({
         {showDoubleUpsell && (
           <PlusOfferButton
             mode={canWatchAd ? 'ad' : 'plus'}
+            intent="double"
             visual={<FlyGlyph />}
             badge="×2"
             title="Double your reward"

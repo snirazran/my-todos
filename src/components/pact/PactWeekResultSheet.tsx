@@ -711,7 +711,7 @@ export function PactWeekResultSheet({
               <button
                 type="button"
                 onClick={() => leave(onGetShield)}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#3b7a38] transition-transform active:translate-y-[2px] active:shadow-none"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#3b7a38] transition-transform active:translate-y-[2px] active:shadow-none"
               >
                 <Icon name="lilyPad" className="-my-1 h-[26px] w-[26px]" />
                 Get a Lily Pad for next time
@@ -725,7 +725,7 @@ export function PactWeekResultSheet({
               <button
                 type="button"
                 onClick={() => leave(onStartLeap)}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-transform active:translate-y-[2px] active:shadow-none"
               >
                 <Play className="h-4 w-4 fill-current" strokeWidth={2.5} />
                 Start this week&apos;s Leap
@@ -742,7 +742,7 @@ export function PactWeekResultSheet({
                 'h-12 w-full rounded-2xl text-[15px] font-black transition-transform active:translate-y-[2px] active:shadow-none',
                 canStart || (missed && result.shieldsLeft === 0)
                   ? 'text-muted-foreground hover:text-foreground'
-                  : 'bg-[#4f9149] text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
+                  : 'bg-[#447d3f] text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40',
               )}
             >
               {missed

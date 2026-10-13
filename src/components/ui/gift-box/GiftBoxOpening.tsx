@@ -335,6 +335,8 @@ export default function GiftBoxOpening({
                     <>
                       <PlusOfferButton
                         mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
+                        intent="another"
+                        rarity={giftDef?.rarity}
                         visual={
                           <span className="pointer-events-none absolute -top-8 left-1/2 h-[80px] w-[60px] -translate-x-1/2">
                             <GiftRive color={giftColor} className="h-full w-full" />

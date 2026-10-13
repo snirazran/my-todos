@@ -400,7 +400,7 @@ export default function MonthCalendar({
                     onSelect(today);
                     onClose();
                   }}
-                  className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] transition-all hover:bg-[#478442] active:translate-y-1 active:shadow-none"
+                  className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[15px] font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] transition-all hover:bg-[#3d7038] active:translate-y-1 active:shadow-none"
                 >
                   <CalendarCheck size={16} />
                   {todayLabel}

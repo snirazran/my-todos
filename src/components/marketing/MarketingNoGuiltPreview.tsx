@@ -46,7 +46,7 @@ export function MarketingNoGuiltPreview() {
               role="tab"
               aria-selected={index === itemIndex}
               onClick={() => setIndex(itemIndex)}
-              className={`relative z-10 rounded-full px-2 py-2.5 text-[13px] font-black transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4f9149] ${
+              className={`relative z-10 rounded-full px-2 py-2.5 text-[13px] font-black transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#447d3f] ${
                 index === itemIndex
                   ? 'text-[#0f2e1d] dark:text-white'
                   : 'text-[#0f2e1d]/55 hover:text-[#0f2e1d] dark:text-white/55 dark:hover:text-white'

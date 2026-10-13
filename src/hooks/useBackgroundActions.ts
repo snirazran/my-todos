@@ -183,7 +183,6 @@ export function useBackgroundActions({
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Purchase failed');
       onSpend?.(item.priceFlies);
-      onNotify?.({ msg: `Purchased ${item.name}!`, type: 'success' });
       refresh();
       return true;
     } catch (err) {

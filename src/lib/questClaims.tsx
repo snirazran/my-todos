@@ -117,6 +117,7 @@ export type Trackable = {
   objectiveLabel: string;
   remainingLabel: string;
   objectiveType?: string;
+  metricKey?: string;
   actionKey?: string;
   questDone?: number;
   questTotal?: number;

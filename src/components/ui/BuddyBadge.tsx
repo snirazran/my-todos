@@ -27,7 +27,7 @@ export function BuddyFrogFace({
   return (
     <span
       className={cn(
-        'relative block overflow-hidden rounded-full bg-[#4f9149]/10',
+        'relative block overflow-hidden rounded-full bg-[#447d3f]/10',
         className,
       )}
       style={{ width: size, height: size }}
@@ -91,7 +91,7 @@ export function BuddyBadge({
           pending
             ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
             : done
-              ? 'bg-[#4f9149]/15 text-[#3d7a38] dark:text-emerald-400'
+              ? 'bg-[#447d3f]/15 text-[#3d7a38] dark:text-emerald-400'
               : 'bg-muted text-muted-foreground',
           className,
         )}
@@ -155,12 +155,12 @@ export function BuddyBadge({
         size={size}
         className={cn(
           'ring-2 ring-inset',
-          partnerDone ? 'ring-[#4f9149]' : 'ring-[#4f9149]/40',
+          partnerDone ? 'ring-[#447d3f]' : 'ring-[#447d3f]/40',
         )}
       />
       {partnerDone && (
         <span
-          className="absolute -bottom-1 -right-1 grid place-items-center rounded-full border border-background bg-[#4f9149] text-white"
+          className="absolute -bottom-1 -right-1 grid place-items-center rounded-full border border-background bg-[#447d3f] text-white"
           style={{ width: size * 0.55, height: size * 0.55 }}
         >
           <Check
@@ -231,7 +231,7 @@ export function BuddyLine({
             pending
               ? 'opacity-70 ring-amber-400/60'
               : partnerDone
-                ? 'ring-[#4f9149]'
+                ? 'ring-[#447d3f]'
                 : 'ring-border',
           )}
         />
@@ -239,7 +239,7 @@ export function BuddyLine({
           <span
             className={cn(
               'absolute -bottom-0.5 -right-1 grid h-3 w-3 place-items-center rounded-full text-white ring-2 ring-card',
-              pending ? 'bg-amber-500' : 'bg-[#4f9149]',
+              pending ? 'bg-amber-500' : 'bg-[#447d3f]',
             )}
           >
             {pending ? (

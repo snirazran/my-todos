@@ -20,6 +20,7 @@ import { LookReactionRow } from '@/components/ui/LookReactions';
 import { FriendFocusScene } from '@/components/ui/FriendFocusScene';
 import { hapticImpact } from '@/lib/haptics';
 import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import {
   useBackgrounds,
   DEFAULT_BACKGROUND_IMAGES,
@@ -497,7 +498,7 @@ export function FriendDetailModal({
                     {incoming.map((inv) => (
                       <div
                         key={inv.bondId}
-                        className="rounded-[18px] border border-[#4f9149]/30 bg-[#4f9149]/8 p-3"
+                        className="rounded-[18px] border border-[#447d3f]/30 bg-[#447d3f]/8 p-3"
                       >
                         <p className="text-sm font-black text-foreground">
                           {inv.withName} invited you
@@ -511,7 +512,7 @@ export function FriendDetailModal({
                             type="button"
                             onClick={() => respondInvite(inv.bondId, 'accept')}
                             disabled={busyBond === inv.bondId}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#4f9149] py-2.5 text-sm font-black text-white transition-colors hover:bg-[#457f40] disabled:opacity-60"
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#447d3f] py-2.5 text-sm font-black text-white transition-colors hover:bg-[#3b6d37] disabled:opacity-60"
                           >
                             {busyBond === inv.bondId ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -551,9 +552,9 @@ export function FriendDetailModal({
                   </div>
                 )}
 
-                <div className="rounded-[20px] border border-[#4f9149]/25 bg-[#4f9149]/[.06] p-3.5">
+                <div className="rounded-[20px] border border-[#447d3f]/25 bg-[#447d3f]/[.06] p-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#4f9149]/15 text-[#4f9149]">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#447d3f]/15 text-[#447d3f]">
                       <Users className="h-6 w-6" />
                     </div>
                     <div className="min-w-0">
@@ -568,7 +569,7 @@ export function FriendDetailModal({
                   <button
                     type="button"
                     onClick={() => onBuddyUp(entry)}
-                    className="mt-3 h-12 w-full rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
+                    className="mt-3 h-12 w-full rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
                   >
                     Start a buddy task
                   </button>
@@ -735,7 +736,7 @@ function ItemPeekSheet({
                   type="button"
                   onClick={handleEquip}
                   disabled={equipping}
-                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none disabled:opacity-60"
                 >
                   {equipping ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -749,17 +750,11 @@ function ItemPeekSheet({
                 <div className="mt-4 rounded-2xl border border-border/60 bg-muted/40 p-4 text-sm font-bold">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Shop price</span>
-                    <span className="inline-flex items-center gap-1.5 font-black tabular-nums">
-                      <Fly size={16} paused y={-2} />
-                      {price.toLocaleString()}
-                    </span>
+                    <FlyAmount amount={price} size={14} className="font-black" />
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-muted-foreground">Your flies</span>
-                    <span className="inline-flex items-center gap-1.5 font-black tabular-nums">
-                      <Fly size={16} paused y={-2} />
-                      {balance.toLocaleString()}
-                    </span>
+                    <FlyAmount amount={balance} size={14} className="font-black" />
                   </div>
                   {shortfall === 0 && (
                     <p className="mt-2.5 text-center text-[13px] font-black text-emerald-600">
@@ -776,7 +771,7 @@ function ItemPeekSheet({
                         `/wardrobe?tab=shop&item=${encodeURIComponent(target.id)}&kind=${target.kind === 'bg' ? 'background' : 'item'}`,
                       )
                     }
-                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
+                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
                   >
                     Get it in your shop
                   </button>
@@ -785,7 +780,7 @@ function ItemPeekSheet({
                     <button
                       type="button"
                       onClick={() => openFlyShop(shortfall)}
-                      className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
+                      className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"
                     >
                       Get
                       <Fly size={28} y={-2} alwaysPlay />

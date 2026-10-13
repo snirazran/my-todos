@@ -22,7 +22,7 @@ import type { FriendSummary } from '@/lib/friends/indices';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { shareLink, type ShareResult } from '@/lib/share';
 
-const BUDDY = '#4f9149';
+const BUDDY = '#447d3f';
 
 type WardrobeIndices = Partial<
   Record<'skin' | 'hat' | 'body' | 'hand_item', number>
@@ -157,7 +157,7 @@ function ChooseSheet({
                 background: `radial-gradient(120% 100% at 50% 0%, ${BUDDY}22 0%, transparent 72%)`,
               }}
             />
-            <p className="relative text-[12px] font-black text-[#4f9149]">
+            <p className="relative text-[12px] font-black text-[#447d3f]">
               Goal buddy · Step 1 of 2
             </p>
             <h2 className="relative mt-1 text-xl font-black tracking-tight text-foreground">
@@ -178,7 +178,7 @@ function ChooseSheet({
                   <button
                     type="button"
                     onClick={() => onPick(f)}
-                    className="flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#4f9149]/40 hover:shadow-md active:scale-[0.99]"
+                    className="flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#447d3f]/40 hover:shadow-md active:scale-[0.99]"
                   >
                     <span className="flex h-14 w-16 shrink-0 items-end justify-center overflow-hidden">
                       {entered && (
@@ -210,9 +210,9 @@ function ChooseSheet({
             <button
               type="button"
               onClick={onInvite}
-              className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#4f9149]/40 bg-[#4f9149]/5 px-4 py-3.5 text-left transition-transform active:scale-[0.99]"
+              className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#447d3f]/40 bg-[#447d3f]/5 px-4 py-3.5 text-left transition-transform active:scale-[0.99]"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f9149]/15 text-[#4f9149]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#447d3f]/15 text-[#447d3f]">
                 <UserPlus className="h-5 w-5" strokeWidth={2.5} />
               </span>
               <span className="min-w-0 flex-1">
@@ -268,7 +268,7 @@ function BuddyInviteFlow({
         ? { x: (rect.left + rect.width / 2) / window.innerWidth, y: 0.4 }
         : { y: 0.4 },
       zIndex: 99999,
-      colors: ['#4f9149', '#8fc36d', '#ffd166', '#ffffff'],
+      colors: ['#447d3f', '#8fc36d', '#ffd166', '#ffffff'],
     });
   }, [sent]);
 
@@ -338,7 +338,7 @@ function BuddyInviteFlow({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="fixed inset-0 z-[1600] flex items-end justify-center bg-[#4f9149]/95 backdrop-blur-sm sm:items-center"
+              className="fixed inset-0 z-[1600] flex items-end justify-center bg-[#447d3f]/95 backdrop-blur-sm sm:items-center"
             >
               <motion.div
                 initial={{ y: '100%' }}
@@ -377,7 +377,7 @@ function BuddyInviteFlow({
                     const result = await shareInviteUrl(invite.url, invite.goal);
                     setCopiedOnly(result === 'copied');
                   }}
-                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
                 >
                   <Share2 className="h-5 w-5" strokeWidth={2.5} />
                   Share the link

@@ -530,7 +530,7 @@ function RightActions({
             className="h-9 w-9 rounded-full object-cover shadow-sm"
           />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#62a65b] to-[#34631f] text-sm font-black text-white shadow-sm">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#62a65b] to-[#2c511a] text-sm font-black text-white shadow-sm">
             {(user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()}
           </span>
         )}
@@ -1914,7 +1914,7 @@ function WeekStartRow() {
             className={cn(
               'h-10 flex-1 rounded-xl text-[13px] font-black transition disabled:opacity-60',
               weekStartsOn === day
-                ? 'bg-emerald-500 text-white'
+                ? 'bg-[#447d3f] text-white'
                 : 'bg-muted text-muted-foreground hover:bg-muted/70',
             )}
           >
@@ -1949,7 +1949,7 @@ function HapticsToggleRow() {
       <span
         className={cn(
           'inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
-          enabled ? 'bg-emerald-500' : 'bg-muted',
+          enabled ? 'bg-[#447d3f]' : 'bg-muted',
         )}
       >
         <span
@@ -1989,7 +1989,7 @@ function CatchSoundsToggleRow() {
       <span
         className={cn(
           'inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
-          enabled ? 'bg-emerald-500' : 'bg-muted',
+          enabled ? 'bg-[#447d3f]' : 'bg-muted',
         )}
       >
         <span
@@ -2047,7 +2047,7 @@ function NotificationsView({
             onClick={notifsEnabled ? onDisableNotifs : onEnableNotifs}
             className={cn(
               'inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-60',
-              notifsEnabled ? 'bg-emerald-500' : 'bg-muted',
+              notifsEnabled ? 'bg-[#447d3f]' : 'bg-muted',
             )}
           >
             <span
@@ -2138,7 +2138,7 @@ function PromoCard({
       type="button"
       onClick={onAction}
       disabled={disabled}
-      className="group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#6fbf5f_0%,#4f9149_58%,#3f7a3a_100%)] px-4 py-3.5 text-left text-white shadow-[0_3px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-70 disabled:active:scale-100"
+      className="group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#6fbf5f_0%,#447d3f_58%,#3f7a3a_100%)] px-4 py-3.5 text-left text-white shadow-[0_3px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-70 disabled:active:scale-100"
     >
       <span
         aria-hidden

@@ -30,10 +30,10 @@ export function MarketingFaq({ items }: { items: readonly FaqItem[] }) {
             key={item.question}
             className={cn('group', !expanded && index >= visibleCount && 'hidden')}
           >
-            <summary className="cursor-pointer list-none px-4 py-4 transition-colors hover:bg-[#4f9149]/[0.04] [&::-webkit-details-marker]:hidden sm:px-7 sm:py-[18px]">
+            <summary className="cursor-pointer list-none px-4 py-4 transition-colors hover:bg-[#447d3f]/[0.04] [&::-webkit-details-marker]:hidden sm:px-7 sm:py-[18px]">
               <h3 className="flex items-center justify-between gap-3 text-[15px] font-black leading-snug text-foreground sm:gap-4 sm:text-base">
                 {item.question}
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#4f9149]/10 text-[#34631f] transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none dark:text-[#9fd98f]">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#447d3f]/10 text-[#2c511a] transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none dark:text-[#9fd98f]">
                   <ChevronDown className="h-4 w-4" aria-hidden />
                 </span>
               </h3>
@@ -50,7 +50,7 @@ export function MarketingFaq({ items }: { items: readonly FaqItem[] }) {
             type="button"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={expanded}
-            className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-black text-[#34631f] transition-colors hover:bg-[#4f9149]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4f9149] dark:text-[#9fd98f]"
+            className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-sm font-black text-[#2c511a] transition-colors hover:bg-[#447d3f]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#447d3f] dark:text-[#9fd98f]"
           >
             {expanded ? 'Show fewer' : `Show all ${ordered.length} questions`}
             <ChevronDown

@@ -697,7 +697,7 @@ export function PactPickSheet({
                             )}
                           </span>
                           {selected ? (
-                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-white">
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
                               <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
                             </span>
                           ) : (
@@ -790,7 +790,7 @@ export function PactPickSheet({
                           className={cn(
                             'flex min-h-12 min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl border-2 px-0.5 text-[13px] font-black transition active:scale-95',
                             on
-                              ? 'border-primary bg-primary text-white'
+                              ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border/60 bg-card text-foreground hover:border-primary/50',
                           )}
                         >
@@ -831,7 +831,7 @@ export function PactPickSheet({
                           className={cn(
                             'min-h-11 rounded-xl border-2 px-1 text-[13px] font-black transition active:scale-95',
                             on
-                              ? 'border-primary bg-primary text-white'
+                              ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border/60 bg-card text-foreground hover:border-primary/50',
                           )}
                         >
@@ -847,7 +847,7 @@ export function PactPickSheet({
                       className={cn(
                         'min-h-11 rounded-xl border-2 px-1 text-[13px] font-black transition active:scale-95',
                         customTime || perDayTimes
-                          ? 'border-primary bg-primary text-white'
+                          ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border/60 bg-card text-foreground hover:border-primary/50',
                       )}
                     >
@@ -1053,7 +1053,7 @@ export function PactPickSheet({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
+                  className="h-12 w-full rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-transform active:translate-y-[2px] active:shadow-none"
                 >
                   Done
                 </button>
@@ -1113,7 +1113,7 @@ export function PactPickSheet({
                 <button
                   type="button"
                   onClick={dismissIntro}
-                  className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
+                  className="h-12 w-full rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-transform active:translate-y-[2px] active:shadow-none"
                 >
                   Let&apos;s go
                 </button>
@@ -1122,7 +1122,7 @@ export function PactPickSheet({
                   type="button"
                   disabled={!previewText}
                   onClick={() => setStep('confirm')}
-                  className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
+                  className="h-12 w-full rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
                 >
                   Next
                 </button>
@@ -1131,7 +1131,7 @@ export function PactPickSheet({
                   type="button"
                   disabled={saving || days.length === 0}
                   onClick={commit}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60"
                 >
                   {saving ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -1257,7 +1257,7 @@ function IntroBeat({
           {icon}
         </span>
       ) : (
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black tabular-nums text-white">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black tabular-nums text-primary-foreground">
           {index}
         </span>
       )}

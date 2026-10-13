@@ -4,7 +4,7 @@ import React from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Bookmark, Repeat, ShoppingBag } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useTradeConfig } from '@/hooks/useTradeConfig';
@@ -119,9 +119,8 @@ export function WishlistSheet({
               <p className="min-w-0 text-sm font-medium text-muted-foreground">
                 {subtitle}
               </p>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/50 bg-card px-2.5 py-1 text-sm font-black tabular-nums text-foreground shadow-sm">
-                <Fly size={26} paused y={-2} />
-                {balance.toLocaleString()}
+              <span className="inline-flex shrink-0 items-center rounded-full border border-border/50 bg-card py-1 pl-3 pr-3 font-black text-foreground shadow-sm">
+                <FlyAmount amount={balance} size={14} />
               </span>
             </div>
           </div>
@@ -145,7 +144,7 @@ export function WishlistSheet({
                 <button
                   type="button"
                   onClick={onGoToShop}
-                  className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl bg-green-500 px-5 text-sm font-black text-white shadow-lg shadow-green-500/25 transition-colors hover:bg-green-600"
+                  className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl bg-[#447d3f] px-5 text-sm font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow,background-color] active:translate-y-[3px] active:shadow-none [@media(hover:hover)]:hover:bg-[#3d7038]"
                 >
                   <ShoppingBag className="h-4 w-4" strokeWidth={3} />
                   Browse the shop

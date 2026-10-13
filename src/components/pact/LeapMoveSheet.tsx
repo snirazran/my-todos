@@ -162,7 +162,7 @@ export function LeapMoveSheet({
                       className={cn(
                         'flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left transition-colors',
                         picked
-                          ? 'border-[#4f9149] bg-[#4f9149]/10'
+                          ? 'border-[#447d3f] bg-[#447d3f]/10'
                           : 'border-border/60 bg-card/60 hover:bg-muted/60',
                       )}
                     >
@@ -214,7 +214,7 @@ export function LeapMoveSheet({
                     className={cn(
                       'h-11 rounded-xl border text-[13px] font-black transition-colors',
                       picked
-                        ? 'border-[#4f9149] bg-[#4f9149] text-white'
+                        ? 'border-[#447d3f] bg-[#447d3f] text-white'
                         : 'border-border/60 bg-card/60 text-foreground hover:bg-muted/60',
                     )}
                   >
@@ -237,7 +237,7 @@ export function LeapMoveSheet({
               type="button"
               onClick={spent ? onClose : submit}
               disabled={!spent && !canSave}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60 disabled:shadow-none"
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60 disabled:shadow-none"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

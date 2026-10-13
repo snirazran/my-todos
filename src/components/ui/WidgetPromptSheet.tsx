@@ -121,7 +121,7 @@ export function WidgetPromptSheet({
               >
                 {IOS_STEPS.map((step, i) => (
                   <li key={step} className="flex gap-3">
-                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#4f9149] text-sm font-bold text-white">
+                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#447d3f] text-sm font-bold text-white">
                       {i + 1}
                     </span>
                     <span className="leading-snug">{step}</span>
@@ -136,7 +136,7 @@ export function WidgetPromptSheet({
               type="button"
               onClick={showSteps && !pinnable ? handleIosDone : handleAdd}
               disabled={busy}
-              className="h-14 w-full rounded-2xl bg-[#4f9149] text-lg font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:grayscale"
+              className="h-14 w-full rounded-2xl bg-[#447d3f] text-lg font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:grayscale"
             >
               {showSteps && !pinnable
                 ? "Done, it's on there"

@@ -541,6 +541,7 @@ export default function TaskCard({
         />
         {steps && (
           <StepsStrip
+            slideRows={false}
             taskText={task.text}
             items={steps.items}
             doneCount={steps.doneCount}

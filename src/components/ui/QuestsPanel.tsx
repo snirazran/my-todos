@@ -38,6 +38,7 @@ import {
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import { GiftRive } from './gift-box/GiftBox';
 import Fly from './fly';
+import { FlyAmount } from './FlyAmount';
 import { useInventory } from '@/hooks/useInventory';
 import {
   enqueueQuestRewardReveal,
@@ -953,7 +954,7 @@ function QuestSeasonBanner({
         <div className="absolute inset-x-3 bottom-14 z-10 mx-auto flex max-w-xl items-center gap-1.5 rounded-[24px] bg-background p-3 shadow-lg sm:gap-3">
           {seasonComplete ? (
             <>
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#447d3f] text-white shadow-md">
                 <Check className="h-8 w-8" strokeWidth={4} />
               </div>
               <div className="min-w-0 flex-1">
@@ -1710,8 +1711,7 @@ function QuestSeasonEventOverlay({
                 <span className="hidden [@media(min-width:420px)]:inline">
                   {skipping ? 'Skipping…' : 'Skip'}
                 </span>
-                <span className="tabular-nums">{season.tierSkipCost}</span>
-                <Fly size={18} y={-2} paused={paused} interactive={false} />
+                <FlyAmount amount={season.tierSkipCost} size={13} />
               </button>
             )}
 

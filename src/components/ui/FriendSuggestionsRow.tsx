@@ -75,7 +75,7 @@ export function FriendSuggestionsRow({
               'shrink-0 rounded-lg px-2 py-1 text-xs font-black transition-colors',
               inverted
                 ? 'text-[color:var(--pond-eyebrow)] hover:bg-[color:var(--pond-chip-hover)]'
-                : 'text-[#4f9149] hover:bg-[#4f9149]/10',
+                : 'text-[#447d3f] hover:bg-[#447d3f]/10',
             )}
           >
             Retry
@@ -239,7 +239,7 @@ export function FriendSuggestionsRow({
                       'bg-[color:var(--pond-accent-2)] text-[color:var(--pond-accent-2-ink)] shadow-[0_3px_0_0_var(--pond-accent-2-shadow)] hover:bg-[color:var(--pond-accent-2-hover)] active:translate-y-0.5 active:shadow-none',
                     !sent &&
                       !inverted &&
-                      'bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] hover:bg-[#5aa354] active:translate-y-0.5 active:shadow-none',
+                      'bg-[#447d3f] text-white shadow-[0_3px_0_0_#2c511a] hover:bg-[#5aa354] active:translate-y-0.5 active:shadow-none',
                   )}
                 >
                   {busyId === s.userId ? (

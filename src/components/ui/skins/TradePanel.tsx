@@ -50,7 +50,7 @@ import {
   recipeFor,
 } from '@/lib/skins/tradeModifiers';
 import { isAvailableAt } from '@/lib/skins/availability';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -876,19 +876,10 @@ export function TradePanel({
         disabled: false,
         onClick: handleConfirmTrade,
         label: (
-          <span className="relative inline-flex items-center justify-center">
-            Get&nbsp;
-            <span className="tabular-nums">
-              {(aimQuote.price - balance).toLocaleString()}
-            </span>
-            &nbsp;flies
-            <Fly
-              size={36}
-              paused
-              x={2}
-              y={-5}
-              className="absolute inset-y-0 left-full my-auto"
-            />
+          <span className="inline-flex items-center justify-center gap-1">
+            Get
+            <FlyAmount amount={aimQuote.price - balance} size={14} />
+            more
           </span>
         ),
       };
@@ -1249,7 +1240,7 @@ export function TradePanel({
             !primaryCta.disabled &&
             'bg-primary text-primary-foreground shadow-[0_4px_0_0_hsl(var(--primary)/0.55)] active:translate-y-0.5 active:shadow-[0_2px_0_0_hsl(var(--primary)/0.55)]',
           primaryCta.tone === 'flies' &&
-            'bg-amber-500 text-white shadow-[0_4px_0_0_#b45309] active:translate-y-0.5',
+            'bg-amber-400 text-amber-950 shadow-[0_4px_0_0_#b45309] active:translate-y-0.5',
           primaryCta.tone === 'fill' &&
             'border border-primary/30 bg-primary/10 text-primary shadow-none hover:bg-primary/15 active:scale-[0.98]',
           primaryCta.tone === 'idle' && 'bg-muted text-muted-foreground/70',
@@ -1488,17 +1479,16 @@ export function TradePanel({
                       {aimQuote.basePrice.toLocaleString()}
                     </span>
                   )}
-                  <Fly size={30} paused y={-4} />
-                  <span
+                  <FlyAmount
+                    amount={aimQuote.price}
+                    size={14}
                     className={cn(
-                      'text-sm font-black tabular-nums',
+                      'font-black',
                       !aimActive || canAffordAim
                         ? 'text-foreground'
-                        : 'text-amber-600 dark:text-amber-400',
+                        : 'text-amber-700 dark:text-amber-400',
                     )}
-                  >
-                    {aimQuote.price.toLocaleString()}
-                  </span>
+                  />
                 </span>
               </button>
             )}
@@ -1649,6 +1639,7 @@ export function TradePanel({
                   ) : (
                     <PlusOfferButton
                       mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
+                      intent="reroll"
                       visual={<Dices className="h-6 w-6" strokeWidth={2.5} />}
                       title="Reroll this reward"
                       busy={rerollBusy}

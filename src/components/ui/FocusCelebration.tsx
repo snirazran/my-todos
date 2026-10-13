@@ -7,7 +7,7 @@ import { Sparkles } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import Fly from '@/components/ui/fly';
+import { FlyIcon } from '@/components/ui/FlyAmount';
 import type { Claimable, Trackable } from '@/lib/questClaims';
 
 type HomeView = {
@@ -139,18 +139,14 @@ export function FocusCelebration({
           className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5"
         >
           {fliesCaught > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-white/25 py-1 pl-2 pr-3 text-[13px] font-black text-white">
-              <span className="flex h-6 w-6 -translate-y-[3px] items-center justify-center">
-                <Fly size={28} interactive={false} paused />
-              </span>
+            <span className="flex items-center gap-1.5 rounded-full bg-white/25 py-1 pl-3 pr-3 text-[13px] font-black text-white">
+              <FlyIcon textPx={13} />
               +{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
             </span>
           )}
           {bonusFly && (
-            <span className="flex items-center gap-1.5 rounded-full bg-white/25 py-1 pl-2 pr-3 text-[13px] font-black text-white">
-              <span className="flex h-6 w-6 -translate-y-[3px] items-center justify-center">
-                <Fly size={28} interactive={false} paused />
-              </span>
+            <span className="flex items-center gap-1.5 rounded-full bg-white/25 py-1 pl-3 pr-3 text-[13px] font-black text-white">
+              <FlyIcon textPx={13} />
               +1 fly · Deep focus
             </span>
           )}

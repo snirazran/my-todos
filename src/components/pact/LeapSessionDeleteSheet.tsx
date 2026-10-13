@@ -369,7 +369,7 @@ export function LeapSessionDeleteSheet({
                   tone === 'danger'
                     ? 'text-destructive'
                     : tone === 'good'
-                      ? 'text-[#4f9149] dark:text-emerald-400'
+                      ? 'text-[#447d3f] dark:text-emerald-400'
                       : 'text-muted-foreground',
                 )}
               >
@@ -398,7 +398,7 @@ export function LeapSessionDeleteSheet({
                 'inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-black text-white transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60',
                 danger
                   ? 'bg-destructive shadow-[0_4px_0_0_rgba(0,0,0,0.28)]'
-                  : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f]',
+                  : 'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a]',
               )}
             >
               {busy ? (

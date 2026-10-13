@@ -1232,7 +1232,7 @@ function CleanSweepCard({
                 'inline-flex h-9 items-center justify-center rounded-xl px-4 text-[13px] font-black text-white transition-all hover:translate-y-[-1px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60',
                 golden
                   ? 'bg-amber-500 shadow-[0_3px_0_0_#b45309] hover:shadow-[0_4px_0_0_#b45309]'
-                  : 'bg-emerald-500 shadow-[0_3px_0_0_#047857] hover:shadow-[0_4px_0_0_#047857]',
+                  : 'bg-[#447d3f] shadow-[0_3px_0_0_#2c511a] hover:shadow-[0_4px_0_0_#2c511a]',
               )}
             >
               {claiming

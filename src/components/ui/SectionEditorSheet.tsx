@@ -248,7 +248,7 @@ export function SectionEditorSheet({
             type="button"
             onClick={commit}
             disabled={!name.trim()}
-            className="mt-6 w-full rounded-2xl bg-[#4f9149] py-3.5 text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-1 active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="mt-6 w-full rounded-2xl bg-[#447d3f] py-3.5 text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] transition-all active:translate-y-1 active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             {displayMode === 'create' ? 'Create section' : 'Save'}
           </button>

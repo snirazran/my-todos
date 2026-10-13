@@ -411,7 +411,7 @@ export function TaskFilterSheet({
             </button>
             <button
               onClick={() => onOpenChange(false)}
-              className="h-12 flex-[1.4] rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-[2px] active:shadow-none"
+              className="h-12 flex-[1.4] rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-[2px] active:shadow-none"
             >
               Close
             </button>

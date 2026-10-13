@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Loader2, PackageOpen, ShoppingBag, X } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import Fly from '@/components/ui/fly';
+import { FlyAmount } from '@/components/ui/FlyAmount';
 import { RarityCornerBadge } from '@/components/ui/skins/RarityCornerBadge';
 import {
   beginEquipMutation,
@@ -163,7 +163,7 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
         <div className="flex items-center justify-between border-b border-border bg-card/95 px-4 py-3 sm:px-5">
           <div><p className="font-display text-2xl text-primary">FROG SHOP</p><p className="text-[12px] font-black text-muted-foreground">Catch. Unlock. Equip.</p></div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-black text-primary"><Fly size={22} paused interactive={false} /> {balance}</div>
+            <div className="flex items-center rounded-full bg-primary/10 py-1.5 pl-3.5 pr-3 font-black text-primary"><FlyAmount amount={balance} size={14} /></div>
             <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-muted text-foreground" aria-label="Close shop"><X className="h-4 w-4" /></button>
           </div>
         </div>
@@ -205,7 +205,7 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
                     <p className="mt-2 w-full truncate text-sm font-black text-foreground">{entry.name}</p>
                     <p className="text-[11px] font-black text-muted-foreground">{entry.kind === 'item' ? entry.item.slot.replace('_', ' ') : 'background'}</p>
                     <div className={cn('mt-auto flex min-h-8 w-full items-center justify-center rounded-lg px-2 text-[12px] font-black', tab === 'shop' ? (confirming ? 'bg-amber-400 text-amber-950' : 'bg-primary text-primary-foreground') : (equipped ? 'bg-primary/15 text-primary' : 'bg-muted text-foreground'))}>
-                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : tab === 'shop' ? (confirming ? 'Tap again to buy' : <span className="flex items-center gap-1"><Fly size={17} paused interactive={false} />{entry.price}</span>) : (equipped ? 'Equipped' : 'Tap to equip')}
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : tab === 'shop' ? (confirming ? 'Tap again to buy' : <FlyAmount amount={entry.price} size={14} />) : (equipped ? 'Equipped' : 'Tap to equip')}
                     </div>
                   </button>
                 );
