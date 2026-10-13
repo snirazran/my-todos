@@ -766,6 +766,49 @@ function recipePickModifiers(pick: RecipePoolEntry): Partial<QuestLogicBlock> {
   return modifiers;
 }
 
+/**
+ * Dailies sync (hidden) while they are still locked, so on the day they
+ * unlock they would otherwise appear with the morning's tasks already counted.
+ * At the unlock moment every unclaimed objective is re-based on its current
+ * raw count, so only work done from now on moves it.
+ */
+async function startDailiesFromNow(
+  docs: InstanceType<typeof QuestModel>[],
+): Promise<boolean> {
+  let any = false;
+  await Promise.all(
+    docs.map(async (doc) => {
+      const claimed = new Set(doc.claimedObjectiveIds ?? []);
+      if (doc.claimedAt) return;
+      let changed = false;
+      const logic = (doc.logic ?? []).map((block: any) => {
+        if (block.preCredited || claimed.has(block.id) || !(block.progress > 0)) {
+          return block;
+        }
+        changed = true;
+        return {
+          ...block,
+          baselineProgress: Math.max(0, block.baselineProgress ?? 0) + block.progress,
+          progress: 0,
+        };
+      });
+      if (!changed) return;
+      any = true;
+      doc.logic = logic as any;
+      doc.progress = logic.reduce(
+        (sum: number, block: any) => sum + Math.min(block.progress ?? 0, block.target ?? 0),
+        0,
+      );
+      doc.completedAt = null as any;
+      doc.markModified('logic');
+      await doc.save().catch((err: unknown) => {
+        console.error('Re-basing daily quest at unlock failed', err);
+      });
+    }),
+  );
+  return any;
+}
+
 function retroactiveBaseline(args: {
   placement: QuestPlacement;
   isNewDoc: boolean;
@@ -1697,8 +1740,8 @@ export async function syncQuestState(args: {
     deletePromise,
   ]);
 
-  const questViews = docs.map(questDocToView);
-  const dailyQuests = questViews
+  let questViews = docs.map(questDocToView);
+  let dailyQuests = questViews
     .filter((quest): quest is DailyQuestProgressView => quest.placement === 'daily')
     .sort((a, b) => a.title.localeCompare(b.title))
     .map((quest) =>
@@ -1770,11 +1813,54 @@ export async function syncQuestState(args: {
       0,
     );
 
-  const dailyQuestsGated =
+  const dailyGate = (user as any).quests?.dailyGate as
+    | 'locked'
+    | 'unlocked'
+    | undefined;
+  const gateComputed =
     earlyObjectiveSteps < DAILY_QUESTS_UNLOCK_STEP_TARGET &&
     onboardingCandidates
       .slice(0, 2)
       .some((template) => !onboardingProgressComplete(template.templateId));
+  const dailyQuestsGated = dailyGate === 'unlocked' ? false : gateComputed;
+  if (gateComputed && dailyGate === undefined) {
+    await UserModel.updateOne(
+      { _id: userId, 'quests.dailyGate': { $exists: false } },
+      { $set: { 'quests.dailyGate': 'locked' } },
+    );
+  } else if (!gateComputed && dailyGate !== 'unlocked') {
+    const transition = await UserModel.updateOne(
+      {
+        _id: userId,
+        'quests.dailyGate':
+          dailyGate === 'locked' ? 'locked' : { $exists: false },
+      },
+      {
+        $set: {
+          'quests.dailyGate': 'unlocked',
+          'quests.dailyUnlockedAt': new Date(),
+        },
+      },
+    );
+    if (dailyGate === 'locked' && transition.modifiedCount === 1) {
+      const rebased = await startDailiesFromNow(
+        docs.filter(
+          (doc) => doc.placement === 'daily' && doc.windowKey === todayKey,
+        ),
+      );
+      if (rebased) {
+        questViews = docs.map(questDocToView);
+        dailyQuests = questViews
+          .filter((quest): quest is DailyQuestProgressView => quest.placement === 'daily')
+          .sort((a, b) => a.title.localeCompare(b.title))
+          .map((quest) =>
+            quest.templateId.startsWith('gend:') && dailyRecipe?.coverImageUrl
+              ? { ...quest, coverImageUrl: dailyRecipe.coverImageUrl }
+              : quest,
+          );
+      }
+    }
+  }
   const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
 
   const templatesWithCover = new Set(
