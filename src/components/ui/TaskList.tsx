@@ -394,6 +394,21 @@ type TaskRowBodyProps = SortableTaskItemProps & {
   onSwipeOpenChange: (open: boolean) => void;
 };
 
+type SlotPreviewProps = {
+  previewShift?: number;
+  hidePreviewHole?: boolean;
+};
+
+const SORT_TRANSITION_CSS = `transform ${SORT_TRANSITION.duration}ms ${SORT_TRANSITION.easing}`;
+
+function previewTransform(
+  transform: { x: number; y: number } | null,
+  shift: number | undefined,
+) {
+  if (shift === undefined) return pixelSnappedTranslate(transform);
+  return `translate3d(0, ${Math.round((transform?.y ?? 0) + shift)}px, 0)`;
+}
+
 const TaskRowBody = React.memo(function TaskRowBody(
     {
       task,
@@ -1251,8 +1266,11 @@ const TaskRowBody = React.memo(function TaskRowBody(
 
 const SortableTaskItem = React.forwardRef<
   HTMLDivElement,
-  SortableTaskItemProps
->(function SortableTaskItem(props, ref) {
+  SortableTaskItemProps & SlotPreviewProps
+>(function SortableTaskItem(
+  { previewShift, hidePreviewHole, ...props },
+  ref,
+) {
   const {
     task,
     isDone,
@@ -1297,8 +1315,9 @@ const SortableTaskItem = React.forwardRef<
         else if (ref) ref.current = node;
       }}
       style={{
-        transform: pixelSnappedTranslate(transform),
-        transition,
+        transform: previewTransform(transform, previewShift),
+        transition: previewShift !== undefined ? SORT_TRANSITION_CSS : transition,
+        visibility: hidePreviewHole ? 'hidden' : undefined,
         zIndex: swipeOpen ? 20 : isMenuOpen ? 50 : isExitingLater ? 0 : 1,
       }}
       {...attributes}
@@ -1357,6 +1376,8 @@ function SortableSectionHeader({
   doneCount,
   isDropTarget = false,
   slotDroppable = true,
+  previewShift,
+  slotHoleHeight,
   onToggleCollapsed,
   onEdit,
   onAddTask,
@@ -1366,6 +1387,8 @@ function SortableSectionHeader({
   doneCount: number;
   isDropTarget?: boolean;
   slotDroppable?: boolean;
+  previewShift?: number;
+  slotHoleHeight?: number;
   onToggleCollapsed: () => void;
   onEdit: () => void;
   onAddTask?: () => void;
@@ -1401,8 +1424,8 @@ function SortableSectionHeader({
     <div
       ref={setNodeRef}
       style={{
-        transform: pixelSnappedTranslate(transform),
-        transition,
+        transform: previewTransform(transform, previewShift),
+        transition: previewShift !== undefined ? SORT_TRANSITION_CSS : transition,
         zIndex: isDragging ? 30 : 1,
       }}
       data-is-active="true"
@@ -1484,7 +1507,14 @@ function SortableSectionHeader({
         )}
       </div>
       {showSlot && !isDragging && (
-        <div ref={setSlotRef} className="pb-2 pt-1">
+        <div ref={setSlotRef} className="relative pb-2 pt-1">
+          {slotHoleHeight !== undefined && (
+            <span
+              aria-hidden
+              className={`absolute inset-x-0 top-0 bg-muted/60 ${HOME_CARD_RADIUS}`}
+              style={{ height: Math.max(0, slotHoleHeight - 8) }}
+            />
+          )}
           <button
             type="button"
             {...stopDndActivation}
@@ -1494,6 +1524,8 @@ function SortableSectionHeader({
             }}
             disabled={!onAddTask}
             className={`flex h-11 w-full items-center pl-3.5 text-left text-[14px] font-semibold transition-[background-color,color,box-shadow] duration-150 disabled:pointer-events-none md:pl-4 ${HOME_CARD_RADIUS} ${
+              slotHoleHeight !== undefined ? 'invisible' : ''
+            } ${
               slotOver
                 ? 'bg-primary/[0.1] text-primary shadow-[inset_0_0_0_2px_hsl(var(--primary)/0.35)]'
                 : 'bg-foreground/[0.035] text-muted-foreground/70 shadow-[inset_0_2px_0_rgba(15,23,42,0.04)] dark:bg-white/[0.04] dark:shadow-[inset_0_2px_0_rgba(0,0,0,0.25)] [@media(hover:hover)]:hover:bg-foreground/[0.06] [@media(hover:hover)]:hover:text-muted-foreground'
@@ -1954,6 +1986,11 @@ export default function TaskList({
   const [dropSectionId, setDropSectionId] = useState<string | null | undefined>(
     undefined,
   );
+  const [slotTarget, setSlotTarget] = useState<{
+    sectionId: string;
+    hole: number;
+    slot: number;
+  } | null>(null);
   const flipNext = (reveal: string[] = [], exclude?: string) => {
     pendingFlipRef.current = {
       snap: captureListFlip(listRootRef.current),
@@ -2431,6 +2468,29 @@ export default function TaskList({
   const rowIds = rows.map((r) =>
     r.kind === 'task' ? r.task.id : sectionSortableId(r.section.id),
   );
+  const slotPreview = (() => {
+    if (!slotTarget || !dragActiveId) return null;
+    const order = [
+      ...rowIds,
+      ...(completedTasks.length > 0 ? ['completed-divider'] : []),
+      ...completedTasks.map((t) => t.id),
+    ];
+    const origin = order.indexOf(dragActiveId);
+    const target = order.indexOf(sectionSortableId(slotTarget.sectionId));
+    if (origin === -1 || target === -1) return null;
+    const { hole, slot } = slotTarget;
+    const shifts = new Map<string, number>();
+    order.forEach((id, i) => {
+      let y = 0;
+      if (origin < target) {
+        if (i > origin && i <= target) y = -hole;
+        else if (i > target) y = -slot;
+      } else if (i > target && i < origin) y = hole - slot;
+      else if (i > origin) y = -slot;
+      shifts.set(id, y);
+    });
+    return { shifts, sectionId: slotTarget.sectionId, hole };
+  })();
   // While a header is being dragged, only headers participate in sorting —
   // unsectioned tasks stay frozen in place instead of shifting around it.
   const activeTaskIds =
@@ -2548,6 +2608,7 @@ export default function TaskList({
   const handleDragCancel = () => {
     if (maxDragDistRef.current >= 5) lastSortDragAt = performance.now();
     setDropSectionId(undefined);
+    setSlotTarget(null);
     setIsAnyDragging(false);
     setDragActiveId(null);
     setCollapsedForDrag(false);
@@ -2561,7 +2622,20 @@ export default function TaskList({
     const slotSectionId = overId != null ? sectionIdFromEmptySlot(overId) : null;
     if (slotSectionId) {
       setDropSectionId(slotSectionId);
-    } else if (hasSections && draggingSectionId === null && overId != null) {
+      setSlotTarget({
+        sectionId: slotSectionId,
+        hole: event.active.rect.current.initial?.height ?? 0,
+        slot: event.over?.rect.height ?? 0,
+      });
+    } else {
+      setSlotTarget(null);
+    }
+    if (
+      !slotSectionId &&
+      hasSections &&
+      draggingSectionId === null &&
+      overId != null
+    ) {
       const from = rowIds.indexOf(String(event.active.id));
       const to = rowIds.indexOf(String(overId));
       if (from !== -1 && to !== -1) {
@@ -2595,6 +2669,7 @@ export default function TaskList({
     );
     if (travelled >= 5) lastSortDragAt = performance.now();
     setDropSectionId(undefined);
+    setSlotTarget(null);
     setIsAnyDragging(false);
     setDragActiveId(null);
     setCollapsedForDrag(false);
@@ -2878,6 +2953,16 @@ export default function TaskList({
                           <div
                             key="completed-divider"
                             data-completed-divider
+                            style={
+                              slotPreview
+                                ? {
+                                    transform: `translate3d(0, ${slotPreview.shifts.get('completed-divider') ?? 0}px, 0)`,
+                                    transition: SORT_TRANSITION_CSS,
+                                  }
+                                : isAnyDragging
+                                  ? { transition: SORT_TRANSITION_CSS }
+                                  : undefined
+                            }
                             className="relative flex min-h-[40px] items-center gap-2 pl-3.5 pr-1 pt-3 md:pl-4"
                           >
                             <span className="text-[16px] font-black tracking-tight text-muted-foreground md:text-[17px]">
@@ -2899,6 +2984,14 @@ export default function TaskList({
                             doneCount={row.doneCount}
                             isDropTarget={dropSectionId === s.id}
                             slotDroppable={draggingSectionId === null}
+                            previewShift={slotPreview?.shifts.get(
+                              sectionSortableId(s.id),
+                            )}
+                            slotHoleHeight={
+                              slotPreview?.sectionId === s.id
+                                ? slotPreview.hole
+                                : undefined
+                            }
                             onToggleCollapsed={() => {
                               hapticTick();
                               flipNext(
@@ -2940,6 +3033,10 @@ export default function TaskList({
                         <SortableTaskItem
                           key={task.id}
                           task={task}
+                          previewShift={slotPreview?.shifts.get(task.id)}
+                          hidePreviewHole={
+                            !!slotPreview && task.id === dragActiveId
+                          }
                           isDone={isCompleted}
                           isMenuOpen={isMenuOpen}
                           isExitingLater={isExitingLater}

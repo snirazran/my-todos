@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const premium = isPremiumActive(user.premiumUntil);
     const balanceBefore = user.wardrobe?.flies ?? 0;
     const first = !user.wardrobe?.shopGift?.dayKey;
-    const roll = rollShopGift(userId, shop.dayKey, premium, config.shopGift, first);
+    const roll = rollShopGift(balanceBefore, premium, config.shopGift, first);
 
     const ledgerDay = economyDayKey(tz);
     const grantedToday = await fliesGrantedOnDay(userId, ledgerDay);

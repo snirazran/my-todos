@@ -9,9 +9,11 @@ import {
   type FlyEconomyConfig,
 } from '@/lib/economy/defaults';
 import {
+  SHOP_GIFT_FIRST_FLIES,
+  SHOP_GIFT_FLOOR_FROM_BALANCE,
+  SHOP_GIFT_FULL_BELOW_BALANCE,
   SHOP_GIFT_MAX_FLIES,
   SHOP_GIFT_MIN_FLIES,
-  SHOP_GIFT_STEP,
 } from '@/lib/economy/shopGift';
 
 type LedgerSummary = {
@@ -420,7 +422,7 @@ export function AdminEconomyManager() {
 
             <Group
               title="Daily shop gift"
-              subtitle={`Free flies for opening the Shop once a day; renews with the deals. A random ${SHOP_GIFT_MIN_FLIES}–${SHOP_GIFT_MAX_FLIES} in steps of ${SHOP_GIFT_STEP}, fixed per user per day.`}
+              subtitle={`Free flies for opening the Shop once a day; renews with the deals. ${SHOP_GIFT_MAX_FLIES} at ${SHOP_GIFT_FULL_BELOW_BALANCE} flies or less, sliding to ${SHOP_GIFT_MIN_FLIES} at ${SHOP_GIFT_FLOOR_FROM_BALANCE}+. The first visit is ${SHOP_GIFT_FIRST_FLIES}.`}
             >
               <ToggleField
                 label="Gift enabled"

@@ -18,28 +18,26 @@ export type ShopGiftStatus = {
   first?: boolean;
 };
 
-export const SHOP_GIFT_MIN_FLIES = 25;
-export const SHOP_GIFT_MAX_FLIES = 100;
-export const SHOP_GIFT_STEP = 5;
+export const SHOP_GIFT_MIN_FLIES = 15;
+export const SHOP_GIFT_MAX_FLIES = 30;
+export const SHOP_GIFT_FULL_BELOW_BALANCE = 100;
+export const SHOP_GIFT_FLOOR_FROM_BALANCE = 2000;
 export const SHOP_GIFT_FIRST_FLIES = 150;
 
-function hashSeed(seed: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-export function shopGiftBaseFlies(userId: string, dayKey: string): number {
-  const steps = (SHOP_GIFT_MAX_FLIES - SHOP_GIFT_MIN_FLIES) / SHOP_GIFT_STEP + 1;
-  return SHOP_GIFT_MIN_FLIES + (hashSeed(`${userId}:${dayKey}`) % steps) * SHOP_GIFT_STEP;
+export function shopGiftBaseFlies(balance: number): number {
+  const low = Math.log(SHOP_GIFT_FULL_BELOW_BALANCE);
+  const high = Math.log(SHOP_GIFT_FLOOR_FROM_BALANCE);
+  const t = Math.min(
+    1,
+    Math.max(0, (Math.log(Math.max(1, balance)) - low) / (high - low)),
+  );
+  return Math.round(
+    SHOP_GIFT_MAX_FLIES - t * (SHOP_GIFT_MAX_FLIES - SHOP_GIFT_MIN_FLIES),
+  );
 }
 
 export function rollShopGift(
-  userId: string,
-  dayKey: string,
+  balance: number,
   premium: boolean,
   config: ShopGiftConfig,
   first = false,
@@ -53,7 +51,7 @@ export function rollShopGift(
       amount: SHOP_GIFT_FIRST_FLIES,
     };
   }
-  const base = shopGiftBaseFlies(userId, dayKey);
+  const base = shopGiftBaseFlies(balance);
   const lucky = random() * 100 < config.luckyChancePercent;
   const amount =
     base *
@@ -66,7 +64,7 @@ export function shopGiftStatus(
   claimedDayKey: string | undefined,
   shop: { dayKey: string; endsAt: string },
   enabled: boolean,
-  preview?: { userId: string; premium: boolean; config: ShopGiftConfig },
+  preview?: { balance: number; premium: boolean; config: ShopGiftConfig },
 ): ShopGiftStatus {
   const first = !claimedDayKey;
   return {
@@ -79,7 +77,7 @@ export function shopGiftStatus(
         ? { amount: SHOP_GIFT_FIRST_FLIES, luckyMultiplier: null }
         : {
             amount: Math.floor(
-              shopGiftBaseFlies(preview.userId, shop.dayKey) *
+              shopGiftBaseFlies(preview.balance) *
                 (preview.premium ? preview.config.plusMultiplier : 1),
             ),
             luckyMultiplier:

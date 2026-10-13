@@ -2579,6 +2579,7 @@ export const RewardTile = memo(function RewardTile({
         className,
       )}
       title={rewardLabel(reward, rewardCatalog, isPremium)}
+      data-fly-source={reward.type === 'FLIES' ? '' : undefined}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}

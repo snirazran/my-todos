@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -94,7 +94,7 @@ export default function GiftBoxOpening({
     try {
       // 1. Minimum animation time promise
       const animationPromise = new Promise((resolve) =>
-        setTimeout(resolve, 2000),
+        setTimeout(resolve, 1500),
       );
 
       // GUEST MODE: Skip API
@@ -226,6 +226,14 @@ export default function GiftBoxOpening({
       setAdBusy(false);
     }
   };
+
+  const autoOpenedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!mounted || autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    void handleOpen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]);
 
   const giftDef = byId[giftBoxId];
   const giftColor = giftDef?.riveIndex ?? 0;

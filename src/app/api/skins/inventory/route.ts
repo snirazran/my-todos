@@ -235,7 +235,7 @@ export async function GET(req: NextRequest) {
           wardrobe.shopGift?.dayKey,
           rotation,
           economy.shopGift.enabled,
-          { userId, premium: isPremium, config: economy.shopGift },
+          { balance: wardrobe.flies ?? 0, premium: isPremium, config: economy.shopGift },
         ),
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
@@ -267,7 +267,7 @@ export async function GET(req: NextRequest) {
         wardrobe.shopGift?.dayKey,
         rotation,
         economy.shopGift.enabled,
-        { userId, premium: isPremium, config: economy.shopGift },
+        { balance: wardrobe.flies ?? 0, premium: isPremium, config: economy.shopGift },
       ),
       isPremium,
     });

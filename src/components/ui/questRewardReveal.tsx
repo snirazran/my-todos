@@ -17,7 +17,18 @@ import {
   patchInventoryFlies,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
-import { hapticCelebrate, hapticTick } from '@/lib/haptics';
+import { flyFliesToCounter, holdFlyCounter } from '@/lib/flyFlight';
+import {
+  preloadRewardedAd,
+  rewardedAdFailureMessage,
+  rewardedAdsAvailable,
+  showRewardedAd,
+  takePlusOfferAfterAd,
+} from '@/lib/ads';
+import { useNotification } from '@/components/providers/NotificationProvider';
+import { FlyAmount } from '@/components/ui/FlyAmount';
+import { useUIStore } from '@/lib/uiStore';
+import { hapticCelebrate, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { maybeRequestAppRating, type RatingMoment } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
@@ -73,7 +84,17 @@ type RevealHostState = {
   } | null;
   flyGainToast: FlyGainToast | null;
   interlude: boolean;
+  flyOffer: FlyDoubleOffer | null;
 };
+
+type FlyDoubleOffer = {
+  id: number;
+  amount: number;
+  placement: string;
+  run: () => Promise<{ bonus: number; balanceAfter?: number }>;
+};
+
+export type FlyRewardDouble = FlyDoubleOffer['run'];
 
 // One reveal pipeline for the whole app: any page enqueues claim summaries,
 // the single host (mounted in providers) plays them. Module-level so the
@@ -83,7 +104,161 @@ const revealStore = createStore<RevealHostState>(() => ({
   giftOpening: null,
   flyGainToast: null,
   interlude: false,
+  flyOffer: null,
 }));
+
+type PressedSource = {
+  el: Element;
+  source: Element | null;
+  rect: DOMRect;
+  at: number;
+};
+
+let lastPressed: PressedSource | null = null;
+
+function centerOf(rect: DOMRect) {
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function nearestFlySource(pressed: Element): Element | null {
+  const own = pressed.closest('[data-fly-source]');
+  if (own) return own;
+  const origin = centerOf(pressed.getBoundingClientRect());
+  let node: Element | null = pressed.parentElement;
+  for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
+    if (node === document.body || node === document.documentElement) break;
+    const found = Array.from(node.querySelectorAll('[data-fly-source]'));
+    if (!found.length) continue;
+    let best: Element | null = null;
+    let bestDistance = Infinity;
+    for (const candidate of found) {
+      const point = centerOf(candidate.getBoundingClientRect());
+      const distance = Math.hypot(point.x - origin.x, point.y - origin.y);
+      if (distance < bestDistance) {
+        best = candidate;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+  return null;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!(event.target instanceof Element)) return;
+      const el =
+        event.target.closest('button,[role="button"],a') ?? event.target;
+      const source = nearestFlySource(el);
+      lastPressed = {
+        el,
+        source,
+        rect: (source ?? el).getBoundingClientRect(),
+        at: Date.now(),
+      };
+    },
+    { capture: true, passive: true },
+  );
+}
+
+function visibleRect(el: Element | null | undefined): DOMRect | null {
+  if (!el || !el.isConnected) return null;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight
+    ? rect
+    : null;
+}
+
+function launchRect(source?: Element | DOMRect | null): DOMRect {
+  if (source instanceof DOMRect) return source;
+  const explicit = visibleRect(source);
+  if (explicit) return explicit;
+  const pressed =
+    lastPressed && Date.now() - lastPressed.at < 8000 ? lastPressed : null;
+  if (pressed) {
+    const live = visibleRect(pressed.source);
+    if (live) return live;
+    const snap = pressed.rect;
+    if (snap.width > 0 && snap.bottom > 0 && snap.top < window.innerHeight) {
+      return snap;
+    }
+    const button = visibleRect(pressed.el);
+    if (button) return button;
+  }
+  return new DOMRect(window.innerWidth / 2 - 20, window.innerHeight * 0.55, 40, 40);
+}
+
+let flyOfferCounter = 0;
+
+function landFlies(
+  amount: number,
+  balanceAfter: number | undefined,
+  source?: Element | DOMRect | null,
+) {
+  if (amount <= 0) return;
+  const from = launchRect(source);
+  const counterVisible = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-fly-counter]'),
+  ).some((node) => {
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+  });
+  const before =
+    typeof balanceAfter === 'number' ? balanceAfter - amount : knownFlyBalance;
+  const release = holdFlyCounter();
+  markFlyEarn();
+  if (typeof balanceAfter === 'number') {
+    knownFlyBalance = balanceAfter;
+    patchInventoryFlies(balanceAfter);
+  }
+  mutateInventoryCaches();
+  hapticSuccess();
+  if (!counterVisible) {
+    release();
+    revealStore.setState({
+      flyGainToast: {
+        id: ++toastIdCounter,
+        amount,
+        from: Math.max(0, before),
+        to: Math.max(0, before) + amount,
+      },
+    });
+    return;
+  }
+  flyFliesToCounter({ from, count: amount, onFirstLand: release });
+  window.setTimeout(release, 2500);
+}
+
+/**
+ * Flies are the everyday reward, so they skip the reveal card: they fly from
+ * whatever was pressed straight into the counter, and doubling is offered as a
+ * dismissible toast instead of a second decision on a blocking card.
+ */
+export function presentFlyReward({
+  amount,
+  balanceAfter,
+  source,
+  double,
+  placement = 'double_reward',
+}: {
+  amount: number;
+  balanceAfter?: number;
+  source?: Element | DOMRect | null;
+  double?: FlyRewardDouble | null;
+  placement?: string;
+}) {
+  const granted = Math.max(0, Math.floor(amount));
+  if (granted <= 0) return;
+  landFlies(granted, balanceAfter, source);
+  if (double && rewardedAdsAvailable()) {
+    void preloadRewardedAd(placement);
+    revealStore.setState({
+      flyOffer: { id: ++flyOfferCounter, amount: granted, placement, run: double },
+    });
+  }
+}
 
 const INTERLUDE_MS = 1100;
 let interludeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -128,6 +303,7 @@ export function enqueueQuestRewardReveal(
     // false so the balance isn't celebrated twice.
     showFlyGainPill?: boolean;
     moment?: RatingMoment;
+    source?: Element | DOMRect | null;
   },
 ): number {
   const { catalog, isPremium } = options;
@@ -228,6 +404,36 @@ export function enqueueQuestRewardReveal(
   }
 
   if (!nextEntries.length) return 0;
+  const [flyEntry] = nextEntries;
+  if (nextEntries.length === 1 && flyEntry.fliesGranted) {
+    const claimId = flyEntry.doubleClaimId;
+    presentFlyReward({
+      amount: flyEntry.fliesGranted,
+      balanceAfter: flyEntry.flyBalanceAfter,
+      source: options.source,
+      placement: 'quest_reward_double',
+      double:
+        claimId && !isPremium
+          ? async () => {
+              const res = await fetch('/api/rewards/double', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ claimId }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data?.granted) {
+                throw new Error('Could not double this reward — try again later.');
+              }
+              const balanceAfter =
+                typeof data?.summary?.flyBalanceAfter === 'number'
+                  ? data.summary.flyBalanceAfter
+                  : knownFlyBalance + (flyEntry.fliesGranted ?? 0);
+              return { bonus: flyEntry.fliesGranted ?? 0, balanceAfter };
+            }
+          : null,
+    });
+    return 0;
+  }
   revealStore.setState((state) => ({
     queue: [...state.queue, ...nextEntries],
   }));
@@ -365,7 +571,46 @@ function handleGiftBoxClosed() {
   }));
 }
 
+function useFlyDoubleOffer() {
+  const offer = useStore(revealStore, (state) => state.flyOffer);
+  const { showNotification } = useNotification();
+  const setPremiumModalOpen = useUIStore((state) => state.setPremiumModalOpen);
+  useEffect(() => {
+    if (!offer) return;
+    revealStore.setState({ flyOffer: null });
+    const double = async () => {
+      const outcome = await showRewardedAd(offer.placement);
+      if (outcome !== 'rewarded') {
+        if (outcome === 'failed') showNotification(rewardedAdFailureMessage());
+        return;
+      }
+      try {
+        const { bonus, balanceAfter } = await offer.run();
+        landFlies(bonus, balanceAfter, null);
+        if (takePlusOfferAfterAd()) {
+          window.setTimeout(() => setPremiumModalOpen(true, offer.placement), 1600);
+        }
+      } catch (err) {
+        showNotification(
+          err instanceof Error && err.message
+            ? err.message
+            : 'Could not double this reward — try again.',
+        );
+      }
+    };
+    showNotification(
+      <span className="flex items-center gap-1.5">
+        <FlyAmount amount={offer.amount} size={14} className="font-black" />
+        <span className="text-muted-foreground">· watch an ad to double</span>
+      </span>,
+      double,
+      { actionLabel: 'Double ▶', durationMs: 7000 },
+    );
+  }, [offer, showNotification, setPremiumModalOpen]);
+}
+
 export function QuestRewardRevealHost() {
+  useFlyDoubleOffer();
   const { queue, giftOpening, flyGainToast, interlude } = useStore(revealStore);
 
   // The reveal covers the page with a near-opaque backdrop, but it isn't a

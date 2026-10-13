@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -13,8 +13,6 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useFrogBelly, useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { useLookReactions } from '@/hooks/useLookReactions';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
-import { hapticCelebrate } from '@/lib/haptics';
-import Fly from '@/components/ui/fly';
 import {
   FriendsPageSkeleton,
 } from '@/components/ui/Skeleton';
@@ -28,15 +26,10 @@ import { BuddyNudgeSheet } from '@/components/ui/BuddyNudgeSheet';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
 import { type FriendSummary } from '@/lib/friends/indices';
 import { cn } from '@/lib/utils';
-import { RewardCard } from '@/components/ui/gift-box/RewardCard';
-import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import {
-  mutateInventoryCaches,
-  patchInventoryFlies,
   useInventory,
 } from '@/hooks/useInventory';
-import { markFlyEarn } from '@/lib/flyEarn';
+import { presentFlyReward } from '@/components/ui/questRewardReveal';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import {
   MobileHeaderActions,
@@ -44,7 +37,6 @@ import {
 } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { useUIStore } from '@/lib/uiStore';
-import type { ItemDef } from '@/lib/skins/catalog';
 import { PondHero } from '@/components/ui/friends/PondHero';
 import { FriendRow } from '@/components/ui/friends/FriendRow';
 import { GrowPondCard } from '@/components/ui/friends/GrowPondCard';
@@ -107,10 +99,6 @@ export default function FriendsPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [claimReward, setClaimReward] = useState<{
-    amount: number;
-    doubled: boolean;
-  } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<FriendSummary | null>(null);
   const [detailTarget, setDetailTarget] = useState<FriendSummary | null>(null);
   const [buddyTarget, setBuddyTarget] = useState<FriendSummary | null>(null);
@@ -127,7 +115,6 @@ export default function FriendsPage() {
     addOpen ||
     inviteOpen ||
     inboxOpen ||
-    claimReward !== null ||
     !!removeTarget ||
     !!detailTarget ||
     !!buddyTarget || buddyPickerOpen || buddyInviteOpen || !!keepsakeTarget || roomOpen;
@@ -149,13 +136,33 @@ export default function FriendsPage() {
       if (!res.ok) throw new Error(data?.error || 'Could not collect your flies. Try again.');
       const granted = Math.max(0, Math.floor(data?.granted ?? 0));
       if (granted > 0) {
-        markFlyEarn();
-        if (typeof flyBalance === 'number') {
-          patchInventoryFlies(flyBalance + granted);
-        }
-        mutateInventoryCaches();
-        await mutateFriends();
-        setClaimReward({ amount: granted, doubled: !!data?.doubled });
+        const balanceAfter =
+          typeof flyBalance === 'number' ? flyBalance + granted : undefined;
+        presentFlyReward({
+          amount: granted,
+          balanceAfter,
+          placement: 'friend_reward_double',
+          double: data?.doubled
+            ? null
+            : async () => {
+                const response = await fetch('/api/friends/claim', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tz, double: true }),
+                });
+                const result = await response.json().catch(() => ({}));
+                const bonus = Math.max(0, Math.floor(result?.granted ?? 0));
+                if (!response.ok || bonus <= 0) {
+                  throw new Error('Could not double your flies — try again later.');
+                }
+                return {
+                  bonus,
+                  balanceAfter:
+                    balanceAfter !== undefined ? balanceAfter + bonus : undefined,
+                };
+              },
+        });
+        void mutateFriends();
       }
     } catch (error) {
       setClaimError(error instanceof Error ? error.message : 'Could not collect your flies. Try again.');
@@ -311,14 +318,6 @@ export default function FriendsPage() {
         open={inboxOpen}
         onClose={() => setInboxOpen(false)}
       />
-      {claimReward !== null && (
-        <FlyClaimRewardOverlay
-          amount={claimReward.amount}
-          alreadyDoubled={claimReward.doubled}
-          tz={tz}
-          onClose={() => setClaimReward(null)}
-        />
-      )}
       <FriendDetailModal
         entry={detailTarget}
         onClose={() => setDetailTarget(null)}
@@ -436,115 +435,3 @@ function RemoveFriendDialog({
   );
 }
 
-function makeFlyPrize(amount: number): ItemDef {
-  return {
-    id: `friend-flies-${amount}`,
-    name: `${amount} ${amount === 1 ? 'Fly' : 'Flies'}`,
-    rarity: 'uncommon',
-    priceFlies: 0,
-    slot: 'hand_item',
-    riveIndex: 0,
-    icon: '',
-  };
-}
-
-function FlyClaimRewardOverlay({
-  amount,
-  alreadyDoubled,
-  tz,
-  onClose,
-}: {
-  amount: number;
-  /** Plus already took the double on the server, so there is nothing to offer. */
-  alreadyDoubled: boolean;
-  tz: string;
-  onClose: () => void;
-}) {
-  useRegisterOpenSheet(true);
-  const [displayAmount, setDisplayAmount] = useState(amount);
-  const [doubling, setDoubling] = useState(false);
-  const doubledRef = useRef(alreadyDoubled);
-
-  React.useEffect(() => {
-    hapticCelebrate();
-  }, []);
-  const prize = useMemo(() => makeFlyPrize(displayAmount), [displayAmount]);
-
-  const handleWatchAd = async () => {
-    if (doubledRef.current || doubling) return;
-    setDoubling(true);
-    try {
-      const res = await fetch('/api/friends/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tz, double: true }),
-      });
-      const data = await res.json().catch(() => ({}));
-      const bonus = Math.max(0, Math.floor(data?.granted ?? 0));
-      if (bonus > 0) {
-        doubledRef.current = true;
-        markFlyEarn();
-        mutateInventoryCaches();
-        setDisplayAmount((a) => a + bonus);
-      } else {
-        throw new Error('Could not double your flies — try again later.');
-      }
-    } finally {
-      setDoubling(false);
-    }
-  };
-
-  if (typeof document === 'undefined') return null;
-
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        key="fly-claim"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[10001] flex items-center justify-center px-4"
-      >
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
-          onClick={onClose}
-        />
-        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
-          <RotatingRays colorClass={RARITY_CONFIG.uncommon.rays} />
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(circle, transparent 40%, rgba(2,6,23,0.8) 100%)',
-            }}
-          />
-        </div>
-        <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center p-6">
-          <RewardCard
-            prize={prize}
-            claiming={false}
-            onClaim={onClose}
-            slotLabel="currency"
-            showDoubleUpsell={!doubledRef.current}
-            rewardAmount={displayAmount}
-            flyCollectAmount={displayAmount}
-            onWatchAd={handleWatchAd}
-            doublePlacement="friend_reward_double"
-            customPreview={
-              <div className="relative flex h-full w-full items-center justify-center">
-                <Fly size={132} interactive={false} />
-                <span className="absolute right-3 top-3 z-40 rounded-xl border border-white/20 bg-black/45 px-3 py-1 text-sm font-black text-white shadow-sm backdrop-blur-sm">
-                  x{displayAmount}
-                </span>
-              </div>
-            }
-          />
-        </div>
-      </motion.div>
-    </AnimatePresence>,
-    document.body,
-  );
-}
