@@ -51,6 +51,8 @@ export interface TaskBondDoc {
   completedTo: string[];
   /** Occurrence dates where the both-complete 2× bonus has been granted. */
   bonusAwardedDates: string[];
+  /** Completion pushes already sent, keyed `<occurrence>:<finisherId|both>`. */
+  completionPushKeys: string[];
   streak: { count: number; lastDate: string | null };
   pendingRepeatChange?: PendingRepeatChange | null;
   expiresAt?: Date | null;
@@ -80,6 +82,7 @@ const TaskBondSchema = new Schema<TaskBondDoc>(
     completedFrom: { type: [String], default: [] },
     completedTo: { type: [String], default: [] },
     bonusAwardedDates: { type: [String], default: [] },
+    completionPushKeys: { type: [String], default: [] },
     streak: {
       type: {
         count: { type: Number, default: 0 },

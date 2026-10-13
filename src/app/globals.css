@@ -35,6 +35,7 @@
     --bottom-safe: env(safe-area-inset-bottom, 0px);
     --repeat-icon-grey: #6c6c6c;
     --repeat-icon-green: #1f621c;
+    --board-list: 140 10% 94.5%;
     color-scheme: light;
   }
 
@@ -69,6 +70,7 @@
        the icon to a single currentColor fill. */
     --repeat-icon-grey: #a3ada6;
     --repeat-icon-green: #3ed66b;
+    --board-list: 150 24% 4.5%;
     color-scheme: dark;
   }
 }

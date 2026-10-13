@@ -769,24 +769,17 @@ export default function HomeDashboard() {
   const showListHeader =
     !guided && !((dayCleared || data.length === 0) && !filtersActive);
 
-  const renderListHeader = (inCard: boolean) => (
+  const renderListHeader = (inList: boolean) => (
     <>
       {showListHeader && (
         <div
           className={cn(
-            'flex min-h-9 items-center justify-between gap-2',
-            inCard
-              ? 'border-b border-border/60 py-2 pl-4 pr-3'
-              : 'mb-2 pl-5 pr-3',
+            'mb-2 flex min-h-9 items-center justify-between gap-2',
+            inList ? 'pl-4 pr-1' : 'pl-5 pr-3',
           )}
         >
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h2
-              className={cn(
-                'font-black tracking-tight text-foreground',
-                inCard ? 'text-[18px]' : 'text-[19px]',
-              )}
-            >
+            <h2 className="text-[19px] font-black tracking-tight text-foreground">
               Today
             </h2>
             <span className="text-[13px] font-bold tabular-nums text-muted-foreground">
@@ -821,9 +814,7 @@ export default function HomeDashboard() {
           onChange={setFilters}
           onClearAll={resetFilters}
           onOpenMore={() => setIsHeaderMenuOpen(true)}
-          className={
-            inCard ? 'border-b border-border/60 px-4 py-2' : 'mb-2 px-2'
-          }
+          className={inList ? 'mb-2 px-2.5' : 'mb-2 px-2'}
         />
       )}
     </>
@@ -1031,6 +1022,7 @@ export default function HomeDashboard() {
                         data-fly-slot
                         data-hint="task-fly"
                         data-tag-ids={task.tags?.join(',') || undefined}
+                        data-habit={task.type === 'weekly' ? 'true' : undefined}
                       >
                         {showFlyCoach && (
                           <>

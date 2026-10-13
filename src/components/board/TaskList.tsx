@@ -38,8 +38,8 @@ import {
 } from '@/lib/taskFilters';
 import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
 
-const ROW_DIVIDER =
-  'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-10 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden md:before:ml-3';
+const CARD_GAP = 8;
+const LIST_PAD_TOP = 8;
 const DRAG_SHIFT_TRANSITION = 'transform 200ms cubic-bezier(0.2, 0, 0, 1)';
 
 export default React.memo(function TaskList({
@@ -586,7 +586,7 @@ export default React.memo(function TaskList({
   }
 
   const rows: React.ReactNode[] = [];
-  const shiftHeight = dragHeight ?? 64;
+  const shiftHeight = (dragHeight ?? 64) + CARD_GAP;
 
   const inGrace = (id: string) => !!gracePeriodIds?.has(id);
 
@@ -635,7 +635,7 @@ export default React.memo(function TaskList({
     -collapse(k) + (placeholderAt != null && k >= placeholderAt ? shiftHeight : 0);
 
   const slotTop = (() => {
-    if (placeholderAt == null || others.length === 0) return 0;
+    if (placeholderAt == null || others.length === 0) return LIST_PAD_TOP;
     const at = Math.min(placeholderAt, others.length);
     const ref = at < others.length ? others[at] : others[others.length - 1];
     const el = rowElsRef.current.get(ref.id);
@@ -650,9 +650,9 @@ export default React.memo(function TaskList({
       key={`slot-${day}`}
       data-drop-placeholder
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 z-0 bg-muted/60"
+      className="pointer-events-none absolute inset-x-2 top-0 z-0 rounded-[14px] bg-foreground/[0.06]"
       style={{
-        height: shiftHeight,
+        height: shiftHeight - CARD_GAP,
         transform: `translate3d(0, ${slotTop}px, 0)`,
         transition: DRAG_SHIFT_TRANSITION,
       }}
@@ -662,10 +662,10 @@ export default React.memo(function TaskList({
   if (filteredItems.length === 0 || (others.length === 0 && !isSelfDrag)) {
     if (placeholderAt != null) {
       return (
-        <>
+        <div className="relative" style={{ paddingTop: LIST_PAD_TOP }}>
           {renderSlot()}
           <div aria-hidden style={{ height: shiftHeight }} />
-        </>
+        </div>
       );
     }
     if (hiddenIds?.size && items.length > 0) {
@@ -690,7 +690,7 @@ export default React.memo(function TaskList({
             ? 'Nothing planned for today'
             : 'Nothing planned yet';
       return (
-        <div className="absolute inset-0 flex items-center justify-center px-6 pb-[12%]">
+        <div className="flex items-center justify-center px-6 py-6">
           <button
             type="button"
             disabled={emptyMode === 'none'}
@@ -731,8 +731,6 @@ export default React.memo(function TaskList({
     const sourceIdx = items.indexOf(t);
     const isDraggedHere = isSelfDrag && sourceIndex === sourceIdx;
     const shift = isDragging && !isDraggedHere ? shiftFor(k) : 0;
-    const visuallyFirst =
-      isDragging && !isDraggedHere && k === 0 && placeholderAt !== 0;
     const id = draggableIdFor(day, t.id);
 
     rows.push(
@@ -745,10 +743,8 @@ export default React.memo(function TaskList({
         data-row
         data-drag-source={isDraggedHere ? 'true' : undefined}
         className={cn(
-          'relative z-[1]',
-          ROW_DIVIDER,
+          'relative z-[1] px-2 pb-2',
           isDraggedHere && 'pointer-events-none opacity-0',
-          visuallyFirst && 'before:hidden',
         )}
         style={
           isDragging || settleBack
@@ -827,6 +823,7 @@ export default React.memo(function TaskList({
               ? (mods) => selection.toggle(t, mods, filteredItems)
               : undefined
           }
+          floating
         />
       </div>,
     );
@@ -845,7 +842,9 @@ export default React.memo(function TaskList({
 
   return (
     <>
-      {rows}
+      <div className="relative" style={{ paddingTop: LIST_PAD_TOP }}>
+        {rows}
+      </div>
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}

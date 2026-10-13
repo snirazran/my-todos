@@ -1,5 +1,10 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import {
+  BOARD_CARD_SURFACE,
+  BOARD_LIST_SURFACE,
+  HOME_CARD_SURFACE,
+} from './taskSurfaces';
 
 export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn('skeleton rounded-lg', className)} />;
@@ -78,7 +83,7 @@ export function HomePageSkeleton() {
         </div>
 
         <div className="relative -mx-3 -mt-10 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-3 pt-14 md:mx-auto md:mt-4 md:w-full md:max-w-2xl md:bg-none md:px-8 md:pt-5">
-          <div className="flex min-h-9 items-center justify-between pl-3.5 pr-1.5 md:pl-4">
+          <div className="mb-2 flex min-h-9 items-center justify-between pl-5 pr-3 md:pl-8 md:pr-5">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-20 rounded-full" />
               <Skeleton className="h-3.5 w-12 rounded-full" />
@@ -86,21 +91,28 @@ export function HomePageSkeleton() {
             <Skeleton className="h-9 w-9 rounded-xl" />
           </div>
 
-          <div className="mb-16 mt-2 overflow-hidden rounded-[20px] border border-border/60 bg-card">
+          <div className="mb-16 px-1.5 md:px-4">
             {['w-2/5', 'w-1/4', 'w-1/3', 'w-2/5', 'w-1/4'].map((w, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'flex items-center gap-3 py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3',
-                  i > 0 && 'border-t border-border/50',
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <Skeleton className={cn('h-3.5 rounded-full', w)} />
+              <div key={i} className="pb-2">
+                <div
+                  className={cn(
+                    'flex items-center gap-3 py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3',
+                    HOME_CARD_SURFACE,
+                  )}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <Skeleton className={cn('h-3.5 rounded-full', w)} />
+                    <Skeleton className="h-2.5 w-24 rounded-full" />
+                  </div>
+                  <Skeleton className="h-11 w-11 shrink-0 rounded-full md:h-12 md:w-12" />
                 </div>
-                <Skeleton className="h-11 w-11 shrink-0 rounded-full md:h-12 md:w-12" />
               </div>
             ))}
+            <div className="flex items-center gap-3 py-1.5 pl-3.5 pr-2.5 md:pl-4 md:pr-3">
+              <Skeleton className="h-3.5 w-20 rounded-full" />
+              <span className="flex-1" />
+              <span className="h-11 w-11 shrink-0 rounded-full border-[1.5px] border-dashed border-muted-foreground/25" />
+            </div>
           </div>
         </div>
       </div>
@@ -140,37 +152,47 @@ function PlannerColumnSkeleton({
         {heading}
         {actions}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
-        <div className="hidden min-h-[52px] items-center justify-between border-b border-border/60 pl-3 pr-2.5 md:flex">
+      <div
+        className={cn(
+          'flex min-h-0 flex-col overflow-hidden md:max-h-full',
+          BOARD_LIST_SURFACE,
+        )}
+      >
+        <div className="hidden min-h-[48px] items-center justify-between pb-0.5 pl-3 pr-2.5 pt-1.5 md:flex">
           {heading}
           {actions}
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="min-h-0 overflow-hidden px-2 pt-2">
           {['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3', 'w-2/5'].slice(0, rows).map((w, i) => (
-            <div
-              key={i}
-              className={cn(
-                'flex items-center gap-2.5 py-3 pl-3.5 pr-2.5 md:pl-3',
-                i > 0 && 'border-t border-border/60',
-                isPast && 'opacity-60',
-              )}
-            >
-              <Skeleton className={cn('h-4 rounded-full', w)} />
-              <span className="flex-1" />
-              <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div key={i} className="pb-2">
+              <div
+                className={cn(
+                  'flex items-center gap-2.5 py-3 pl-3.5 pr-2.5 md:py-2.5 md:pl-3',
+                  BOARD_CARD_SURFACE,
+                  isPast && 'opacity-60',
+                )}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <Skeleton className={cn('h-4 rounded-full', w)} />
+                  <Skeleton className="h-2.5 w-20 rounded-full" />
+                </div>
+                <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+              </div>
             </div>
           ))}
         </div>
-        {!isPast && (
-          <div className="flex items-center border-t border-border/60 py-2 pl-3.5 pr-2.5 md:pl-3">
-            <Skeleton className="h-4 w-24 rounded-full" />
-            <span className="flex-1" />
-            <span className="h-10 w-10 shrink-0 rounded-full border-[1.5px] border-dashed border-muted-foreground/25" />
+        <div className="px-2 pb-2">
+          {!isPast && (
+            <div className="flex items-center py-1.5 pl-3.5 pr-2.5 md:pl-3 md:pr-2">
+              <Skeleton className="h-4 w-24 rounded-full" />
+              <span className="flex-1" />
+              <span className="h-10 w-10 shrink-0 rounded-full border-[1.5px] border-dashed border-muted-foreground/25" />
+            </div>
+          )}
+          <div className="flex items-center gap-2 py-2.5 pl-3.5 pr-3 md:hidden">
+            <Skeleton className="h-[18px] w-[18px] rounded-md" />
+            <Skeleton className="h-3.5 w-14 rounded-full" />
           </div>
-        )}
-        <div className="flex items-center gap-2 border-t border-border/60 py-3 pl-3.5 pr-3 md:hidden">
-          <Skeleton className="h-[18px] w-[18px] rounded-md" />
-          <Skeleton className="h-3.5 w-14 rounded-full" />
         </div>
       </div>
     </div>

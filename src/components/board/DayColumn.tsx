@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { addDays, parseYmd, todayYmd } from './helpers';
+import { BOARD_LIST_SURFACE } from '@/components/ui/taskSurfaces';
 
 type DayLabel = { name: string; date: string | null };
 
@@ -103,7 +104,7 @@ export default function DayColumn({
   footer?: React.ReactNode;
   maxHeightClass?: string;
   compact?: boolean;
-  /** Stretch to the slide's full height instead of sizing to the list. */
+  /** Size to the list but never past the slide's height. */
   fill?: boolean;
   /** Mobile: the day heading sits above the card, like Home's list header. */
   headingOutside?: boolean;
@@ -152,38 +153,37 @@ export default function DayColumn({
   const card = (
     <section
       className={[
-        'relative flex flex-col overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
-        isPast ? 'dark:bg-card/70' : '',
-        fill ? (headingOutside ? 'min-h-0 flex-1' : 'h-full') : appliedMax,
+        `relative flex flex-col overflow-hidden ${BOARD_LIST_SURFACE}`,
+        fill ? (headingOutside ? 'min-h-0' : 'max-h-full') : appliedMax,
       ].join(' ')}
     >
       {!headingOutside && (
-        <div className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 border-b border-border/60 py-1.5 pl-3.5 pr-1.5 md:pl-3">
+        <div className="flex min-h-[48px] shrink-0 items-center justify-between gap-2 pb-0.5 pl-3.5 pr-1.5 pt-1.5 md:pl-3">
           {heading}
           {actions}
         </div>
       )}
 
       {note ? (
-        <div className="shrink-0 border-b border-border/60 px-3.5 py-1.5 md:px-3">
-          {note}
-        </div>
+        <div className="shrink-0 px-3.5 pb-0.5 pt-1.5 md:px-3">{note}</div>
       ) : null}
 
       <div
         ref={listRef}
         className={[
-          'relative flex-1 overflow-x-hidden',
+          'relative flex-auto overflow-x-hidden',
           disableVerticalScroll
             ? 'overflow-y-visible touch-pan-y'
-            : 'overflow-y-auto no-scrollbar touch-pan-y overscroll-y-contain',
+            : 'min-h-0 overflow-y-auto no-scrollbar touch-pan-y overscroll-y-contain',
         ].join(' ')}
       >
         {children}
       </div>
 
       {footer ? (
-        <div className="shrink-0 border-t border-border/60">{footer}</div>
+        <div data-column-footer className="shrink-0 px-2 pb-2">
+          {footer}
+        </div>
       ) : null}
     </section>
   );

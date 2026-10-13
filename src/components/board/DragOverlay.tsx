@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
 import { TaskMetaLine } from '@/components/ui/TaskMeta';
-import { LeapStageMark, StepPips } from '@/components/ui/TaskAdornments';
+import { StepPips } from '@/components/ui/TaskAdornments';
 import { ChecklistCheckbox } from './ChecklistEditor';
 import Fly from '@/components/ui/fly';
 
@@ -76,7 +76,7 @@ export default function DragOverlay({
               rotate: -1.5 + depth * 2,
             }}
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-            className="absolute inset-x-0 top-0 rounded-2xl bg-card shadow-[0_2px_6px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.06] dark:ring-white/10"
+            className="absolute inset-x-0 top-0 rounded-[14px] bg-card shadow-[0_2px_6px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.06] dark:ring-white/10"
             style={{ height, zIndex: -depth }}
           />
         ))}
@@ -95,7 +95,7 @@ export default function DragOverlay({
         <div
           data-drag-lift
           data-tilt
-          className="relative flex select-none items-center gap-2.5 rounded-2xl bg-card py-3 pl-3.5 pr-2.5 ring-1 ring-black/[0.06] dark:ring-white/10 md:gap-2 md:py-2.5 md:pl-3 md:pr-2"
+          className="relative flex select-none items-center gap-2.5 rounded-[14px] bg-card py-3 pl-3.5 pr-2.5 ring-1 ring-black/[0.06] dark:ring-white/10 md:gap-2 md:py-2.5 md:pl-3 md:pr-2"
           style={{ minHeight: height }}
         >
           {tag && (
@@ -108,9 +108,6 @@ export default function DragOverlay({
           <span className="min-w-0 flex-1">
             <span className="block break-words text-[16px] font-semibold leading-snug text-foreground md:text-[15px]">
               {text}
-              {taskType === 'weekly' && (
-                <LeapStageMark className="ml-1.5 -translate-y-px" />
-              )}
             </span>
             <TaskMetaLine
               tags={tags}

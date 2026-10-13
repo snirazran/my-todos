@@ -127,6 +127,8 @@ function readingTimeMs(text: string, hasAction: boolean): number {
   return Math.max(base, hasAction ? 5000 : 3500);
 }
 
+const STAY_SCALE = 0.5;
+
 export const TOAST_SURFACE_STYLE = {
   backgroundColor: 'var(--toast-surface, hsl(115 36% 36%))',
   boxShadow:
@@ -281,8 +283,10 @@ export function NotificationProvider({
         id,
         content,
         undoAction,
-        durationMs:
-          options?.durationMs ?? readingTimeMs(dedupeKey, !!undoAction),
+        durationMs: Math.round(
+          (options?.durationMs ?? readingTimeMs(dedupeKey, !!undoAction)) *
+            STAY_SCALE,
+        ),
         dedupeKey,
         actionLabel: options?.actionLabel ?? 'Undo',
       };

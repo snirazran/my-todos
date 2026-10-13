@@ -16,11 +16,11 @@ import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
 import { TaskMetaLine } from '@/components/ui/TaskMeta';
+import { StepPips, StreakPill } from '@/components/ui/TaskAdornments';
 import {
-  LeapStageMark,
-  StepPips,
-  StreakPill,
-} from '@/components/ui/TaskAdornments';
+  HOME_CARD_RADIUS,
+  HOME_CARD_SURFACE,
+} from '@/components/ui/taskSurfaces';
 import { StepsStrip } from '@/components/ui/TaskSteps';
 import {
   hapticGrab,
@@ -201,10 +201,7 @@ const SWIPE_SNAP_THRESHOLD = 32;
 const SWIPE_COMMIT_X = SWIPE_ACTION_WIDTH + 40;
 const SWIPE_SPRING = { type: 'spring' as const, stiffness: 900, damping: 80, mass: 1 };
 const SWIPE_MAX_RELEASE_VELOCITY = 1500;
-const LIST_ROW_DIVIDER =
-  'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:ml-3.5 before:h-px before:bg-border/60 first:before:hidden md:before:ml-4';
-const LIST_GROUP_DIVIDER =
-  'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:h-px before:bg-border/60 first:before:hidden';
+const TASK_CARD_GAP = 'pb-2';
 
 const SORT_TRANSITION = {
   duration: 240,
@@ -235,11 +232,11 @@ function TaskDragPreview({
   const stepsDone = steps.filter((step) => step.done).length;
   const nextStep = steps.find((step) => !step.done);
   return (
-    <div className="h-full w-full">
+    <div className={`h-full w-full ${TASK_CARD_GAP}`}>
     <div
       data-drag-lift
       data-tilt
-      className="relative flex h-full w-full items-center gap-3 overflow-hidden rounded-2xl bg-card py-[15px] pl-3.5 pr-2.5 ring-1 ring-black/[0.06] dark:ring-white/10 md:pl-4 md:pr-3"
+      className={`relative flex h-full w-full items-center gap-3 overflow-hidden py-[15px] pl-3.5 pr-2.5 md:pl-4 md:pr-3 ${HOME_CARD_SURFACE}`}
     >
       {tags.length > 0 && (
         <span
@@ -252,9 +249,6 @@ function TaskDragPreview({
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="text-[17px] font-semibold leading-snug text-foreground md:text-[17.5px]">
             {task.text}
-            {task.type === 'weekly' && (
-              <LeapStageMark className="ml-1.5 -translate-y-px" />
-            )}
             {(task.streak ?? 0) > 0 && (
               <StreakPill
                 count={task.streak ?? 0}
@@ -305,7 +299,7 @@ function TaskDragPreview({
 
 function SectionDragPreview({ name }: { name: string }) {
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full pt-2">
     <div
       data-drag-lift
       className="relative flex h-full w-full items-center gap-1 rounded-xl bg-card pl-2.5 pr-2 ring-1 ring-black/[0.06] dark:ring-white/10 md:pl-3"
@@ -830,7 +824,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
       <motion.div
         ref={containerRef}
         style={{ overflow: isDragging ? 'visible' : 'hidden' }}
-        className={`relative w-full ${isDragging ? 'bg-muted/60' : ''} ${hintRowGlow ? 'hint-row-glow' : ''}`}
+        className={`relative w-full ${isDragging ? `${HOME_CARD_RADIUS} bg-muted/60` : HOME_CARD_SURFACE} ${hintRowGlow ? 'hint-row-glow' : ''}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={isExitingLater ? { opacity: 1 } : { opacity: 0 }}
@@ -956,6 +950,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
             }
             className={`
               relative flex w-full flex-col py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3
+              ${HOME_CARD_RADIUS}
               transition-[box-shadow,background-color] duration-200
               bg-card
               shadow-none
@@ -968,7 +963,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
 
               select-none active:bg-muted/50
               has-[[data-completion-target]:active]:bg-card
-              ${isDragging ? 'z-[100] rounded-2xl opacity-100 ring-2 ring-primary/40' : ''}
+              ${isDragging ? 'z-[100] opacity-100 ring-2 ring-primary/40' : ''}
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-muted/40' : ''}
               cursor-pointer
             `}
@@ -1027,9 +1022,6 @@ const TaskRowBody = React.memo(function TaskRowBody(
                     transition={{ duration: 0.2 }}
                   >
                     {task.text}
-                    {isRepeating && !isDone && (
-                      <LeapStageMark className="ml-1.5 -translate-y-px" />
-                    )}
                     {(task.streak ?? 0) > 0 && !isDone && (
                       <StreakPill
                         count={task.streak ?? 0}
@@ -1288,7 +1280,7 @@ const SortableTaskItem = React.forwardRef<
           onOpenDetail?.(task);
         }
       }}
-      className={`relative w-full ${LIST_ROW_DIVIDER} ${isDragging ? 'before:hidden' : ''}`}
+      className={`relative w-full ${TASK_CARD_GAP}`}
       data-is-active={!isDone}
       data-hint={isDone ? undefined : 'task-row'}
       data-tag-ids={isDone ? undefined : task.tags?.join(',') || undefined}
@@ -1370,15 +1362,15 @@ function SortableSectionHeader({
       }}
       data-is-active="true"
       data-section-header="true"
-      className={`relative w-full select-none bg-muted/40 ${LIST_GROUP_DIVIDER} ${
-        isDragging ? 'bg-muted/70 before:hidden' : ''
+      className={`relative w-full select-none pt-2 ${
+        isDragging ? 'rounded-xl bg-muted/70' : ''
       }`}
     >
       <div
         {...attributes}
         {...listeners}
         onClick={onToggleCollapsed}
-        className={`group flex min-h-[40px] cursor-pointer items-center gap-1 py-1 pl-2.5 pr-2 transition-colors md:pl-3 ${
+        className={`group flex min-h-[40px] cursor-pointer items-center gap-1 py-1 pl-2.5 pr-0.5 transition-colors md:pl-3 ${
           isDragging ? 'invisible' : ''
         }`}
       >
@@ -1391,9 +1383,14 @@ function SortableSectionHeader({
           <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
         </motion.span>
 
-        <span className="min-w-0 flex-1 truncate text-[13px] font-black text-foreground/70 md:text-[14px]">
+        <span className="min-w-0 truncate text-[14px] font-black text-foreground/75 md:text-[15px]">
           {section.name}
         </span>
+
+        <span
+          aria-hidden
+          className="mx-1.5 h-px min-w-3 flex-1 bg-border/80"
+        />
 
         {count > 0 && (
           <span
@@ -1447,7 +1444,7 @@ function SortableSectionHeader({
             onAddTask?.();
           }}
           disabled={!onAddTask}
-          className="flex w-full items-center bg-card px-3.5 py-3 text-left text-[13px] font-semibold text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-4 [@media(hover:hover)]:hover:text-foreground"
+          className={`mb-2 flex w-full items-center border-[1.5px] border-dashed border-border px-3.5 py-3 text-left text-[13px] font-semibold text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-4 [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-foreground ${HOME_CARD_RADIUS}`}
         >
           No tasks yet · tap to add, or drag one in
         </button>
@@ -2617,27 +2614,29 @@ export default function TaskList({
   return (
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
-        <div
-          className="w-full overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
-          data-hint="task-list"
-        >
+        <div className="w-full" data-hint="task-list">
         {header}
         <div
-          className={`space-y-0 overflow-y-visible ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`-mx-1.5 -mt-0.5 space-y-0 overflow-y-visible px-1.5 pt-0.5 md:-mx-4 md:px-4 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (
             /* Empty State: No Tasks at all */
-            <EmptyAddRow
-              label="Add your first task"
-              quickAddOpen={quickAddOpen}
-              onClick={() => onAddRequested('', null, { preselectToday: true })}
-            />
+            <div className={`overflow-hidden ${HOME_CARD_SURFACE}`}>
+              <EmptyAddRow
+                label="Add your first task"
+                quickAddOpen={quickAddOpen}
+                onClick={() =>
+                  onAddRequested('', null, { preselectToday: true })
+                }
+              />
+            </div>
           ) : tasks.length > 0 &&
             sortedVisibleTasks.length === 0 &&
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
-            allTasksCompleted && !filtersActive ? (
+            <div className={`overflow-hidden ${HOME_CARD_SURFACE}`}>
+            {allTasksCompleted && !filtersActive ? (
               <DayClearedState
                 doneCount={tasks.length}
                 hideActions={hideAddControls}
@@ -2661,7 +2660,8 @@ export default function TaskList({
                   onAddRequested('', null, { preselectToday: true })
                 }
               />
-            )
+            )}
+            </div>
           ) : (
             /* List Content */
             <DndContext
@@ -2700,12 +2700,12 @@ export default function TaskList({
                         return (
                           <div
                             key="completed-divider"
-                            className={`relative flex items-center gap-2 bg-muted/40 px-3.5 py-2 md:px-4 ${LIST_GROUP_DIVIDER}`}
+                            className="relative flex items-center gap-2 px-3 pb-2 pt-3 md:px-3.5"
                           >
                             <span className="text-[13px] font-black text-muted-foreground/70">
                               Completed
                             </span>
-                            <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">
                               {completedTasks.length}
                             </span>
                           </div>
@@ -2830,11 +2830,11 @@ export default function TaskList({
         {!hideAddControls &&
           (exitAction ||
           (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-          <div className="border-t border-border/60">
+          <div>
             <button
               onClick={() => onAddRequested('', null, { preselectToday: true })}
               disabled={quickAddOpen}
-              className="group relative flex w-full items-center gap-3 py-2 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 disabled:pointer-events-none disabled:opacity-0 md:pl-4 md:pr-3 [@media(hover:hover)]:hover:bg-muted/40"
+              className={`group relative flex w-full items-center gap-3 py-1.5 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/60 disabled:pointer-events-none disabled:opacity-0 md:pl-4 md:pr-3 [@media(hover:hover)]:hover:bg-muted/50 ${HOME_CARD_RADIUS}`}
             >
               <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-muted-foreground transition-colors group-hover:text-foreground md:text-[16px]">
                 Add a task

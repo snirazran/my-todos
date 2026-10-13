@@ -576,6 +576,9 @@ export async function GET(req: Request) {
         ...objectiveEffort(block, dashboard.tasks, effortTodayKey, effortHour),
       })),
     });
+    const hasHabits = dashboard.tasks.some(
+      (task) => task.type === 'weekly' && !task.isTutorial,
+    );
     for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests]) {
       if (quest.claimed) continue;
       const activeOnboardingObjectiveId =
@@ -636,7 +639,7 @@ export async function GET(req: Request) {
           rewardValue: rewardWorth(block.rewards),
           lastProgressAt: quest.lastProgressAt,
           expiresAt: quest.expiresAt,
-          hint: objectiveHintText(block),
+          hint: objectiveHintText(block, { hasHabits }),
           guideId: guideIdForBlock(block) ?? undefined,
           guideContext: guideContextForBlock(block) ?? undefined,
         });

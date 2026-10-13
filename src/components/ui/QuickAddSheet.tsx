@@ -151,9 +151,10 @@ const ToolbarChip = React.forwardRef<
     label: string;
     ariaLabel?: string;
     active?: boolean;
+    hint?: string;
     onClick: () => void;
   }
->(function ToolbarChip({ icon, label, ariaLabel, active = false, onClick }, ref) {
+>(function ToolbarChip({ icon, label, ariaLabel, active = false, hint, onClick }, ref) {
   const settled = useRef(false);
   useEffect(() => {
     settled.current = true;
@@ -163,6 +164,7 @@ const ToolbarChip = React.forwardRef<
       ref={ref}
       type="button"
       aria-label={ariaLabel ?? label}
+      data-hint={hint}
       onClick={onClick}
       className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
         active
@@ -1582,6 +1584,7 @@ export default function QuickAddSheet({
                               repeatsOn ? `Repeats ${repeatShortLabel}` : 'Repeat'
                             }
                             active={repeatsOn}
+                            hint="quickadd-repeat"
                             onClick={() => setActivePicker('repeat')}
                           />
                         )}

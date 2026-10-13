@@ -262,7 +262,7 @@ const DropDock = React.forwardRef<
       left: r.left + 1,
       width: r.width - 2,
       bottom: window.innerHeight - r.bottom + 1,
-      cover: footer?.classList.contains('border-t') ? footer.offsetHeight : 0,
+      cover: footer?.hasAttribute('data-column-footer') ? footer.offsetHeight : 0,
     };
   });
 
@@ -283,9 +283,9 @@ const DropDock = React.forwardRef<
         className="pointer-events-none fixed z-[96] flex flex-col"
         style={{ left: anchor.left, width: anchor.width, bottom: anchor.bottom }}
       >
-        <div className="h-8 bg-gradient-to-b from-card/0 to-card" />
+        <div className="h-8 bg-gradient-to-b from-[hsl(var(--board-list)/0)] to-[hsl(var(--board-list))]" />
         <div
-          className="flex flex-col justify-end rounded-b-[19px] bg-card px-2.5 pb-2.5 pt-1"
+          className="flex flex-col justify-end rounded-b-[19px] bg-[hsl(var(--board-list))] px-2.5 pb-2.5 pt-1"
           style={{ minHeight: anchor.cover }}
         >
           {grid}
@@ -319,7 +319,7 @@ const ColumnAddRow = React.memo(function ColumnAddRow({
     <button
       type="button"
       onClick={() => onAdd('')}
-      className="group flex w-full items-center gap-2.5 py-2 pl-3.5 pr-2.5 text-left transition-colors active:bg-muted/50 md:gap-2 md:pl-3 md:pr-2 [@media(hover:hover)]:hover:bg-muted/40"
+      className="group flex w-full items-center gap-2.5 rounded-[14px] py-1.5 pl-3.5 pr-2.5 text-left transition-colors active:bg-foreground/[0.07] md:gap-2 md:pl-3 md:pr-2 [@media(hover:hover)]:hover:bg-foreground/[0.05]"
     >
       <span className="min-w-0 flex-1 text-[15px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
         Add a task
@@ -349,8 +349,8 @@ const SavedRow = React.memo(function SavedRow({
         data-hint={hinted ? 'saved-tasks' : undefined}
         aria-label={count ? `Saved tasks, ${count}` : 'Saved tasks'}
         onClick={onOpen}
-        className={`flex w-full items-center justify-between gap-2 py-2.5 pl-3.5 pr-3 text-left transition-colors active:bg-muted/50 [@media(hover:hover)]:hover:bg-muted/40 ${
-          bordered ? 'border-t border-border/60' : ''
+        className={`flex w-full items-center justify-between gap-2 rounded-[14px] py-2.5 pl-3.5 pr-3 text-left transition-colors active:bg-foreground/[0.07] [@media(hover:hover)]:hover:bg-foreground/[0.05] ${
+          bordered ? 'mt-0.5' : ''
         }`}
       >
         <span className="inline-flex items-center gap-2 text-[13px] font-bold text-muted-foreground">

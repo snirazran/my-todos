@@ -8,7 +8,6 @@ import {
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
-  Flame,
   Pencil,
   Repeat,
   RotateCcw,
@@ -38,7 +37,13 @@ import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 import { ChecklistEditor, checklistRewardHint } from './ChecklistEditor';
 import { normalizeChecklistRewards } from '@/lib/checklist';
-import { StepPips } from '@/components/ui/TaskAdornments';
+import {
+  LeapStageMark,
+  StepPips,
+  StreakFlame,
+} from '@/components/ui/TaskAdornments';
+import { useLeapView } from '@/components/leap/useLeapView';
+import { leagueName, leagueTitle } from '@/components/leap/leapCopy';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor, { NotesView } from './RichNotesEditor';
@@ -225,6 +230,7 @@ export default function TaskDetailSheet({
   const [showBuddyInvite, setShowBuddyInvite] = useState(false);
   nestedOpenRef.current = showRepeat || showBuddyInvite;
   const [cancelling, setCancelling] = useState(false);
+  const { data: leapView } = useLeapView(open);
 
   const notesText = useMemo(() => {
     if (!notes) return '';
@@ -320,8 +326,10 @@ export default function TaskDetailSheet({
   const stepsDone = rewardItems.filter((item) => item.done).length;
   const rewardHint = checklistRewardHint(rewardItems);
   const hasContent = !!notesText || checklist.length > 0;
+  const showLeap = isRepeating && !!leapView?.enabled;
   const hasMeta =
     isCompleted ||
+    showLeap ||
     (isRepeating && streak > 0) ||
     (minimal &&
       (!!buddy || isRepeating || !!displayTask.startTime || taskTags.length > 0));
@@ -419,9 +427,15 @@ export default function TaskDetailSheet({
                         Completed
                       </span>
                     )}
+                    {showLeap && leapView && (
+                      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#447d3f]/10 pl-1.5 pr-2.5 text-[#3d7a38] dark:text-emerald-400">
+                        <LeapStageMark />
+                        {leagueTitle(leagueName(leapView))}
+                      </span>
+                    )}
                     {isRepeating && streak > 0 && (
                       <span className="inline-flex h-7 items-center gap-1 rounded-full bg-orange-500/10 px-2.5 text-orange-600 dark:text-orange-400">
-                        <Flame className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+                        <StreakFlame />
                         <span className="tabular-nums">{streak} in a row</span>
                       </span>
                     )}

@@ -115,6 +115,8 @@ const NEEDS_A_TASK: Pick<HintBeat, 'satisfiedWhen'> = {
   satisfiedWhen: '[data-hint="task-row"]',
 };
 
+const HABIT_FLY = '[data-hint="task-fly"][data-habit="true"]';
+
 // The focus flow is now: the timer's own button → pick a subject → start. Both
 // leading beats wait on the next surface appearing rather than on the tap, so
 // a user who opens the picker their own way is still followed correctly.
@@ -313,9 +315,22 @@ const GUIDES: Record<string, HintGuide> = {
     goal: 'Tick off a task that repeats',
     beats: [
       {
+        ...ADD_TASK_BEAT,
+        say: 'No habit to tick off today — tap + to add one',
+        satisfiedWhen: HABIT_FLY,
+      },
+      {
+        anchor: 'quickadd-repeat',
+        say: 'Make it repeat — that makes it a habit',
+        satisfiedWhen: HABIT_FLY,
+        timeoutMs: 60_000,
+      },
+      {
         href: '/',
         anchor: 'task-fly',
+        selector: HABIT_FLY,
         say: 'Tick off a task that repeats. Every one is a hop toward your Leap',
+        timeoutMs: 90_000,
       },
     ],
   },

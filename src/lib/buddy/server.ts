@@ -20,6 +20,8 @@ import { creditDuoWeek } from '@/lib/economy/socialRewards';
 import { awardBuddyKeepsakes } from '@/lib/friends/pondServer';
 import { ONE_TIME_OCCURRENCE, isOneTimeParams } from '@/lib/buddy/bond';
 
+const COMPLETION_PUSH_KEYS_KEPT = 60;
+
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
@@ -281,6 +283,16 @@ export async function handleBuddyCompletion(opts: {
   // Push the partner when I finish today's shared occurrence.
   if (completed && date === today) {
     void (async () => {
+      const pushKey = `${occurrence}:${bothNow ? 'both' : userId}`;
+      const claim = await TaskBondModel.updateOne(
+        { bondId, completionPushKeys: { $ne: pushKey } },
+        {
+          $push: {
+            completionPushKeys: { $each: [pushKey], $slice: -COMPLETION_PUSH_KEYS_KEPT },
+          },
+        },
+      );
+      if (claim.modifiedCount === 0) return;
       const [name, partnerTask] = await Promise.all([
         buddyDisplayName(userId),
         TaskModel.findOne({ userId: partnerId, bondId })

@@ -14,10 +14,8 @@ import {
 } from 'lucide-react';
 import { TaskMetaLine } from '@/components/ui/TaskMeta';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
-import {
-  LeapStageMark,
-  StreakPill,
-} from '@/components/ui/TaskAdornments';
+import { StreakPill } from '@/components/ui/TaskAdornments';
+import { BOARD_CARD_SURFACE } from '@/components/ui/taskSurfaces';
 import { StepsStrip } from '@/components/ui/TaskSteps';
 import { checklistPayout } from '@/lib/checklist';
 import type { Task } from './helpers';
@@ -67,6 +65,7 @@ export default function TaskCard({
   onSelectToggle,
   onToggleChecklistItem,
   flyPaused = false,
+  floating = false,
 }: {
   dragId: string;
   task: Task;
@@ -105,6 +104,8 @@ export default function TaskCard({
   onSelectToggle?: (mods: SelectModifiers) => void;
   onToggleChecklistItem?: (itemId: string) => void;
   flyPaused?: boolean;
+  /** Its own rounded card on a tinted list instead of a divided row. */
+  floating?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -437,6 +438,7 @@ export default function TaskCard({
       }}
       className={[
         'group relative flex select-none items-center gap-2.5 bg-card py-3 pl-3.5 pr-2.5 transition-colors duration-150 md:gap-2 md:py-2.5 md:pl-3 md:pr-2',
+        floating ? BOARD_CARD_SURFACE : '',
         isDone
           ? isPast
             ? 'cursor-pointer'
@@ -499,9 +501,6 @@ export default function TaskCard({
             }`}
           >
             {task.text}
-            {isRepeating && (
-              <LeapStageMark className="ml-1.5 -translate-y-px" />
-            )}
             {streak > 0 && (
               <StreakPill
                 count={streak}

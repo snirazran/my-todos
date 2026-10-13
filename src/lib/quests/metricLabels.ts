@@ -142,6 +142,9 @@ const METRIC_HINT_COPY: Record<string, string> = {
     'Tick off tasks on Home until the belly bar is completely full.',
 };
 
+const NO_HABIT_HINT =
+  "You don't have a habit yet. Add a task, set it to repeat, then tick it off.";
+
 export function objectiveHintText(
   block: {
     type?: string;
@@ -157,6 +160,7 @@ export function objectiveHintText(
     beforeHour?: number;
     target?: number;
   },
+  options?: { hasHabits?: boolean },
 ): string {
   // A metric fully determines the action, so its copy outranks helpText:
   // re-pointing a block at another metric in the admin leaves the old text
@@ -164,7 +168,9 @@ export function objectiveHintText(
   // custom phrasing that had nothing left to add.
   const metricCopy =
     block.type === 'metric_count' && block.metricKey
-      ? METRIC_HINT_COPY[block.metricKey]
+      ? block.metricKey === 'focus_tag_linked' && options?.hasHabits === false
+        ? NO_HABIT_HINT
+        : METRIC_HINT_COPY[block.metricKey]
       : undefined;
   if (block.helpText && !metricCopy) return block.helpText;
 

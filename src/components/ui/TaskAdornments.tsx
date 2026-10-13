@@ -6,6 +6,8 @@ import { LILY_ART_BOTTOM, LILY_ART_TOP } from '@/components/leap/LeapRail';
 import { cn } from '@/lib/utils';
 
 const LILY_MARK_INK = 17;
+const FLAME_INK_SHARE = 19 / 24;
+const FLAME_BOX = Math.round(LILY_MARK_INK / FLAME_INK_SHARE);
 
 export function LeapStageMark({ className }: { className?: string }) {
   const { data } = useLeapView();
@@ -50,17 +52,25 @@ export function StreakPill({
       title={`${count} in a row`}
       className={cn(
         'inline-flex shrink-0 items-center gap-0.5 font-black tabular-nums leading-none text-orange-500 dark:text-orange-400',
-        size === 'sm' ? 'text-[13px]' : 'text-[14px]',
+        size === 'sm' ? 'text-[14px]' : 'text-[15px]',
         className,
       )}
     >
-      <Flame
-        className={size === 'sm' ? 'h-4 w-4' : 'h-[18px] w-[18px]'}
-        fill="currentColor"
-        strokeWidth={0}
-      />
+      <StreakFlame />
       {count}
     </span>
+  );
+}
+
+export function StreakFlame({ className }: { className?: string }) {
+  return (
+    <Flame
+      aria-hidden="true"
+      className={cn('-mx-[3px] shrink-0', className)}
+      style={{ width: FLAME_BOX, height: FLAME_BOX }}
+      fill="currentColor"
+      strokeWidth={0}
+    />
   );
 }
 
