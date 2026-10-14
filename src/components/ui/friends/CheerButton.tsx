@@ -18,13 +18,16 @@ export function CheerButton({
   toUserId,
   className,
   compact = false,
+  variant = 'default',
   onSent,
 }: {
   toUserId: string;
   className?: string;
   compact?: boolean;
+  variant?: 'default' | 'pad';
   onSent?: (kind: LookReactionKind) => void;
 }) {
+  const pad = variant === 'pad';
   const { sentToday, react } = useLookReactions();
   const sent = sentToday[toUserId];
   const [picking, setPicking] = React.useState(false);
@@ -76,10 +79,17 @@ export function CheerButton({
           setPicking((v) => !v);
         }}
         className={cn(
-          'relative flex h-11 touch-manipulation items-center justify-center gap-1 rounded-xl transition-[transform,background-color,border-color] active:scale-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-          sent
-            ? 'w-11 bg-primary/10 text-lg'
-            : compact ? 'px-2 text-[11px] font-black text-foreground hover:bg-accent' : 'border border-primary/20 bg-primary/[.06] pl-2.5 pr-3 text-[13px] font-black text-primary hover:bg-primary/10',
+          'relative flex h-11 touch-manipulation items-center justify-center gap-1 transition-[transform,background-color,border-color] active:scale-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+          pad
+            ? cn(
+                'w-11 rounded-full ring-1 ring-inset md:h-12 md:w-12',
+                sent
+                  ? 'bg-card text-xl ring-[#447d3f]/40'
+                  : 'bg-primary/[0.16] text-[22px] ring-primary/25 [@media(hover:hover)]:hover:bg-primary/25',
+              )
+            : sent
+              ? 'w-11 rounded-xl bg-primary/10 text-lg'
+              : compact ? 'rounded-xl px-2 text-[11px] font-black text-foreground hover:bg-accent' : 'rounded-xl border border-primary/20 bg-primary/[.06] pl-2.5 pr-3 text-[13px] font-black text-primary hover:bg-primary/10',
         )}
       >
         <motion.span
@@ -87,11 +97,11 @@ export function CheerButton({
           initial={sent && !reduceMotion ? { scale: 0.4 } : false}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 520, damping: 14 }}
-          className={cn(!sent && 'text-base')}
+          className={cn(!sent && !pad && 'text-base')}
         >
           {REACTION_EMOJI[sent ?? DEFAULT_KIND]}
         </motion.span>
-        {!sent && <span>Cheer</span>}
+        {!sent && !pad && <span>Cheer</span>}
         {sent && (
           <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-card bg-[#447d3f] text-white">
             <Check className="h-2.5 w-2.5" strokeWidth={4} />

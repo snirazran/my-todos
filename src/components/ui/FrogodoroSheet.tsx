@@ -339,38 +339,10 @@ export default function FrogodoroSheet({
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   // Heavy Rive content (the live frog scene) mounts only after the sheet's
-  // entrance animation settles — a static frog stamp holds its place — so the
+  // entrance animation settles, so the
   // slide-in/out never competes with Rive canvas setup (same pattern as
   // BaseSheet's `entered`).
   const [sheetEntered, setSheetEntered] = useState(false);
-  // Snapshot → live-rive handoff: the live frog canvas stays transparent
-  // until rive loads and the outfit indices apply, then fades itself in over
-  // ~150ms. The static stamp must stay FULLY OPAQUE on top until that fade-in
-  // has finished — fading both layers at once dips the combined opacity and
-  // reads as a flicker — and only then fade out over identical pixels.
-  const [frogSwap, setFrogSwap] = useState<'snapshot' | 'fading' | 'live'>(
-    'snapshot',
-  );
-  const frogFadeTimersRef = useRef<number[]>([]);
-  const handleFrogReady = () => {
-    if (frogFadeTimersRef.current.length > 0) return;
-    frogFadeTimersRef.current.push(
-      window.setTimeout(() => {
-        setFrogSwap((s) => (s === 'snapshot' ? 'fading' : s));
-      }, 200),
-      window.setTimeout(() => {
-        setFrogSwap('live');
-      }, 430),
-    );
-  };
-  useEffect(() => {
-    if (!open) {
-      setFrogSwap('snapshot');
-      for (const t of frogFadeTimersRef.current) window.clearTimeout(t);
-      frogFadeTimersRef.current = [];
-    }
-  }, [open]);
-
   // Boot the stamp engine while the sheet is still closed, so the very first
   // open doesn't show a blank frog spot while the engine cold-starts.
   useEffect(() => {
@@ -1737,7 +1709,6 @@ export default function FrogodoroSheet({
                                 catchImminent={catchImminent}
                                 counterRef={catchChipRef}
                                 onGainLand={() => setChipPulse((p) => p + 1)}
-                                onFrogReady={handleFrogReady}
                                 suspended={
                                   confirmStop ||
                                   confirmPause ||
@@ -1746,27 +1717,19 @@ export default function FrogodoroSheet({
                                 }
                               />
                             )}
-                            {frogSwap !== 'live' && (
+                            {!sheetEntered && (
                               <div
-                                className={`flex flex-col items-center transition-opacity duration-200 ${
-                                  sheetEntered
-                                    ? 'pointer-events-none absolute inset-x-0 top-0 z-40'
-                                    : 'relative'
-                                } ${frogSwap === 'fading' ? 'opacity-0' : 'opacity-100'}`}
+                                aria-hidden
+                                className="pointer-events-none flex flex-col items-center"
                               >
                                 <div
-                                  className="pointer-events-none relative z-30"
                                   style={{
+                                    width: 144,
+                                    height: 162,
                                     marginTop: -Math.round(144 * 0.42),
                                     marginBottom: -6,
                                   }}
-                                >
-                                  <FrogSnapshot
-                                    indices={frogIndices}
-                                    width={144}
-                                    height={162}
-                                  />
-                                </div>
+                                />
                               </div>
                             )}
                           </div>
@@ -1785,31 +1748,15 @@ export default function FrogodoroSheet({
                                 className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
                                 style={{ bottom: 'calc(100% - 6px)' }}
                               >
-                                {sheetEntered && (
-                                  <Frog
-                                    width={144}
-                                    height={162}
-                                    indices={frogIndices}
-                                    onDressed={handleFrogReady}
-                                  />
-                                )}
-                                {frogSwap !== 'live' && (
-                                  <div
-                                    className={`transition-opacity duration-200 ${
-                                      sheetEntered ? 'absolute inset-0' : ''
-                                    } ${
-                                      frogSwap === 'fading'
-                                        ? 'opacity-0'
-                                        : 'opacity-100'
-                                    }`}
-                                  >
-                                    <FrogSnapshot
-                                      indices={frogIndices}
+                                <div style={{ width: 144, height: 162 }}>
+                                  {sheetEntered && (
+                                    <Frog
                                       width={144}
                                       height={162}
+                                      indices={frogIndices}
                                     />
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                               {celebrateFocus ? (
                                 <button

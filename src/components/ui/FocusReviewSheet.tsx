@@ -7,7 +7,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Coffee, Play } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Frog from '@/components/ui/frog';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { hapticSelect, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -125,27 +124,6 @@ export function FocusReviewSheet({
   const [finishedIds, setFinishedIds] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
   const finishedRef = useRef(false);
-
-  const [frogSwap, setFrogSwap] = useState<'snapshot' | 'fading' | 'live'>(
-    'snapshot',
-  );
-  const frogFadeTimersRef = useRef<number[]>([]);
-  const handleFrogReady = useCallback(() => {
-    if (frogFadeTimersRef.current.length > 0) return;
-    frogFadeTimersRef.current.push(
-      window.setTimeout(
-        () => setFrogSwap((v) => (v === 'snapshot' ? 'fading' : v)),
-        200,
-      ),
-      window.setTimeout(() => setFrogSwap('live'), 430),
-    );
-  }, []);
-  useEffect(() => {
-    if (open) return;
-    setFrogSwap('snapshot');
-    for (const t of frogFadeTimersRef.current) window.clearTimeout(t);
-    frogFadeTimersRef.current = [];
-  }, [open]);
 
   const { indices: frogIndices } = useWardrobeIndices(open);
 
@@ -281,17 +259,7 @@ export function FocusReviewSheet({
                   indices={{ ...frogIndices, mood: 0 }}
                   emote="love"
                   ignoreIdlePause
-                  onDressed={handleFrogReady}
                 />
-              )}
-              {frogSwap !== 'live' && (
-                <div
-                  className={`transition-opacity duration-200 ${
-                    entered ? 'absolute inset-0' : ''
-                  } ${frogSwap === 'fading' ? 'opacity-0' : 'opacity-100'}`}
-                >
-                  <FrogSnapshot indices={frogIndices} width={120} height={135} />
-                </div>
               )}
             </div>
             <h2 className="text-balance text-[24px] font-black leading-tight tracking-[-0.03em] text-foreground">

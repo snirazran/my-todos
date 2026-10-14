@@ -477,28 +477,25 @@ export function WardrobePageSkeleton() {
   );
 }
 
-export function FriendsLeaderboardSkeleton({ rows = 4 }: { rows?: number }) {
+function FriendsHeaderSkeleton({ width = 'w-28' }: { width?: string }) {
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {Array.from({ length: rows }).map((_, index) => (
-        <li key={index} className="overflow-hidden rounded-[20px] border border-border/60 bg-card">
-          <Skeleton className="h-[144px] rounded-none sm:h-[170px]" />
-          <div className="space-y-2 px-3 py-3">
-            <Skeleton className="h-4 w-2/3 rounded-full" />
-            <Skeleton className="h-3 w-4/5 rounded-full" />
-          </div>
-          <div className="flex gap-2 border-t border-border/40 p-2">
-            <Skeleton className="h-11 flex-1 rounded-xl" />
-            <Skeleton className="h-11 flex-1 rounded-xl" />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div className="mb-2 flex min-h-9 items-center pl-3.5">
+      <Skeleton className={cn('h-5 rounded-md', width)} />
+    </div>
   );
 }
 
-function FriendsSectionSkeleton() {
-  return <div className="mb-3 space-y-2 px-1"><Skeleton className="h-5 w-40 rounded-full" /><Skeleton className="h-3 w-3/4 max-w-[280px] rounded-full" /></div>;
+function FriendsRowSkeleton({ avatar = false }: { avatar?: boolean }) {
+  return (
+    <div className={cn('flex items-center gap-3 py-3 pl-3.5 pr-2.5', avatar && 'py-2 pl-2', HOME_CARD_SURFACE)}>
+      {avatar && <Skeleton className="h-[52px] w-[52px] shrink-0 rounded-[14px]" />}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <Skeleton className="h-4 w-1/2 rounded-md" />
+        <Skeleton className="h-3 w-2/3 rounded-md" />
+      </div>
+      <Skeleton className="h-11 w-11 shrink-0 rounded-full md:h-12 md:w-12" />
+    </div>
+  );
 }
 
 export function FriendsPageSkeleton() {
@@ -506,32 +503,33 @@ export function FriendsPageSkeleton() {
     <SkeletonShell label="Loading your friends and shared habits" className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-12">
         <div className="relative h-[232px] w-full max-w-[480px] md:h-[286px] md:max-w-[760px]">
-          <div className="absolute bottom-4 left-[16%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[22%] lg:left-[28%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-7 w-16 rounded-full" /></div>
-          <div className="absolute bottom-4 left-[84%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[78%] lg:left-[72%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-7 w-16 rounded-full" /></div>
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"><Skeleton className="h-[150px] w-[160px] rounded-[60px] md:h-[175px] md:w-[180px]" /><Skeleton className="h-9 w-20 rounded-full" /></div>
+          <div className="absolute bottom-4 left-[16%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[22%] lg:left-[28%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-6 w-16 rounded-full" /></div>
+          <div className="absolute bottom-4 left-[84%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[78%] lg:left-[72%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-6 w-16 rounded-full" /></div>
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2"><Skeleton className="h-[170px] w-[170px] rounded-b-none rounded-t-[72px]" /></div>
         </div>
-        <div className="relative z-10 flex min-h-[68px] w-full max-w-[688px] items-center gap-3 rounded-[20px] border border-border/60 bg-card px-3.5 py-3 shadow-sm">
-          <div className="hidden w-[220px] shrink-0 items-center gap-2 border-r border-border/50 pr-3 md:flex"><Skeleton className="h-4 w-20 rounded-full" /><Skeleton className="h-3 flex-1 rounded-full" /></div>
-          <div className="flex-1 space-y-2"><Skeleton className="h-4 w-2/3 rounded-full" /><Skeleton className="h-3 w-4/5 rounded-full" /></div>
+        <div className="relative z-[25] w-full md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
+          <div className="flex items-center gap-3 rounded-[20px] border border-border/60 bg-card py-2.5 pl-3 pr-3 shadow-sm">
+            <div className="hidden w-[238px] shrink-0 items-center gap-2 border-r border-border/50 pr-3 md:flex"><Skeleton className="h-4 w-20 rounded-full" /><Skeleton className="h-3 flex-1 rounded-full" /></div>
+            <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2"><Skeleton className="h-4 w-1/2 rounded-md" /><Skeleton className="h-2.5 w-full rounded-full" /></div>
+          </div>
         </div>
-        <div className="relative z-20 -mx-3 -mt-12 flex w-[calc(100%+1.5rem)] flex-col gap-6 px-3 pt-16 md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:px-8 md:pt-14">
+        <div className="relative z-20 -mx-3 -mt-12 flex w-[calc(100%+1.5rem)] flex-col gap-7 px-3 pt-16 md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:gap-9 md:px-8 md:pt-14">
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)]" />
           <section>
-            <FriendsSectionSkeleton />
-            <div className="rounded-[20px] border border-border/60 bg-card p-3.5 sm:p-4">
-              <div className="flex items-start justify-between gap-3"><div className="flex-1 space-y-2"><Skeleton className="h-3 w-20 rounded-full" /><Skeleton className="h-5 w-2/3 rounded-full" /><Skeleton className="h-3 w-24 rounded-full" /></div><Skeleton className="h-[66px] w-[128px] rounded-2xl" /></div>
-              <div className="mt-3 grid grid-cols-2 gap-2"><Skeleton className="h-9 rounded-xl" /><Skeleton className="h-9 rounded-xl" /></div>
-              <div className="mt-3 flex items-center gap-3"><Skeleton className="h-3 flex-1 rounded-full" /><Skeleton className="h-10 w-24 rounded-xl" /></div>
+            <FriendsHeaderSkeleton />
+            <div className="flex flex-col gap-2">
+              <FriendsRowSkeleton />
+              <FriendsRowSkeleton />
+              <Skeleton className={cn('h-[60px] w-full', HOME_CARD_SURFACE)} />
             </div>
-            <div className="mt-2.5 flex items-center gap-3 rounded-2xl border border-border/50 bg-card p-3.5"><Skeleton className="h-10 w-10 shrink-0 rounded-xl" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-3/5 rounded-full" /><Skeleton className="h-3 w-full rounded-full" /></div></div>
           </section>
           <section>
-            <FriendsSectionSkeleton />
-            <div className="rounded-[20px] border border-border/60 bg-card p-3.5"><div className="flex items-center gap-3"><Skeleton className="h-11 w-11 shrink-0 rounded-2xl" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/2 rounded-full" /><Skeleton className="h-3 w-full rounded-full" /></div></div><Skeleton className="mt-4 h-11 w-full rounded-xl" /></div>
+            <FriendsHeaderSkeleton width="w-24" />
+            <div className="flex flex-col gap-2 md:grid md:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => <FriendsRowSkeleton key={index} avatar />)}
+            </div>
           </section>
-          <section><FriendsSectionSkeleton /><FriendsLeaderboardSkeleton /></section>
-          <section><FriendsSectionSkeleton /><div className="grid grid-cols-4 gap-2">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)}</div></section>
-          <section><FriendsSectionSkeleton /><Skeleton className="h-[180px] w-full rounded-[20px]" /></section>
         </div>
       </div>
     </SkeletonShell>

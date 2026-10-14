@@ -7,7 +7,6 @@ import confetti from 'canvas-confetti';
 import { usePathname, useRouter } from 'next/navigation';
 import { Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
@@ -630,7 +629,6 @@ function RevealStep({
   const [count, setCount] = useState(celebration.previousCount);
   const [popped, setPopped] = useState(false);
   const [frogReady, setFrogReady] = useState(false);
-  const [frogDressed, setFrogDressed] = useState(false);
   const shortScreen = useMediaQuery('(max-height: 800px)');
   const frogHeight = shortScreen ? 234 : 300;
   const frogWidth = Math.round((frogHeight * 128) / 144);
@@ -785,7 +783,10 @@ function RevealStep({
             transition={{ type: 'spring', stiffness: 240, damping: 20 }}
             className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-11px)] z-20 flex justify-center short-screen:bottom-[calc(100%-10px)]"
           >
-            <div className="relative">
+            <div
+              className="relative"
+              style={{ width: frogWidth, height: frogHeight }}
+            >
               {frogReady && (
                 <Frog
                   ref={frogRef}
@@ -793,21 +794,7 @@ function RevealStep({
                   height={frogHeight}
                   indices={indices}
                   emote="love"
-                  onDressed={() => setFrogDressed(true)}
                 />
-              )}
-              {!frogDressed && (
-                <div
-                  className={
-                    frogReady ? 'pointer-events-none absolute inset-0' : ''
-                  }
-                >
-                  <FrogSnapshot
-                    indices={indices}
-                    width={frogWidth}
-                    height={frogHeight}
-                  />
-                </div>
               )}
             </div>
           </motion.div>
@@ -1225,7 +1212,6 @@ function HomeStep({
   onGoToTasks: () => void;
 }) {
   const reduceMotion = useReducedMotion();
-  const [frogDressed, setFrogDressed] = useState(false);
   const atRisk = !view.checkedInToday && view.count > 0;
   const toBeat = view.longestStreak - view.count + 1;
   const goal = view.goal;
@@ -1279,23 +1265,7 @@ function HomeStep({
             className="relative mb-1 -mt-14 h-[196px] w-[196px] motion-safe:animate-[streak-frog-bob_3.2s_ease-in-out_infinite] short-screen:-mt-16"
           >
             {frogReady && (
-              <Frog
-                width={196}
-                height={196}
-                indices={indices}
-                emote="love"
-                onDressed={() => setFrogDressed(true)}
-              />
-            )}
-            {!frogDressed && (
-              <div className="pointer-events-none absolute inset-0">
-                <FrogSnapshot
-                  indices={indices}
-                  width={196}
-                  height={196}
-                  cachedOnly={!frogReady}
-                />
-              </div>
+              <Frog width={196} height={196} indices={indices} emote="love" />
             )}
           </div>
 

@@ -155,14 +155,12 @@ function WelcomeContent({
               transition={{ type: 'spring', stiffness: 140, damping: 16 }}
             />
           </div>
-          <div className="relative -mb-0.5">
-            {entered ? (
+          <div className="relative -mb-0.5" style={{ width: 170, height: 180 }}>
+            {entered && (
               <>
                 <Frog width={170} height={180} indices={indices} emote="love" />
                 <PremiumFrogAura show compact alwaysPlay />
               </>
-            ) : (
-              <FrogSnapshot width={170} height={180} indices={indices} />
             )}
           </div>
         </div>

@@ -367,19 +367,22 @@ export function FriendDetailModal({
                     ref={friendFrogBoxRef}
                     className="relative -translate-y-[26px] lg:origin-bottom lg:scale-110"
                   >
-                    {!liveReady && <FrogSnapshot width={230} height={210} indices={entry.indices} cachedOnly={!entered} />}
-                    {entered && !reduceMotion ? (
-                      <div className={cn(!liveReady && 'absolute inset-0 opacity-0')}>
-                      <Frog
-                        ref={friendFrogRef}
-                        width={230}
-                        height={210}
-                        indices={entry.indices}
-                        mouthOpen={friendMouthOpen}
-                        onDressed={() => setDressedFor(entry.userId)}
-                      />
+                    {reduceMotion ? (
+                      <FrogSnapshot width={230} height={210} indices={entry.indices} />
+                    ) : (
+                      <div style={{ width: 230, height: 210 }}>
+                        {entered && (
+                          <Frog
+                            ref={friendFrogRef}
+                            width={230}
+                            height={210}
+                            indices={entry.indices}
+                            mouthOpen={friendMouthOpen}
+                            onDressed={() => setDressedFor(entry.userId)}
+                          />
+                        )}
                       </div>
-                    ) : null}
+                    )}
                     {liveReady && !reduceMotion && <PremiumFrogAura show={!!entry.premium} alwaysPlay />}
                   </div>
                 </div>

@@ -232,19 +232,15 @@ export default function GlobalFrogodoroMini() {
                               className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
                               style={{ bottom: 'calc(100% - 5px)' }}
                             >
-                              {cardEntered ? (
-                                <Frog
-                                  width={144}
-                                  height={162}
-                                  indices={frogIndices}
-                                />
-                              ) : (
-                                <FrogSnapshot
-                                  indices={frogIndices}
-                                  width={144}
-                                  height={162}
-                                />
-                              )}
+                              <div style={{ width: 144, height: 162 }}>
+                                {cardEntered && (
+                                  <Frog
+                                    width={144}
+                                    height={162}
+                                    indices={frogIndices}
+                                  />
+                                )}
+                              </div>
                             </div>
                             <button
                               onClick={handleDone}

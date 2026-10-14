@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Bell, UserMinus, UserPlus, Loader2, Search, Handshake, ChevronRight } from 'lucide-react';
+import { Bell, UserMinus, UserPlus, Loader2, Search, Plus } from 'lucide-react';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -40,7 +40,18 @@ import { useUIStore } from '@/lib/uiStore';
 import { PondHero } from '@/components/ui/friends/PondHero';
 import { FriendRow } from '@/components/ui/friends/FriendRow';
 import { GrowPondCard } from '@/components/ui/friends/GrowPondCard';
-import { SharedHabits, PondFocusSection, KeepsakeShelf, PondSectionTitle } from '@/components/ui/friends/PondSocial';
+import { CheerEarnHint } from '@/components/ui/friends/CheerButton';
+import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
+import {
+  TogetherSection,
+  KeepsakeShelf,
+  PondSectionHeader,
+  FrogTile,
+  POND_PAD,
+  POND_PILL,
+  POND_ROW,
+  POND_ROW_PRESS,
+} from '@/components/ui/friends/PondSocial';
 import { BuddyPickerSheet, KeepsakeSheet, FocusRoomSheet } from '@/components/ui/friends/PondSheets';
 import { usePond, pondFetcher } from '@/hooks/usePond';
 import { useTaskData } from '@/hooks/useTaskData';
@@ -207,13 +218,47 @@ export default function FriendsPage() {
   const pendingCount = requestsData?.incoming?.length ?? 0;
   const buddyInviteCount = buddyInvitesData?.incoming?.length ?? 0;
   const alertsCount = pendingCount + buddyInviteCount + unseenLooks;
+  const alertsWaiting = pendingCount + buddyInviteCount;
 
-  const growCard = () => (
-    <GrowPondCard
-      onInvite={() => setInviteOpen(true)}
-      onAdd={() => setAddOpen(true)}
-      enabled={!!user}
+  const firstInvite = buddyInvitesData?.incoming?.[0];
+  const inviter = firstInvite
+    ? friends.find((friend) => friend.userId === firstInvite.withUserId)
+    : undefined;
+  const inviterName = inviter
+    ? (inviter.name || inviter.frogName).trim().split(/\s+/)[0]
+    : null;
+  const alertLabel =
+    buddyInviteCount === 1 && !pendingCount && inviterName
+      ? inviterName + ' wants to share a habit'
+      : !pendingCount
+        ? buddyInviteCount + ' habit invites waiting'
+        : !buddyInviteCount
+          ? pendingCount === 1
+            ? '1 friend request'
+            : pendingCount + ' friend requests'
+          : pendingCount + buddyInviteCount + ' invites waiting';
+
+  const together = (
+    <TogetherSection
+      data={pond.error && !pond.data ? undefined : pond.data}
+      completedById={completedById}
+      onComplete={async (taskId) => {
+        await toggleTask(taskId);
+        await pond.mutate();
+        void mutateFriends();
+      }}
+      onStartBuddy={startBuddy}
+      onOpenRoom={openRoom}
+      hasFriends={hasRealFriends}
       paused={isAnyPanelOpen}
+    />
+  );
+
+  const suggestions = (
+    <FriendSuggestionsRow
+      enabled={!!user}
+      variant="section"
+      title="People you may know"
     />
   );
 
@@ -281,22 +326,72 @@ export default function FriendsPage() {
           onOpenFriend={openFriend}
           onInvite={() => setInviteOpen(true)}
         />
-        <div data-fly-sheet className="relative z-20 -mx-3 -mt-12 flex w-[calc(100%+1.5rem)] flex-col gap-6 px-3 pt-16 md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:px-8 md:pt-14">
+        <div data-fly-sheet className="relative z-20 -mx-3 -mt-12 flex w-[calc(100%+1.5rem)] flex-col gap-7 px-3 pt-16 md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:gap-9 md:px-8 md:pt-14">
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)]" />
-          {(friendsError || pond.error || claimError) && <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-card px-4 py-3"><p className="text-[12px] font-semibold text-destructive">{claimError || 'Some of your pond could not load.'}</p><button type="button" onClick={() => { setClaimError(null); void mutateFriends(); void pond.mutate(); }} className="min-h-11 shrink-0 rounded-xl px-3 text-[12px] font-black text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Try again</button></div>}
-          {buddyInviteCount > 0 && <button type="button" onClick={openInbox} className="flex min-h-14 items-center gap-3 rounded-2xl border border-primary/20 bg-card px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Handshake className="h-5 w-5 shrink-0 text-primary" aria-hidden /><span className="min-w-0 flex-1 text-[13px] font-black text-foreground">{buddyInviteCount === 1 ? 'A friend wants to build a habit with you' : buddyInviteCount + ' buddy invitations are waiting'}</span><ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden /></button>}
-          {(!pond.error || pond.data) && <SharedHabits data={pond.data} indices={indices} completedById={completedById} onComplete={async (taskId) => { await toggleTask(taskId); await pond.mutate(); void mutateFriends(); }} onStart={startBuddy} hasFriends={hasRealFriends} paused={isAnyPanelOpen} />}
-          <PondFocusSection rooms={pond.data?.rooms} hasFriends={hasRealFriends} onOpen={openRoom} onInvite={() => setInviteOpen(true)} />
-          {hasRealFriends && <section>
-            <PondSectionTitle title="Your people" subtitle={friends.length + (friends.length === 1 ? ' friend. Lots of little possibilities.' : ' friends. Lots of little possibilities.')} action={<button type="button" onClick={() => setAddOpen(true)} aria-label="Add someone to your pond" className="grid h-11 w-11 place-items-center rounded-full border border-border/50 bg-card text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><UserPlus className="h-5 w-5" aria-hidden /></button>} />
-            {friends.length > 6 && <label className="mb-3 flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-card px-3 focus-within:ring-2 focus-within:ring-primary/40"><Search className="h-4 w-4 text-muted-foreground" aria-hidden /><span className="sr-only">Find a friend</span><input type="search" value={friendSearch} onChange={(event) => setFriendSearch(event.target.value)} placeholder="Find a friend…" autoComplete="off" name="friend-search" className="min-w-0 flex-1 bg-transparent py-2 text-[13px] text-foreground outline-none" /></label>}
-            <ul data-hint="friends-list" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {filteredRows.map((entry, index) => <FriendRow key={entry.userId} entry={entry} animate={index < 2} buddyInvites={buddyInviteByFriend.get(entry.userId) ?? 0} onOpen={() => setDetailTarget(entry)} onBuddyUp={() => setBuddyTarget(entry)} paused={isAnyPanelOpen} />)}
-            </ul>
-            {!filteredRows.length && <p role="status" className="py-6 text-center text-[13px] font-medium text-muted-foreground">No friends match that name. Try another search.</p>}
-          </section>}
+          {(friendsError || pond.error || claimError || alertsWaiting > 0) && (
+            <div className="-mb-3 flex flex-col gap-2 md:-mb-5">
+              {(friendsError || pond.error || claimError) && (
+                <div role="alert" className={cn('flex items-center justify-between gap-3 py-2 pl-3.5 pr-2', POND_ROW)}>
+                  <p className="text-[13px] font-semibold text-destructive">{claimError || 'Some of your pond could not load.'}</p>
+                  <button type="button" onClick={() => { setClaimError(null); void mutateFriends(); void pond.mutate(); }} className="min-h-11 shrink-0 rounded-xl px-3 text-[13px] font-black text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Try again</button>
+                </div>
+              )}
+              {alertsWaiting > 0 && (
+                <button type="button" onClick={openInbox} className={cn('flex w-full items-center gap-3 py-2 pl-2 pr-2.5 md:pr-3', POND_ROW, POND_ROW_PRESS)}>
+                  {inviter && !pendingCount ? (
+                    <FrogTile indices={inviter.indices} background={inviter.backgroundPreview} size={44} className="rounded-xl" />
+                  ) : (
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/[0.12] text-primary">
+                      <UserPlus className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-bold leading-tight text-foreground md:text-[16px]">{alertLabel}</span>
+                  <span className={cn(POND_PILL, 'bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)]')}>Review</span>
+                </button>
+              )}
+            </div>
+          )}
+          {hasRealFriends && together}
+          <section aria-labelledby="pond-friends">
+            <PondSectionHeader id="pond-friends" title="Friends" count={hasRealFriends ? String(friends.length) : null} />
+            {hasRealFriends ? (
+              <>
+                <div className="-mt-1.5 mb-2 pl-3.5 empty:hidden"><CheerEarnHint /></div>
+                {friends.length > 6 && (
+                  <label className={cn('mb-2 flex min-h-12 items-center gap-2.5 px-3.5 focus-within:ring-2 focus-within:ring-primary/40', POND_ROW)}>
+                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="sr-only">Find a friend</span>
+                    <input type="search" value={friendSearch} onChange={(event) => setFriendSearch(event.target.value)} placeholder="Find a friend…" autoComplete="off" name="friend-search" className="min-w-0 flex-1 bg-transparent py-2 text-[15px] font-medium text-foreground outline-none placeholder:text-muted-foreground/70" />
+                  </label>
+                )}
+                <ul data-hint="friends-list" className="flex flex-col gap-2 md:grid md:grid-cols-2">
+                  {filteredRows.map((entry) => (
+                    <FriendRow
+                      key={entry.userId}
+                      entry={entry}
+                      buddyInvites={buddyInviteByFriend.get(entry.userId) ?? 0}
+                      onOpen={() => setDetailTarget(entry)}
+                    />
+                  ))}
+                </ul>
+                {!filteredRows.length && <p role="status" className="py-6 text-center text-[13px] font-semibold text-muted-foreground">No friends match that name.</p>}
+                <div className="mt-2">
+                  <GrowPondCard onInvite={() => setInviteOpen(true)} enabled={!!user} paused={isAnyPanelOpen} />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <GrowPondCard onInvite={() => setInviteOpen(true)} enabled={!!user} paused={isAnyPanelOpen} emphasize />
+                <button type="button" onClick={() => setAddOpen(true)} className={cn('flex w-full items-center gap-3 py-2 pl-3.5 pr-2.5 md:pl-4 md:pr-3', POND_ROW, POND_ROW_PRESS)}>
+                  <span className="min-w-0 flex-1 text-[17px] font-semibold leading-snug text-muted-foreground/80 md:text-[17.5px]">Add by friend code</span>
+                  <span className={POND_PAD}><Plus className="h-5 w-5" strokeWidth={3} aria-hidden /></span>
+                </button>
+              </div>
+            )}
+          </section>
+          {suggestions}
+          {!hasRealFriends && together}
           {pond.data && <KeepsakeShelf keepsakes={pond.data.keepsakes} pinnedId={pond.data.pinnedKeepsakeId} onSelect={(item) => { pond.clearActionError(); setKeepsakeTarget(item); }} />}
-          {growCard()}
         </div>
       </div>
 

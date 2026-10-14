@@ -6,6 +6,12 @@ import { UserPlus, X, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import {
+  FrogTile,
+  PondSectionHeader,
+  POND_PILL,
+  POND_ROW,
+} from '@/components/ui/friends/PondSocial';
 import type { FriendSuggestion } from '@/app/api/friends/suggestions/route';
 
 const fetcher = async (url: string) => {
@@ -25,7 +31,7 @@ export function FriendSuggestionsRow({
 }: {
   enabled: boolean;
   /** `embedded` drops the outer spacing so it can sit inside a sheet. */
-  variant?: 'page' | 'embedded';
+  variant?: 'page' | 'embedded' | 'section';
   /** `inverted` reads on a dark panel instead of the page background. */
   tone?: 'default' | 'inverted';
   title?: string;
@@ -133,6 +139,96 @@ export function FriendSuggestionsRow({
       return `Friends with ${names} +${s.mutualCount - s.mutualNames.length}`;
     return `Friends with ${names}`;
   };
+
+  if (variant === 'section') {
+    return (
+      <section className={className} aria-labelledby="pond-suggestions">
+        <PondSectionHeader
+          id="pond-suggestions"
+          title={title}
+          count={String(suggestions.length)}
+        />
+        <ul className="flex flex-col gap-2 md:grid md:grid-cols-2">
+          {suggestions.map((s) => {
+            const sent = sentTo.has(s.userId);
+            return (
+              <li
+                key={s.userId}
+                className={cn(
+                  'flex min-w-0 items-center gap-3 py-2 pl-2 pr-1.5',
+                  POND_ROW,
+                )}
+              >
+                <FrogTile indices={s.indices} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className={cn(
+                        'truncate text-[17px] font-semibold leading-snug text-foreground',
+                        s.premium && 'plus-name-shimmer',
+                      )}
+                    >
+                      {s.name || s.frogName}
+                    </span>
+                    {s.premium && (
+                      <Icon
+                        name="frogPlus"
+                        label="Frogress Plus"
+                        className="h-5 w-5 shrink-0"
+                      />
+                    )}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-muted-foreground md:text-[13px]">
+                    {reasonLabel(s)}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => sendRequest(s.userId)}
+                  disabled={busyId === s.userId || sent}
+                  aria-label={
+                    sent
+                      ? `Request sent to ${s.name || s.frogName}`
+                      : `Add ${s.name || s.frogName}`
+                  }
+                  className={cn(
+                    POND_PILL,
+                    'touch-manipulation px-3 transition-[transform,background-color] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    sent
+                      ? 'bg-primary/[0.12] text-primary'
+                      : 'bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)]',
+                  )}
+                >
+                  {busyId === s.userId ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : sent ? (
+                    <>
+                      <Check className="h-4 w-4" strokeWidth={3} />
+                      Sent
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="h-4 w-4" strokeWidth={2.5} />
+                      Add
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dismiss(s.userId)}
+                  aria-label={`Hide ${s.name || s.frogName} for now`}
+                  title="Hide for now"
+                  className="grid h-9 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    );
+  }
 
   return (
     <div

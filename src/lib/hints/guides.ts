@@ -398,8 +398,8 @@ const GUIDES: Record<string, HintGuide> = {
     beats: [
       {
         href: '/friends',
-        anchor: 'friends-list',
-        say: 'Pick a friend and team up on a task',
+        anchor: 'share-habit',
+        say: 'Share a habit with a friend and tick it off together',
       },
     ],
   },

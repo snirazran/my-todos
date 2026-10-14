@@ -716,9 +716,6 @@ function LookStage({ desktop }: { desktop?: boolean }) {
       >
         {rarity.label} look
       </span>
-      {!dressed ? (
-        <Icon name="frogPlus" className="absolute bottom-6 left-1/2 h-16 w-16 -translate-x-1/2 opacity-30" />
-      ) : null}
       <div className="absolute inset-0 origin-bottom short:scale-[0.7]">
       <motion.div
         animate={hop}
