@@ -345,35 +345,6 @@ export default function ManageTasksPage() {
     [tz, jumpToDate, showNotification],
   );
 
-  // Move a single occurrence of a repeating task to another day: suppress the
-  // source date on the rule and create a standalone one-off on the target,
-  // leaving the rest of the series intact.
-  const moveRepeatInstance = useCallback(
-    async (
-      taskId: string,
-      newId: string,
-      fromDate: string,
-      toDate: string,
-      order?: number,
-    ) => {
-      await trackWrite(async () => {
-        try {
-          await fetch('/api/tasks', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              moveInstance: { taskId, newId, fromDate, toDate, order },
-              timezone: tz,
-            }),
-          });
-        } catch (e) {
-          console.error('moveRepeatInstance failed', e);
-        }
-      });
-    },
-    [tz, trackWrite],
-  );
-
   // Save tasks for a specific date (full reorder for that column)
   const saveDate = useCallback(
     async (dateKey: string, tasks: Task[]) => {
@@ -651,7 +622,6 @@ export default function ManageTasksPage() {
           onJumpToDate={jumpToDate}
           onMoveTaskToDate={moveTaskToDate}
           onDuplicateTaskToDate={duplicateTaskToDate}
-          onMoveRepeatInstance={moveRepeatInstance}
           onToggleRepeat={onToggleRepeat}
           onScheduleTask={onScheduleTask}
         />

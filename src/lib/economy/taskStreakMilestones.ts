@@ -41,8 +41,9 @@ export type MilestoneResult = {
 export function streakGroupKey(task: {
   id: string;
   repeatGroupId?: string | null;
+  habitKey?: string | null;
 }) {
-  return task.repeatGroupId || `solo:${task.id}`;
+  return task.habitKey || task.repeatGroupId || `solo:${task.id}`;
 }
 
 const milestoneKey = (groupKey: string, day: number) =>

@@ -77,7 +77,19 @@ import {
   occursOnDate,
   isCompletedOnDate,
   dayCandidateFilter,
+  habitGroupKey,
+  habitKeyFilter,
+  liveMoves,
+  movedInOn,
 } from '@/lib/taskOccurrence';
+import {
+  discardPendingMoves,
+  moveFutureOccurrences,
+  moveOneOccurrence,
+  parseMoveRequest,
+  skipOccurrence,
+  unskipOccurrence,
+} from '@/lib/occurrenceMoves';
 import { recordHungerStarted } from '@/lib/analytics/hunger';
 import { refundLegacyStolenFlies } from '@/lib/hungerRefund';
 import { extendStreakForCompletion } from '@/lib/streak/loginStreak';
@@ -197,18 +209,19 @@ async function streakMapForWeeklyDocs(
   ]);
   const freeSlipEveryDays = economyConfig.taskStreak.freeSlipEveryDays;
 
-  const groupIds = Array.from(
-    new Set(
-      weeklyDocs
-        .map((d) => d.repeatGroupId)
-        .filter((g): g is string => !!g),
-    ),
+  const sharedKeys = Array.from(
+    new Set(weeklyDocs.map((d) => habitGroupKey(d))),
   );
 
   const byGroup = new Map<string, TaskDoc[]>();
-  if (groupIds.length > 0) {
+  if (sharedKeys.length > 0) {
     const sibs = await TaskModel.find(
-      { userId: uid, repeatGroupId: { $in: groupIds } },
+      {
+        userId: uid,
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        $or: sharedKeys.map((key) => habitKeyFilter(key)),
+      },
       {
         id: 1,
         type: 1,
@@ -216,7 +229,9 @@ async function streakMapForWeeklyDocs(
         completedDates: 1,
         lateCompletedDates: 1,
         suppressedDates: 1,
+        movedDates: 1,
         repeatGroupId: 1,
+        habitKey: 1,
         repeatRule: 1,
         repeatStartDate: 1,
         repeatEndDate: 1,
@@ -228,17 +243,15 @@ async function streakMapForWeeklyDocs(
       .lean<TaskDoc[]>()
       .exec();
     for (const s of sibs) {
-      const k = s.repeatGroupId!;
+      const k = habitGroupKey(s);
       if (!byGroup.has(k)) byGroup.set(k, []);
       byGroup.get(k)!.push(s);
     }
   }
 
   for (const d of weeklyDocs) {
-    const sibs =
-      d.repeatGroupId && byGroup.has(d.repeatGroupId)
-        ? byGroup.get(d.repeatGroupId)!
-        : [d];
+    const key = habitGroupKey(d);
+    const sibs = byGroup.get(key) ?? [d];
     map.set(
       d.id,
       computeGroupStreak(sibs, today, tz, { protectedDays, freeSlipEveryDays }),
@@ -1573,6 +1586,7 @@ export async function applySetRepeat(
   }
 
   const repeatEndDate = normalizeRepeatEnd(setRepeat.endDate);
+  const movesReset = discardPendingMoves(doc, getZonedToday(tz)) ?? {};
 
   // Converting a one-off into a repeat: its checklist becomes series content
   // and any already-checked items become that start date's checked state.
@@ -1613,6 +1627,8 @@ export async function applySetRepeat(
           repeatDayOfMonth: 1,
           repeatRule: 1,
           checklistDoneByDate: 1,
+          movedDates: 1,
+          habitKey: 1,
         },
       },
     );
@@ -1627,6 +1643,7 @@ export async function applySetRepeat(
       repeatStartDate,
       repeatDayOfMonth: domFromYMD(repeatStartDate),
       ...repeatSeedFields(repeatStartDate),
+      ...movesReset,
     };
     const unset: Record<string, unknown> = {
       date: 1,
@@ -1655,6 +1672,7 @@ export async function applySetRepeat(
       repeatStartDate,
       repeatRule: rule,
       ...repeatSeedFields(repeatStartDate),
+      ...movesReset,
     };
     const unset: Record<string, unknown> = {
       date: 1,
@@ -1695,6 +1713,7 @@ export async function applySetRepeat(
       repeatMode: mode,
       repeatStartDate,
       ...repeatSeedFields(repeatStartDate),
+      ...movesReset,
     };
     const unset: Record<string, unknown> = {
       date: 1,
@@ -1737,6 +1756,7 @@ export async function applySetRepeat(
           checklist: checklistContent(doc.checklist),
           repeatMode: mode,
           repeatGroupId: groupId,
+          ...(doc.habitKey ? { habitKey: doc.habitKey } : {}),
           repeatStartDate,
           repeatEndDate: repeatEndDate ?? undefined,
           startTime: doc.startTime,
@@ -1800,6 +1820,9 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
     if (d && YMD_RE.test(d)) dates.add(d);
   };
   let affected = 0;
+  let skippedRepeats = 0;
+  let blockedRepeats = 0;
+  let completedRepeats = 0;
 
   /** Expand to whole repeat groups when the caller asked for scope:'all'. */
   const scopedIds = async (): Promise<string[]> => {
@@ -1854,6 +1877,14 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
       if (!doc) continue;
       noteDate(item.fromDate);
 
+      if (toBacklog && doc.type === 'weekly') {
+        if (item.fromDate && YMD_RE.test(item.fromDate)) {
+          await skipOccurrence(uid, doc, item.fromDate);
+          skippedRepeats++;
+        }
+        continue;
+      }
+
       if (toBacklog) {
         const order = await nextOrderBacklog(uid, weekStart);
         await TaskModel.updateOne(
@@ -1881,40 +1912,28 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
 
       noteDate(target);
 
-      // A repeating task moves one occurrence only: the series keeps its rule,
-      // the source date is suppressed, and the moved copy lands as a one-off.
-      if (doc.type === 'weekly' && item.fromDate && YMD_RE.test(item.fromDate)) {
+      if (doc.type === 'weekly') {
+        if (!item.fromDate || !YMD_RE.test(item.fromDate)) continue;
         if (item.fromDate === target) {
           landedIds.push(doc.id);
           continue;
         }
-        const newId = uuid();
-        await TaskModel.updateOne(
-          { userId: uid, id: doc.id },
-          { $addToSet: { suppressedDates: item.fromDate } },
-        );
-        await TaskModel.create({
+        const moved = await moveOneOccurrence({
           userId: uid,
-          type: 'regular',
-          id: newId,
-          text: doc.text,
-          date: target,
+          taskId: doc.id,
+          from: item.fromDate,
+          to: target,
+          tz,
           order: await orderForTarget(),
-          completed: false,
-          // Detaching an occurrence is a move, not a new task: keep the series'
-          // createdAt so it can't read as a task added today.
-          createdAt: doc.createdAt ?? now,
-          updatedAt: now,
-          tags: doc.tags ?? [],
-          notes: doc.notes ?? '',
-          checklist: checklistForDate(doc, item.fromDate),
-          startTime: doc.startTime,
-          endTime: doc.endTime,
-          reminder: doc.reminder,
-          ...(doc.sectionId ? { sectionId: doc.sectionId } : {}),
         });
-        landedIds.push(newId);
-        affected++;
+        if (moved.ok) {
+          landedIds.push(doc.id);
+          affected++;
+        } else if (moved.error === 'occupied') {
+          blockedRepeats++;
+        } else if (moved.error === 'completed') {
+          completedRepeats++;
+        }
         continue;
       }
 
@@ -2000,13 +2019,11 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
       const doc = byId.get(item.taskId);
       if (!doc) continue;
       noteDate(item.fromDate);
-      if (doc.type === 'weekly' && item.fromDate && YMD_RE.test(item.fromDate)) {
+      if (doc.type === 'weekly') {
+        if (!item.fromDate || !YMD_RE.test(item.fromDate)) continue;
         // Match the single-task planner delete: hide this occurrence, keep the
         // series. Deleting the whole series stays an explicit, separate choice.
-        await TaskModel.updateOne(
-          { userId: uid, id: doc.id },
-          { $addToSet: { suppressedDates: item.fromDate } },
-        );
+        await skipOccurrence(uid, doc, item.fromDate);
       } else {
         await TaskModel.deleteOne({ userId: uid, id: doc.id });
         if (doc.bondId) await severBond(doc.bondId, uid);
@@ -2050,6 +2067,9 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
     ok: true,
     affected,
     dates: Array.from(dates),
+    ...(skippedRepeats ? { skippedRepeats } : {}),
+    ...(blockedRepeats ? { blockedRepeats } : {}),
+    ...(completedRepeats ? { completedRepeats } : {}),
   });
 }
 
@@ -2068,6 +2088,24 @@ export async function PUT(req: NextRequest) {
     Array.isArray(body.tasks)
   )
     return handleBoardPutByDate(uid, body, tz);
+  if (body.moveOccurrence) {
+    const move = parseMoveRequest(body.moveOccurrence);
+    if (!move)
+      return NextResponse.json(
+        { error: 'Invalid moveOccurrence payload' },
+        { status: 400 },
+      );
+    const request = { userId: uid, tz, ...move };
+    const res =
+      move.scope === 'future'
+        ? await moveFutureOccurrences(request)
+        : await moveOneOccurrence(request);
+    if (!res.ok)
+      return NextResponse.json({ error: res.error }, { status: res.status });
+    await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
+    return NextResponse.json(res);
+  }
   // Move a single occurrence of a repeating task to a different day. The series
   // is left intact: the source date is suppressed (that one occurrence hidden)
   // and a standalone one-off regular task is materialized on the target date.
@@ -2151,6 +2189,11 @@ export async function PUT(req: NextRequest) {
     }).lean<TaskDoc>();
     if (!doc)
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    if (doc.type === 'weekly')
+      return NextResponse.json(
+        { error: 'Repeating tasks move with moveOccurrence' },
+        { status: 409 },
+      );
 
     const now = new Date();
     const { weekStart, weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
@@ -2383,10 +2426,7 @@ export async function PUT(req: NextRequest) {
         { error: 'Only repeating tasks can be unskipped' },
         { status: 400 },
       );
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId },
-      { $pull: { suppressedDates: date } },
-    );
+    await unskipOccurrence(uid, doc, date);
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
@@ -2408,6 +2448,7 @@ export async function PUT(req: NextRequest) {
           $unset: {
             dayOfWeek: 1,
             suppressedDates: 1,
+            movedDates: 1,
             completedDates: 1,
             repeatStartDate: 1,
             checklistDoneByDate: 1,
@@ -2745,13 +2786,14 @@ export async function DELETE(req: NextRequest) {
   if (body.deleteSeries && body.taskId) {
     const doc = await TaskModel.findOne(
       { userId: uid, id: body.taskId },
-      { repeatGroupId: 1, type: 1, bondId: 1 },
+      { id: 1, repeatGroupId: 1, habitKey: 1, type: 1, bondId: 1 },
     ).lean<TaskDoc>();
     const today = getZonedToday(tz);
     const cutoff = addDaysYMD(today, -1);
-    const seriesFilter = doc?.repeatGroupId
-      ? { userId: uid, repeatGroupId: doc.repeatGroupId }
-      : { userId: uid, id: body.taskId };
+    const seriesFilter =
+      doc?.type === 'weekly'
+        ? { userId: uid, ...habitKeyFilter(habitGroupKey(doc)) }
+        : { userId: uid, id: body.taskId };
     const seriesDocs = await TaskModel.find(seriesFilter).lean<TaskDoc[]>();
     const now = new Date();
     const toInsert: Record<string, unknown>[] = [];
@@ -2761,10 +2803,14 @@ export async function DELETE(req: NextRequest) {
       if (!start) continue;
       const suppressed = new Set(s.suppressedDates ?? []);
       const completed = new Set(s.completedDates ?? []);
-      let d = start;
+      const movedPast = liveMoves(s)
+        .filter((m) => m.to <= cutoff && movedInOn(s, m.to))
+        .map((m) => m.to);
+      let d = movedPast.concat(start).sort()[0];
       for (let guard = 0; guard < 1000 && d <= cutoff; guard++, d = addDaysYMD(d, 1)) {
-        if (suppressed.has(d)) continue;
-        if (!siblingOccursOn(s, d)) continue;
+        const movedHere = movedPast.indexOf(d) !== -1;
+        if (!movedHere && (d < start || suppressed.has(d))) continue;
+        if (!movedHere && !siblingOccursOn(s, d)) continue;
         const session = s.frogodoroSessions?.find((x) => x.date === d);
         const isOriginal = d === start;
         toInsert.push({
@@ -2824,7 +2870,13 @@ export async function DELETE(req: NextRequest) {
       );
     const doc = await TaskModel.findOne(
       { userId: uid, id: taskId },
-      { type: 1, bondId: 1 },
+      {
+        type: 1,
+        bondId: 1,
+        movedDates: 1,
+        repeatStartDate: 1,
+        repeatEndDate: 1,
+      },
     )
       .lean<TaskDoc>()
       .exec();
@@ -2833,10 +2885,7 @@ export async function DELETE(req: NextRequest) {
       if (doc.bondId) await severBond(doc.bondId, uid);
       await recordTaskDeleted(uid, [doc], 'single');
     } else if (doc?.type === 'weekly') {
-      await TaskModel.updateOne(
-        { userId: uid, type: doc.type, id: taskId },
-        { $addToSet: { suppressedDates: dateKey } },
-      );
+      await skipOccurrence(uid, { ...doc, id: taskId }, dateKey);
     }
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
@@ -2855,10 +2904,7 @@ export async function DELETE(req: NextRequest) {
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   if (doc.type === 'weekly') {
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId },
-      { $addToSet: { suppressedDates: date } },
-    );
+    await skipOccurrence(uid, doc, date);
     await recordTaskDeleted(uid, [doc], 'occurrence');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
@@ -2929,6 +2975,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       repeatDayOfMonth: t.repeatDayOfMonth,
       repeatRule: t.repeatRule,
       dayOfWeek: t.dayOfWeek,
+      movedFrom: movedInOn(t, date)?.from,
       completedDates: t.completedDates ?? [],
       streak,
       flyWorth: taskFlyWorthNow({
@@ -3247,6 +3294,11 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         repeatRule: { $exists: true },
       },
       {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        'movedDates.to': { $in: dates },
+      },
+      {
         type: 'regular',
         deletedAt: { $exists: false },
         date: { $in: dates },
@@ -3311,6 +3363,37 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
       });
       continue;
     }
+    const movedHere = new Set<string>();
+    for (const move of liveMoves(doc)) {
+      if (!dateSet.has(move.to) || !movedInOn(doc, move.to)) continue;
+      movedHere.add(move.to);
+      byDate[move.to].push({
+        id: doc.id,
+        text: doc.text,
+        order: doc.orderOverrides?.[move.to] ?? doc.order,
+        type: doc.type,
+        completed: (doc.completedDates ?? []).includes(move.to),
+        tags: doc.tags ?? [],
+        notes: doc.notes ?? '',
+        checklist: checklistForDate(doc, move.to),
+        repeatMode: doc.repeatMode,
+        repeatGroupId: doc.repeatGroupId,
+        repeatStartDate: repeatStartForDoc(doc, tz),
+        repeatEndDate: doc.repeatEndDate,
+        repeatDayOfMonth: doc.repeatDayOfMonth,
+        repeatRule: doc.repeatRule,
+        dayOfWeek:
+          doc.repeatRule || doc.repeatMode === 'monthly'
+            ? dowFromYMD(move.from)
+            : doc.dayOfWeek,
+        movedFrom: move.from,
+        frogodoroSession: sessionForRow(doc, move.to),
+        calendarEventId: doc.calendarEventId,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+    }
     // A weekly doc is expanded by exactly ONE rule, in priority order:
     // custom repeatRule → monthly → legacy dayOfWeek. These must be mutually
     // exclusive — a custom/monthly doc can still carry a stale `dayOfWeek`
@@ -3323,7 +3406,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         if (!customOccursOn(doc, d)) continue;
         if (repeatStart && d < repeatStart) continue;
         if (isAfterRepeatEnd(doc, d)) continue;
-        if ((doc.suppressedDates ?? []).includes(d)) continue;
+        if (movedHere.has(d) || (doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
           id: doc.id,
           text: doc.text,
@@ -3352,7 +3435,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         if (domFromYMD(d) !== doc.repeatDayOfMonth) continue;
         if (repeatStart && d < repeatStart) continue;
         if (isAfterRepeatEnd(doc, d)) continue;
-        if ((doc.suppressedDates ?? []).includes(d)) continue;
+        if (movedHere.has(d) || (doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
           id: doc.id,
           text: doc.text,
@@ -3381,7 +3464,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         if (dowFromYMD(d) !== doc.dayOfWeek) continue;
         if (repeatStart && d < repeatStart) continue;
         if (isAfterRepeatEnd(doc, d)) continue;
-        if ((doc.suppressedDates ?? []).includes(d)) continue;
+        if (movedHere.has(d) || (doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
           id: doc.id,
           text: doc.text,
@@ -3532,7 +3615,20 @@ async function handleBoardPut(
   const now = new Date();
   const { weekStart, weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
   if (day === -1) {
-    const ids = (tasks as Array<{ id: string }>).map((t) => t.id);
+    const requested = (tasks as Array<{ id: string }>).map((t) => t.id);
+    const repeating = new Set(
+      (
+        await TaskModel.find(
+          { userId: uid, id: { $in: requested }, type: 'weekly' },
+          { id: 1 },
+        )
+          .lean<{ id: string }[]>()
+          .exec()
+      ).map((d) => d.id),
+    );
+    const ids = requested.filter((id) => !repeating.has(id));
+    if (ids.length === 0 && requested.length > 0)
+      return NextResponse.json({ ok: true });
     if (ids.length === 0) {
       await TaskModel.deleteMany({ userId: uid, type: 'backlog', weekStart });
       await syncGamification(uid, tz);
@@ -3630,7 +3726,7 @@ async function handleBoardPut(
     await TaskModel.deleteMany({
       userId: uid,
       id: { $in: ids },
-      type: { $in: ['weekly', 'regular'] },
+      type: 'regular',
     });
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
@@ -3825,7 +3921,9 @@ async function handleBoardPutByDate(
       repeatDayOfMonth: 1,
       repeatRule: 1,
       repeatStartDate: 1,
+      repeatEndDate: 1,
       repeatGroupId: 1,
+      movedDates: 1,
       frogodoroSessions: 1,
       isTutorial: 1,
     },
@@ -3882,20 +3980,18 @@ async function handleBoardPutByDate(
         : {};
       if (ttype === 'weekly') {
         // `type: 'weekly'` covers every repeat kind (weekly / monthly / custom).
-        // When the task is being reordered within a column that is a *natural*
-        // occurrence of its rule, only persist the new order — never detach it
-        // into a one-off, which would strip the repeat (and, for monthly/custom,
-        // wipe every other generated occurrence). Only when the task lands on a
-        // day the rule doesn't fall on do we convert it to a one-off regular.
+        // Only the per-date order is saved; cross-day moves use moveOccurrence.
         const doc = docById.get(t.id);
         const occursHere =
-          doc?.repeatMode === 'monthly'
-            ? domFromYMD(dateKey) === doc.repeatDayOfMonth
-            : doc?.repeatRule
-              ? customOccursOn(doc, dateKey)
-              : typeof doc?.dayOfWeek === 'number'
-                ? dowFromYMD(dateKey) === doc.dayOfWeek
-                : false;
+          !!doc &&
+          (!!movedInOn(doc, dateKey) ||
+            (doc.repeatMode === 'monthly'
+              ? domFromYMD(dateKey) === doc.repeatDayOfMonth
+              : doc.repeatRule
+                ? customOccursOn(doc, dateKey)
+                : typeof doc.dayOfWeek === 'number'
+                  ? dowFromYMD(dateKey) === doc.dayOfWeek
+                  : false));
         if (occursHere) {
           const sec = sectionOps(t);
           return Promise.all([
@@ -3914,34 +4010,7 @@ async function handleBoardPutByDate(
             applySectionToSeries(uid, doc, sec),
           ]);
         }
-        // Lands on a non-occurrence day: detach into a one-off regular task.
-        return TaskModel.updateOne(
-          { userId: uid, id: t.id },
-          {
-            $set: {
-              type: 'regular',
-              date: dateKey,
-              order: i + 1,
-              updatedAt: now,
-              tags,
-              notes,
-              checklist,
-              ...scheduleFields,
-              ...sectionOps(t).set,
-            },
-            $unset: {
-              dayOfWeek: 1,
-              repeatMode: 1,
-              repeatGroupId: 1,
-              repeatRule: 1,
-              repeatDayOfMonth: 1,
-              repeatStartDate: 1,
-              repeatEndDate: 1,
-              checklistDoneByDate: 1,
-              ...sectionOps(t).unset,
-            },
-          },
-        );
+        return Promise.resolve();
       }
       if (ttype === 'backlog')
         return Promise.all([
@@ -4118,30 +4187,11 @@ async function placeTasksInDay(
   now: Date,
   tz: string,
 ) {
-  const dow = dowFromYMD(date);
-  const docs = await TaskModel.find({
-    userId,
-    $or: [
-      { type: 'weekly', deletedAt: { $exists: false }, dayOfWeek: dow },
-      { type: 'weekly', deletedAt: { $exists: false }, repeatMode: 'monthly' },
-      {
-        type: 'weekly',
-        deletedAt: { $exists: false },
-        repeatRule: { $exists: true },
-      },
-      { type: 'regular', deletedAt: { $exists: false }, date },
-    ],
-  })
+  const docs = await TaskModel.find(dayCandidateFilter(userId, date))
     .lean<TaskDoc[]>()
     .exec();
 
-  const onThisDay = docs.filter((d) => {
-    if ((d.suppressedDates ?? []).includes(date)) return false;
-    if (d.type === 'regular') return d.date === date;
-    const start = repeatStartForDoc(d, tz);
-    if (start && date < start) return false;
-    return siblingOccursOn(d, date);
-  });
+  const onThisDay = docs.filter((d) => occursOnDate(d, date, tz));
 
   const orderOf = (d: TaskDoc) => d.orderOverrides?.[date] ?? d.order ?? 0;
   const moved = new Set(movedIds);

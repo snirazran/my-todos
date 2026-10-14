@@ -1,6 +1,8 @@
 import type { TaskDoc } from '@/lib/models/Task';
 import {
   addDaysYMD,
+  liveMoves,
+  movedInOn,
   siblingOccursOn,
   repeatStartForDoc,
 } from '@/lib/taskOccurrence';
@@ -58,14 +60,11 @@ function unionSorted(values: (string[] | undefined)[]): string[] {
  * recurring DTSTART to the first occurrence >= max(repeatStart, today) so past
  * occurrences (which deleteSeries may have materialized) are never re-exported.
  */
-export function taskUnitToNeutral(
-  unit: TaskUnit,
+function eventBase(
+  primary: TaskDoc,
   tz: string,
-  todayYMD: string,
-): NeutralEvent | null {
-  const primary = unit.docs[0];
-  if (!primary || primary.type === 'backlog') return null;
-
+  key: TaskUnit['key'],
+): Omit<NeutralEvent, 'startDate' | 'allDay'> {
   const startTime = primary.startTime || undefined;
   // Calendars require an end; default to +30min so the fingerprint matches
   // what a round trip through the provider produces. Cross-midnight ends
@@ -76,17 +75,67 @@ export function taskUnitToNeutral(
     const end = defaultEnd('2000-01-01', startTime);
     endTime = end.ymd === '2000-01-01' ? end.hm : undefined;
   }
-
-  const base: Omit<NeutralEvent, 'startDate' | 'allDay'> = {
+  return {
     title: primary.text.trim(),
     notes: primary.notes?.trim() || undefined,
     startTime,
     endTime,
     timezone: tz,
     reminderMinutes: reminderToMinutes(primary.reminder),
-    appTaskId: unit.key.taskId,
-    appGroupId: unit.key.repeatGroupId,
+    appTaskId: key.taskId,
+    appGroupId: key.repeatGroupId,
   };
+}
+
+const MOVED_KEY_SEPARATOR = '@';
+
+export function movedOccurrenceKey(taskId: string, from: string) {
+  return `${taskId}${MOVED_KEY_SEPARATOR}${from}`;
+}
+
+export function parseMovedOccurrenceKey(key: string | undefined) {
+  if (!key) return null;
+  const at = key.lastIndexOf(MOVED_KEY_SEPARATOR);
+  if (at <= 0) return null;
+  const from = key.slice(at + 1);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return null;
+  return { taskId: key.slice(0, at), from };
+}
+
+/** Single occurrences moved off their rule day, each exported as its own event on the new day. */
+export function movedOccurrenceUnits(
+  docs: TaskDoc[],
+  tz: string,
+): { unit: TaskUnit; neutral: NeutralEvent }[] {
+  const out: { unit: TaskUnit; neutral: NeutralEvent }[] = [];
+  for (const doc of docs) {
+    if (doc.type !== 'weekly') continue;
+    for (const move of liveMoves(doc)) {
+      if (!movedInOn(doc, move.to)) continue;
+      const unit: TaskUnit = {
+        key: { taskId: movedOccurrenceKey(doc.id, move.from) },
+        docs: [doc],
+      };
+      const base = eventBase(doc, tz, unit.key);
+      out.push({
+        unit,
+        neutral: { ...base, allDay: !base.startTime, startDate: move.to },
+      });
+    }
+  }
+  return out;
+}
+
+export function taskUnitToNeutral(
+  unit: TaskUnit,
+  tz: string,
+  todayYMD: string,
+): NeutralEvent | null {
+  const primary = unit.docs[0];
+  if (!primary || primary.type === 'backlog') return null;
+
+  const base = eventBase(primary, tz, unit.key);
+  const startTime = base.startTime;
   const allDay = !startTime;
 
   if (primary.type === 'regular') {

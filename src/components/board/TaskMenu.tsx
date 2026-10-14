@@ -216,7 +216,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               className={itemDefault}
             >
               <Icon name="saved" className={iconCls} />
-              Save for Later
+              {isWeekly ? 'Skip this day' : 'Save for Later'}
             </button>
           )}
 

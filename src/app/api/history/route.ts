@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel, { type TaskDoc, type Weekday } from '@/lib/models/Task';
+import { movedInOn } from '@/lib/taskOccurrence';
 import { format, parseISO, subDays } from 'date-fns';
 
 /* ---------- GET  /api/history ---------- */
@@ -66,6 +67,9 @@ export async function GET(req: NextRequest) {
         completed: 1,
         completedDates: 1,
         suppressedDates: 1,
+        movedDates: 1,
+        repeatStartDate: 1,
+        repeatEndDate: 1,
         createdAt: 1,
         deletedAt: 1,
         tags: 1,
@@ -103,7 +107,7 @@ export async function GET(req: NextRequest) {
           if (t.type === 'regular') {
             matchesDay = t.date === dateStr;
           } else if (t.type === 'weekly') {
-            matchesDay = t.dayOfWeek === dow;
+            matchesDay = !!movedInOn(t, dateStr) || t.dayOfWeek === dow;
           }
 
           if (!matchesDay) return false;
@@ -122,7 +126,11 @@ export async function GET(req: NextRequest) {
 
           return true;
         })
-        .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(dateStr))
+        .filter(
+          (t: TaskDoc) =>
+            !!movedInOn(t, dateStr) ||
+            !(t.suppressedDates ?? []).includes(dateStr),
+        )
         .map(
           (t): HistoryTask => ({
             id: t.id,

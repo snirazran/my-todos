@@ -5,6 +5,7 @@ import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
+import { habitGroupKey, liveMoves, movedInOn } from '@/lib/taskOccurrence';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,10 @@ type InsightTask = Pick<
   | 'completed'
   | 'completedDates'
   | 'suppressedDates'
+  | 'movedDates'
+  | 'habitKey'
+  | 'repeatStartDate'
+  | 'repeatEndDate'
   | 'createdAt'
   | 'deletedAt'
   | 'tags'
@@ -159,6 +164,10 @@ export async function GET(req: NextRequest) {
           completed: 1,
           completedDates: 1,
           suppressedDates: 1,
+          movedDates: 1,
+          habitKey: 1,
+          repeatStartDate: 1,
+          repeatEndDate: 1,
           createdAt: 1,
           deletedAt: 1,
           tags: 1,
@@ -180,6 +189,7 @@ export async function GET(req: NextRequest) {
 
     const regularByDate = new Map<string, InsightTask[]>();
     const weeklyByDay = new Map<number, InsightTask[]>();
+    const movedByDate = new Map<string, InsightTask[]>();
     const focusByDate = new Map<string, number>();
 
     for (const task of tasks) {
@@ -187,7 +197,16 @@ export async function GET(req: NextRequest) {
         const matches = regularByDate.get(task.date) ?? [];
         matches.push(task);
         regularByDate.set(task.date, matches);
-      } else if (task.type === 'weekly' && typeof task.dayOfWeek === 'number') {
+      }
+      if (task.type === 'weekly') {
+        for (const move of liveMoves(task)) {
+          if (!movedInOn(task, move.to)) continue;
+          const moved = movedByDate.get(move.to) ?? [];
+          moved.push(task);
+          movedByDate.set(move.to, moved);
+        }
+      }
+      if (task.type === 'weekly' && typeof task.dayOfWeek === 'number') {
         const matches = weeklyByDay.get(task.dayOfWeek) ?? [];
         matches.push(task);
         weeklyByDay.set(task.dayOfWeek, matches);
@@ -201,19 +220,24 @@ export async function GET(req: NextRequest) {
     const allDates = daysBetween(historyStart, lastFullDay);
     const instances: Instance[] = [];
     for (const date of allDates) {
-      const candidates = [...(regularByDate.get(date) ?? []), ...(weeklyByDay.get(weekday(date)) ?? [])];
+      const moved = movedByDate.get(date) ?? [];
+      const candidates = [
+        ...(regularByDate.get(date) ?? []),
+        ...(weeklyByDay.get(weekday(date)) ?? []).filter((task) => moved.indexOf(task) === -1),
+        ...moved,
+      ];
       for (const task of candidates) {
         const createdKey = task.createdAt ? getZonedYMD(task.createdAt, timezone) : null;
         const deletedKey = task.deletedAt ? getZonedYMD(task.deletedAt, timezone) : null;
         if (createdKey && createdKey > date) continue;
         if (deletedKey && deletedKey <= date) continue;
-        if ((task.suppressedDates ?? []).includes(date)) continue;
+        if (moved.indexOf(task) === -1 && (task.suppressedDates ?? []).includes(date)) continue;
 
         const repeating = task.type === 'weekly' || !!task.repeatGroupId || (!!task.repeatMode && task.repeatMode !== 'none');
         instances.push({
           date,
           taskId: task.id,
-          groupId: task.repeatGroupId || task.id,
+          groupId: task.type === 'weekly' ? habitGroupKey(task) : task.repeatGroupId || task.id,
           title: task.text,
           completed: (task.completedDates ?? []).includes(date) || (task.type === 'regular' && !!task.completed),
           tags: task.tags ?? [],

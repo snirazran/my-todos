@@ -1,5 +1,10 @@
 import type { TaskDoc } from '@/lib/models/Task';
-import { addDaysYMD, occursOnDate } from '@/lib/taskOccurrence';
+import {
+  addDaysYMD,
+  habitGroupKey as sharedHabitKey,
+  movedInOn,
+  ruleOccursOn,
+} from '@/lib/taskOccurrence';
 import { isWithinStreakCreditWindow } from '@/lib/streak/taskStreaks';
 import { startOfWeekYMD, weekDatesFor, type WeekStartDay } from '@/lib/weekStart';
 import type { LeapDayState, LeapHabitView } from './types';
@@ -14,7 +19,9 @@ export const LEAP_TASK_FIELDS = {
   completedDates: 1,
   lateCompletedDates: 1,
   suppressedDates: 1,
+  movedDates: 1,
   repeatGroupId: 1,
+  habitKey: 1,
   repeatRule: 1,
   repeatStartDate: 1,
   repeatEndDate: 1,
@@ -52,8 +59,10 @@ export function hopKeyGroup(key: string) {
   return index < 0 ? key : key.slice(0, index);
 }
 
-export function habitGroupKey(task: Pick<TaskDoc, 'id' | 'repeatGroupId'>) {
-  return task.repeatGroupId || `solo:${task.id}`;
+export function habitGroupKey(
+  task: Pick<TaskDoc, 'id' | 'repeatGroupId' | 'habitKey'>,
+) {
+  return sharedHabitKey(task);
 }
 
 export type HabitGroup = { key: string; sibs: TaskDoc[] };
@@ -70,10 +79,6 @@ export function groupHabits(tasks: TaskDoc[]): HabitGroup[] {
   const out: HabitGroup[] = [];
   groups.forEach((sibs, key) => out.push({ key, sibs }));
   return out;
-}
-
-function scheduledOn(task: TaskDoc, date: string, tz: string) {
-  return occursOnDate({ ...task, suppressedDates: [] } as TaskDoc, date, tz);
 }
 
 function doneOn(task: TaskDoc, date: string) {
@@ -97,14 +102,23 @@ export function readGroupDay(
   let scheduled = false;
   let done = false;
   let skipped = false;
+  let live = false;
   for (const sib of sibs) {
     if (doneOn(sib, date)) done = true;
-    if (scheduledOn(sib, date, tz)) {
+    if (movedInOn(sib, date)) {
+      scheduled = true;
+      live = true;
+    } else if (ruleOccursOn(sib, date, tz)) {
       scheduled = true;
       if ((sib.suppressedDates ?? []).includes(date)) skipped = true;
+      else live = true;
     }
   }
-  return { scheduled: scheduled || done, done, skipped: skipped && !done };
+  return {
+    scheduled: scheduled || done,
+    done,
+    skipped: skipped && !live && !done,
+  };
 }
 
 export type LeapLedger = {
@@ -175,7 +189,9 @@ export function readLeapWeek(args: {
     }
     if (groupScheduled === 0) continue;
     scheduled += groupScheduled;
-    const head = group.sibs[0];
+    const head =
+      group.sibs.find((s) => !s.repeatEndDate || s.repeatEndDate >= todayKey) ??
+      group.sibs[0];
     habits.push({
       key: group.key,
       taskId: head.id,

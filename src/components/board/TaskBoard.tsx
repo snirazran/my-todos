@@ -43,7 +43,15 @@ import BulkActionBar, { type BulkAction } from './BulkActionBar';
 import BulkTagsSheet from './BulkTagsSheet';
 import BulkConfirmDialog from './BulkConfirmDialog';
 import { EditScopeDialog } from './EditScopeDialog';
+import { MoveRepeatSheet, type MoveRepeatPrompt } from './MoveRepeatSheet';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
+import {
+  describeRepeatMove,
+  impliedGroupDays,
+  planRuleMove,
+  type RepeatMoveScope,
+} from '@/lib/repeatMove';
+import { useBuddyState } from '@/hooks/useBuddyState';
 import {
   useTaskSelection,
   BACKLOG_KEY,
@@ -236,7 +244,7 @@ function DockTile({
   );
 }
 
-type DockAnchor = { left: number; width: number; bottom: number; cover: number };
+type DockAnchor = { left: number; width: number };
 
 const DropDock = React.forwardRef<
   HTMLDivElement,
@@ -257,13 +265,7 @@ const DropDock = React.forwardRef<
     });
     if (!card) return null;
     const r = (card as HTMLElement).getBoundingClientRect();
-    const footer = (card as HTMLElement).lastElementChild as HTMLElement | null;
-    return {
-      left: r.left + 1,
-      width: r.width - 2,
-      bottom: window.innerHeight - r.bottom + 1,
-      cover: footer?.hasAttribute('data-column-footer') ? footer.offsetHeight : 0,
-    };
+    return { left: r.left, width: r.width };
   });
 
   const grid = (
@@ -276,18 +278,14 @@ const DropDock = React.forwardRef<
     return (
       <motion.div
         ref={ref}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeOut' } }}
-        transition={{ duration: 0.14, ease: 'easeOut' }}
-        className="pointer-events-none fixed z-[96] flex flex-col"
-        style={{ left: anchor.left, width: anchor.width, bottom: anchor.bottom }}
+        transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+        className="pointer-events-none fixed z-[96] bottom-[calc(env(safe-area-inset-bottom)+88px)]"
+        style={{ left: anchor.left, width: anchor.width }}
       >
-        <div className="h-8 bg-gradient-to-b from-[hsl(var(--board-list)/0)] to-[hsl(var(--board-list))]" />
-        <div
-          className="flex flex-col justify-end rounded-b-[19px] bg-[hsl(var(--board-list))] px-2.5 pb-2.5 pt-1"
-          style={{ minHeight: anchor.cover }}
-        >
+        <div className="rounded-[20px] border border-border/60 bg-card p-2.5 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.35),0_2px_6px_-2px_rgba(15,23,42,0.08)]">
           {grid}
         </div>
       </motion.div>
@@ -429,7 +427,6 @@ export default function TaskBoard({
   onJumpToDate,
   onMoveTaskToDate,
   onDuplicateTaskToDate,
-  onMoveRepeatInstance,
   onToggleRepeat,
   onScheduleTask,
   onEditTask,
@@ -481,13 +478,6 @@ export default function TaskBoard({
   onDuplicateTaskToDate?: (
     taskId: string,
     targetKey: string,
-  ) => void | Promise<void>;
-  onMoveRepeatInstance?: (
-    taskId: string,
-    newId: string,
-    fromDate: string,
-    toDate: string,
-    order?: number,
   ) => void | Promise<void>;
   onToggleRepeat?: (taskId: string, dateKey: string) => Promise<void> | void;
   onScheduleTask?: (
@@ -1190,6 +1180,238 @@ export default function TaskBoard({
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
       : 'UTC';
 
+  const buddyByTaskId = useBuddyState();
+  const latestColumnsRef = useRef(sortedTasksByDate);
+  latestColumnsRef.current = sortedTasksByDate;
+  const [movePrompt, setMovePrompt] = useState<{
+    prompt: MoveRepeatPrompt;
+    choose: (scope: RepeatMoveScope) => void;
+    cancel: () => void;
+  } | null>(null);
+
+  const habitOnDay = useCallback(
+    (task: Task, dateKey: string) =>
+      (tasksByDate[dateKey] ?? []).some(
+        (t) =>
+          t.type === 'weekly' &&
+          (t.id === task.id ||
+            (!!task.repeatGroupId && t.repeatGroupId === task.repeatGroupId)),
+      ),
+    [tasksByDate],
+  );
+
+  const groupDaysOf = useCallback(
+    (task: Task): number[] | null => {
+      if (!task.repeatGroupId) return null;
+      const implied = impliedGroupDays(task.repeatMode);
+      if (implied) return implied;
+      const days: number[] = [];
+      for (const key of windowDates) {
+        for (const t of tasksByDate[key] ?? []) {
+          if (t.repeatGroupId !== task.repeatGroupId || t.movedFrom) continue;
+          if (typeof t.dayOfWeek === 'number' && days.indexOf(t.dayOfWeek) === -1)
+            days.push(t.dayOfWeek);
+        }
+      }
+      return days.length ? days : null;
+    },
+    [windowDates, tasksByDate],
+  );
+
+  const showHabitTaken = useCallback(
+    (task: Task, from: string, to: string) => {
+      const day = relativeDayLabel(to);
+      const canSkip = cmpYmd(from, todayKey) >= 0;
+      showNotification(
+        `${day.charAt(0).toUpperCase()}${day.slice(1)} already has “${task.text}”`,
+        canSkip ? () => removeOnDate(from, task.id) : undefined,
+        canSkip
+          ? {
+              actionLabel: `Skip ${parseYmd(from).toLocaleDateString('en-US', {
+                weekday: 'short',
+              })}`,
+            }
+          : undefined,
+      );
+    },
+    [showNotification, removeOnDate, todayKey],
+  );
+
+  const sendOccurrenceMove = useCallback(
+    (
+      taskId: string,
+      from: string,
+      to: string,
+      scope: RepeatMoveScope,
+      order?: number,
+    ) =>
+      trackWrite(async () => {
+        try {
+          const res = await fetch('/api/tasks', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              moveOccurrence: { taskId, from, to, scope, order },
+              timezone: tz,
+            }),
+          });
+          const json = await res.json().catch(() => ({}));
+          return res.ok
+            ? (json as { ok: true; taskId: string; split?: boolean })
+            : { ok: false as const, error: String(json?.error ?? 'failed') };
+        } catch {
+          return { ok: false as const, error: 'network' };
+        }
+      }),
+    [trackWrite, tz],
+  );
+
+  const moveRepeatOccurrence = useCallback(
+    (args: {
+      task: Task;
+      from: string;
+      to: string;
+      atIndex?: number;
+      viaCalendar?: boolean;
+    }) => {
+      const { task, from, to } = args;
+      if (from === to || task.completed || cmpYmd(to, todayKey) < 0) return;
+      if (habitOnDay(task, to)) {
+        showHabitTaken(task, from, to);
+        return;
+      }
+
+      const slot = task.movedFrom ?? from;
+      const restoring = to === slot;
+      const fromBefore = tasksByDate[from];
+      const toBefore = tasksByDate[to];
+      let destList: Task[] | null = null;
+      let order: number | undefined;
+      if (toBefore) {
+        const dest = (sortedTasksByDate[to] ?? toBefore).filter(
+          (t) => t.id !== task.id,
+        );
+        const firstDone = dest.findIndex((t) => t.completed);
+        const fallback = firstDone === -1 ? dest.length : firstDone;
+        const at = Math.max(0, Math.min(args.atIndex ?? fallback, dest.length));
+        dest.splice(at, 0, { ...task, movedFrom: restoring ? undefined : slot });
+        destList = dest;
+        order = at + 1;
+      }
+      const placed = destList;
+      setTasksByDate((prev) => ({
+        ...prev,
+        [from]: (prev[from] ?? []).filter((t) => t.id !== task.id),
+        ...(placed ? { [to]: placed } : {}),
+      }));
+      const fromIndex = (fromBefore ?? []).findIndex((t) => t.id === task.id);
+      const revert = () =>
+        setTasksByDate((prev) => {
+          const next = { ...prev };
+          if (prev[to]) next[to] = prev[to].filter((t) => t.id !== task.id);
+          if (prev[from]) {
+            const src = prev[from].filter((t) => t.id !== task.id);
+            src.splice(Math.max(0, Math.min(fromIndex, src.length)), 0, task);
+            next[from] = src;
+          }
+          return next;
+        });
+
+      const commit = async (scope: RepeatMoveScope, plannedTitle?: string) => {
+        const res = await sendOccurrenceMove(task.id, from, to, scope, order);
+        if (!res.ok) {
+          revert();
+          window.dispatchEvent(new Event('board-refresh'));
+          if (res.error === 'occupied') showHabitTaken(task, from, to);
+          else if (res.error === 'completed')
+            showNotification('Finished repeats stay on their day');
+          else showNotification('Couldn’t move that repeat. Try again.');
+          return;
+        }
+        const latest = latestColumnsRef.current[to];
+        if (placed && latest?.some((t) => t.id === task.id)) {
+          const persisted =
+            res.taskId !== task.id
+              ? latest.map((t) =>
+                  t.id === task.id ? { ...t, id: res.taskId } : t,
+                )
+              : latest;
+          await saveDate(to, persisted).catch(() => {});
+        } else if (placed) {
+          window.dispatchEvent(new Event('board-refresh'));
+        }
+        if (scope === 'future') {
+          window.dispatchEvent(new Event('board-refresh'));
+          if (plannedTitle)
+            showNotification(
+              `“${task.text}” now repeats ${plannedTitle.charAt(0).toLowerCase()}${plannedTitle.slice(1)}`,
+            );
+          return;
+        }
+        if (task.movedFrom) return;
+        if (args.viaCalendar || !plannedTitle) {
+          const canUndo = cmpYmd(from, todayKey) >= 0;
+          showNotification(
+            args.viaCalendar
+              ? `Moved to ${relativeDayLabel(to)}`
+              : 'Moved just this one',
+            canUndo
+              ? async () => {
+                  await sendOccurrenceMove(task.id, to, from, 'one');
+                  window.dispatchEvent(new Event('board-refresh'));
+                }
+              : undefined,
+          );
+        }
+      };
+
+      if (restoring || task.movedFrom) {
+        void commit('one');
+        return;
+      }
+      const plan = buddyByTaskId[task.id]
+        ? null
+        : planRuleMove(task, from, to, todayKey, groupDaysOf(task));
+      if (!plan) {
+        void commit('one');
+        return;
+      }
+      const copy = describeRepeatMove(task, plan, from);
+      hapticTick();
+      setMovePrompt({
+        prompt: {
+          taskText: task.text,
+          from,
+          to,
+          oneDetail: copy.oneDetail,
+          futureTitle: copy.futureTitle ?? '',
+          futureDetail: copy.futureDetail ?? '',
+        },
+        choose: (scope) => {
+          setMovePrompt(null);
+          void commit(scope, copy.futureTitle);
+        },
+        cancel: () => {
+          setMovePrompt(null);
+          revert();
+        },
+      });
+    },
+    [
+      todayKey,
+      habitOnDay,
+      showHabitTaken,
+      tasksByDate,
+      sortedTasksByDate,
+      setTasksByDate,
+      sendOccurrenceMove,
+      saveDate,
+      showNotification,
+      buddyByTaskId,
+      groupDaysOf,
+    ],
+  );
+
   const [bulkTagsOpen, setBulkTagsOpen] = useState(false);
   const [bulkRepeatOpen, setBulkRepeatOpen] = useState(false);
   // Snapshotted when the sheet opens: a background refetch mid-edit would
@@ -1367,7 +1589,7 @@ export default function TaskBoard({
     ) => {
       const snapshot = (placement?.refs ?? selection.refs).slice();
       selection.exit();
-      await runBulk(
+      const json = await runBulk(
         {
           op: 'move',
           date: target,
@@ -1378,8 +1600,20 @@ export default function TaskBoard({
           fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
         })),
       );
+      const blocked = Number(json?.blockedRepeats ?? 0);
+      const finished = Number(json?.completedRepeats ?? 0);
+      if (blocked > 0) {
+        const day = relativeDayLabel(target);
+        showNotification(
+          blocked === 1
+            ? `Kept 1 repeating task in place. ${day.charAt(0).toUpperCase()}${day.slice(1)} already has it.`
+            : `Kept ${blocked} repeating tasks in place. ${day.charAt(0).toUpperCase()}${day.slice(1)} already has them.`,
+        );
+      } else if (finished > 0) {
+        showNotification('Finished repeats stay on their day');
+      }
     },
-    [selection, runBulk],
+    [selection, runBulk, showNotification],
   );
 
   const applyScoped = useCallback(
@@ -1553,16 +1787,38 @@ export default function TaskBoard({
           task,
         ]),
       );
+      const targetKey = toDay === BACKLOG_IDX ? null : windowDates[toDay];
       const movedTasks: Task[] = [];
+      const landedHabits: Task[] = [];
       for (const ref of orderedRefs) {
-        if (ref.isRepeating) continue;
         const task = taskFor.get(`${ref.dateKey}::${ref.taskId}`);
-        if (task) movedTasks.push(task);
+        if (!task) continue;
+        if (!ref.isRepeating) {
+          movedTasks.push(task);
+          continue;
+        }
+        if (!targetKey || ref.dateKey === targetKey) continue;
+        const blocked =
+          !!task.completed ||
+          habitOnDay(task, targetKey) ||
+          landedHabits.some(
+            (h) =>
+              h.id === task.id ||
+              (!!task.repeatGroupId && h.repeatGroupId === task.repeatGroupId),
+          );
+        if (blocked) {
+          picked.delete(`${ref.dateKey}::${ref.taskId}`);
+          continue;
+        }
+        const slot = task.movedFrom ?? ref.dateKey;
+        const landed = {
+          ...task,
+          movedFrom: slot === targetKey ? undefined : slot,
+        };
+        landedHabits.push(landed);
+        movedTasks.push(landed);
       }
 
-      // Optimistically empty the source columns so the drop reads as instant;
-      // repeating occurrences are left to the refetch, since the server mints a
-      // fresh one-off id for each and the client can't predict it.
       setTasksByDate((prev) => {
         const next: Record<string, Task[]> = {};
         let changed = false;
@@ -1572,7 +1828,6 @@ export default function TaskBoard({
           next[k] = filtered;
         }
         if (!changed) return prev;
-        const targetKey = toDay === BACKLOG_IDX ? null : windowDates[toDay];
         if (targetKey && movedTasks.length) {
           const dest = (next[targetKey] ?? []).slice();
           const at = Math.max(0, Math.min(toIndex, dest.length));
@@ -1594,15 +1849,22 @@ export default function TaskBoard({
             taskId: r.taskId,
             fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
           })),
-        ).then(() =>
+        ).then((json) => {
+          const skipped = Number(json?.skippedRepeats ?? 0);
+          const saved = count - skipped;
+          const plural = (n: number, one: string, many: string) =>
+            `${n} ${n === 1 ? one : many}`;
           showNotification(
-            `Saved ${count} ${count === 1 ? 'task' : 'tasks'} for later`,
-          ),
-        );
+            skipped === 0
+              ? `Saved ${plural(count, 'task', 'tasks')} for later`
+              : saved > 0
+                ? `Saved ${saved} for later · skipped ${plural(skipped, 'repeat', 'repeats')}`
+                : `Skipped ${plural(skipped, 'repeating task', 'repeating tasks')}`,
+          );
+        });
         return;
       }
 
-      const targetKey = windowDates[toDay];
       if (targetKey)
         void bulkMoveToDate(targetKey, {
           atIndex: Math.max(0, toIndex),
@@ -1624,6 +1886,7 @@ export default function TaskBoard({
       runBulk,
       showNotification,
       bulkMoveToDate,
+      habitOnDay,
     ],
   );
 
@@ -1647,7 +1910,20 @@ export default function TaskBoard({
     day < N &&
     cmpYmd(windowDates[day], todayKey) < 0;
 
-  const effectiveTargetDay = isPastDay(targetDay) ? null : targetDay;
+  const habitBlocksDay = (day: number | null) =>
+    day !== null &&
+    day >= 0 &&
+    day < N &&
+    !!drag &&
+    day !== drag.fromDay &&
+    (drag.bundleCount ?? 1) <= 1 &&
+    !!draggingTask &&
+    draggingTask.type === 'weekly' &&
+    drag.fromDay !== BACKLOG_IDX &&
+    habitOnDay(draggingTask, windowDates[day]);
+
+  const effectiveTargetDay =
+    isPastDay(targetDay) || habitBlocksDay(targetDay) ? null : targetDay;
 
   // Clamp Target Index Logic (unchanged)
   let clampedTargetIndex = targetIndex;
@@ -1775,9 +2051,6 @@ export default function TaskBoard({
         const destList = colAt(toDay).slice();
         const destIndex = Math.min(toIndex, destList.length);
 
-        // Moving one occurrence of a repeating task to another day must not
-        // touch the series: detach it into a standalone one-off (fresh id) on
-        // the destination and suppress the source date on the rule.
         const isRepeatInstance =
           moved.type === 'weekly' &&
           drag.fromDay !== BACKLOG_IDX &&
@@ -1785,39 +2058,14 @@ export default function TaskBoard({
         const fromDate = windowDates[drag.fromDay];
         const toDate = windowDates[toDay];
 
-        if (isRepeatInstance && fromDate && toDate && onMoveRepeatInstance) {
-          const newId = randomUUID();
-          const instance: Task = {
-            ...moved,
-            id: newId,
-            type: 'regular',
-            repeatMode: 'none',
-            repeatGroupId: undefined,
-            repeatRule: undefined,
-            repeatDayOfMonth: undefined,
-            repeatStartDate: undefined,
-            repeatEndDate: undefined,
-            dayOfWeek: undefined,
-            completedDates: undefined,
-          };
-          destList.splice(destIndex, 0, instance);
-          setColAt(drag.fromDay, sourceList);
-          setColAt(toDay, destList);
-          (async () => {
-            try {
-              await onMoveRepeatInstance(
-                moved.id,
-                newId,
-                fromDate,
-                toDate,
-                destIndex + 1,
-              );
-              await saveCol(toDay, destList);
-              await saveCol(drag.fromDay, sourceList);
-            } catch (e) {
-              console.error('move repeat instance failed', e);
-            }
-          })();
+        if (isRepeatInstance) {
+          if (fromDate && toDate)
+            moveRepeatOccurrence({
+              task: moved,
+              from: fromDate,
+              to: toDate,
+              atIndex: destIndex,
+            });
           return;
         }
 
@@ -1839,7 +2087,7 @@ export default function TaskBoard({
       setColAt,
       saveCol,
       windowDates,
-      onMoveRepeatInstance,
+      moveRepeatOccurrence,
       commitBundleDrop,
     ],
   );
@@ -1885,6 +2133,23 @@ export default function TaskBoard({
       if (dayIdx === BACKLOG_IDX) return;
       const dk = windowDates[dayIdx];
       if (!dk) return;
+      if ((tasksByDate[dk] ?? []).some((t) => t.id === taskId && t.type === 'weekly')) {
+        await removeOnDate(dk, taskId);
+        showNotification(`Skipped ${relativeDayLabel(dk)}`, async () => {
+          await fetch('/api/tasks', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId,
+              date: dk,
+              unskip: true,
+              timezone: tz,
+            }),
+          });
+          window.dispatchEvent(new Event('board-refresh'));
+        });
+        return;
+      }
       let movedTask: Task | undefined;
       setTasksByDate((prev) => {
         const list = (prev[dk] ?? []).slice();
@@ -1907,6 +2172,10 @@ export default function TaskBoard({
     [
       BACKLOG_IDX,
       windowDates,
+      tasksByDate,
+      removeOnDate,
+      showNotification,
+      tz,
       setTasksByDate,
       saveDate,
       setBacklog,
@@ -2002,6 +2271,14 @@ export default function TaskBoard({
         endDrag();
         setIsDragOverBacklog(false);
         setTrayCloseProgress(0);
+        return;
+      }
+      if (toKey && habitBlocksDay(finalToDay) && draggingTask) {
+        const fromKey = windowDates[drag.fromDay];
+        endDrag();
+        setIsDragOverBacklog(false);
+        setTrayCloseProgress(0);
+        if (fromKey) showHabitTaken(draggingTask, fromKey, toKey);
         return;
       }
     }
@@ -2112,6 +2389,9 @@ export default function TaskBoard({
     endDrag,
     settleAndEnd,
     draggingRepeating,
+    draggingTask,
+    habitOnDay,
+    showHabitTaken,
     removeOnDate,
     selection,
     showNotification,
@@ -2858,7 +3138,21 @@ export default function TaskBoard({
           } else if (pendingMove?.mode === 'duplicate') {
             onDuplicateTaskToDate?.(pendingMove.taskId, d);
           } else if (pendingMove) {
-            onMoveTaskToDate?.(pendingMove.taskId, pendingMove.fromDateKey, d);
+            const occurrence = pendingMove.fromDateKey
+              ? (tasksByDate[pendingMove.fromDateKey] ?? []).find(
+                  (t) => t.id === pendingMove.taskId,
+                )
+              : undefined;
+            if (occurrence?.type === 'weekly') {
+              moveRepeatOccurrence({
+                task: occurrence,
+                from: pendingMove.fromDateKey,
+                to: d,
+                viaCalendar: true,
+              });
+            } else {
+              onMoveTaskToDate?.(pendingMove.taskId, pendingMove.fromDateKey, d);
+            }
           }
           setBulkDateMode(null);
           setPendingMove(null);
@@ -3237,6 +3531,12 @@ export default function TaskBoard({
           pendingBulkScope?.run(scope);
           setPendingBulkScope(null);
         }}
+      />
+
+      <MoveRepeatSheet
+        prompt={movePrompt?.prompt ?? null}
+        onChoose={(scope) => movePrompt?.choose(scope)}
+        onCancel={() => movePrompt?.cancel()}
       />
 
       {drag?.active && (

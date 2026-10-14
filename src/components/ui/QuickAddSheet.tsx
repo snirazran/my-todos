@@ -1546,7 +1546,7 @@ export default function QuickAddSheet({
                           onMouseUp={tagScroll.handlers.onMouseUp}
                           onMouseMove={tagScroll.handlers.onMouseMove}
                           onWheel={tagScroll.handlers.onWheel}
-                          className={`flex cursor-grab select-none items-center gap-2 overflow-x-auto overscroll-x-none no-scrollbar px-2 py-1 touch-pan-x active:cursor-grabbing ${
+                          className={`grid auto-cols-max grid-flow-col ${stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'} cursor-grab select-none items-center justify-start gap-2 overflow-x-auto overscroll-x-none no-scrollbar px-2 py-1 touch-pan-x active:cursor-grabbing ${
                             tagFadeRight ? 'mask-fade-right' : ''
                           }`}
                           style={{ overscrollBehaviorX: 'none' }}

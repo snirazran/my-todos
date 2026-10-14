@@ -22,7 +22,9 @@ import { neutralToAppRepeat, type NeutralToAppResult } from './recurrence';
 import { minutesToReminder } from './reminders';
 import {
   groupIntoUnits,
+  movedOccurrenceUnits,
   neutralRecurrenceToCreateBody,
+  parseMovedOccurrenceKey,
   taskUnitToNeutral,
   type TaskUnit,
 } from './taskMapping';
@@ -782,6 +784,12 @@ export async function runOutboundSweep(
     }
     eligible.push({ unit, neutral, fp: fingerprint(neutral) });
   }
+  const movedKeys = new Set<string>();
+  for (const { unit, neutral } of movedOccurrenceUnits(tasks, tz)) {
+    movedKeys.add(unit.key.taskId!);
+    if (neutral.startDate < todayYMD || neutral.startDate > windowEnd) continue;
+    eligible.push({ unit, neutral, fp: fingerprint(neutral) });
+  }
 
   for (const conn of conns) {
     const adapter = adapters[conn.provider];
@@ -840,10 +848,12 @@ export async function runOutboundSweep(
         if (link.recurrenceInstanceId) continue;
         const key = link.repeatGroupId ?? link.taskId;
         if (!key || liveKeys.has(key)) continue;
-        const stillExists = await TaskModel.exists({
-          userId,
-          ...linkKeyFilter(link),
-        });
+        const stillExists = parseMovedOccurrenceKey(link.taskId)
+          ? movedKeys.has(key)
+          : await TaskModel.exists({
+              userId,
+              ...linkKeyFilter(link),
+            });
         if (stillExists) continue; // ineligible but alive (e.g. became buddy task) — leave remote as-is
         await adapter.removeOrEnd(conn, link, todayYMD, tz);
         await CalendarEventLinkModel.deleteOne({ _id: link._id });

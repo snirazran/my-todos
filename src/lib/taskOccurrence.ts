@@ -148,14 +148,73 @@ export function normalizeRepeatRule(
   return rule;
 }
 
+export type MovedDate = NonNullable<TaskDoc['movedDates']>[number];
+
+/** Streak/Leap identity of a habit across its sibling and split docs. */
+export function habitGroupKey(
+  task: Pick<TaskDoc, 'id'> & {
+    repeatGroupId?: string | null;
+    habitKey?: string | null;
+  },
+) {
+  return task.habitKey || task.repeatGroupId || `solo:${task.id}`;
+}
+
+/** Mongo filter for every doc that carries the habit `key` (see habitGroupKey). */
+export function habitKeyFilter(key: string) {
+  return key.startsWith('solo:')
+    ? { $or: [{ id: key.slice(5) }, { habitKey: key }] }
+    : { $or: [{ repeatGroupId: key }, { habitKey: key }] };
+}
+
+function slotInSeries(
+  task: Pick<TaskDoc, 'repeatStartDate' | 'repeatEndDate'>,
+  slot: string,
+) {
+  if (task.repeatStartDate && slot < task.repeatStartDate) return false;
+  return !isAfterRepeatEnd(task, slot);
+}
+
+export function liveMoves(task: Pick<TaskDoc, 'movedDates'>): MovedDate[] {
+  return (task.movedDates ?? []).filter((m) => !m.skipped);
+}
+
+/** The single occurrence moved onto `date` from another day, if any. */
+export function movedInOn(
+  task: Pick<
+    TaskDoc,
+    'type' | 'movedDates' | 'repeatStartDate' | 'repeatEndDate'
+  >,
+  date: string,
+): MovedDate | undefined {
+  if (task.type !== 'weekly' || !task.movedDates?.length) return undefined;
+  return liveMoves(task).find((m) => m.to === date && slotInSeries(task, m.from));
+}
+
+/** The move that took this rule date's occurrence to another day, if any. */
+export function movedAwayFrom(
+  task: Pick<TaskDoc, 'type' | 'movedDates'>,
+  date: string,
+): MovedDate | undefined {
+  if (task.type !== 'weekly' || !task.movedDates?.length) return undefined;
+  return liveMoves(task).find((m) => m.from === date);
+}
+
 /**
  * Whether a task doc has a live occurrence on `date`: the repeat rule matches,
  * the date sits inside the repeat's start/end bounds, and the occurrence has
- * not been suppressed. The one answer every "what is on this day" surface
- * should ask — list, reminder cron, count.
+ * not been suppressed — or a single occurrence was moved onto it. The one
+ * answer every "what is on this day" surface should ask — list, reminder
+ * cron, count.
  */
 export function occursOnDate(task: TaskDoc, date: string, tz: string) {
+  if (movedInOn(task, date)) return true;
   if ((task.suppressedDates ?? []).includes(date)) return false;
+  return ruleOccursOn(task, date, tz);
+}
+
+/** Whether the repeat rule alone (within its bounds) lands on `date`. */
+export function ruleOccursOn(task: TaskDoc, date: string, tz: string) {
   if (isAfterRepeatEnd(task, date)) return false;
 
   const repeatStart = repeatStartForDoc(task, tz);
@@ -201,6 +260,7 @@ export function dayCandidateFilter(userId: string, date: string) {
       { type: 'weekly', dayOfWeek: dowFromYMD(date) },
       { type: 'weekly', repeatMode: 'monthly' },
       { type: 'weekly', repeatRule: { $exists: true } },
+      { type: 'weekly', 'movedDates.to': date },
       { type: 'regular', date },
     ],
   };

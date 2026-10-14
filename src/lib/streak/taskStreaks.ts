@@ -1,6 +1,10 @@
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import {
   addDaysYMD,
+  habitGroupKey,
+  liveMoves,
+  movedInOn,
+  occursOnDate,
   repeatStartForDoc,
   siblingOccursOn,
 } from '@/lib/taskOccurrence';
@@ -74,14 +78,22 @@ export function computeGroupStreak(
   const completed = new Set<string>();
   const late = new Set<string>();
   const suppressed = new Set<string>();
+  const movedAway = new Set<string>();
+  const starts = new Map<TaskDoc, string | undefined>();
   let earliestStart: string | undefined;
   for (const s of sibs) {
     for (const d of s.completedDates ?? []) completed.add(d);
     for (const d of s.lateCompletedDates ?? []) late.add(d);
     for (const d of s.suppressedDates ?? []) suppressed.add(d);
+    for (const m of liveMoves(s)) movedAway.add(m.from);
     const rs = repeatStartForDoc(s, tz);
+    starts.set(s, rs);
     if (rs && (!earliestStart || rs < earliestStart)) earliestStart = rs;
   }
+  const naturalOn = (s: TaskDoc, d: string) => {
+    const rs = starts.get(s);
+    return !(rs && d < rs) && siblingOccursOn(s, d);
+  };
   const slipWindow = options.freeSlipEveryDays ?? FREE_SLIP_EVERY_DAYS;
   let lastSlip: string | null = null;
   let streak = 0;
@@ -89,7 +101,11 @@ export function computeGroupStreak(
   let d = today;
   for (let guard = 0; guard < 2000; guard++) {
     if (earliestStart && d < earliestStart) break;
-    if (sibs.some((s) => siblingOccursOn(s, d))) {
+    const movedIn = sibs.some((s) => !!movedInOn(s, d));
+    if (
+      movedIn ||
+      (!movedAway.has(d) && sibs.some((s) => naturalOn(s, d)))
+    ) {
       if (completed.has(d) && !late.has(d)) {
         skipRun = 0;
         streak++;
@@ -97,7 +113,7 @@ export function computeGroupStreak(
         skipRun = 0;
       } else if (protectedDays?.has(d)) {
         skipRun = 0;
-      } else if (suppressed.has(d)) {
+      } else if (!movedIn && suppressed.has(d)) {
         skipRun++;
         if (skipRun > MAX_CONSECUTIVE_SKIPS) break;
       } else if (
@@ -125,7 +141,9 @@ const STREAK_SELECT = {
   completedDates: 1,
   lateCompletedDates: 1,
   suppressedDates: 1,
+  movedDates: 1,
   repeatGroupId: 1,
+  habitKey: 1,
   repeatRule: 1,
   repeatStartDate: 1,
   repeatEndDate: 1,
@@ -137,7 +155,7 @@ const STREAK_SELECT = {
 function groupSiblings(docs: TaskDoc[]) {
   const groups = new Map<string, TaskDoc[]>();
   for (const doc of docs) {
-    const key = doc.repeatGroupId || `solo:${doc.id}`;
+    const key = habitGroupKey(doc);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(doc);
   }
@@ -173,10 +191,8 @@ export async function findTaskStreaksAtRisk(args: {
   const atRisk: TaskStreakAtRisk[] = [];
 
   for (const sibs of Array.from(groupSiblings(docs).values())) {
-    if (!sibs.some((s) => siblingOccursOn(s, missedDayKey))) continue;
+    if (!sibs.some((s) => occursOnDate(s, missedDayKey, timezone))) continue;
     if (sibs.some((s) => (s.completedDates ?? []).includes(missedDayKey)))
-      continue;
-    if (sibs.some((s) => (s.suppressedDates ?? []).includes(missedDayKey)))
       continue;
 
     const count = computeGroupStreak(sibs, dayBefore, timezone, {

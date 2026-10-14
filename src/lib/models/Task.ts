@@ -15,6 +15,8 @@ export interface TaskDoc {
   completedAtByDate?: Record<string, Date | string>; // occurrence YYYY-MM-DD -> when the tick actually happened
   lateCompletedDates?: string[]; // subset of completedDates ticked after the streak-credit window closed
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
+  movedDates?: { from: string; to: string; skipped?: boolean }[]; // single occurrences moved to another day; `from` is also in suppressedDates
+  habitKey?: string; // shared streak/Leap identity when a schedule change split one habit into several docs
   orderOverrides?: Record<string, number>; // YYYY-MM-DD -> per-date order for repeating instances
   notes?: string; // free-text notes shown in the task detail card
   checklist?: { id: string; text: string; done: boolean; reward?: boolean }[]; // Trello-like sub-items
@@ -88,6 +90,18 @@ const TaskSchema = new Schema<TaskDoc>(
     completedAtByDate: { type: Schema.Types.Mixed, default: undefined },
     lateCompletedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
+    movedDates: {
+      type: [
+        {
+          _id: false,
+          from: { type: String, required: true },
+          to: { type: String, required: true },
+          skipped: { type: Boolean, default: undefined },
+        },
+      ],
+      default: undefined,
+    },
+    habitKey: { type: String, default: undefined },
     orderOverrides: { type: Schema.Types.Mixed, default: undefined },
     notes: { type: String },
     repeatMode: {
