@@ -25,6 +25,7 @@ import {
   normalizeChecklistRewards,
   type ChecklistItem,
 } from '@/lib/checklist';
+import { revealInScroller } from '@/lib/revealInScroller';
 
 export type { ChecklistItem };
 export { CHECKLIST_MAX_ITEMS };
@@ -329,12 +330,12 @@ export function ChecklistEditor({
       target === 'new' ? addRef.current : inputRefs.current.get(target);
     if (!el) return;
     pendingFocusRef.current = null;
-    el.focus();
+    el.focus({ preventScroll: true });
     const len = el.value.length;
     try {
       el.setSelectionRange(len, len);
     } catch {}
-    el.scrollIntoView({ block: 'nearest' });
+    revealInScroller(el);
   });
 
   const update = (
@@ -487,9 +488,9 @@ export function ChecklistEditor({
                 e.preventDefault();
                 if (!addFromDraft()) e.currentTarget.blur();
                 else
-                  requestAnimationFrame(() =>
-                    addRef.current?.scrollIntoView({ block: 'nearest' }),
-                  );
+                  requestAnimationFrame(() => {
+                    if (addRef.current) revealInScroller(addRef.current);
+                  });
               } else if (e.key === 'Escape') {
                 e.currentTarget.blur();
               }

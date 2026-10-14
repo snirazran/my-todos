@@ -2869,7 +2869,7 @@ export default function TaskList({
         <div className="w-full" data-hint="task-list">
         {header}
         <div
-          className={`-mx-1.5 -mt-0.5 space-y-0 overflow-y-visible px-1.5 pt-0.5 md:-mx-4 md:px-4 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`-mx-1.5 -mb-1 -mt-0.5 space-y-0 overflow-y-visible px-1.5 pb-1 pt-0.5 md:-mx-4 md:px-4 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (

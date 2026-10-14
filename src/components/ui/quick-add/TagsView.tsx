@@ -4,8 +4,18 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Lock, Minus, Pencil, Plus, Sparkles } from 'lucide-react';
-import { TAG_COLORS, TAG_MAX_LENGTH } from './constants';
+import { Lock, Pencil, Plus, Sparkles, Tag } from 'lucide-react';
+import { TAG_MAX_LENGTH } from './constants';
+import {
+  AreaOption,
+  FIELD_TILE,
+  KitSection,
+  PRIMARY_BUTTON,
+  Squircle,
+  SwatchGrid,
+  TagPillContent,
+  tagPillProps,
+} from './kit';
 import { fetcher } from './utils';
 import type { SavedTag } from './types';
 import type { TagManager } from './useTagManager';
@@ -261,36 +271,45 @@ export function TagsView({
     <div className="space-y-4">
       {savedTags.length > 0 && !showColorPicker && (
         <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[13px] font-extrabold tracking-wide text-muted-foreground">
-              Saved tags{' '}
-              <span className="font-bold text-muted-foreground/60">
-                {counterLabel}
-              </span>
+          <div className="mb-2 flex h-9 items-center gap-2">
+            <Squircle tint="violet" size="sm">
+              <Tag className="h-3.5 w-3.5" strokeWidth={2.75} />
+            </Squircle>
+            <span className="text-[14px] font-black text-foreground">Your tags</span>
+            <span className="text-[12px] font-bold tabular-nums text-muted-foreground">
+              {counterLabel}
             </span>
             <button
               type="button"
               onClick={() => setManageTagsMode(!manageTagsMode)}
-              className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-black tracking-wide transition-colors ${
- manageTagsMode
- ? 'bg-primary/10 text-primary'
- : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
- }`}
+              aria-pressed={manageTagsMode}
+              className={`ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-black transition-colors ${
+                manageTagsMode
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+              }`}
             >
               <Pencil className="h-3 w-3" strokeWidth={2.75} />
               {manageTagsMode ? 'Done' : 'Edit'}
             </button>
           </div>
 
-          <div className="flex max-h-[46vh] flex-wrap content-start items-start gap-2.5 overflow-y-auto px-1 py-1.5">
+          <div className="flex max-h-[46vh] flex-wrap content-start items-start gap-2 overflow-y-auto py-0.5">
             {unlockedTags.map((st) => {
-              const isSelected = selectedTagIds.includes(st.id);
+              const isSelected = selectedTagIds.includes(st.id) && !manageTagsMode;
+              const isPartial = isSelected && !!partialTagIds?.has(st.id);
+              const pill = tagPillProps({
+                color: st.color,
+                selected: isSelected && !isPartial,
+                partial: isPartial,
+              });
               return (
                 <button
                   key={st.id}
                   type="button"
                   data-hint="tags-popup-tag"
                   data-tag-id={st.id}
+                  aria-pressed={isSelected}
                   onPointerDown={(e) => startLongPress(st, e)}
                   onPointerMove={moveLongPress}
                   onPointerUp={cancelLongPress}
@@ -302,7 +321,6 @@ export function TagsView({
                     setManagedTag(st);
                   }}
                   onClick={() => {
-                    // Swallow the click that follows a long-press.
                     if (lpFired.current) {
                       lpFired.current = false;
                       return;
@@ -313,91 +331,80 @@ export function TagsView({
                     }
                     handleToggle(st);
                   }}
-                  className={`relative inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
- isSelected && !manageTagsMode
- ? 'ring-2 ring-offset-1 ring-offset-background'
- : ''
- }`}
-                  style={{
-                    backgroundColor: `${st.color}20`,
-                    color: st.color,
-                    borderColor: `${st.color}40`,
-                    ...(isSelected && !manageTagsMode
-                      ? ({ ['--tw-ring-color' as never]: st.color } as object)
-                      : {}),
-                  }}
+                  className={pill.className}
+                  style={pill.style}
                 >
-                  {isSelected &&
-                    !manageTagsMode &&
-                    (partialTagIds?.has(st.id) ? (
-                      <Minus
-                        className="h-3.5 w-3.5 shrink-0"
-                        strokeWidth={3.5}
-                      />
-                    ) : (
-                      <Check
-                        className="h-3.5 w-3.5 shrink-0"
-                        strokeWidth={3.5}
-                      />
-                    ))}
-                  <span className="truncate">{st.name}</span>
-                  {manageTagsMode && (
-                    <Pencil
-                      className="h-3 w-3 shrink-0 opacity-70"
-                      strokeWidth={2.75}
-                    />
-                  )}
+                  <TagPillContent
+                    name={st.name}
+                    color={st.color}
+                    selected={isSelected && !isPartial}
+                    partial={isPartial}
+                    maxWidth="max-w-[200px]"
+                    trailing={
+                      manageTagsMode ? (
+                        <Pencil className="h-3 w-3 shrink-0 opacity-60" strokeWidth={2.75} />
+                      ) : undefined
+                    }
+                  />
                 </button>
               );
             })}
           </div>
 
           {lockedTags.length > 0 && (
-            <div className="mt-2">
-              <div className="mb-1.5 flex items-center gap-1.5 px-1">
-                <Lock
-                  className="h-3 w-3 text-muted-foreground/60"
-                  strokeWidth={2.75}
-                />
-                <span className="text-[12px] font-extrabold tracking-wide text-muted-foreground/60">
-                  Locked · unlock with
-                </span>
-                <span className="inline-flex items-center gap-0.5 text-[12px] font-extrabold tracking-wide text-amber-600 dark:text-amber-400">
-                  <Icon name="frogPlus" className="h-7 w-7 shrink-0" />
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={onPremiumLimit}
+                className="mb-2 inline-flex items-center gap-1.5 rounded-full text-[12.5px] font-black text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
+              >
+                <Lock className="h-3 w-3" strokeWidth={2.75} />
+                Unlock with
+                <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+                  <Icon name="frogPlus" className="-my-1.5 h-7 w-7 shrink-0" />
                   Plus
                 </span>
-              </div>
-              <div className="flex flex-wrap gap-2 px-1">
-                {lockedTags.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => handleToggle(st)}
-                    className="inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border border-dashed border-border bg-muted px-3.5 py-2 text-[13px] font-black text-muted-foreground/70 transition-all active:scale-95"
-                  >
-                    <span className="truncate">{st.name}</span>
-                    <Lock className="h-3 w-3 shrink-0" />
-                  </button>
-                ))}
+              </button>
+              <div className="flex flex-wrap gap-2">
+                {lockedTags.map((st) => {
+                  const pill = tagPillProps({ color: st.color, locked: true });
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => handleToggle(st)}
+                      className={pill.className}
+                      style={pill.style}
+                    >
+                      <TagPillContent name={st.name} color={st.color} locked />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {showSuggestion && (
-        <button
-          type="button"
-          onClick={handleQuickCreate}
-          disabled={isCreatingTag}
-          className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-[13px] font-extrabold text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/10 active:scale-95 disabled:opacity-50"
-        >
-          <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
-          <span className="truncate">
-            {isCreatingTag ? 'Creating...' : `Create “${trimmedSuggestion}” tag`}
-          </span>
-        </button>
-      )}
+      {showSuggestion && (() => {
+        const pill = tagPillProps({ color: '#447d3f', suggest: true });
+        return (
+          <button
+            type="button"
+            onClick={handleQuickCreate}
+            disabled={isCreatingTag}
+            className={`${pill.className} disabled:opacity-50`}
+            style={pill.style}
+          >
+            <TagPillContent
+              name={isCreatingTag ? 'Creating…' : `Create “${trimmedSuggestion}”`}
+              color="#447d3f"
+              suggest
+              maxWidth="max-w-[240px]"
+            />
+          </button>
+        );
+      })()}
 
       <AnimatePresence>
         {showColorPicker && (
@@ -407,108 +414,59 @@ export function TagsView({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="rounded-2xl border border-border bg-muted/20 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-[13px] font-extrabold tracking-wide text-muted-foreground">
-                  New tag
-                </span>
-                <span
-                  className="inline-flex max-w-[180px] items-center justify-center rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm"
-                  style={{
-                    backgroundColor: `${newTagColor}20`,
-                    borderColor: `${newTagColor}40`,
-                    color: newTagColor,
-                  }}
-                >
-                  <span className="truncate">{tagInput.trim() || 'Preview'}</span>
-                </span>
-              </div>
-              <div className="mb-3 text-[13px] font-extrabold tracking-wide text-muted-foreground">
-                Pick a color
-              </div>
-              <div className="flex flex-wrap gap-2.5">
-                {TAG_COLORS.map((c) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onClick={() => setNewTagColor(c.value)}
-                    className={`h-9 w-9 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-background transition-transform active:scale-95 ${
-                      newTagColor === c.value
-                        ? 'scale-110 ring-primary'
-                        : 'ring-transparent'
-                    }`}
-                    title={c.name}
-                  />
-                ))}
-              </div>
+            <KitSection
+              tint="violet"
+              icon={<Plus className="h-3.5 w-3.5" strokeWidth={3} />}
+              title="New tag"
+              aside={(() => {
+                const pill = tagPillProps({ color: newTagColor, selected: true, size: 'sm' });
+                return (
+                  <span className={pill.className} style={pill.style}>
+                    <TagPillContent
+                      name={tagInput.trim() || 'Preview'}
+                      color={newTagColor}
+                      selected
+                      maxWidth="max-w-[150px]"
+                    />
+                  </span>
+                );
+              })()}
+            >
+              <SwatchGrid value={newTagColor} onChange={setNewTagColor} />
 
               {showFocusConnect && focusAreas.length > 0 && (
-                <div className="mt-4 border-t border-border/60 pt-3.5">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[13px] font-extrabold tracking-wide text-muted-foreground">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Connect to focus area
-                    </span>
-                    <span className="text-[12px] font-bold tracking-wide text-muted-foreground/60">
+                <div className="px-1 pb-1 pt-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-[13px] font-black text-foreground">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
+                    Count toward a focus area
+                    <span className="ml-auto text-[12px] font-bold text-muted-foreground">
                       Optional
                     </span>
                   </div>
-                  <p className="mb-2.5 text-[12px] font-medium leading-snug text-muted-foreground">
-                    Tasks with this tag will count toward that area&rsquo;s
-                    quest.
+                  <p className="mb-2.5 text-[12px] font-semibold leading-snug text-muted-foreground">
+                    Tasks with this tag will count toward that area&rsquo;s quest.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {focusAreas.map((area) => {
                       const isPicked = newTagAreaId === area.id;
-                      const isActiveFocus =
-                        !isPremium && activeFocusCategoryId === area.id;
-                      const accent = area.accent || '#22c55e';
                       const occupied =
                         !isPremium &&
-                        (categoryTagMap.find(
-                          (entry) => entry.categoryId === area.id,
-                        )?.tagIds.length ?? 0) > 0;
+                        (categoryTagMap.find((entry) => entry.categoryId === area.id)
+                          ?.tagIds.length ?? 0) > 0;
                       return (
-                        <button
+                        <AreaOption
                           key={area.id}
-                          type="button"
-                          onClick={() =>
-                            setNewTagAreaId(isPicked ? null : area.id)
+                          label={area.name}
+                          accent={area.accent}
+                          picked={isPicked}
+                          locked={occupied}
+                          badge={
+                            !isPremium && activeFocusCategoryId === area.id
+                              ? 'ACTIVE'
+                              : undefined
                           }
-                          className={`inline-flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-[13px] font-black transition-all active:scale-95 ${
- isPicked
- ? 'ring-2 ring-offset-1 ring-offset-background'
- : ''
- }`}
-                          style={{
-                            backgroundColor: `${accent}${isPicked ? '2b' : '14'}`,
-                            borderColor: `${accent}40`,
-                            color: accent,
-                            ...(isPicked
-                              ? ({
-                                  ['--tw-ring-color' as never]: accent,
-                                } as object)
-                              : {}),
-                          }}
-                        >
-                          {isPicked ? (
-                            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
-                          ) : occupied ? (
-                            <Lock
-                              className="h-3 w-3 opacity-70"
-                              strokeWidth={2.75}
-                            />
-                          ) : null}
-                          <span className="truncate">{area.name}</span>
-                          {isActiveFocus && (
-                            <span
-                              className="rounded-md px-1.5 py-0.5 text-[8px] font-black tracking-[0.14em] text-white"
-                              style={{ backgroundColor: accent }}
-                            >
-                              ACTIVE
-                            </span>
-                          )}
-                        </button>
+                          onClick={() => setNewTagAreaId(isPicked ? null : area.id)}
+                        />
                       );
                     })}
                   </div>
@@ -516,7 +474,7 @@ export function TagsView({
                     <button
                       type="button"
                       onClick={onPremiumLimit}
-                      className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-amber-400/10 px-3 py-2 text-left text-[11px] font-bold leading-snug text-amber-700 transition-colors hover:bg-amber-400/20 dark:text-amber-300"
+                      className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-amber-400/10 px-3 py-2 text-left text-[11.5px] font-bold leading-snug text-amber-700 transition-colors hover:bg-amber-400/20 dark:text-amber-300"
                     >
                       <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
                       <span>
@@ -533,59 +491,51 @@ export function TagsView({
                   )}
                 </div>
               )}
-            </div>
+            </KitSection>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Add a tag — kept near the bottom (above Done) so it's within thumb
-          reach on mobile, instead of being the top-most element. */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Icon name="filter" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" />
-          <input
-            ref={tagInputRef}
-            value={tagInput}
-            onChange={(e) => {
-              const value = e.target.value;
-              setTagInput(value);
-              // As soon as the text is a brand-new tag (no saved tag matches
-              // it), open the colour picker so the bottom button becomes
-              // "Create". Close it again while empty or while it matches.
-              const trimmed = value.trim().toLowerCase();
-              const matchesExisting = savedTags.some((st) =>
-                st.name.toLowerCase().includes(trimmed),
-              );
-              setShowColorPicker(!!trimmed && !matchesExisting);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitTagInput();
-              }
-            }}
-            maxLength={TAG_MAX_LENGTH}
-            placeholder={placeholder}
-            className="h-12 w-full rounded-2xl border border-border bg-background pl-9 pr-3 text-base font-bold text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
+      <div className={`flex h-14 items-center gap-2 pl-2 pr-1.5 ${FIELD_TILE}`}>
+        <Squircle tint="violet" size="lg">
+          <Tag className="h-4 w-4" strokeWidth={2.5} />
+        </Squircle>
+        <input
+          ref={tagInputRef}
+          value={tagInput}
+          onChange={(e) => {
+            const value = e.target.value;
+            setTagInput(value);
+            const trimmed = value.trim().toLowerCase();
+            const matchesExisting = savedTags.some((st) =>
+              st.name.toLowerCase().includes(trimmed),
+            );
+            setShowColorPicker(!!trimmed && !matchesExisting);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submitTagInput();
+            }
+          }}
+          maxLength={TAG_MAX_LENGTH}
+          placeholder={placeholder}
+          className="h-full min-w-0 flex-1 bg-transparent text-[16px] font-bold text-foreground outline-none placeholder:text-muted-foreground/70"
+        />
         <button
           type="button"
           onClick={submitTagInput}
           disabled={!tagInput}
-          aria-label={showColorPicker ? 'Pick color' : 'Add tag'}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-all hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
+          aria-label={showColorPicker ? 'Create tag' : 'Add tag'}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#447d3f] text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-[2px] active:shadow-none disabled:bg-muted disabled:text-muted-foreground/50 disabled:shadow-none"
         >
-          <Plus className="h-5 w-5 stroke-[3]" />
+          <Plus className="h-5 w-5" strokeWidth={3} />
         </button>
       </div>
 
       <button
         type="button"
         onClick={async () => {
-          // Writing a brand-new tag → the button creates + selects it (with the
-          // chosen colour, connected to the picked focus area) and stays open
-          // so the user can keep going / press Done.
           if (isCreatingNewTag) {
             await handleCreate();
           } else {
@@ -593,10 +543,10 @@ export function TagsView({
           }
         }}
         disabled={isCreatingTag}
-        className="h-12 w-full rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985] disabled:opacity-50"
+        className={PRIMARY_BUTTON}
       >
         {isCreatingTag
-          ? 'Saving...'
+          ? 'Saving…'
           : isCreatingNewTag
             ? `Create “${tagInput.trim()}”`
             : `${doneLabel}${

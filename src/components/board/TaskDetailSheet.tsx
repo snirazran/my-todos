@@ -36,6 +36,7 @@ import { BuddyTaskInvite } from '@/components/ui/buddy/BuddyTaskInvite';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
+import { revealInScroller } from '@/lib/revealInScroller';
 import { ChecklistEditor, checklistRewardHint } from './ChecklistEditor';
 import { normalizeChecklistRewards } from '@/lib/checklist';
 import {
@@ -195,6 +196,18 @@ export default function TaskDetailSheet({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!keyboardActive) return;
+    const timer = window.setTimeout(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && el.closest('[data-task-detail]') && isEditableTarget(el)) {
+        revealInScroller(el);
+      }
+    }, 80);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyboardActive, kbInset, vvHeight]);
 
   const nestedOpenRef = useRef(false);
   const escapeRef = useRef<() => void>(() => {});
@@ -366,6 +379,7 @@ export default function TaskDetailSheet({
             role="dialog"
             aria-modal="true"
             aria-label={displayTask.text}
+            data-task-detail
             onFocusCapture={handleFocusCapture}
             onBlurCapture={handleBlurCapture}
             className={`flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 sm:px-1.5 ${

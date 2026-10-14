@@ -17,6 +17,7 @@ import {
   motion,
   useDragControls,
   useMotionValue,
+  useReducedMotion,
 } from 'framer-motion';
 import {
   ArrowUp,
@@ -41,6 +42,8 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 import Fly from '@/components/ui/fly';
+import { LilyInk } from '@/components/ui/TaskAdornments';
+import { useLeapView } from '@/components/leap/useLeapView';
 import { useIntros } from '@/hooks/useIntros';
 import { useUIStore } from '@/lib/uiStore';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
@@ -51,7 +54,20 @@ import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { QuickAddTip } from './quick-add/QuickAddTip';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
-import { SuggestionTabs } from './quick-add/SuggestionTabs';
+import {
+  SAVED_TASKS_KEY,
+  SuggestionTabs,
+  type SuggestionPick,
+} from './quick-add/SuggestionTabs';
+import { SavedTasksSheet } from './quick-add/SavedTasksSheet';
+import { Icon as AppIcon } from '@/components/ui/Icon';
+import { useDragScroll } from './quick-add/useDragScroll';
+import {
+  TINT,
+  TagPillContent,
+  tagPillProps,
+  type Tint,
+} from './quick-add/kit';
 import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
 import { useKeyboardInset } from './quick-add/useKeyboardInset';
@@ -64,60 +80,9 @@ import {
   stripNaturalTokens,
   repeatModeFor,
   ymdLocal,
+  fetcher,
   type RepeatRule,
 } from './quick-add/utils';
-
-// Click-and-drag horizontal scrolling — mirrors the shop/wardrobe FilterBar.
-// Touch scrolls natively via `touch-pan-x`; this adds desktop drag, and `guard`
-// swallows the click that ends a drag so a chip doesn't toggle on release.
-function useDragScroll() {
-  const ref = useRef<HTMLDivElement>(null);
-  const isDown = useRef(false);
-  const startX = useRef(0);
-  const startScroll = useRef(0);
-  const dragging = useRef(false);
-
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    const el = ref.current;
-    if (!el) return;
-    isDown.current = true;
-    dragging.current = false;
-    startX.current = e.pageX - el.offsetLeft;
-    startScroll.current = el.scrollLeft;
-  }, []);
-  const onMouseLeave = useCallback(() => {
-    isDown.current = false;
-  }, []);
-  const onMouseUp = useCallback(() => {
-    isDown.current = false;
-    setTimeout(() => {
-      dragging.current = false;
-    }, 0);
-  }, []);
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    const el = ref.current;
-    if (!isDown.current || !el) return;
-    e.preventDefault();
-    const walk = e.pageX - el.offsetLeft - startX.current;
-    if (Math.abs(walk) > 5) {
-      dragging.current = true;
-      el.scrollLeft = startScroll.current - walk;
-    }
-  }, []);
-  const guard = useCallback(
-    (fn: () => void) => () => {
-      if (dragging.current) return;
-      fn();
-    },
-    [],
-  );
-
-  return {
-    ref,
-    handlers: { onMouseDown, onMouseLeave, onMouseUp, onMouseMove },
-    guard,
-  };
-}
 
 // Horizontal rails here scroll but must not show a scrollbar, so the only cue
 // that more is off-screen is a soft fade on the trailing edge.
@@ -152,9 +117,10 @@ const ToolbarChip = React.forwardRef<
     ariaLabel?: string;
     active?: boolean;
     hint?: string;
+    tint: Tint;
     onClick: () => void;
   }
->(function ToolbarChip({ icon, label, ariaLabel, active = false, hint, onClick }, ref) {
+>(function ToolbarChip({ icon, label, ariaLabel, active = false, hint, tint, onClick }, ref) {
   const settled = useRef(false);
   useEffect(() => {
     settled.current = true;
@@ -166,13 +132,13 @@ const ToolbarChip = React.forwardRef<
       aria-label={ariaLabel ?? label}
       data-hint={hint}
       onClick={onClick}
-      className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
-        active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground ring-1 ring-inset ring-border/80 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+      className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-muted/50 pl-1 pr-3.5 text-[14px] font-bold transition-[transform,background-color] active:scale-95 active:bg-muted sm:h-10 sm:pr-3 sm:text-[13.5px] [@media(hover:hover)]:hover:bg-muted ${
+        active ? 'text-foreground' : 'text-muted-foreground'
       }`}
     >
-      {icon}
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-8 sm:w-8 ${TINT[tint]}`}>
+        {icon}
+      </span>
       <motion.span
         key={label}
         initial={settled.current ? { opacity: 0, y: 5 } : false}
@@ -262,6 +228,7 @@ export default function QuickAddSheet({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const tagScroll = useDragScroll();
+  const actionsScroll = useDragScroll();
   const [tagFadeRight, setTagFadeRight] = useState(false);
   const updateTagFade = useCallback(() => {
     const el = tagScroll.ref.current;
@@ -638,6 +605,52 @@ export default function QuickAddSheet({
     isLater || anchorDisplayDay === 7 ? todayIndex : anchorDisplayDay
   ) as DisplayDay;
   const repeatsOn = repeat !== 'this-week';
+  const { data: leapView } = useLeapView(open);
+  const reduceMotion = useReducedMotion();
+  const leapLily = repeatsOn && !!leapView?.enabled;
+  const [savedOpen, setSavedOpen] = useState(false);
+  const { data: savedBacklog } = useSWR<unknown>(open ? SAVED_TASKS_KEY : null, fetcher);
+  const savedCount = Array.isArray(savedBacklog) ? savedBacklog.length : 0;
+  const applySavedPick = (pick: SuggestionPick) => {
+    setText(pick.text);
+    setTags((prev) => {
+      const removed = new Set(autoAddedTagIds);
+      const seen = new Set<string>();
+      const next: string[] = [];
+      for (const id of prev) {
+        if (removed.has(id)) continue;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        next.push(id);
+      }
+      for (const id of pick.tagIds) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        next.push(id);
+      }
+      return next;
+    });
+    setAutoAddedTagIds(pick.tagIds);
+    pickSetTimeRef.current = pick.startTime !== undefined;
+    if (pick.startTime !== undefined) {
+      setStartTime(pick.startTime);
+      setEndTime(pick.endTime ?? '');
+      setNotifyEnabled(!!pick.reminder);
+      if (pick.reminder) setReminder(pick.reminder);
+    }
+    if (pick.backlogTaskId) {
+      setPickedBacklogTaskId(pick.backlogTaskId);
+      setPickedBacklogText(pick.text);
+      setPickedNotes(pick.notes);
+      setPickedChecklist(pick.checklist);
+    } else {
+      setPickedBacklogTaskId(null);
+      setPickedBacklogText(null);
+      setPickedNotes(undefined);
+      setPickedChecklist(undefined);
+    }
+    inputRef.current?.focus();
+  };
   const hasTaskText = text.trim().length > 0;
   const keyboardActive = inputFocused && keyboardInset > 0;
   const availableSheetHeight = Math.max(
@@ -1379,17 +1392,17 @@ export default function QuickAddSheet({
                                         : [...prev, suggestedTag.id],
                                     ),
                                   )}
-                                  className="relative inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-dashed px-2.5 text-[13px] font-black transition-transform active:scale-95 [@media(hover:hover)]:hover:opacity-75"
-                                  style={{
-                                    backgroundColor: `${suggestedTag.color}12`,
+                                  {...tagPillProps({
                                     color: suggestedTag.color,
-                                    borderColor: `${suggestedTag.color}55`,
-                                  }}
+                                    suggest: true,
+                                    size: 'sm',
+                                  })}
                                 >
-                                  <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
-                                  <span className="max-w-[128px] truncate">
-                                    {suggestedTag.name}
-                                  </span>
+                                  <TagPillContent
+                                    name={suggestedTag.name}
+                                    color={suggestedTag.color}
+                                    suggest
+                                  />
                                 </button>
                               ))}
                               <button
@@ -1405,7 +1418,116 @@ export default function QuickAddSheet({
                         </div>
                       )}
 
-                      <div className="mt-1.5 mb-3 h-px bg-border/60" />
+                      <div className="h-3" />
+
+                      {/* One row that scrolls. Every control keeps its word —
+                          a bare icon in here reads as a puzzle to anyone who
+                          has not already learnt it. */}
+                      <div
+                        ref={(el) => {
+                          (actionsFade.ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+                          (actionsScroll.ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+                        }}
+                        onScroll={actionsFade.update}
+                        {...actionsScroll.handlers}
+                        className={`-mx-1 flex cursor-grab select-none items-center gap-2 overflow-x-auto overscroll-x-none no-scrollbar px-1 pb-0.5 touch-pan-x active:cursor-grabbing ${
+                          actionsFade.faded ? 'mask-fade-right' : ''
+                        }`}
+                      >
+                        {!hideDayPicker && (
+                          <ToolbarChip
+                            tint="sky"
+                            icon={<CalendarDays className="h-4 w-4" strokeWidth={2.5} />}
+                            label={selectedDateLabel}
+                            ariaLabel={`When: ${selectedDateLabel}`}
+                            active
+                            onClick={() => setActivePicker('date')}
+                          />
+                        )}
+                        {!hideRepeatPicker && (
+                          <ToolbarChip
+                            tint="green"
+                            icon={
+                              leapLily && leapView ? (
+                                <motion.span
+                                  key="leap-lily"
+                                  className="-my-1 inline-flex"
+                                  initial={reduceMotion ? false : { scale: 0.4, rotate: -14 }}
+                                  animate={{ scale: 1, rotate: 0 }}
+                                  transition={{ type: 'spring', stiffness: 520, damping: 18 }}
+                                >
+                                  <LilyInk index={leapView.league} ink={16} />
+                                </motion.span>
+                              ) : (
+                                <Repeat className="h-4 w-4" strokeWidth={2.5} />
+                              )
+                            }
+                            label={repeatsOn ? repeatShortLabel : 'Repeat'}
+                            ariaLabel={
+                              repeatsOn
+                                ? `Repeats ${repeatShortLabel}${leapLily ? ', counts toward your weekly league' : ''}`
+                                : 'Repeat'
+                            }
+                            active={repeatsOn}
+                            hint="quickadd-repeat"
+                            onClick={() => setActivePicker('repeat')}
+                          />
+                        )}
+                        <ToolbarChip
+                          tint="amber"
+                          icon={<Bell className="h-4 w-4" strokeWidth={2.5} />}
+                          label={
+                            effectiveNotify && effectiveStartTime
+                              ? effectiveStartTime
+                              : 'Reminder'
+                          }
+                          ariaLabel={
+                            effectiveNotify && effectiveStartTime
+                              ? `Reminder at ${effectiveStartTime}`
+                              : 'Set a reminder'
+                          }
+                          active={effectiveNotify}
+                          onClick={openReminderPicker}
+                        />
+                        {savedCount > 0 && (
+                          <ToolbarChip
+                            tint="green"
+                            icon={<AppIcon name="saved" className="h-[18px] w-[18px]" />}
+                            label={`${savedCount} saved`}
+                            ariaLabel={`Pick from ${savedCount} saved tasks`}
+                            active={!!pickedBacklogTaskId}
+                            onClick={() => setSavedOpen(true)}
+                          />
+                        )}
+                        {sections.length > 0 && !isLater && (
+                          <ToolbarChip
+                            ref={sectionBtnRef}
+                            tint="teal"
+                            icon={<Rows3 className="h-4 w-4" strokeWidth={2.5} />}
+                            label={pickedSection?.name ?? 'Section'}
+                            active={!!pickedSection}
+                            onClick={toggleSectionPicker}
+                          />
+                        )}
+                        {stripTags.length === 0 && (
+                          <ToolbarChip
+                            tint="violet"
+                            icon={<Tag className="h-4 w-4" strokeWidth={2.5} />}
+                            label="Tag"
+                            ariaLabel="Add a tag"
+                            onClick={() => setActivePicker('tags')}
+                          />
+                        )}
+                        {!isDesktop && (
+                          <ToolbarChip
+                            tint="neutral"
+                            icon={<ListPlus className="h-4 w-4" strokeWidth={2.5} />}
+                            label="Multiple"
+                            ariaLabel="Add multiple tasks"
+                            onClick={() => openBulkAdd([])}
+                          />
+                        )}
+                      </div>
 
                       {/* No rail until tags exist: a dashed "Create tag" button
                           was the loudest thing on an empty sheet, asking for
@@ -1413,9 +1535,7 @@ export default function QuickAddSheet({
                           is the way in until then. */}
                       {stripTags.length > 0 && (
                       <div
-                        className={`relative -mx-2 ${
-                          keyboardActive ? 'mb-2' : 'mb-3'
-                        }`}
+                        className="relative -mx-2 mt-1.5"
                       >
                         <div
                           ref={tagScroll.ref}
@@ -1425,20 +1545,11 @@ export default function QuickAddSheet({
                           onMouseLeave={tagScroll.handlers.onMouseLeave}
                           onMouseUp={tagScroll.handlers.onMouseUp}
                           onMouseMove={tagScroll.handlers.onMouseMove}
-                          className={
-                            isDesktop
-                              ? 'flex flex-wrap items-center gap-2 px-2 py-1.5'
-                              : `grid auto-cols-max grid-flow-col ${
-                                  stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
-                                } gap-y-2.5 cursor-grab select-none items-center gap-x-2 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
-                                  tagFadeRight ? 'mask-fade-right' : ''
-                                }`
-                          }
-                          style={{
-                            overscrollBehaviorX: 'none',
-                            rowGap: 10,
-                            columnGap: 8,
-                          }}
+                          onWheel={tagScroll.handlers.onWheel}
+                          className={`flex cursor-grab select-none items-center gap-2 overflow-x-auto overscroll-x-none no-scrollbar px-2 py-1 touch-pan-x active:cursor-grabbing ${
+                            tagFadeRight ? 'mask-fade-right' : ''
+                          }`}
+                          style={{ overscrollBehaviorX: 'none' }}
                         >
                         {stripTags.map((tag) => {
                           const selected = tags.includes(tag.id);
@@ -1505,36 +1616,19 @@ export default function QuickAddSheet({
                                 tagManager.toggleTag(tag);
                               })}
                               aria-pressed={selected}
-                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-full border px-3.5 text-[13px] font-black transition-[transform,background-color,border-color,color] active:scale-95 ${
-                                tag.disabled
-                                  ? 'border-dashed border-border bg-muted text-muted-foreground/70'
-                                  : ''
-                              }`}
-                              style={
-                                tag.disabled
-                                  ? undefined
-                                  : selected
-                                    ? {
-                                        backgroundColor: tag.color,
-                                        color: '#fff',
-                                        borderColor: tag.color,
-                                      }
-                                    : {
-                                        backgroundColor: `${tag.color}14`,
-                                        color: tag.color,
-                                        borderColor: `${tag.color}40`,
-                                      }
-                              }
+                              {...tagPillProps({
+                                color: tag.color,
+                                selected: selected && !tag.disabled,
+                                locked: tag.disabled,
+                                size: isDesktop ? 'sm' : 'md',
+                              })}
                             >
-                              {selected && !tag.disabled && (
-                                <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
-                              )}
-                              <span className="max-w-[128px] truncate">
-                                {tag.name}
-                              </span>
-                              {tag.disabled && (
-                                <Lock className="h-3 w-3 shrink-0" />
-                              )}
+                              <TagPillContent
+                                name={tag.name}
+                                color={tag.color}
+                                selected={selected && !tag.disabled}
+                                locked={tag.disabled}
+                              />
                             </button>
                           );
                         })}
@@ -1542,9 +1636,9 @@ export default function QuickAddSheet({
                           type="button"
                           aria-label="Add tag"
                           onClick={tagScroll.guard(() => setActivePicker('tags'))}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-primary/40 bg-primary/5 text-[13px] font-extrabold text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/35 sm:h-8 sm:w-8 text-muted-foreground transition-colors active:scale-95 [@media(hover:hover)]:hover:border-muted-foreground/60 [@media(hover:hover)]:hover:text-foreground"
                         >
-                          <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+                          <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
                         </button>
                         </div>
                       </div>
@@ -1558,81 +1652,6 @@ export default function QuickAddSheet({
                           setTagEditTipOpen(false);
                         }}
                       />
-
-                      {/* One row that scrolls. Every control keeps its word —
-                          a bare icon in here reads as a puzzle to anyone who
-                          has not already learnt it. */}
-                      <div
-                        ref={actionsFade.ref}
-                        onScroll={actionsFade.update}
-                        className={
-                          isDesktop
-                            ? '-mx-1 flex flex-wrap items-center gap-1.5 px-1 pb-0.5'
-                            : `-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5 ${
-                                actionsFade.faded ? 'mask-fade-right' : ''
-                              }`
-                        }
-                      >
-                        {!hideDayPicker && (
-                          <ToolbarChip
-                            icon={<CalendarDays className="h-4 w-4" />}
-                            label={selectedDateLabel}
-                            ariaLabel={`When: ${selectedDateLabel}`}
-                            active
-                            onClick={() => setActivePicker('date')}
-                          />
-                        )}
-                        {!hideRepeatPicker && (
-                          <ToolbarChip
-                            icon={<Repeat className="h-4 w-4" />}
-                            label={repeatsOn ? repeatShortLabel : 'Repeat'}
-                            ariaLabel={
-                              repeatsOn ? `Repeats ${repeatShortLabel}` : 'Repeat'
-                            }
-                            active={repeatsOn}
-                            hint="quickadd-repeat"
-                            onClick={() => setActivePicker('repeat')}
-                          />
-                        )}
-                        <ToolbarChip
-                          icon={<Bell className="h-4 w-4" />}
-                          label={
-                            effectiveNotify && effectiveStartTime
-                              ? effectiveStartTime
-                              : 'Reminder'
-                          }
-                          ariaLabel={
-                            effectiveNotify && effectiveStartTime
-                              ? `Reminder at ${effectiveStartTime}`
-                              : 'Set a reminder'
-                          }
-                          active={effectiveNotify}
-                          onClick={openReminderPicker}
-                        />
-                        {sections.length > 0 && !isLater && (
-                          <ToolbarChip
-                            ref={sectionBtnRef}
-                            icon={<Rows3 className="h-4 w-4" />}
-                            label={pickedSection?.name ?? 'Section'}
-                            active={!!pickedSection}
-                            onClick={toggleSectionPicker}
-                          />
-                        )}
-                        {stripTags.length === 0 && (
-                          <ToolbarChip
-                            icon={<Tag className="h-4 w-4" />}
-                            label="Tag"
-                            ariaLabel="Add a tag"
-                            onClick={() => setActivePicker('tags')}
-                          />
-                        )}
-                        <ToolbarChip
-                          icon={<ListPlus className="h-4 w-4" />}
-                          label="Multiple"
-                          ariaLabel="Add multiple tasks"
-                          onClick={() => openBulkAdd([])}
-                        />
-                      </div>
 
                       <SuggestionTabs
                         open={open}
@@ -1659,64 +1678,19 @@ export default function QuickAddSheet({
                           inputRef.current?.focus();
                         }}
                         onContentChange={setHasSuggestionContent}
-                        onPick={(pick) => {
-                            setText(pick.text);
-                            setTags((prev) => {
-                              const removed = new Set(autoAddedTagIds);
-                              const seen = new Set<string>();
-                              const next: string[] = [];
-                              for (const id of prev) {
-                                if (removed.has(id)) continue;
-                                if (seen.has(id)) continue;
-                                seen.add(id);
-                                next.push(id);
-                              }
-                              for (const id of pick.tagIds) {
-                                if (seen.has(id)) continue;
-                                seen.add(id);
-                                next.push(id);
-                              }
-                              return next;
-                            });
-                            setAutoAddedTagIds(pick.tagIds);
-                            pickSetTimeRef.current = pick.startTime !== undefined;
-                            if (pick.startTime !== undefined) {
-                              setStartTime(pick.startTime);
-                              setEndTime(pick.endTime ?? '');
-                              setNotifyEnabled(!!pick.reminder);
-                              if (pick.reminder) setReminder(pick.reminder);
-                            }
-                            if (pick.backlogTaskId) {
-                              setPickedBacklogTaskId(pick.backlogTaskId);
-                              setPickedBacklogText(pick.text);
-                              setPickedNotes(pick.notes);
-                              setPickedChecklist(pick.checklist);
-                            } else {
-                              setPickedBacklogTaskId(null);
-                              setPickedBacklogText(null);
-                              setPickedNotes(undefined);
-                              setPickedChecklist(undefined);
-                            }
-                            inputRef.current?.focus();
-                          }}
+                        onPick={applySavedPick}
                       />
 
                       {isDesktop && (
                         <div className="-mx-5 -mb-3.5 mt-3.5 flex items-center justify-between gap-3 border-t border-border/60 bg-muted/30 px-5 py-3">
-                          <span className="flex items-center gap-3 text-[12px] font-semibold text-muted-foreground/80">
-                            <span className="inline-flex items-center gap-1.5">
-                              <kbd className="rounded-md border border-border/80 bg-card px-1.5 py-0.5 font-sans text-[11px] font-bold text-muted-foreground shadow-[0_1px_0_0_hsl(var(--border))]">
-                                ↵
-                              </kbd>
-                              add
-                            </span>
-                            <span className="inline-flex items-center gap-1.5">
-                              <kbd className="rounded-md border border-border/80 bg-card px-1.5 py-0.5 font-sans text-[11px] font-bold text-muted-foreground shadow-[0_1px_0_0_hsl(var(--border))]">
-                                esc
-                              </kbd>
-                              close
-                            </span>
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openBulkAdd([])}
+                            className="-ml-2 inline-flex h-10 items-center gap-2 rounded-xl px-2.5 text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <ListPlus className="h-4 w-4" strokeWidth={2.5} />
+                            Add multiple
+                          </button>
                           <span className="flex items-center gap-2">
                             <button
                               type="button"
@@ -1797,6 +1771,11 @@ export default function QuickAddSheet({
                   tagInputRef={tagInputRef}
                 />
               </AnimatePresence>
+              <SavedTasksSheet
+                open={savedOpen}
+                onClose={() => setSavedOpen(false)}
+                onPick={applySavedPick}
+              />
             </>
           )}
         </AnimatePresence>,

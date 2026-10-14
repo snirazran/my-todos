@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect } from 'react';
 import useSWR from 'swr';
-import { Check, Pen, ListChecks } from 'lucide-react';
-import { TimeTag } from '@/components/ui/TimeTag';
+import { Check, Pen, ListChecks, Plus } from 'lucide-react';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import type {
   FocusCategoryTagMap,
@@ -15,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { fetcher } from './utils';
+import { useDragScroll } from './useDragScroll';
 
 type BacklogTask = {
   id: string;
@@ -29,6 +29,44 @@ type BacklogTask = {
 
 const SAVED_TAB = '__saved__' as const;
 type TabId = MacroCategoryId | typeof SAVED_TAB;
+
+export const SAVED_TASKS_KEY = '/api/tasks?view=board&day=-1';
+
+function withMatch(text: string, query: string) {
+  if (query.length < 2) return text;
+  const at = text.toLowerCase().indexOf(query);
+  if (at < 0) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <mark className="rounded-[4px] bg-primary/15 px-px text-inherit">
+        {text.slice(at, at + query.length)}
+      </mark>
+      {text.slice(at + query.length)}
+    </>
+  );
+}
+
+function AddDot({ picked, size = 'sm' }: { picked: boolean; size?: 'sm' | 'md' }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'grid shrink-0 place-items-center rounded-full transition-colors',
+        size === 'md' ? 'h-9 w-9' : 'h-7 w-7',
+        picked
+          ? 'bg-primary text-primary-foreground'
+          : 'border-[1.5px] border-dashed border-muted-foreground/35 text-muted-foreground',
+      )}
+    >
+      {picked ? (
+        <Check className={size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'} strokeWidth={3.5} />
+      ) : (
+        <Plus className={size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'} strokeWidth={2.75} />
+      )}
+    </span>
+  );
+}
 
 export type SuggestionPick = {
   text: string;
@@ -67,11 +105,10 @@ export function SuggestionTabs({
   selectedId = null,
   onUnpick,
 }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showBottomFade, setShowBottomFade] = useState(false);
+  const rail = useDragScroll();
 
   const { data: backlogData } = useSWR<BacklogTask[]>(
-    open ? '/api/tasks?view=board&day=-1' : null,
+    open ? SAVED_TASKS_KEY : null,
     fetcher,
   );
 
@@ -84,22 +121,10 @@ export function SuggestionTabs({
 
   const backlog = Array.isArray(backlogData) ? backlogData : [];
 
-  const updateFade = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const more = el.scrollHeight - el.clientHeight - el.scrollTop > 4;
-    setShowBottomFade(more);
-  };
-
-  useEffect(() => {
-    updateFade();
-  }, [backlog.length, open]);
-
   useEffect(() => {
     onContentChange?.(backlog.length > 0);
   }, [backlog.length, onContentChange]);
 
-  // Only render when there are actually saved tasks.
   if (backlog.length === 0) return null;
 
   const pickOf = (t: BacklogTask): SuggestionPick => ({
@@ -123,19 +148,24 @@ export function SuggestionTabs({
       ? backlog.filter(
           (t) => t.id === selectedId || t.text.toLowerCase().includes(q),
         )
-      : backlog;
+      : selected
+        ? [selected]
+        : [];
     if (shown.length === 0) return null;
     return (
-      <div className={cn('mt-3 border-t border-border/60 pt-2.5', className)}>
-        <div className="flex items-center gap-1.5 px-0.5 pb-2 text-[12px] font-black text-muted-foreground">
-          <AppIcon name="saved" className="h-3.5 w-3.5" />
-          <span>{searching ? 'Already saved?' : 'From Saved'}</span>
-          <span className="tabular-nums opacity-70">{shown.length}</span>
-        </div>
-        <div className="-mx-1 flex touch-pan-x gap-1.5 overflow-x-auto px-1 pb-0.5 no-scrollbar">
-          {shown.map((t) => {
+      <div className={cn('mt-2.5 flex min-w-0 items-center gap-2', className)}>
+        <span className="flex shrink-0 items-center gap-1 text-[12.5px] font-black text-muted-foreground">
+          <AppIcon name="saved" className="h-4 w-4" />
+          {searching ? 'Already saved?' : 'From Saved'}
+        </span>
+        <div
+          ref={rail.ref}
+          {...rail.handlers}
+          className="-my-1 flex min-w-0 flex-1 cursor-grab select-none gap-2 overflow-x-auto py-1 no-scrollbar active:cursor-grabbing"
+          style={{ overscrollBehaviorX: 'none' }}
+        >
+          {shown.slice(0, 8).map((t) => {
             const isSelected = t.id === selectedId;
-            const firstTag = t.tags?.length ? getTagDetails(t.tags[0]) : undefined;
             return (
               <button
                 key={t.id}
@@ -144,24 +174,17 @@ export function SuggestionTabs({
                   isSelected && onUnpick ? onUnpick() : onPick(pickOf(t))
                 }
                 aria-pressed={isSelected}
+                aria-label={isSelected ? `Remove ${t.text}` : `Add saved task: ${t.text}`}
                 title={t.text}
                 className={cn(
-                  'inline-flex h-9 max-w-[220px] shrink-0 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-bold transition-[background-color,border-color,color,transform] active:scale-95',
+                  'inline-flex h-9 max-w-[230px] shrink-0 items-center gap-1.5 rounded-full pl-1 pr-3 text-[13px] font-bold transition-[background-color,box-shadow]',
                   isSelected
-                    ? 'border-primary/50 bg-primary/10 text-primary'
-                    : 'border-border/70 bg-muted/60 text-foreground [@media(hover:hover)]:hover:border-primary/40',
+                    ? 'bg-primary/10 text-primary ring-[1.5px] ring-inset ring-primary/45'
+                    : 'bg-muted/60 text-foreground [@media(hover:hover)]:hover:bg-muted',
                 )}
               >
-                {isSelected ? (
-                  <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-                ) : firstTag ? (
-                  <span
-                    aria-hidden
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: firstTag.color }}
-                  />
-                ) : null}
-                <span className="truncate">{t.text}</span>
+                <AddDot picked={isSelected} />
+                <span className="truncate">{withMatch(t.text, searching ? q : '')}</span>
               </button>
             );
           })}
@@ -171,135 +194,61 @@ export function SuggestionTabs({
   }
 
   return (
-    <div
-      className={cn(
-        'mt-3 flex flex-col border-t border-border/60 pt-3',
-        className,
-      )}
-    >
-      <div className="flex shrink-0 items-center justify-between px-1 pb-2.5">
-        <div className="flex items-center gap-1.5 text-[13px] font-black text-muted-foreground">
-          <AppIcon name="saved" className="h-3.5 w-3.5" />
-          <span>Saved</span>
-        </div>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black tabular-nums text-muted-foreground">
-          {backlog.length}
-        </span>
-      </div>
-
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div
-          ref={scrollRef}
-          onScroll={updateFade}
-          className="h-full min-h-0 overflow-y-auto px-1 pb-2 overscroll-contain"
-        >
-          <div className="flex flex-col gap-1.5">
-            {backlog.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() =>
-                  onPick({
-                    text: t.text,
-                    tagIds: t.tags ?? [],
-                    sourceTab: SAVED_TAB,
-                    startTime: t.startTime,
-                    endTime: t.endTime,
-                    reminder: t.reminder,
-                    backlogTaskId: t.id,
-                    notes: t.notes,
-                    checklist: t.checklist,
-                  })
-                }
-                className="group flex items-center gap-3 w-full rounded-xl border border-transparent bg-card dark:bg-muted px-3 py-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] transition-all [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:bg-primary/5 active:scale-[0.99]"
-              >
-                <div className="min-w-0 flex-1 flex flex-col gap-1">
-                  {((t.tags && t.tags.length > 0) || t.startTime) && (
-                    <div className="flex flex-wrap items-center gap-1">
-                      {t.startTime && (
-                        <TimeTag
-                          startTime={t.startTime}
-                          endTime={t.endTime}
-                          reminder={t.reminder}
-                        />
-                      )}
-                      {t.tags?.map((tagId) => {
-                        const tag = getTagDetails(tagId);
-                        if (!tag) return null;
-                        return (
-                          <span
-                            key={tagId}
-                            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold tracking-normal shadow-sm"
-                            style={{
-                              backgroundColor: `${tag.color}20`,
-                              color: tag.color,
-                              borderColor: `${tag.color}40`,
-                            }}
-                          >
-                            {tag.name}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="text-[13px] font-bold text-foreground truncate">
-                      {t.text}
+    <div className={cn('flex flex-col gap-2', className)}>
+      {backlog.map((t) => {
+        const firstTag = t.tags?.length ? getTagDetails(t.tags[0]) : undefined;
+        const extraTags = Math.max(0, (t.tags?.length ?? 0) - 1);
+        const steps = t.checklist?.length ?? 0;
+        const stepsDone = t.checklist?.filter((c) => c.done).length ?? 0;
+        const hasMeta = !!firstTag || !!t.startTime || !!t.notes?.trim() || steps > 0;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onPick(pickOf(t))}
+            className="flex w-full items-center gap-3 rounded-2xl bg-muted/50 py-2 pl-2 pr-2.5 text-left transition-colors active:bg-muted [@media(hover:hover)]:hover:bg-muted"
+          >
+            <AddDot picked={false} size="md" />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-[14.5px] font-bold text-foreground">{t.text}</span>
+              {hasMeta && (
+                <span className="flex min-w-0 items-center gap-2 text-[12px] font-bold text-muted-foreground">
+                  {firstTag && (
+                    <span className="inline-flex min-w-0 items-center gap-1">
+                      <span
+                        aria-hidden
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: firstTag.color }}
+                      />
+                      <span className="truncate">{firstTag.name}</span>
+                      {extraTags > 0 && <span className="shrink-0">+{extraTags}</span>}
                     </span>
-                    {(t.notes?.trim() ||
-                      (t.checklist && t.checklist.length > 0)) && (
-                      <span className="inline-flex flex-shrink-0 items-center gap-1.5">
-                        {t.notes?.trim() && (
-                          <Pen
-                            aria-label="Has notes"
-                            className="h-3.5 w-3.5 text-muted-foreground/70"
-                          />
-                        )}
-                        {t.checklist &&
-                          t.checklist.length > 0 &&
-                          (() => {
-                            const done = t.checklist.filter(
-                              (c) => c.done,
-                            ).length;
-                            const total = t.checklist.length;
-                            return (
-                              <span
-                                className={`inline-flex items-center gap-1 ${
-                                  done === total
-                                    ? 'text-primary'
-                                    : 'text-muted-foreground/70'
-                                }`}
-                              >
-                                <ListChecks className="h-3.5 w-3.5" />
-                                <span className="text-[10px] font-bold tabular-nums">
-                                  {done}/{total}
-                                </span>
-                              </span>
-                            );
-                          })()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
-                  <Fly size={28} y={-3} paused />
-                  <FlyValueBadge
-                    size="sm"
-                    value={taskFlyWorthNow({ checklist: t.checklist })}
-                  />
+                  )}
+                  {t.startTime && <span className="shrink-0 tabular-nums">{t.startTime}</span>}
+                  {t.notes?.trim() && (
+                    <Pen aria-label="Has notes" className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  {steps > 0 && (
+                    <span
+                      className={cn(
+                        'inline-flex shrink-0 items-center gap-1 tabular-nums',
+                        stepsDone === steps && 'text-primary',
+                      )}
+                    >
+                      <ListChecks className="h-3.5 w-3.5" />
+                      {stepsDone}/{steps}
+                    </span>
+                  )}
                 </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {showBottomFade && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-popover/95 to-transparent rounded-b-md"
-          />
-        )}
-      </div>
+              )}
+            </span>
+            <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card">
+              <Fly size={28} y={-3} paused />
+              <FlyValueBadge size="sm" value={taskFlyWorthNow({ checklist: t.checklist })} />
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
