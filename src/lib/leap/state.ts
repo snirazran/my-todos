@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { shiftYMD } from '@/lib/weekStart';
-import type { LeapConfigView, LeapWeekResult } from './types';
+import type { LeapConfigView, LeapJoin, LeapWeekResult } from './types';
 
 export type LeapState = {
   v: 2;
@@ -17,11 +17,23 @@ export type LeapState = {
   forgoneFlies: number;
   hopsTotal: number;
   pendingResult: LeapWeekResult | null;
+  pendingJoin: LeapJoin | null;
 };
 
 const n = (value: unknown, min = 0) =>
   Math.max(min, Math.floor(Number(value) || 0));
 const s = (value: unknown) => (typeof value === 'string' ? value : '');
+
+function readJoin(raw: unknown): LeapJoin | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const entry = raw as { weekKey?: unknown; giftIds?: unknown };
+  return {
+    weekKey: s(entry.weekKey),
+    giftIds: Array.isArray(entry.giftIds)
+      ? entry.giftIds.filter((id): id is string => typeof id === 'string')
+      : [],
+  };
+}
 
 export function readLeapState(user: any): LeapState | null {
   const raw = user?.quests?.leap;
@@ -45,6 +57,7 @@ export function readLeapState(user: any): LeapState | null {
       raw.pendingResult && typeof raw.pendingResult === 'object'
         ? (raw.pendingResult as LeapWeekResult)
         : null,
+    pendingJoin: readJoin(raw.pendingJoin),
   };
 }
 
@@ -114,6 +127,7 @@ export async function ensureLeapState(args: {
     forgoneFlies: fromDraft ? n(draft.forgoneFlies) : n(legacy.forgoneFlies),
     hopsTotal: fromDraft ? n(draft.hopsTotal) : 0,
     pendingResult: null,
+    pendingJoin: null,
   };
 
   const res = await UserModel.updateOne(

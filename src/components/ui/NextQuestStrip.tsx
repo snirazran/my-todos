@@ -28,7 +28,12 @@ import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useLeapView } from '@/components/leap/useLeapView';
 import { LeapStripRow } from '@/components/leap/LeapStripRow';
-import { leapHasHabits, leapLeft } from '@/components/leap/leapCopy';
+import {
+  leapCompeting,
+  leapHasHabits,
+  leapHoldLeft,
+  leapLeft,
+} from '@/components/leap/leapCopy';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/lib/uiStore';
 import {
@@ -205,7 +210,9 @@ export function NextQuestStrip({
     : (displayNextUp?.progress ?? 1);
 
   const liveLeap =
-    leapView?.enabled && leapHasHabits(leapView) ? leapView : null;
+    leapView?.enabled && leapHasHabits(leapView) && leapCompeting(leapView)
+      ? leapView
+      : null;
 
   const leapHops = liveLeap?.week.hops ?? null;
   const prevLeapHops = useRef<number | null>(null);
@@ -239,8 +246,7 @@ export function NextQuestStrip({
       (liveLeap.league > 0 &&
         liveLeap.week.hold.available &&
         !liveLeap.week.hold.reached &&
-        leapOpenToday >=
-          Math.max(1, liveLeap.week.hold.target - liveLeap.week.hops)));
+        leapOpenToday >= Math.max(1, leapHoldLeft(liveLeap))));
   const leapWins =
     !!liveLeap &&
     (holdingLeapAdvance ||

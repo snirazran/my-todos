@@ -69,8 +69,8 @@ const features = [
   },
   {
     icon: 'lilyPad' as const,
-    title: 'Leaps',
-    description: 'Every habit you tick is a hop that pays right away. Keep your week going and your frog Leaps.',
+    title: 'Weekly Leap',
+    description: 'Every habit you tick pays right away. Climb your weekly league from Lily Leaf to Lily Garden.',
   },
 ];
 

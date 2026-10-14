@@ -73,20 +73,30 @@ export function dismissShieldOffer() {
 
 /* --- Cross-tree request channel, mirroring the streak sheet's --- */
 
-let sheetListener: ((offer: ShieldOffer | null) => void) | null = null;
-let pending: { offer: ShieldOffer | null } | null = null;
+export type ShieldSheetContext = 'streak' | 'leap';
 
-export function openShieldSheet(offer: ShieldOffer | null = null) {
-  if (sheetListener) sheetListener(offer);
-  else pending = { offer };
+type ShieldSheetListener = (
+  offer: ShieldOffer | null,
+  context: ShieldSheetContext,
+) => void;
+
+let sheetListener: ShieldSheetListener | null = null;
+let pending: { offer: ShieldOffer | null; context: ShieldSheetContext } | null = null;
+
+export function openShieldSheet(
+  offer: ShieldOffer | null = null,
+  context: ShieldSheetContext = 'streak',
+) {
+  if (sheetListener) sheetListener(offer, context);
+  else pending = { offer, context };
 }
 
-export function subscribeShieldSheet(cb: (offer: ShieldOffer | null) => void) {
+export function subscribeShieldSheet(cb: ShieldSheetListener) {
   sheetListener = cb;
   if (pending) {
     const req = pending;
     pending = null;
-    cb(req.offer);
+    cb(req.offer, req.context);
   }
   return () => {
     if (sheetListener === cb) sheetListener = null;

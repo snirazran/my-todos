@@ -136,7 +136,7 @@ const METRIC_HINT_COPY: Record<string, string> = {
   skin_equipped:
     'In the Wardrobe, tap an outfit or a background you own to put it on.',
   focus_tag_linked:
-    'Tick off a task that repeats. Every one is a hop toward your Leap.',
+    'Tick off a task that repeats. Every one counts toward your weekly league.',
   focus_started: 'Start the focus timer on any task. Any length counts.',
   frog_fed_full:
     'Tick off tasks on Home until the belly bar is completely full.',

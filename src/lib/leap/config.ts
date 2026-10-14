@@ -137,6 +137,7 @@ export function normalizeLeapConfig(
       LEAP_DEFAULTS[key] as number,
       LEAP_NUMBER_LIMITS[key],
     );
+  const marks = sanitizeMarks(source.marks);
   const leagues = sanitizeList<LeapLeague>(
     source.leagues,
     LEAP_DEFAULTS.leagues,
@@ -146,6 +147,12 @@ export function normalizeLeapConfig(
           ? entry.label.trim().slice(0, 40)
           : 'Lily',
       multiplier: clampNumber(entry.multiplier, 1, { min: 1, max: 5 }),
+      leapPercent: whole(
+        entry.leapPercent,
+        LEAP_DEFAULTS.leagues[index]?.leapPercent ?? marks.leap.percent,
+        1,
+        100,
+      ),
       weekRewards: sanitizeBonusRewards(entry.weekRewards),
       reachRewards: sanitizeBonusRewards(entry.reachRewards),
       plusReachRewards: sanitizeBonusRewards(entry.plusReachRewards),
@@ -181,29 +188,31 @@ export function normalizeLeapConfig(
         return weight > 0 && rewards.length ? { weight, rewards } : null;
       },
     ),
-    marks: sanitizeMarks(source.marks),
+    marks,
     leagues: leagues.length ? leagues : LEAP_DEFAULTS.leagues,
   };
 }
 
-const LEGACY_LEAP_HELP_TEXT =
-  'Pick this week’s area on the Quests page and commit to one thing in it.';
+const LEGACY_LEAP_HELP_TEXTS = [
+  'Pick this week’s area on the Quests page and commit to one thing in it.',
+  'Tick off a task that repeats. Every one is a hop toward your Leap.',
+];
 const LEAP_HELP_TEXT =
-  'Tick off a task that repeats. Every one is a hop toward your Leap.';
+  'Tick off a task that repeats. Every one counts toward your weekly league.';
 
 async function refreshLeapOnboardingCopy() {
   const { default: QuestTemplateModel } = await import('@/lib/models/QuestTemplate');
   const { default: QuestModel } = await import('@/lib/models/Quest');
   const filter = {
     'logic.metricKey': 'focus_tag_linked',
-    'logic.helpText': LEGACY_LEAP_HELP_TEXT,
+    'logic.helpText': { $in: LEGACY_LEAP_HELP_TEXTS },
   };
   const update = { $set: { 'logic.$[block].helpText': LEAP_HELP_TEXT } };
   const options = {
     arrayFilters: [
       {
         'block.metricKey': 'focus_tag_linked',
-        'block.helpText': LEGACY_LEAP_HELP_TEXT,
+        'block.helpText': { $in: LEGACY_LEAP_HELP_TEXTS },
       },
     ],
   };

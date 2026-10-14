@@ -2,13 +2,7 @@ import type { TaskDoc } from '@/lib/models/Task';
 import { addDaysYMD, occursOnDate } from '@/lib/taskOccurrence';
 import { isWithinStreakCreditWindow } from '@/lib/streak/taskStreaks';
 import { startOfWeekYMD, weekDatesFor, type WeekStartDay } from '@/lib/weekStart';
-import {
-  LEAP_MARK_IDS,
-  type LeapConfigView,
-  type LeapDayState,
-  type LeapHabitView,
-  type LeapMarkId,
-} from './types';
+import type { LeapDayState, LeapHabitView } from './types';
 
 export const HOP_KEY_SEPARATOR = '|';
 
@@ -233,48 +227,13 @@ export function readLeapWeek(args: {
   };
 }
 
-export type MarkTarget = {
-  id: LeapMarkId;
-  target: number;
-  minDays: number;
-  available: boolean;
-};
-
-export function markTargets(
-  config: LeapConfigView,
-  scheduled: number,
-  scheduledDays: number,
-): MarkTarget[] {
-  const out: MarkTarget[] = [];
-  let previousTarget = 0;
-  for (const id of LEAP_MARK_IDS) {
-    const mark = config.marks[id];
-    const minDays = Math.max(2, Math.min(mark.minDays, scheduledDays));
-    const raw = Math.ceil((scheduled * mark.percent) / 100);
-    const target = Math.max(1, raw, minDays);
-    const available =
-      scheduled >= mark.minScheduled &&
-      scheduledDays >= 2 &&
-      target <= scheduled &&
-      target > previousTarget;
-    if (available) previousTarget = target;
-    out.push({ id, target, minDays, available });
-  }
-  return out;
-}
-
-export function marksMet(
-  targets: MarkTarget[],
-  hops: number,
-  activeDays: number,
-): LeapMarkId[] {
-  return targets
-    .filter(
-      (mark) =>
-        mark.available && hops >= mark.target && activeDays >= mark.minDays,
-    )
-    .map((mark) => mark.id);
-}
+export {
+  lineGoal,
+  markTargets,
+  marksMet,
+  targetBasis,
+  type MarkTarget,
+} from './targets';
 
 export function lastScheduledBefore(
   sibs: TaskDoc[],

@@ -12,6 +12,7 @@ export interface LeapWeekDoc {
   luckyByDay: Record<string, number>;
   comebacksByDay: Record<string, number>;
   marks: LeapMarkId[];
+  scheduledCap?: number;
   fliesGranted: number;
   grantedItemIds: string[];
   scheduled?: number;
@@ -35,6 +36,7 @@ const LeapWeekSchema = new Schema<LeapWeekDoc>(
     luckyByDay: { type: Schema.Types.Mixed, default: () => ({}) },
     comebacksByDay: { type: Schema.Types.Mixed, default: () => ({}) },
     marks: { type: [String], default: [] },
+    scheduledCap: { type: Number },
     fliesGranted: { type: Number, default: 0 },
     grantedItemIds: { type: [String], default: [] },
     scheduled: { type: Number },

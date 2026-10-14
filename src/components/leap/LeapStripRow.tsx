@@ -2,18 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
-import { QuestTrack } from '@/components/ui/QuestTrack';
 import { statusDockRowClass } from '@/components/home/StatusDock';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { tileRewards } from '@/lib/leap/format';
 import type { LeapView } from '@/lib/leap/types';
-import {
-  leagueArt,
-  leagueName,
-  leapStatus,
-  leapTarget,
-  leapWeekRewards,
-} from './leapCopy';
+import { leapStatus, leapWeekRewards } from './leapCopy';
+import { LeapTrack } from './LeapTrack';
 
 export function LeapStripRow({ view }: { view: LeapView }) {
   const router = useRouter();
@@ -49,16 +43,8 @@ export function LeapStripRow({ view }: { view: LeapView }) {
             {leapStatus(view)}
           </span>
         </span>
-        <QuestTrack progress={view.week.hops} target={leapTarget(view)} />
+        <LeapTrack view={view} />
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={leagueArt(view.league)}
-        alt={leagueName(view)}
-        title={leagueName(view)}
-        draggable={false}
-        className="-mr-1 h-9 w-11 shrink-0 select-none object-contain"
-      />
     </div>
   );
 }

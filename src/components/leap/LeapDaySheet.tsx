@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { motion, useReducedMotion } from 'framer-motion';
+import { Check } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -27,11 +28,21 @@ function copyFor(result: LeapWeekResult, view: LeapView | undefined) {
   const after = labelFor(view, result.leagueAfter);
   const before = labelFor(view, result.leagueBefore);
   const upNext = view?.leagues[result.leagueAfter + 1]?.label;
+  if (result.firstWeek && result.outcome === 'stay' && result.leagueAfter === 0) {
+    return {
+      title: 'Your first week is done',
+      body: upNext
+        ? `Reach the promotion zone this week to advance to the ${upNext} League.`
+        : 'Reach the promotion zone this week to advance.',
+    };
+  }
   switch (result.outcome) {
     case 'up':
       return {
         title: `You advanced to the ${after} League!`,
-        body: upNext ? `Next up: the ${upNext} League.` : "That's the top league!",
+        body: upNext
+          ? `${result.firstWeek ? 'Your first week, done. ' : ''}Next up: the ${upNext} League.`
+          : "That's the top league!",
       };
     case 'top':
       return { title: 'You stayed on top!', body: `The ${after} League is still yours.` };
@@ -188,16 +199,32 @@ export function LeapDayContent({
         {body}
       </motion.p>
 
-      {(result.fliesGranted > 0 || giftIds.length > 0) && (
+      {(result.hops > 0 || result.fliesGranted > 0 || giftIds.length > 0) && (
         <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-muted/60 px-3.5 py-1.5 text-[13px] font-black text-foreground">
           <span className="text-muted-foreground">Last week</span>
+          {result.scheduled > 0 && (
+            <span
+              className="inline-flex items-center gap-1 tabular-nums"
+              aria-label={`${result.hops} of ${result.scheduled} habits`}
+            >
+              <span
+                aria-hidden="true"
+                className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#4f9149] text-white"
+              >
+                <Check className="h-2.5 w-2.5" strokeWidth={4} />
+              </span>
+              <span aria-hidden="true">
+                {result.hops}/{result.scheduled}
+              </span>
+            </span>
+          )}
           {result.fliesGranted > 0 && <FlyAmount amount={result.fliesGranted} />}
           {giftIds.length > 0 && (
             <span
               className="inline-flex items-center gap-0.5"
               aria-label={`${giftIds.length} gift${giftIds.length === 1 ? '' : 's'}`}
             >
-              <span aria-hidden="true" className="-my-2 h-8 w-8 shrink-0 -translate-y-1">
+              <span aria-hidden="true" className="-my-3.5 aspect-[282/381] h-12 w-auto shrink-0 -translate-y-[9px]">
                 <GiftRive
                   className="h-full w-full"
                   color={giftRiveIndex}

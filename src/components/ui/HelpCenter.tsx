@@ -108,8 +108,8 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'When an objective is complete, a Claim button appears. Daily rewards can be claimed once their day arrives.',
       },
       {
-        q: 'What is a Leap?',
-        a: 'Leap is your weekly habit league. Every task that repeats is a habit, and every one you tick off pays flies right away, sometimes with a gift. Finish enough habits in a week to reach the promotion zone and you advance to the next league: Lily Leaf, Lily Bud, Lily Bloom, Lily Bouquet, then Lily Garden. Each league has its own prizes, and higher leagues pay more for every habit. Finish too few and you land in the demotion zone and drop one league, unless a Lily Pad saves you. Tap any lily on the Leap card to see its prizes.',
+        q: 'What is Leap?',
+        a: 'Leap is your weekly habit league. Every task that repeats is a habit, and every one you tick off pays flies right away, sometimes with a gift. Finish enough habits in a week to reach the promotion zone and you advance to the next league: Lily Leaf, Lily Bud, Lily Bloom, Lily Bouquet, then Lily Garden. Each league has its own prizes, and higher leagues pay more for every habit. From Lily Bud up, finish too few and you land in the demotion zone and drop one league, unless a Lily Pad saves you. A week with no habits never costs you a league. Tap any lily on the Leap card to see its prizes.',
       },
     ],
   },
@@ -170,7 +170,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     items: [
       {
         q: 'What is Frogress Plus?',
-        a: 'Plus is an optional subscription. You hold three Lily Pads instead of two and get one free every month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
+        a: 'Plus is an optional subscription. You hold three Lily Pads instead of two and get one free every month, unlock premium reward tracks, and earn double rewards.',
       },
       {
         q: 'How do I get Plus?',

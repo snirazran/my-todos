@@ -118,8 +118,8 @@ function RotatingPrize({
   );
 }
 
-function quantity(reward: BonusReward, bonus: boolean) {
-  if (reward.type === 'FLIES') return reward.amount ? `${bonus ? '+' : ''}${reward.amount}` : null;
+function quantity(reward: BonusReward) {
+  if (reward.type === 'FLIES') return reward.amount ? String(reward.amount) : null;
   const amount = 'amount' in reward ? reward.amount ?? 1 : 1;
   return amount > 1 ? `×${amount}` : null;
 }
@@ -130,7 +130,6 @@ export function LeapPrizeTile({
   size = 'md',
   offset = 0,
   plus = false,
-  bonus = false,
   done = false,
   className,
 }: {
@@ -139,7 +138,6 @@ export function LeapPrizeTile({
   size?: LeapPrizeSize;
   offset?: number;
   plus?: boolean;
-  bonus?: boolean;
   done?: boolean;
   className?: string;
 }) {
@@ -147,7 +145,7 @@ export function LeapPrizeTile({
   const catalog = view.rewardCatalog as Catalog;
   const preview =
     reward.type === 'RARITY_ITEM' ? view.rarityPreview?.[reward.rarity] ?? [] : [];
-  const amount = quantity(reward, bonus);
+  const amount = quantity(reward);
   const rarity = prizeRarity(reward, catalog);
 
   return (
@@ -175,14 +173,19 @@ export function LeapPrizeTile({
           />
         )}
       </span>
-      {!done && (rarity || amount) && (
+      {!done && rarity && (
         <span
           className={cn(
             'absolute -bottom-1.5 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/15 px-1 text-[9.5px] font-black capitalize leading-[15px] tabular-nums text-white shadow-sm',
-            rarity ? RARITY_PILL[rarity] ?? 'bg-slate-500' : 'bg-black/65',
+            RARITY_PILL[rarity] ?? 'bg-slate-500',
           )}
         >
-          {rarity ?? amount}
+          {rarity}
+        </span>
+      )}
+      {!done && !rarity && amount && (
+        <span className="absolute -right-1.5 -top-1.5 z-20 whitespace-nowrap rounded-md border border-white/15 bg-black/65 px-1 text-[9.5px] font-black leading-[15px] tabular-nums text-white shadow-sm">
+          {amount}
         </span>
       )}
       {plus && (

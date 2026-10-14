@@ -9,6 +9,42 @@ const LILY_MARK_INK = 17;
 const FLAME_INK_SHARE = 19 / 24;
 const FLAME_BOX = Math.round(LILY_MARK_INK / FLAME_INK_SHARE);
 
+export function LilyInk({
+  index,
+  ink = LILY_MARK_INK,
+  title,
+  className,
+}: {
+  index: number;
+  ink?: number;
+  title?: string;
+  className?: string;
+}) {
+  const clamped = Math.min(Math.max(0, index), LILY_ART_TOP.length - 1);
+  const top = LILY_ART_TOP[clamped];
+  const height = ink / (LILY_ART_BOTTOM - top);
+  return (
+    <span
+      title={title}
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none relative inline-block shrink-0 select-none align-middle',
+        className,
+      )}
+      style={{ height: ink, width: Math.round((ink * 23) / 17) }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={leagueArt(clamped)}
+        alt=""
+        draggable={false}
+        className="absolute left-1/2 max-w-none -translate-x-1/2"
+        style={{ height, width: (height * 500) / 430, top: -top * height }}
+      />
+    </span>
+  );
+}
+
 export function LeapStageMark({ className }: { className?: string }) {
   const { data } = useLeapView();
   if (!data?.enabled) return null;

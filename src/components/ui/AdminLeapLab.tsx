@@ -15,8 +15,10 @@ import type { Task } from '@/components/board/helpers';
 import { LeapStripRow } from '@/components/leap/LeapStripRow';
 import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { LeapDayContent, LeapDaySheet } from '@/components/leap/LeapDaySheet';
+import { LeapJoinContent, LeapJoinSheet } from '@/components/leap/LeapJoinSheet';
 import { announceLeapHop, buildLeapHopToast } from '@/components/leap/leapHopToast';
 import {
+  LEAP_LAB_JOINS,
   LEAP_LAB_RESULTS,
   LEAP_LAB_SCENARIOS,
   labHop,
@@ -29,9 +31,10 @@ const HOP_KINDS = [
   ['Plain hop', 'hop'],
   ['Comeback', 'comeback'],
   ['Lucky flies', 'lucky'],
-  ['First hop ever', 'first'],
+  ['First habit ever', 'first'],
   ['Out of the demotion zone', 'hold'],
   ['Promotion zone', 'leap'],
+  ['Top prize', 'top'],
 ] as const;
 
 const SAMPLE_TAGS = [
@@ -112,6 +115,7 @@ export function AdminLeapLab() {
   const { resolvedTheme, setTheme } = useTheme();
   const [catalog, setCatalog] = useState<Record<string, unknown>>({});
   const [result, setResult] = useState<LeapWeekResult | null>(null);
+  const [joinIndex, setJoinIndex] = useState<number | null>(null);
 
   useEffect(() => {
     void fetch('/api/admin/leap')
@@ -132,6 +136,15 @@ export function AdminLeapLab() {
     [catalog],
   );
   const resultView = scenarios[2]?.view;
+  const joins = useMemo(
+    () =>
+      LEAP_LAB_JOINS.map((entry) => ({
+        ...entry,
+        view: { ...entry.view, rewardCatalog: catalog },
+      })),
+    [catalog],
+  );
+  const openJoin = joinIndex === null ? null : joins[joinIndex];
 
   return (
     <div className="mx-auto max-w-[1300px] space-y-10 px-4 py-8">
@@ -181,7 +194,7 @@ export function AdminLeapLab() {
 
       <Section
         title="Home quest strip"
-        note="Shown in the home strip right after a habit tick, or when the goal can still be hit today."
+        note="Shown in the home strip right after a habit tick, or when the goal can still be hit today. Only weeks with a promotion line reach the strip; the other states here are card-only."
       >
         {scenarios.map((entry) => (
           <Frame key={entry.id} label={entry.label}>
@@ -243,6 +256,33 @@ export function AdminLeapLab() {
         })}
       </Section>
 
+      <Section
+        title="Joining the league"
+        note="Shown once, the first time a repeating task is ticked. It carries the first-habit gift."
+      >
+        {joins.map((entry, index) => (
+          <Frame key={entry.label} label={entry.label}>
+            <div className="rounded-[24px] bg-card px-4 pb-4 pt-5">
+              <LeapJoinContent
+                join={entry.join}
+                view={entry.view}
+                active
+                quiet
+                onClose={() => setJoinIndex(index)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setJoinIndex(index)}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[12px] font-black text-foreground"
+            >
+              <Play className="h-3 w-3 fill-current" />
+              Open as sheet
+            </button>
+          </Frame>
+        ))}
+      </Section>
+
       <Section title="Monday results" note="Shown once, the first time the app opens in a new week.">
         {LEAP_LAB_RESULTS.map((entry) => (
           <Frame key={entry.label} label={entry.label}>
@@ -266,6 +306,15 @@ export function AdminLeapLab() {
           </Frame>
         ))}
       </Section>
+
+      {openJoin && (
+        <LeapJoinSheet
+          join={openJoin.join}
+          view={openJoin.view}
+          open={!!openJoin}
+          onClose={() => setJoinIndex(null)}
+        />
+      )}
 
       {result && (
         <LeapDaySheet

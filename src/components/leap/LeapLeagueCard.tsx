@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Clock } from 'lucide-react';
+import { Check, Clock, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { FlyAmount } from '@/components/ui/FlyAmount';
-import { QuestTrack } from '@/components/ui/QuestTrack';
 import { QUEST_CARD_CLASS, QuestSectionHeader } from '@/components/ui/QuestCards';
 import { HintButton, QuestRewardTileBadge } from '@/lib/questClaims';
 import { openShieldSheet } from '@/hooks/useShields';
@@ -19,14 +18,17 @@ import {
   leagueArt,
   leagueName,
   leagueTitle,
+  leapCompeting,
   leapDaysLeft,
   leapHasHabits,
   leapHint,
+  leapRepeating,
   leapRule,
   leapStatus,
   leapTarget,
   leapWeekRewards,
 } from './leapCopy';
+import { LeapTrack } from './LeapTrack';
 import { useLeapView } from './useLeapView';
 
 const STEP = 6;
@@ -47,9 +49,8 @@ function railFor(view: LeapView): { stops: LeapStop[]; progress: number } {
     art: leagueArt(index),
     isHere: index === view.league,
   }));
-  const progress = leapHasHabits(view)
-    ? Math.min(1, view.week.hops / leapTarget(view))
-    : 0;
+  const target = leapTarget(view);
+  const progress = target > 0 ? Math.min(1, view.week.hops / target) : 0;
   return { stops, progress };
 }
 
@@ -96,7 +97,7 @@ function PlusRow({ view }: { view: LeapView }) {
   const shown = waiting[0] ?? next;
   if (!shown) return null;
   const prizes = shown.plusReachRewards.slice(0, 2).map((reward, i) => (
-    <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i} bonus />
+    <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i} />
   ));
   return (
     <div className="px-3 pb-3">
@@ -131,6 +132,8 @@ export function LeapLeagueCard() {
 
   if (!view || !view.enabled || !view.leagues.length) return null;
   const hasHabits = leapHasHabits(view);
+  const repeating = leapRepeating(view);
+  const competing = hasHabits && leapCompeting(view);
   const landed = view.week.leap.reached;
   const { stops, progress } = railFor(view);
 
@@ -143,7 +146,7 @@ export function LeapLeagueCard() {
             {view.shields.count > 0 && (
               <button
                 type="button"
-                onClick={() => openShieldSheet()}
+                onClick={() => openShieldSheet(null, 'leap')}
                 aria-label={`${view.shields.count} Lily Pad${view.shields.count === 1 ? '' : 's'}`}
                 className="inline-flex h-8 items-center gap-1 rounded-full bg-muted/70 pl-1 pr-2.5 text-[13px] font-black tabular-nums text-foreground transition active:scale-95"
               >
@@ -180,7 +183,7 @@ export function LeapLeagueCard() {
 
         <div className="flex items-center gap-3 border-t border-border/50 py-3 pl-3.5 pr-3">
           <span className="min-h-11 min-w-11 shrink-0 rounded-xl">
-            {hasHabits ? (
+            {competing ? (
               <QuestRewardTileBadge
                 rewards={tileRewards(leapWeekRewards(view))}
                 catalog={view.rewardCatalog as never}
@@ -202,11 +205,19 @@ export function LeapLeagueCard() {
               )}
               <span className="min-w-0">{leapStatus(view)}</span>
             </span>
-            {hasHabits && (
-              <QuestTrack progress={view.week.hops} target={leapTarget(view)} />
+            {competing && <LeapTrack view={view} />}
+            {!repeating && (
+              <button
+                type="button"
+                onClick={() => startHintGuide('take-leap')}
+                className="inline-flex h-8 w-fit items-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[12.5px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:-translate-y-px hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none"
+              >
+                <Play className="h-3 w-3 fill-current" />
+                Show me
+              </button>
             )}
           </div>
-          {!landed && (
+          {repeating && !landed && (
             <span className="-mr-1.5 shrink-0 self-center">
               <HintButton
                 iconOnly

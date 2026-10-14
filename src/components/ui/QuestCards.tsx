@@ -49,14 +49,14 @@ import { QuestTrack } from './QuestTrack';
 import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
 import { useUIStore } from '@/lib/uiStore';
 import { useLeapView } from '@/components/leap/useLeapView';
-import { leapHasHabits } from '@/components/leap/leapCopy';
+import { leapRepeating } from '@/components/leap/leapCopy';
 
 function useObjectiveHint(block: Parameters<typeof objectiveHintText>[0]) {
   const habitMetric =
     block.type === 'metric_count' && block.metricKey === 'focus_tag_linked';
   const { data: leapView } = useLeapView(habitMetric);
   return objectiveHintText(block, {
-    hasHabits: leapView ? leapHasHabits(leapView) : undefined,
+    hasHabits: leapView ? leapRepeating(leapView) : undefined,
   });
 }
 

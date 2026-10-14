@@ -30,6 +30,7 @@ import {
 } from '@/lib/notifications/frogVoice';
 import { runWishlistDealAlerts } from '@/lib/skins/wishlistAlerts';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { lineGoal } from '@/lib/leap/targets';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -235,45 +236,53 @@ async function leapMessage(
     if (slot === 'morning') {
       const result = view.weekResult;
       if (!result) return null;
-      if (result.outcome === 'up') {
-        return {
-          title: `You moved up to ${league(result.leagueAfter)}`,
-          body: 'Your habits did it. Every hop now pays more.',
-          data: { type: 'leap_day', path: '/quests#leap' },
-        };
-      }
-      if (result.outcome === 'covered') {
-        return {
-          title: 'A Lily Pad caught you',
-          body: `You stay at ${league(result.leagueAfter)}. A fresh week starts now.`,
-          data: { type: 'leap_day', path: '/quests#leap' },
-        };
-      }
-      return null;
+      const message: PushMessage | null =
+        result.outcome === 'up'
+          ? {
+              title: `You advanced to the ${league(result.leagueAfter)} League!`,
+              body: 'Your habits did it. Every habit now pays more flies.',
+              data: { type: 'leap_day', path: '/quests#leap' },
+            }
+          : result.outcome === 'covered'
+            ? {
+                title: 'A Lily Pad saved you',
+                body: `You stay in the ${league(result.leagueAfter)} League. A fresh week starts now.`,
+                data: { type: 'leap_day', path: '/quests#leap' },
+              }
+            : null;
+      if (!message) return null;
+      const claimed = await UserModel.updateOne(
+        { _id: userId, 'quests.leap.resultPushed': { $ne: result.weekKey } },
+        { $set: { 'quests.leap.resultPushed': result.weekKey } },
+      );
+      return claimed.modifiedCount === 1 ? message : null;
     }
 
     const { week } = view;
     if (week.openToday === 0 || week.leap.reached || !week.leap.available) return null;
     const habits = (n: number) => `${n} habit${n === 1 ? '' : 's'}`;
-    const holdLeft = Math.max(0, week.hold.target - week.hops);
+    const them = (n: number) => (n === 1 ? 'it' : 'them');
+    const holdLeft = week.hold.reached
+      ? 0
+      : Math.max(0, lineGoal(week.hold, week.hops, week.activeDays) - week.hops);
     if (
       view.league > 0 &&
       week.hold.available &&
-      !week.hold.reached &&
+      holdLeft > 0 &&
       holdLeft <= week.openToday
     ) {
       return {
-        title: `${habits(holdLeft)} to stay at ${league(view.league)}`,
-        body: 'Tick them off tonight and you keep your Lily.',
+        title: `${habits(holdLeft)} to leave the demotion zone`,
+        body: `Finish ${them(holdLeft)} tonight to stay in the ${league(view.league)} League.`,
         data: { type: 'leap_reminder', path: '/' },
       };
     }
-    const left = Math.max(1, week.leap.target - week.hops);
+    const left = Math.max(1, lineGoal(week.leap, week.hops, week.activeDays) - week.hops);
     const next = view.leagues[view.league + 1]?.label;
     if (next && left <= Math.min(2, week.openToday)) {
       return {
-        title: `${habits(left)} to move up`,
-        body: `Land your Leap tonight and ${next} is next.`,
+        title: `${habits(left)} to the promotion zone`,
+        body: `Finish ${them(left)} tonight to advance to the ${next} League.`,
         data: { type: 'leap_reminder', path: '/' },
       };
     }

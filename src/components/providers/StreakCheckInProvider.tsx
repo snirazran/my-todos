@@ -19,7 +19,11 @@ import {
 import { StreakSheet } from '@/components/ui/streak/StreakSheet';
 import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
 import { ShieldSheet } from '@/components/ui/streak/ShieldSheet';
-import { openShieldSheet, subscribeShieldSheet } from '@/hooks/useShields';
+import {
+  openShieldSheet,
+  subscribeShieldSheet,
+  type ShieldSheetContext,
+} from '@/hooks/useShields';
 import { markNegativeMoment, recordAppUsageDay } from '@/lib/rateApp';
 import {
   LOGIN_STREAK_HOLD,
@@ -218,6 +222,7 @@ function StreakSheetHost() {
   const [rescue, setRescue] = useState<LoginStreakRescue | null>(null);
   const [shieldOpen, setShieldOpen] = useState(false);
   const [shieldOffer, setShieldOffer] = useState<ShieldOffer | null>(null);
+  const [shieldContext, setShieldContext] = useState<ShieldSheetContext>('streak');
 
   useEffect(() => {
     return subscribeStreakSheet((req: StreakSheetRequest) => {
@@ -233,8 +238,9 @@ function StreakSheetHost() {
   }, []);
 
   useEffect(() => {
-    return subscribeShieldSheet((offer) => {
+    return subscribeShieldSheet((offer, context) => {
       setShieldOffer(offer);
+      setShieldContext(context);
       setShieldOpen(true);
     });
   }, []);
@@ -279,6 +285,7 @@ function StreakSheetHost() {
           if (!v) setShieldOffer(null);
         }}
         offer={shieldOffer}
+        context={shieldContext}
       />
     </>
   );

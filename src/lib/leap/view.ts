@@ -9,12 +9,12 @@ import {
 } from '@/lib/shields/engine';
 import { daysBetweenYMD, shiftYMD } from '@/lib/weekStart';
 import type { QuestReward } from '@/lib/quests/types';
-import { creditHops } from './hop';
+import { creditHops, weekTargets } from './hop';
 import { scaleFlies } from './rewards';
 import { payPlusBacklog } from './settle';
 import { clampLeague } from './state';
 import { loadLeapContext, type LeapContext } from './sync';
-import { markTargets } from './week';
+import { groupHabits } from './week';
 import type {
   BonusRewards,
   LeapConfigView,
@@ -122,6 +122,8 @@ export function disabledLeapView(): LeapView {
       holdFlies: 0,
       habits: 0,
     },
+    repeating: 0,
+    join: null,
     shields: { count: 0, cap: 0 },
     hopFlies: 0,
     firstDropPending: false,
@@ -137,7 +139,7 @@ export async function buildLeapView(ctx: LeapContext): Promise<LeapView> {
     ctx;
   const multiplier = Math.max(1, weekDoc.multiplier ?? 1);
   const reached = new Set<LeapMarkId>(weekDoc.marks ?? []);
-  const targets = markTargets(config, ledger.scheduled, ledger.scheduledDays);
+  const targets = weekTargets(ctx);
   const markView = (id: LeapMarkId): LeapMarkView => {
     const mark = targets.find((entry) => entry.id === id);
     if (!mark) return EMPTY_MARK(id);
@@ -230,6 +232,10 @@ export async function buildLeapView(ctx: LeapContext): Promise<LeapView> {
       holdFlies: scaleFlies(config.marks.hold.flies, multiplier, isPremium),
       habits: ledger.habits.length,
     },
+    repeating: groupHabits(
+      ctx.tasks.filter((task) => !task.repeatEndDate || task.repeatEndDate >= todayKey),
+    ).length,
+    join: state.pendingJoin,
     shields: {
       count: shieldState.count,
       cap: shieldCapFor(shieldConfig, isPremium),

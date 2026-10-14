@@ -11,7 +11,7 @@ import {
 import { hapticCelebrate } from '@/lib/haptics';
 import type { LeapHopResult } from '@/lib/leap/types';
 import { cn } from '@/lib/utils';
-import { leagueArt, leagueTitle } from './leapCopy';
+import { leagueArt, leagueTitle, weekdayOf } from './leapCopy';
 
 type ShowNotification = (
   content: ReactNode,
@@ -27,6 +27,7 @@ function HopToast({
   from,
   to,
   target,
+  stay,
   league,
   prize,
 }: {
@@ -35,14 +36,17 @@ function HopToast({
   from: number;
   to: number;
   target: number;
+  stay?: number;
   league: number;
   prize?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
+  const metered = target > 0;
   const safe = Math.max(1, target);
   const fromPct = Math.min(100, (Math.max(0, from) / safe) * 100);
   const toPct = Math.min(100, (Math.max(0, to) / safe) * 100);
   const full = to >= safe;
+  const stayPct = stay && stay > 0 && stay < safe ? (stay / safe) * 100 : null;
 
   return (
     <div className="flex w-full items-center gap-3">
@@ -69,21 +73,39 @@ function HopToast({
           <span className="min-w-0 text-[14px] font-black leading-tight text-foreground">
             {title}
           </span>
-          <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
-            {Math.min(to, safe)}/{safe}
-          </span>
+          {metered && (
+            <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
+              {Math.min(to, safe)}/{safe}
+            </span>
+          )}
         </span>
-        <span className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-          <motion.span
-            className={cn(
-              'absolute inset-y-0 left-0 rounded-full',
-              full ? 'bg-lime-600' : 'bg-amber-400',
+        {metered && (
+          <span className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+            {stayPct !== null && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 bg-rose-500/25 dark:bg-rose-400/30"
+                style={{ width: `${stayPct}%` }}
+              />
             )}
-            initial={reduceMotion ? false : { width: `${fromPct}%` }}
-            animate={{ width: `${toPct}%` }}
-            transition={{ type: 'spring', stiffness: 170, damping: 22, delay: 0.15 }}
-          />
-        </span>
+            <motion.span
+              className={cn(
+                'absolute inset-y-0 left-0 rounded-full',
+                full ? 'bg-lime-600' : 'bg-amber-400',
+              )}
+              initial={reduceMotion ? false : { width: `${fromPct}%` }}
+              animate={{ width: `${toPct}%` }}
+              transition={{ type: 'spring', stiffness: 170, damping: 22, delay: 0.15 }}
+            />
+            {stayPct !== null && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white/90"
+                style={{ left: `${stayPct}%` }}
+              />
+            )}
+          </span>
+        )}
         {detail && (
           <span className="mt-1 text-[12px] font-bold leading-tight text-muted-foreground">
             {detail}
@@ -109,6 +131,7 @@ export function buildLeapHopToast(result: LeapHopResult): LeapHopToastSpec | nul
     from: Math.max(0, meter.hops - result.hops),
     to: meter.hops,
     target: meter.target,
+    stay: result.league > 0 && !meter.reached.includes('hold') ? meter.holdTarget : undefined,
     league: result.league,
   };
   const gifts = [
@@ -120,10 +143,15 @@ export function buildLeapHopToast(result: LeapHopResult): LeapHopToastSpec | nul
   const markFlies = result.marks.reduce((sum, mark) => sum + mark.fliesGranted, 0);
   const allFlies =
     result.hopFlies + result.comebackFlies + markFlies + (result.lucky?.fliesGranted ?? 0);
-  const spec = (content: ReactNode, celebrate: boolean, quiet = false) => ({
+  const spec = (
+    content: ReactNode,
+    celebrate: boolean,
+    quiet = false,
+    giftIds: string[] = gifts,
+  ) => ({
     content,
     celebrate,
-    gifts,
+    gifts: giftIds,
     quiet,
   });
 
@@ -132,25 +160,38 @@ export function buildLeapHopToast(result: LeapHopResult): LeapHopToastSpec | nul
       <HopToast
         {...base}
         prize
-        title={result.nextLeagueLabel ? 'Promotion zone!' : 'Top prize won!'}
+        title={
+          result.nextLeagueLabel
+            ? 'Promotion zone!'
+            : `Top prize won!${plusFlies(allFlies)}`
+        }
         detail={
           result.nextLeagueLabel
-            ? `You'll advance to the ${leagueTitle(result.nextLeagueLabel)}`
-            : `You stay in the ${leagueTitle(result.leagueLabel)}${plusFlies(allFlies)}`
+            ? `You'll advance to the ${leagueTitle(result.nextLeagueLabel)} on ${weekdayOf(result.weekKey)}`
+            : `The ${leagueTitle(result.leagueLabel)} is still yours`
         }
       />,
       true,
     );
   }
-  if (result.lucky?.first) {
+  if (result.joined || result.lucky?.first) {
+    const left = Math.max(0, meter.target - meter.hops);
     return spec(
       <HopToast
         {...base}
         prize
-        title="First hop! A gift dropped"
-        detail="Leap rewards every habit you finish"
+        title={gifts.length ? 'First habit! A gift dropped' : `First habit!${plusFlies(allFlies)}`}
+        detail={
+          meter.target > 0 && left > 0
+            ? result.nextLeagueLabel
+              ? `${left} more this week to reach ${result.nextLeagueLabel}`
+              : `${left} more this week for the top prize`
+            : 'Every habit you finish counts'
+        }
       />,
       true,
+      false,
+      result.joined ? [] : gifts,
     );
   }
   if (holdMark && result.league > 0) {
@@ -158,8 +199,8 @@ export function buildLeapHopToast(result: LeapHopResult): LeapHopToastSpec | nul
       <HopToast
         {...base}
         prize
-        title="Out of the demotion zone"
-        detail={`You stay in the ${leagueTitle(result.leagueLabel)}${plusFlies(allFlies)}`}
+        title={`Out of the demotion zone!${plusFlies(allFlies)}`}
+        detail={`Your spot in the ${leagueTitle(result.leagueLabel)} is safe`}
       />,
       false,
     );

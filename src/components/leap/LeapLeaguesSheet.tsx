@@ -231,7 +231,6 @@ export function LeapLeaguesSheet({
                                 size={narrow ? 'md' : 'lg'}
                                 offset={index + i + 2}
                                 done={plusDone}
-                                bonus
                               />
                             ))}
                           </span>

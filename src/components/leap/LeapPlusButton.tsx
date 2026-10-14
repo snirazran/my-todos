@@ -27,8 +27,12 @@ export function LeapPlusButton({
         className,
       )}
     >
-      <Icon name="frogPlus" label="Plus" className="h-10 w-10 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]" />
-      <span className="min-w-0 flex-1">
+      <Icon
+        name="frogPlus"
+        label="Plus"
+        className="h-10 w-10 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]"
+      />
+      <span className="flex-1 min-w-0">
         <span className="block whitespace-normal break-words text-clip text-[14px] font-black leading-tight [overflow:visible]">
           {title}
         </span>
@@ -36,8 +40,13 @@ export function LeapPlusButton({
           {subtitle}
         </span>
       </span>
-      {prizes && <span className="flex shrink-0 items-center gap-1.5">{prizes}</span>}
-      <ChevronRight className="h-4 w-4 shrink-0 text-[#6b4a12]" strokeWidth={3} />
+      {prizes && (
+        <span className="flex shrink-0 items-center gap-1.5">{prizes}</span>
+      )}
+      <ChevronRight
+        className="h-4 w-4 shrink-0 text-[#6b4a12]"
+        strokeWidth={3}
+      />
     </button>
   );
 }

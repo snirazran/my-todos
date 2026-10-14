@@ -38,6 +38,7 @@ export async function PATCH(req: NextRequest) {
   await connectMongo();
   const set: Record<string, unknown> = {};
   if (body.resultSeen === true) set['quests.leap.pendingResult'] = null;
+  if (body.joinSeen === true) set['quests.leap.pendingJoin'] = null;
   if (Object.keys(set).length) {
     await UserModel.updateOne(
       { _id: userId, 'quests.leap.v': 2 },

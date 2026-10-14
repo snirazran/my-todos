@@ -18,6 +18,7 @@ import {
   dismissShieldOffer,
   patchShieldView,
   useShields,
+  type ShieldSheetContext,
 } from '@/hooks/useShields';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import type { ShieldOffer } from '@/lib/shields/types';
@@ -26,17 +27,24 @@ function headline(offer: ShieldOffer | null) {
   if (!offer) return 'Lily Pad';
   if (offer.reason === 'missed') {
     return offer.system === 'pact'
-      ? 'Your Leap streak broke'
+      ? 'You dropped a league'
       : `Your ${offer.atStake}-day streak broke`;
   }
   return offer.system === 'pact'
-    ? 'Nothing is holding your Leap streak up'
+    ? 'Nothing is holding your league up'
     : `Nothing is holding your ${offer.atStake}-day streak up`;
 }
 
-function subhead(offer: ShieldOffer | null) {
+function forLeap(offer: ShieldOffer | null, context: ShieldSheetContext) {
+  return offer ? offer.system === 'pact' : context === 'leap';
+}
+
+function subhead(offer: ShieldOffer | null, context: ShieldSheetContext) {
   if (offer?.reason === 'missed') {
     return 'A Lily Pad would have caught that one on its own. Keep one under you for the next slip.';
+  }
+  if (forLeap(offer, context)) {
+    return 'A Lily Pad saves you from one demotion. It works by itself, nothing to switch on.';
   }
   return 'A Lily Pad floats under your streak and catches the first day you miss. Nothing to remember, nothing to switch on.';
 }
@@ -51,10 +59,12 @@ export function ShieldSheet({
   open,
   onOpenChange,
   offer,
+  context = 'streak',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   offer: ShieldOffer | null;
+  context?: ShieldSheetContext;
 }) {
   const { shields, flyBalance } = useShields(open);
   const [phase, setPhase] = useState<'confirm' | 'success'>('confirm');
@@ -183,8 +193,10 @@ export function ShieldSheet({
           </h2>
           <p className="mt-1 text-center text-sm font-medium text-muted-foreground">
             {phase === 'success'
-              ? 'It catches the next day you miss, by itself. Nothing to switch on.'
-              : subhead(offer)}
+              ? forLeap(offer, context)
+                ? 'It saves your league the next time you would drop. Nothing to switch on.'
+                : 'It catches the next day you miss, by itself. Nothing to switch on.'
+              : subhead(offer, context)}
           </p>
 
           <div className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-muted-foreground">

@@ -12,8 +12,14 @@ import {
 import { shiftYMD, type WeekStartDay } from '@/lib/weekStart';
 import { emptyGrant, grantLeapRewards, mergeGrant } from './rewards';
 import { payMark } from './marks';
-import { leagueMultiplier, readLeapState, type LeapState } from './state';
-import { markTargets, marksMet, readLeapWeek, weekKeyFor } from './week';
+import { clampLeague, leagueMultiplier, readLeapState, type LeapState } from './state';
+import {
+  markTargets,
+  marksMet,
+  readLeapWeek,
+  targetBasis,
+  weekKeyFor,
+} from './week';
 import type {
   LeapConfigView,
   LeapGrantSummary,
@@ -23,6 +29,7 @@ import type {
 } from './types';
 
 const MAX_WEEKS_PER_SETTLE = 26;
+const PLAYED_OUTCOMES: LeapWeekOutcome[] = ['up', 'top', 'stay', 'covered', 'down'];
 
 async function payReach(args: {
   userId: string;
@@ -161,6 +168,11 @@ export async function settleLeapWeeks(args: {
     weekKey: { $gte: first, $lte: lastWeek },
   }).lean<LeapWeekDoc[]>();
   const docByWeek = new Map(weekDocs.map((doc) => [doc.weekKey, doc]));
+  let played = await LeapWeekModel.countDocuments({
+    userId,
+    weekKey: { $lt: first },
+    outcome: { $in: PLAYED_OUTCOMES },
+  });
 
   for (let week = first; week <= lastWeek; week = shiftYMD(week, 7)) {
     const settleDay = shiftYMD(week, 7);
@@ -185,7 +197,12 @@ export async function settleLeapWeeks(args: {
       ).lean<LeapWeekDoc>());
 
     const grant = emptyGrant();
-    const targets = markTargets(config, ledger.scheduled, ledger.scheduledDays);
+    const targets = markTargets(
+      config,
+      targetBasis(ledger.scheduled, weekDoc?.scheduledCap),
+      ledger.scheduledDays,
+      clampLeague(config, weekDoc?.league ?? state.league),
+    );
     const met = marksMet(targets, ledger.hops, ledger.activeDays);
     const noStayLine = !targets.find((mark) => mark.id === 'hold')?.available;
     const paidMarks = new Set<LeapMarkId>(weekDoc?.marks ?? []);
@@ -282,6 +299,8 @@ export async function settleLeapWeeks(args: {
 
     weeksSettled += 1;
     if (outcome === 'quiet') continue;
+    const firstWeek = played === 0;
+    played += 1;
     result = {
       weekKey: week,
       outcome,
@@ -294,6 +313,7 @@ export async function settleLeapWeeks(args: {
       grantedItemIds: [...(weekDoc?.grantedItemIds ?? []), ...grant.grantedItemIds],
       shieldsLeft: 0,
       weeksSettled,
+      firstWeek,
     };
   }
 

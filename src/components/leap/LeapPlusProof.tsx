@@ -52,7 +52,7 @@ export function LeapPlusProof({
           </span>
           <span className="flex items-center gap-1.5">
             {target.plusReachRewards.slice(0, 2).map((reward, i) => (
-              <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i + 2} bonus />
+              <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i + 2} />
             ))}
           </span>
         </div>

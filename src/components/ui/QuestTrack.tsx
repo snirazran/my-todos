@@ -28,11 +28,13 @@ export function QuestTrack({
   target,
   action,
   entrance = false,
+  notch,
 }: {
   progress: number;
   target: number;
   action?: QuestTrackAction | null;
   entrance?: boolean;
+  notch?: number;
 }) {
   const reduceMotion = useReducedMotion();
   const safeTarget = Math.max(1, target);
@@ -209,6 +211,10 @@ export function QuestTrack({
         ? Math.max((clamped / safeTarget) * 100, 8)
         : 100;
   const charged = stage === 'charged';
+  const notchPct =
+    notch !== undefined && notch > 0 && notch < safeTarget
+      ? (notch / safeTarget) * 100
+      : null;
 
   useLayoutEffect(() => {
     const next = showBar ? fillPct : 100;
@@ -230,6 +236,13 @@ export function QuestTrack({
           aria-valuenow={hasAction ? safeTarget : clamped}
           className="relative flex h-2.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)]"
         >
+          {notchPct !== null && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 bg-rose-500/20 dark:bg-rose-400/25"
+              style={{ width: `${notchPct}%` }}
+            />
+          )}
           <span
             ref={fillRef}
             className="absolute inset-0 overflow-hidden rounded-full transition-transform ease-[cubic-bezier(0.45,0.05,0.2,1)] will-change-transform"
@@ -250,6 +263,13 @@ export function QuestTrack({
               className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-0"
             />
           </span>
+          {notchPct !== null && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white dark:bg-white/85"
+              style={{ left: `${notchPct}%` }}
+            />
+          )}
         </span>
       ) : (
         <span

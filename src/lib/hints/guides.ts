@@ -329,7 +329,7 @@ const GUIDES: Record<string, HintGuide> = {
         href: '/',
         anchor: 'task-fly',
         selector: HABIT_FLY,
-        say: 'Tick off a task that repeats. Every one is a hop toward your Leap',
+        say: 'Tick off a task that repeats. Every one counts toward your weekly league',
         timeoutMs: 90_000,
       },
     ],

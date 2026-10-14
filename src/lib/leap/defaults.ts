@@ -8,7 +8,7 @@ import type {
 } from './types';
 
 export const LEAP_CONFIG_ID = 'leap';
-export const LEAP_CONFIG_VERSION = 4;
+export const LEAP_CONFIG_VERSION = 5;
 
 export const RETIRED_LEAGUE_LABELS = [
   'Bronze Lily',
@@ -45,6 +45,7 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
   {
     label: 'Lily Leaf',
     multiplier: 1,
+    leapPercent: 50,
     weekRewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }],
     plusWeekRewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }],
     reachRewards: [],
@@ -53,6 +54,7 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
   {
     label: 'Lily Bud',
     multiplier: 1.25,
+    leapPercent: 60,
     weekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
     plusWeekRewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }],
     reachRewards: [
@@ -67,6 +69,7 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
   {
     label: 'Lily Bloom',
     multiplier: 1.5,
+    leapPercent: 70,
     weekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
     plusWeekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
     reachRewards: [
@@ -81,6 +84,7 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
   {
     label: 'Lily Bouquet',
     multiplier: 1.75,
+    leapPercent: 75,
     weekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
     plusWeekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
     reachRewards: [
@@ -95,6 +99,7 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
   {
     label: 'Lily Garden',
     multiplier: 2,
+    leapPercent: 80,
     weekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
     plusWeekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
     reachRewards: [

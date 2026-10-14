@@ -13,8 +13,10 @@ import {
   hopKeyDate,
   hopKeyGroup,
   lastScheduledBefore,
+  lineGoal,
   markTargets,
   marksMet,
+  targetBasis,
 } from './week';
 import {
   type BonusRewards,
@@ -58,21 +60,35 @@ function pickLuckyDrop(config: LeapConfigView): BonusRewards | null {
   return config.luckyDrops[config.luckyDrops.length - 1]?.rewards ?? null;
 }
 
+export function weekTargets(
+  ctx: Pick<LeapContext, 'config' | 'ledger' | 'weekDoc' | 'state'>,
+) {
+  return markTargets(
+    ctx.config,
+    targetBasis(ctx.ledger.scheduled, ctx.weekDoc.scheduledCap),
+    ctx.ledger.scheduledDays,
+    clampLeague(ctx.config, ctx.weekDoc.league ?? ctx.state.league),
+  );
+}
+
 export function meterFor(
-  ctx: Pick<LeapContext, 'config' | 'ledger'>,
+  ctx: Pick<LeapContext, 'config' | 'ledger' | 'weekDoc' | 'state'>,
   reached: LeapMarkId[],
 ): LeapHopResult['meter'] {
-  const targets = markTargets(
-    ctx.config,
-    ctx.ledger.scheduled,
-    ctx.ledger.scheduledDays,
-  );
+  const targets = weekTargets(ctx);
   const leap = targets.find((mark) => mark.id === 'leap');
   const hold = targets.find((mark) => mark.id === 'hold');
+  const { hops, activeDays } = ctx.ledger;
+  const goal = (mark: typeof leap, id: LeapMarkId) =>
+    !mark || !mark.available
+      ? 0
+      : reached.includes(id)
+        ? mark.target
+        : lineGoal(mark, hops, activeDays);
   return {
-    hops: ctx.ledger.hops,
-    target: leap?.available ? leap.target : Math.max(ctx.ledger.scheduled, 1),
-    holdTarget: hold?.available ? hold.target : 0,
+    hops,
+    target: goal(leap, 'leap'),
+    holdTarget: goal(hold, 'hold'),
     reached,
   };
 }
@@ -209,13 +225,17 @@ export async function creditHops(
     }
   }
 
+  if (hopCount > 0 && typeof weekDoc.scheduledCap !== 'number' && ledger.scheduled > 0) {
+    await LeapWeekModel.updateOne(
+      { _id: weekDoc._id, scheduledCap: { $exists: false } },
+      { $set: { scheduledCap: ledger.scheduled } },
+    );
+    weekDoc.scheduledCap = ledger.scheduled;
+  }
+
   const reached = new Set<LeapMarkId>(weekDoc.marks ?? []);
   const marks: LeapHopResult['marks'] = [];
-  const met = marksMet(
-    markTargets(config, ledger.scheduled, ledger.scheduledDays),
-    ledger.hops,
-    ledger.activeDays,
-  );
+  const met = marksMet(weekTargets(ctx), ledger.hops, ledger.activeDays);
   for (const id of met) {
     if (reached.has(id)) continue;
     const paid = await payMark({
@@ -257,6 +277,15 @@ export async function creditHops(
     ...total.grantedItemIds,
   ];
 
+  const joined = ctx.state.hopsTotal === 0 && hopCount > 0;
+  const join = joined
+    ? {
+        weekKey: currentWeek,
+        giftIds: lucky?.first
+          ? lucky.grantedItemIds.filter((id) => id.startsWith('gift_box'))
+          : [],
+      }
+    : null;
   const inc: Record<string, number> = {};
   if (hopCount > 0) inc['quests.leap.hopsTotal'] = hopCount;
   if (!isPremium && total.fliesGranted > 0) {
@@ -265,12 +294,16 @@ export async function creditHops(
   await UserModel.updateOne(
     { _id: userId },
     {
-      $set: { 'quests.leap.luck.sinceDrop': sinceDrop },
+      $set: {
+        'quests.leap.luck.sinceDrop': sinceDrop,
+        ...(join ? { 'quests.leap.pendingJoin': join } : {}),
+      },
       ...(Object.keys(inc).length ? { $inc: inc } : {}),
     },
   );
   ctx.state.luck.sinceDrop = sinceDrop;
   ctx.state.hopsTotal += hopCount;
+  if (join) ctx.state.pendingJoin = join;
   if (!isPremium) ctx.state.forgoneFlies += total.fliesGranted;
 
   if (hopCount > 0) {
@@ -315,6 +348,8 @@ export async function creditHops(
     league: ctx.state.league,
     leagueLabel: config.leagues[clampLeague(config, ctx.state.league)]?.label ?? 'Lily',
     nextLeagueLabel: config.leagues[ctx.state.league + 1]?.label ?? null,
+    weekKey: currentWeek,
+    joined,
     isPremium,
     catalog,
   };

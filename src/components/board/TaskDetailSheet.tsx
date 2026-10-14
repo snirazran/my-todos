@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Bell,
   FileText,
@@ -231,6 +232,7 @@ export default function TaskDetailSheet({
   nestedOpenRef.current = showRepeat || showBuddyInvite;
   const [cancelling, setCancelling] = useState(false);
   const { data: leapView } = useLeapView(open);
+  const router = useRouter();
 
   const notesText = useMemo(() => {
     if (!notes) return '';
@@ -428,10 +430,14 @@ export default function TaskDetailSheet({
                       </span>
                     )}
                     {showLeap && leapView && (
-                      <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#447d3f]/10 pl-1.5 pr-2.5 text-[#3d7a38] dark:text-emerald-400">
+                      <button
+                        type="button"
+                        onClick={runAndClose(() => router.push('/quests#leap'))}
+                        className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#447d3f]/10 pl-1.5 pr-2.5 text-[#3d7a38] transition active:scale-95 dark:text-emerald-400"
+                      >
                         <LeapStageMark />
                         {leagueTitle(leagueName(leapView))}
-                      </span>
+                      </button>
                     )}
                     {isRepeating && streak > 0 && (
                       <span className="inline-flex h-7 items-center gap-1 rounded-full bg-orange-500/10 px-2.5 text-orange-600 dark:text-orange-400">

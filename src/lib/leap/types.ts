@@ -28,6 +28,7 @@ export type LeapLuckyDrop = { weight: number; rewards: BonusRewards };
 export type LeapLeague = {
   label: string;
   multiplier: number;
+  leapPercent: number;
   /** Paid every week the Leap is landed while in this league. */
   weekRewards: BonusRewards;
   /** Paid once, the first time the league is reached. */
@@ -124,7 +125,10 @@ export type LeapWeekResult = {
   grantedItemIds: string[];
   shieldsLeft: number;
   weeksSettled: number;
+  firstWeek?: boolean;
 };
+
+export type LeapJoin = { weekKey: string; giftIds: string[] };
 
 export type LeapPrizePreview = { kind: 'item' | 'background'; id: string };
 
@@ -135,6 +139,8 @@ export type LeapView = {
   bestLeague: number;
   leagues: LeapLeagueView[];
   week: LeapWeekView;
+  repeating: number;
+  join: LeapJoin | null;
   shields: { count: number; cap: number };
   hopFlies: number;
   firstDropPending: boolean;
@@ -171,6 +177,8 @@ export type LeapHopResult = {
   league: number;
   leagueLabel: string;
   nextLeagueLabel: string | null;
+  weekKey: string;
+  joined: boolean;
   isPremium: boolean;
   catalog: Record<string, unknown>;
   balanceAfter?: number;

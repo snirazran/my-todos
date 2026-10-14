@@ -20,6 +20,7 @@ import {
   type LeapMarkConfig,
   type LeapMarkId,
 } from '@/lib/leap/types';
+import { markTargets } from '@/lib/leap/targets';
 
 const RARITIES: BonusRarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
@@ -205,19 +206,6 @@ const MARK_LABELS: Record<LeapMarkId, string> = {
   leap: 'Move up (Leap)',
 };
 
-function marksFor(config: LeapConfigView, scheduled: number, days: number) {
-  let previous = 0;
-  return LEAP_MARK_IDS.map((id) => {
-    const mark = config.marks[id];
-    const minDays = Math.max(2, Math.min(mark.minDays, days));
-    const target = Math.max(1, Math.ceil((scheduled * mark.percent) / 100), minDays);
-    const available =
-      scheduled >= mark.minScheduled && days >= 2 && target <= scheduled && target > previous;
-    if (available) previous = target;
-    return { id, target, available };
-  });
-}
-
 export function AdminLeapManager() {
   const [config, setConfig] = useState<LeapConfigView | null>(null);
   const [defaults, setDefaults] = useState<LeapConfigView | null>(null);
@@ -259,9 +247,13 @@ export function AdminLeapManager() {
       { label: '3 daily habits', scheduled: 21, days: 7 },
       { label: '5 weekday habits', scheduled: 25, days: 5 },
     ];
-    const top = config.leagues[config.leagues.length - 1]?.multiplier ?? 1;
+    const topIndex = Math.max(0, config.leagues.length - 1);
+    const top = config.leagues[topIndex]?.multiplier ?? 1;
     return examples.map((example) => {
-      const marks = marksFor(config, example.scheduled, example.days);
+      const marks = markTargets(config, example.scheduled, example.days, 0);
+      const topUp = markTargets(config, example.scheduled, example.days, topIndex).find(
+        (mark) => mark.id === 'leap',
+      );
       const markFlies = marks
         .filter((mark) => mark.available)
         .reduce((sum, mark) => sum + config.marks[mark.id].flies, 0);
@@ -269,8 +261,12 @@ export function AdminLeapManager() {
       const base = paidHops * config.hopFlies + markFlies;
       return {
         ...example,
-        marks: marks
-          .map((mark) => (mark.available ? `${mark.id === 'hold' ? 'Stay' : 'Up'} ${mark.target}` : null))
+        marks: [
+          ...marks.map((mark) =>
+            mark.available ? `${mark.id === 'hold' ? 'Stay' : 'Up'} ${mark.target}` : null,
+          ),
+          topUp?.available ? `top league Up ${topUp.target}` : null,
+        ]
           .filter(Boolean)
           .join(' · '),
         base,
@@ -526,7 +522,9 @@ export function AdminLeapManager() {
         <p className="text-sm text-muted-foreground">
           Targets are a share of the habit ticks the user scheduled this week,
           so every schedule is judged against itself. Each line pays the moment
-          it is crossed. Stay keeps the league; Move up promotes next week.
+          it is crossed. Stay keeps the league; Move up promotes next week and
+          uses each league&apos;s Promotion %. No line ever needs every tick, and
+          once the week&apos;s first habit is ticked its targets can only go down.
         </p>
         <div className="mt-4 space-y-4">
           {LEAP_MARK_IDS.map((id) => {
@@ -535,13 +533,19 @@ export function AdminLeapManager() {
               <div key={id} className="rounded-xl border border-border/60 p-3">
                 <p className="mb-2 text-sm font-black text-foreground">{MARK_LABELS[id]}</p>
                 <div className="grid gap-3 sm:grid-cols-4">
-                  <NumberField
-                    label="% of scheduled"
-                    min={1}
-                    max={100}
-                    value={mark.percent}
-                    onChange={(percent) => patchMark(id, { percent })}
-                  />
+                  {id === 'hold' ? (
+                    <NumberField
+                      label="% of scheduled"
+                      min={1}
+                      max={100}
+                      value={mark.percent}
+                      onChange={(percent) => patchMark(id, { percent })}
+                    />
+                  ) : (
+                    <p className="self-center text-[11px] font-bold text-muted-foreground">
+                      % is set per league below.
+                    </p>
+                  )}
                   <NumberField
                     label="Min distinct days"
                     min={1}
@@ -595,6 +599,15 @@ export function AdminLeapManager() {
                 </label>
                 <div className="w-28 shrink-0">
                   <NumberField
+                    label="Promotion %"
+                    min={1}
+                    max={100}
+                    value={league.leapPercent}
+                    onChange={(leapPercent) => patchLeague(index, { leapPercent })}
+                  />
+                </div>
+                <div className="w-28 shrink-0">
+                  <NumberField
                     label="Multiplier"
                     min={1}
                     max={5}
@@ -637,6 +650,11 @@ export function AdminLeapManager() {
                     label: 'New Lily',
                     multiplier:
                       (config.leagues[config.leagues.length - 1]?.multiplier ?? 1) + 0.25,
+                    leapPercent: Math.min(
+                      95,
+                      (config.leagues[config.leagues.length - 1]?.leapPercent ??
+                        config.marks.leap.percent) + 5,
+                    ),
                     weekRewards: [],
                     reachRewards: [],
                     plusReachRewards: [],

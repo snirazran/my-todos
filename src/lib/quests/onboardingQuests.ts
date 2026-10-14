@@ -64,7 +64,7 @@ export const FIRST_HOPS_QUEST: OnboardingQuestDef = {
       tagMode: 'ignore',
       metricKey: 'focus_tag_linked',
       helpText:
-        'Tick off a task that repeats. Every one is a hop toward your Leap.',
+        'Tick off a task that repeats. Every one counts toward your weekly league.',
       rewards: fixedFlies(15),
     },
   ],
