@@ -246,7 +246,7 @@ export const METRICS: MetricDefinition[] = [
     system: 'growth',
     unit: 'percent',
     format: 'percent',
-    definition: 'DAU divided by MAU, as a percentage.',
+    definition: 'Average DAU across the complete days of the range, divided by MAU, as a percentage.',
     why: 'How many days a month the average user shows up. A daily-habit app should be well above a weekly one.',
     direction: 'up',
     band: { min: 20 },

@@ -213,6 +213,13 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
   const dailySessions = new Map(dayUserRows.map((row) => [row._id, row.sessions]));
   const dailyNewUsers = new Map(newUserRows.map((row) => [row._id, row.count]));
 
+  const todayKey = ymd(new Date());
+  const completeDates = dates.filter((date) => date < todayKey);
+  const dauDates = completeDates.length ? completeDates : dates;
+  const dau = round(
+    dauDates.reduce((sum, date) => sum + (dailyActiveUsers.get(date) ?? 0), 0) / dauDates.length,
+  );
+
   const activeSince = (from: Date) => {
     const ids = new Set<string>();
     const fromKey = ymd(from);
@@ -240,7 +247,7 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
     newUsers: Array.from(dailyNewUsers.values()).reduce((sum, value) => sum + value, 0),
     totalUsers: counts[0],
     premiumUsers: counts[1],
-    dau: dailyActiveUsers.get(ymd(range.endDay)) ?? 0,
+    dau,
     wau: activeSince(addUtcDays(range.endDay, -6)),
     mau: activeSince(rollingStart),
     eventsInRange: totalRows.reduce((sum, row) => sum + row.count, 0),

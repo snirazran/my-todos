@@ -203,7 +203,7 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
         sparkline: context.dates.map((date) => context.dailyActiveUsers.get(date) ?? 0),
       }),
       kpi('stickiness', rate(context.dau, context.mau), {
-        detail: `${context.dau} DAU / ${context.mau} MAU`,
+        detail: `${context.dau} avg DAU / ${context.mau} MAU`,
         sample: context.mau,
       }),
       kpi('activation_rate', activationRate, {
