@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { PomodoroPhase } from '@/lib/frogodoroStore';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
+import { timerPhaseEndMessage } from '@/lib/notifications/frogVoice';
 
 /**
  * Frogodoro timer-completion notifications.
@@ -17,28 +18,6 @@ import { iosAlarmFile } from '@/lib/timerSoundFiles';
 // Fixed IDs so we can cancel/replace without tracking state.
 const PHASE_END_ID = 880001;
 const CHAINED_BREAK_END_ID = 880002;
-
-function phaseEndContent(phase: PomodoroPhase, autoStartBreak: boolean) {
-  if (phase === 'focus' && autoStartBreak) {
-    return {
-      type: 'break_started',
-      title: 'Break started',
-      body: 'Focus time finished. Your break has started.',
-    };
-  }
-  if (phase === 'focus') {
-    return {
-      type: 'timer_complete',
-      title: 'Focus timer finished',
-      body: 'Time for a break. You earned it!',
-    };
-  }
-  return {
-    type: 'break_complete',
-    title: 'Break finished',
-    body: 'Ready to focus? Start again whenever you are.',
-  };
-}
 
 export async function cancelTimerNotifications(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
@@ -80,7 +59,7 @@ export async function scheduleTimerNotifications(opts: {
     const notifSound =
       Capacitor.getPlatform() === 'ios' ? iosAlarmFile(timerSound) : undefined;
 
-    const first = phaseEndContent(phase, autoStartBreak);
+    const first = timerPhaseEndMessage(phase, autoStartBreak);
     const notifications = [
       {
         id: PHASE_END_ID,
@@ -101,10 +80,11 @@ export async function scheduleTimerNotifications(opts: {
     // cancelled/replaced, so there's never a duplicate.
     if (phase === 'focus' && autoStartBreak && breakDurationSec > 0) {
       const breakEnd = endTime + breakDurationSec * 1000;
+      const chained = timerPhaseEndMessage('break', false);
       notifications.push({
         id: CHAINED_BREAK_END_ID,
-        title: 'Break finished',
-        body: 'Ready to focus? Start again whenever you are.',
+        title: chained.title,
+        body: chained.body,
         schedule: { at: new Date(breakEnd), allowWhileIdle: true },
         sound: notifSound,
         smallIcon: 'ic_notification',

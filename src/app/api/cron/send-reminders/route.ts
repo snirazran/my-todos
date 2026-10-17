@@ -240,13 +240,13 @@ async function leapMessage(
         result.outcome === 'up'
           ? {
               title: `You advanced to the ${league(result.leagueAfter)} League!`,
-              body: 'Your habits did it. Every habit now pays more flies.',
+              body: 'Your habits did that. Every habit now pays more flies. Fancy.',
               data: { type: 'leap_day', path: '/quests#leap' },
             }
           : result.outcome === 'covered'
             ? {
                 title: 'A Lily Pad saved you',
-                body: `You stay in the ${league(result.leagueAfter)} League. A fresh week starts now.`,
+                body: `You stay in the ${league(result.leagueAfter)} League. Fresh week, clean slate.`,
                 data: { type: 'leap_day', path: '/quests#leap' },
               }
             : null;
@@ -273,7 +273,7 @@ async function leapMessage(
     ) {
       return {
         title: `${habits(holdLeft)} to leave the demotion zone`,
-        body: `Finish ${them(holdLeft)} tonight to stay in the ${league(view.league)} League.`,
+        body: `Finish ${them(holdLeft)} tonight to stay in the ${league(view.league)} League. You've got this.`,
         data: { type: 'leap_reminder', path: '/' },
       };
     }
@@ -282,7 +282,7 @@ async function leapMessage(
     if (next && left <= Math.min(2, week.openToday)) {
       return {
         title: `${habits(left)} to the promotion zone`,
-        body: `Finish ${them(left)} tonight to advance to the ${next} League.`,
+        body: `Finish ${them(left)} tonight to advance to the ${next} League. So close.`,
         data: { type: 'leap_reminder', path: '/' },
       };
     }

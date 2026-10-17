@@ -31,10 +31,9 @@ function invitePushBody(params: BuddyCreateParams): string {
       ? `${params.text.slice(0, GOAL_TEXT_PUSH_MAX - 1).trimEnd()}…`
       : params.text;
   const schedule = buddyScheduleSummary(params);
-  const tail = "you'll see each other's progress.";
   return schedule
-    ? `"${text}" · ${schedule} — ${tail}`
-    : `Team up on "${text}" — ${tail}`;
+    ? `"${text}" · ${schedule}. Team up and you'll see each other's progress.`
+    : `Team up on "${text}" and you'll see each other's progress.`;
 }
 
 export async function POST(req: NextRequest) {

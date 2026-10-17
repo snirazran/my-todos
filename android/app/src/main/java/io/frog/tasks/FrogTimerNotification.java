@@ -173,16 +173,16 @@ public final class FrogTimerNotification {
     /** The ringing notification — also used by the sound service's startForeground. */
     public static Notification buildAlarm(Context ctx, FrogTimerState s) {
         boolean isFocus = !"break".equals(s.phase);
-        String title = isFocus ? "Focus finished" : "Break finished";
+        String title = isFocus ? "Focus done" : "Break's over";
         String body;
         if (isFocus && s.fliesCaught > 0) {
             body = s.fliesCaught == 1
-                    ? "1 fly caught — tap Done to collect."
-                    : s.fliesCaught + " flies caught — tap Done to collect.";
+                    ? "Nice focus. 1 fly caught. Tap Done to collect."
+                    : "Nice focus. " + s.fliesCaught + " flies caught. Tap Done to collect.";
         } else {
             body = isFocus
-                    ? "Time for a break. You earned it!"
-                    : "Ready to focus whenever you are.";
+                    ? "Nice work. Take a break, you earned it."
+                    : "Ready for another round? Start whenever you are.";
         }
         int color = isFocus ? Color.parseColor("#16a34a") : Color.parseColor("#0ea5e9");
 

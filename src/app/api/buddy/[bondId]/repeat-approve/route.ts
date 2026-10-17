@@ -80,7 +80,7 @@ export async function POST(
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(change.requestedBy, {
         title: `${name} approved your change`,
-        body: 'The new schedule is live.',
+        body: 'The new schedule is live for both of you.',
         path: '/planner',
         type: 'buddy_repeat_approved',
       }),

@@ -15,6 +15,7 @@ import { createTasksForUser } from '@/app/api/tasks/route';
 import { buildAcceptBody, repeatLabelFor } from '@/lib/buddy/bond';
 import { getZonedToday } from '@/lib/utils';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
+import { shortTaskText } from '@/lib/notifications/frogVoice';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
@@ -256,7 +257,7 @@ export async function POST(req: NextRequest) {
           void buddyDisplayName(userId).then((name) =>
             sendBuddyPush(referral.inviterId, {
               title: `${name} joined you`,
-              body: `You're sharing "${params.text}" now. Game on.`,
+              body: `You're sharing "${shortTaskText(params.text) ?? 'a task'}" now. Game on.`,
               path: '/planner',
               type: 'buddy_accepted',
             }),

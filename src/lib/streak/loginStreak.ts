@@ -65,6 +65,15 @@ function dayKeyDiff(fromKey: string, toKey: string): number {
   );
 }
 
+function readGoal(raw: any): LoginStreakGoal | null {
+  if (!raw || typeof raw.days !== 'number') return null;
+  return {
+    days: Math.max(1, Math.floor(raw.days)),
+    startCount: Math.max(0, Math.floor(raw.startCount ?? 0)),
+    startDayKey: typeof raw.startDayKey === 'string' ? raw.startDayKey : '',
+  };
+}
+
 function readRescue(raw: any): StreakRescue | null {
   if (
     !raw ||
@@ -98,6 +107,7 @@ function readRescue(raw: any): StreakRescue | null {
     adsWatched: Math.max(0, Math.floor(raw.adsWatched ?? 0)),
     adEligible: raw.adEligible !== false,
     dismissed: raw.dismissed === true,
+    goal: readGoal(raw.goal),
   };
 }
 
@@ -159,17 +169,10 @@ function readCelebration(raw: any): PendingStreakCelebration | null {
 
 export function readLoginStreakState(user: any): LoginStreakState {
   const raw = user?.quests?.loginStreak;
-  const goal =
-    raw?.goal && typeof raw.goal.days === 'number'
-      ? {
-          days: Math.max(1, Math.floor(raw.goal.days)),
-          startCount: Math.max(0, Math.floor(raw.goal.startCount ?? 0)),
-          startDayKey:
-            typeof raw.goal.startDayKey === 'string' ? raw.goal.startDayKey : '',
-        }
-      : null;
+  const count = Math.max(0, Math.floor(raw?.count ?? 0));
+  const goal = readGoal(raw?.goal);
   return {
-    count: Math.max(0, Math.floor(raw?.count ?? 0)),
+    count,
     lastDayKey: typeof raw?.lastDayKey === 'string' ? raw.lastDayKey : '',
     evaluatedDayKey:
       typeof raw?.evaluatedDayKey === 'string' ? raw.evaluatedDayKey : '',
@@ -183,7 +186,7 @@ export function readLoginStreakState(user: any): LoginStreakState {
     protectedDayKeys: Array.isArray(raw?.protectedDayKeys)
       ? raw.protectedDayKeys.filter((k: unknown) => typeof k === 'string')
       : [],
-    goal,
+    goal: goal && count >= goal.startCount ? goal : null,
     goalsCompleted: Array.isArray(raw?.goalsCompleted)
       ? raw.goalsCompleted.filter(
           (g: any) => typeof g?.days === 'number' && typeof g?.dayKey === 'string',
@@ -619,6 +622,7 @@ function buildRescueOffer(args: {
   missedDayKey: string;
   loginCountAtRisk: number;
   taskStreaks: TaskStreakAtRisk[];
+  goal: LoginStreakGoal | null;
 }): StreakRescue | null {
   const {
     user,
@@ -627,6 +631,7 @@ function buildRescueOffer(args: {
     missedDayKey,
     loginCountAtRisk,
     taskStreaks,
+    goal,
   } = args;
 
   if (loginCountAtRisk <= 0 && taskStreaks.length === 0) return null;
@@ -651,6 +656,7 @@ function buildRescueOffer(args: {
     adsRequired: isPremiumUser(user.toObject()) ? 0 : rescueAdsRequired(largest),
     adsWatched: 0,
     adEligible,
+    goal,
   };
 }
 
@@ -749,6 +755,10 @@ async function evaluateStreakDay(
     freshState.lastDayKey < yesterdayKey &&
     freshState.count >= RESCUE_MIN_STREAK &&
     computeGap(freshState.lastDayKey, todayKey) === 1;
+  const goalBroke =
+    !!freshState.goal &&
+    freshState.lastDayKey < yesterdayKey &&
+    freshState.goal.startDayKey <= yesterdayKey;
 
   const taskStreaksAtRisk = await findTaskStreaksAtRisk({
     userId,
@@ -774,6 +784,7 @@ async function evaluateStreakDay(
           ? freshState.notif.saverIgnoredCount + 1
           : freshState.notif.saverIgnoredCount,
     },
+    goal: goalBroke ? null : freshState.goal,
     rescue:
       buildRescueOffer({
         user,
@@ -782,6 +793,7 @@ async function evaluateStreakDay(
         missedDayKey: yesterdayKey,
         loginCountAtRisk: loginBroke ? freshState.count : 0,
         taskStreaks: taskStreaksAtRisk,
+        goal: loginBroke && goalBroke ? freshState.goal : null,
       }) ?? activeRescueForDay(freshState.rescue, todayKey),
   };
 
@@ -1085,9 +1097,21 @@ export async function performRescue(args: {
   const newCount = loginRestored
     ? rescue.previousCount + (doneToday ? 1 : 0)
     : state.count;
+  const pledgedSinceMiss =
+    !!state.goal && state.goal.startDayKey > rescue.missedDayKey;
+  const goal = !loginRestored
+    ? state.goal
+    : state.goal && pledgedSinceMiss
+      ? {
+          ...state.goal,
+          startCount:
+            state.goal.startCount + newCount - (doneToday ? state.count : 0),
+        }
+      : state.goal ?? rescue.goal ?? null;
   const next: LoginStreakState = {
     ...state,
     count: newCount,
+    goal,
     lastDayKey:
       loginRestored && !doneToday ? rescue.missedDayKey : state.lastDayKey,
     longestStreak: Math.max(state.longestStreak, newCount),

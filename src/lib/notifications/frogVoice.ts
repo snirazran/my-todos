@@ -1,16 +1,21 @@
 /**
- * The frog's notification voice. Two registers, mixed across variants:
- * caring coach and dry, lightly dark humor. Routine nudges escalate with
- * the ignored streak: 0-1 mixes both registers, 2-3 goes dry only, 4 is
- * the driest and truthfully warns the frog goes quiet next (mute at 5).
+ * The frog's notification voice: warm underneath, dry on top. The frog is
+ * always on the user's side; the sass lands on the task, the list, the clock
+ * or the frog itself, never on the user. Routine nudges escalate with the
+ * ignored streak: 0-1 is the full voice, 2-3 goes short and deadpan, 4 is an
+ * honest, guilt-free heads-up that the frog goes quiet next (mute at 5).
  * Hard rules for any new copy:
- * the frog speaks as "I"; every number or claim must come from real data
- * (never invent durations or promises); name the actual task when one is
- * relevant; one register per message, never both mushed together.
+ * the title carries the news and reads fine alone (one phrase, no trailing
+ * period); the body is the frog speaking as "I", at most two short sentences,
+ * ending on one small next step; every number or claim must come from real
+ * data (never invent durations or promises); name the actual task when one is
+ * relevant; no guilt, no "don't forget", no "should"; "Lily Pad" and "pad"
+ * only ever mean the shield, and "hop" is never a verb.
  *
  * Lines are grouped into buckets and handed out by `cursors`, a per-user
  * position saved after each send. A bucket is walked end to end before any
- * line repeats, so the same sentence cannot come back two nights running.
+ * line repeats; buckets that fire daily hold 12+ lines so a sentence stays
+ * away for about two weeks, the time a repeat takes to feel fresh again.
  * Titles stay under ~40 characters and bodies under ~100 so nothing is
  * truncated on either platform.
  */
@@ -64,10 +69,13 @@ function makeCtx(partial: Partial<Ctx> = {}): Ctx {
     frog: partial.frog ? shortFrogName(partial.frog) : 'Your frog',
     task: partial.task ?? null,
     owed: partial.owed ?? 0,
-    partner: partial.partner ?? 'Your buddy',
+    partner: partial.partner ?? 'A friend',
     minutes: partial.minutes ?? 0,
   };
 }
+
+const others = (c: Ctx) =>
+  c.count - 1 === 1 ? 'The other one' : `The other ${c.count - 1}`;
 
 /**
  * Take the next line in a bucket. An unseen bucket starts at a random offset
@@ -115,91 +123,119 @@ const MORNING_BASE_ONE: Line[] = [
     title: () => 'One task today',
     body: (c) =>
       c.task
-        ? `Just "${c.task}". Do it and the rest of the day is ours.`
-        : 'Just one. Do it and the rest of the day is ours.',
+        ? `Just "${c.task}". Do it and the rest of the day is yours.`
+        : 'Just one. Do it and the rest of the day is yours.',
   },
   {
-    title: (c) => `${c.frog} checked your list`,
+    title: () => "Today's list is one line long",
     body: (c) =>
       c.task
-        ? `One task: "${c.task}". Practically done already.`
-        : 'One task. Practically done already.',
+        ? `"${c.task}". You've got this. I've survived herons.`
+        : "Just one task. You've got this. I've survived herons.",
   },
   {
-    title: () => 'A one-task day',
+    title: () => 'A one-task kind of day',
     body: (c) =>
       c.task
-        ? `"${c.task}" is the whole thing. I'll be here when it's done.`
-        : "That's the whole thing. I'll be here when it's done.",
+        ? `"${c.task}", then you're free. I like those odds.`
+        : "One task, then you're free. I like those odds.",
   },
   {
     title: () => 'Short list this morning',
     body: (c) =>
       c.task
-        ? `"${c.task}", then you're free. I like those odds.`
-        : "One item, then you're free. I like those odds.",
+        ? `Only "${c.task}". I'd do it before the day gets ideas.`
+        : "Only one task. I'd do it before the day gets ideas.",
   },
   {
-    title: () => 'Just the one',
+    title: () => 'The whole list: one task',
     body: (c) =>
       c.task
-        ? `"${c.task}". Get it early and the day owes you nothing.`
-        : 'Get it early and the day owes you nothing.',
+        ? `"${c.task}". I checked twice, out of suspicion.`
+        : 'I checked twice, out of suspicion.',
   },
   {
-    title: () => 'Today asks for one thing',
+    title: () => 'One task, then nothing',
     body: (c) =>
       c.task
-        ? `"${c.task}". That's it. That's the list.`
-        : "That's it. That's the list.",
+        ? `"${c.task}" first. After that, the day owes you a nap.`
+        : 'Do it first. After that, the day owes you a nap.',
   },
   {
-    title: (c) => `${c.frog} is on lookout`,
+    title: () => 'Easy mode today',
     body: (c) =>
       c.task
-        ? `One task — "${c.task}". Finish it and I'll catch us something.`
-        : "One task. Finish it and I'll catch us something.",
+        ? `Just "${c.task}". I'll be cheering quietly from the pond.`
+        : "Just one task. I'll be cheering quietly from the pond.",
   },
   {
-    title: () => 'The pond is quiet',
+    title: () => 'Morning! Just the one',
     body: (c) =>
       c.task
-        ? `One task on the list: "${c.task}". Perfect morning for it.`
-        : 'One task on the list. Perfect morning for it.',
+        ? `"${c.task}" is all. Get it done early and coast.`
+        : 'One task is all. Get it done early and coast.',
+  },
+  {
+    title: (c) => `${c.frog} read today's list`,
+    body: (c) =>
+      c.task
+        ? `It's just "${c.task}". Honestly, we've got this.`
+        : "It's one task. Honestly, we've got this.",
+  },
+  {
+    title: () => 'Rare sighting: a short list',
+    body: (c) =>
+      c.task
+        ? `Only "${c.task}" today. Enjoy it, these don't last.`
+        : "Only one task today. Enjoy it, these don't last.",
+  },
+  {
+    title: () => 'One task between you and smug',
+    body: (c) =>
+      c.task
+        ? `"${c.task}". Finish it and be insufferable about it.`
+        : 'Finish it and be insufferable about it.',
+  },
+  {
+    title: () => 'Suspiciously short list',
+    body: (c) =>
+      c.task
+        ? `Just "${c.task}". I'm not complaining. Go get it.`
+        : "One task. I'm not complaining. Go get it.",
   },
 ];
 
 const MORNING_BASE_MANY: Line[] = [
   {
-    title: (c) => `Today: ${c.count} tasks`,
+    title: (c) => `${c.count} tasks today`,
     body: (c) =>
       c.task
         ? `Start with "${c.task}". I'll handle the cheering.`
         : "Start with the smallest. I'll handle the cheering.",
   },
   {
-    title: (c) => `Morning — ${c.count} on the list`,
+    title: (c) => `Morning! ${c.count} on the list`,
     body: (c) =>
       c.task
-        ? `"${c.task}" looks like the easy one. I'd eat that first.`
-        : "The smallest one looks edible. I'd start there.",
+        ? `"${c.task}" looks like the easy one. I'd start there.`
+        : "The smallest one looks easy. I'd start there.",
   },
   {
-    title: (c) => `${c.count} tasks. I counted twice.`,
+    title: (c) => `${c.count} tasks, I counted twice`,
     body: (c) =>
       c.task
-        ? `"${c.task}" is the one staring at us. Blink first.`
-        : 'One of them is staring at us. Blink first.',
+        ? `"${c.task}" keeps staring at me. Please deal with it.`
+        : 'One of them keeps staring at me. Please deal with it.',
   },
   {
-    title: () => 'Your list is up before you',
+    title: () => 'Your list woke up before you',
     body: (c) =>
       c.task
-        ? `${c.count} waiting. "${c.task}" is closest to the water.`
-        : `${c.count} waiting. Pick whichever is closest.`,
+        ? `${c.count} waiting. "${c.task}" is a good way in.`
+        : `${c.count} waiting. The smallest is a good way in.`,
   },
   {
-    title: (c) => `${c.count} today`,
+    title: (c) => `${c.count} today, one at a time`,
     body: (c) =>
       c.task
         ? `Do "${c.task}" and ignore the rest for now. That's allowed.`
@@ -209,29 +245,64 @@ const MORNING_BASE_MANY: Line[] = [
     title: (c) => `${c.count} things, one morning`,
     body: (c) =>
       c.task
-        ? `"${c.task}" first. Momentum is a real thing, apparently.`
-        : 'Smallest first. Momentum is a real thing, apparently.',
-  },
-  {
-    title: () => 'The list is awake',
-    body: (c) =>
-      c.task
-        ? `${c.count} on it. "${c.task}" is the one I'd hop at.`
-        : `${c.count} on it. I'd hop at the shortest one.`,
+        ? `"${c.task}" first. Momentum is real, apparently.`
+        : 'Smallest first. Momentum is real, apparently.',
   },
   {
     title: (c) => `${c.count} before tonight`,
     body: (c) =>
       c.task
-        ? `"${c.task}" now, while the pond is still quiet.`
-        : 'Start now, while the pond is still quiet.',
+        ? `"${c.task}" now, while the world is still quiet.`
+        : 'Start now, while the world is still quiet.',
   },
   {
     title: (c) => `${c.frog} read your list`,
     body: (c) =>
       c.task
-        ? `${c.count} tasks. "${c.task}" is the one worth beating.`
-        : `${c.count} tasks. One of them is worth beating.`,
+        ? `${c.count} tasks. Strong list. "${c.task}" looks like a warm-up.`
+        : `${c.count} tasks. Strong list. Start with a warm-up.`,
+  },
+  {
+    title: (c) => `Morning briefing: ${c.count} tasks`,
+    body: (c) =>
+      c.task
+        ? `Recommended opener: "${c.task}". The frog has spoken.`
+        : 'Recommended opener: the smallest one. The frog has spoken.',
+  },
+  {
+    title: (c) => `${c.count} tasks, zero panic`,
+    body: (c) =>
+      c.task
+        ? `Start with "${c.task}". Then the next one. That's the whole trick.`
+        : "Start with one. Then the next. That's the whole trick.",
+  },
+  {
+    title: () => 'Good morning, list-haver',
+    body: (c) =>
+      c.task
+        ? `${c.count} today. I'd open with "${c.task}" and see how we feel.`
+        : `${c.count} today. I'd open with the smallest and see how we feel.`,
+  },
+  {
+    title: (c) => `Today has ${c.count} tasks for you`,
+    body: (c) =>
+      c.task
+        ? `"${c.task}" makes a good first bite. Frogs start small.`
+        : 'Take a small first bite. Frogs always do.',
+  },
+  {
+    title: () => 'Rise and shine, gently',
+    body: (c) =>
+      c.task
+        ? `${c.count} on today's list. "${c.task}" is a soft start.`
+        : `${c.count} on today's list. Pick a soft start.`,
+  },
+  {
+    title: () => 'The plan for today, by me',
+    body: (c) =>
+      c.task
+        ? `Step one: "${c.task}". Step two: feel great about it.`
+        : 'Step one: the smallest task. Step two: feel great about it.',
   },
 ];
 
@@ -240,41 +311,50 @@ const MORNING_DRY_ONE: Line[] = [
     title: () => 'One task today',
     body: (c) =>
       c.task
-        ? `"${c.task}". That's the whole list. I'll wait.`
-        : "That's the whole list. I'll wait.",
+        ? `"${c.task}". I'll keep this short. I know you're busy.`
+        : "I'll keep this short. I know you're busy.",
   },
   {
-    title: () => 'Morning. One task.',
-    body: (c) =>
-      c.task ? `"${c.task}". I've said my piece.` : "I've said my piece.",
-  },
-  {
-    title: () => 'Still just the one',
+    title: () => 'Morning, one task',
     body: (c) =>
       c.task
-        ? `"${c.task}" has been there a while. No notes.`
-        : 'It has been there a while. No notes.',
+        ? `"${c.task}". That's the whole message. Brevity is my gift.`
+        : "That's the whole message. Brevity is my gift.",
   },
   {
-    title: () => 'One item',
+    title: () => 'Just checking in',
     body: (c) =>
       c.task
-        ? `"${c.task}". I'm told this is achievable.`
-        : "I'm told this is achievable.",
+        ? `"${c.task}" is today's only task. No pressure. Mild pressure.`
+        : 'One task today. No pressure. Mild pressure.',
   },
   {
-    title: () => 'One. That is the number.',
+    title: () => 'The list, briefly',
     body: (c) =>
       c.task
-        ? `"${c.task}". Do with that what you like.`
-        : 'Do with that what you like.',
+        ? `One item: "${c.task}". I'm told it's very doable.`
+        : "One item. I'm told it's very doable.",
   },
   {
-    title: () => 'A single task',
+    title: () => 'Quick one',
     body: (c) =>
       c.task
-        ? `"${c.task}". I've done my part, which is this.`
-        : "I've done my part, which is this.",
+        ? `"${c.task}". That's it. I'll go back to my rock now.`
+        : "One task. That's it. I'll go back to my rock now.",
+  },
+  {
+    title: () => 'Same small list',
+    body: (c) =>
+      c.task
+        ? `"${c.task}" is waiting, and so, quietly, am I.`
+        : 'One task is waiting, and so, quietly, am I.',
+  },
+  {
+    title: () => 'Just the one',
+    body: (c) =>
+      c.task
+        ? `"${c.task}". I'll be over here being patient. It's my thing.`
+        : "I'll be over here being patient. It's my thing.",
   },
 ];
 
@@ -283,160 +363,214 @@ const MORNING_DRY_MANY: Line[] = [
     title: () => 'Me again',
     body: (c) =>
       c.task
-        ? `${c.count} on the list. Start with "${c.task}" or don't.`
-        : `${c.count} on the list. Start anywhere or don't.`,
+        ? `${c.count} on the list. "${c.task}" is a fine start. Your call.`
+        : `${c.count} on the list. Start anywhere, or don't. Your call.`,
   },
   {
     title: (c) => `${c.count} tasks today`,
     body: (c) =>
       c.task
-        ? `"${c.task}" is up first. I've done my part, which is this.`
-        : 'I counted them. The rest is on you.',
+        ? `Keeping it short: "${c.task}" first. Back to my rock.`
+        : 'Keeping it short: smallest first. Back to my rock.',
   },
   {
-    title: (c) => `${c.count}. I counted.`,
+    title: () => 'The short version',
     body: (c) =>
       c.task
-        ? `"${c.task}" included. The rest is on you.`
-        : 'The rest is on you.',
+        ? `${c.count} tasks. Start with "${c.task}". That's all I've got.`
+        : `${c.count} tasks. Start anywhere. That's all I've got.`,
   },
   {
-    title: (c) => `Morning. ${c.count} tasks.`,
+    title: (c) => `Morning report: ${c.count}`,
     body: (c) =>
       c.task
-        ? `"${c.task}" is still there. Loyal, that one.`
-        : 'They are all still there. Loyal, that lot.',
+        ? `"${c.task}" is on top. Loyal, that one.`
+        : 'All present and accounted for. Very loyal.',
   },
   {
-    title: (c) => `${c.count} on the list`,
+    title: (c) => `${c.count} on today's list`,
     body: (c) =>
       c.task
-        ? `"${c.task}" hasn't moved. I'm just noting it.`
-        : "Nothing has moved. I'm just noting it.",
+        ? `No speech today. Just "${c.task}", whenever you're ready.`
+        : "No speech today. Just the list, whenever you're ready.",
   },
   {
-    title: (c) => `The list stands at ${c.count}`,
+    title: () => 'A brief croak',
     body: (c) =>
       c.task
-        ? `"${c.task}" leads. No pressure, no expectations.`
-        : 'No pressure, no expectations.',
+        ? `${c.count} tasks. "${c.task}" is a decent start. Your call.`
+        : `${c.count} tasks. Pick any. Your call.`,
+  },
+  {
+    title: () => 'Not nagging, just informing',
+    body: (c) =>
+      c.task
+        ? `${c.count} on today's list, led by "${c.task}".`
+        : `${c.count} on today's list. That's the whole update.`,
+  },
+  {
+    title: () => 'Low-effort reminder',
+    body: (c) =>
+      c.task
+        ? `${c.count} tasks today. I did my part. "${c.task}" is yours.`
+        : `${c.count} tasks today. I did my part. The rest is yours.`,
   },
 ];
 
-function morningCroaksBody(c: Ctx): string {
+function morningQuietBody(c: Ctx): string {
   if (c.count === 1) {
     return c.task
-      ? `One task: "${c.task}". Ignore this one too and I go quiet.`
-      : 'One task today. Ignore this one too and I go quiet.';
+      ? `Today: "${c.task}". If this reminder misses too, I'll give you some quiet.`
+      : "One task today. If this reminder misses too, I'll give you some quiet.";
   }
   return c.task
-    ? `${c.count} today, starting with "${c.task}". Ignore this and I go quiet.`
-    : `${c.count} tasks today. Ignore this one too and I go quiet.`;
+    ? `${c.count} today, "${c.task}" first. If this reminder misses too, I'll ease off.`
+    : `${c.count} tasks today. If this reminder misses too, I'll give you some quiet.`;
 }
 
 function morningLastCroakBody(c: Ctx): string {
   if (c.count === 1) {
     return c.task
-      ? `"${c.task}" is still open. One more miss and I stop sending these.`
-      : 'One task still open. One more miss and I stop sending these.';
+      ? `"${c.task}" is open. One more miss and I'll stop sending these.`
+      : "One task open. One more miss and I'll stop sending these.";
   }
   return c.task
-    ? `${c.count} open, "${c.task}" among them. One more miss and I stop.`
-    : `${c.count} open. One more miss and I stop sending these.`;
+    ? `${c.count} open, "${c.task}" among them. One more miss and I'll ease off.`
+    : `${c.count} open. One more miss and I'll stop sending these.`;
+}
+
+function honestQuestionBody(c: Ctx): string {
+  if (c.count === 1) {
+    return c.task
+      ? `Are these helping? If not, I'll ease off. Today it's just "${c.task}".`
+      : "Are these helping? If not, I'll ease off. Today it's just one task.";
+  }
+  return c.task
+    ? `Are these helping? If not, I'll ease off. ${c.count} open, "${c.task}" first.`
+    : `Are these helping? If not, I'll ease off. ${c.count} tasks are open.`;
 }
 
 const MORNING_FINAL: Line[] = [
-  { title: () => 'Almost out of croaks', body: morningCroaksBody },
-  { title: () => 'Last croak before quiet', body: morningLastCroakBody },
+  { title: () => "I'll go quiet soon", body: morningQuietBody },
+  { title: () => 'Last croak for a while', body: morningLastCroakBody },
+  { title: () => 'Quick, honest question', body: honestQuestionBody },
 ];
 
 const EVENING_BASE_ONE: Line[] = [
   {
-    title: () => 'One task from a clear list',
-    body: (c) =>
-      c.task
-        ? `It's "${c.task}". Go get it — I'll get the flies ready.`
-        : "Go get it — I'll get the flies ready.",
-  },
-  {
-    title: () => 'One little task left',
+    title: () => 'One task left',
     body: (c) =>
       c.task
         ? `"${c.task}" thinks it survived the day. Surprise it.`
-        : 'It thinks it survived the day. Surprise it.',
+        : 'The last task thinks it survived the day. Surprise it.',
   },
   {
     title: () => 'One thing between you and done',
     body: (c) =>
       c.task
-        ? `"${c.task}". Then the evening is entirely yours.`
-        : 'Then the evening is entirely yours.',
+        ? `"${c.task}". Then the evening is all yours.`
+        : 'One task. Then the evening is all yours.',
   },
   {
     title: () => 'Still one open',
     body: (c) =>
       c.task
-        ? `"${c.task}" is small enough to finish before bed.`
-        : "It's small enough to finish before bed.",
+        ? `"${c.task}" can still be beaten before bed.`
+        : 'One task, and still time to beat it before bed.',
   },
   {
     title: () => 'Last one of the day',
     body: (c) =>
       c.task
-        ? `"${c.task}". Clear it and tomorrow starts empty.`
-        : 'Clear it and tomorrow starts empty.',
+        ? `"${c.task}". Clear it and tomorrow starts clean.`
+        : 'Clear the last task and tomorrow starts clean.',
   },
   {
-    title: () => 'One left on the pad',
+    title: () => 'So close',
     body: (c) =>
       c.task
-        ? `"${c.task}". I'd rather not carry it into tomorrow.`
-        : "I'd rather not carry it into tomorrow.",
+        ? `Just "${c.task}" left. Finish strong, then do absolutely nothing.`
+        : 'One task left. Finish strong, then do absolutely nothing.',
   },
   {
-    title: (c) => `${c.frog} is counting one`,
+    title: () => 'Down to the last one',
     body: (c) =>
       c.task
-        ? `"${c.task}" is all that's left. Finish strong.`
-        : "That's all that's left. Finish strong.",
+        ? `"${c.task}" is all that's left. I'm already proud of today.`
+        : "One task is all that's left. I'm already proud of today.",
+  },
+  {
+    title: () => 'The final boss',
+    body: (c) =>
+      c.task
+        ? `It's "${c.task}". Not very scary, as bosses go.`
+        : 'One task. Not very scary, as bosses go.',
+  },
+  {
+    title: () => 'One left, then smugness',
+    body: (c) =>
+      c.task
+        ? `"${c.task}". Finish it and we both get to feel smug.`
+        : 'Finish the last task and we both get to feel smug.',
+  },
+  {
+    title: () => 'Evening! One to go',
+    body: (c) =>
+      c.task
+        ? `"${c.task}" is the last one. Then pajamas, guilt-free.`
+        : 'The last task, then pajamas, guilt-free.',
+  },
+  {
+    title: () => 'Almost a perfect day',
+    body: (c) =>
+      c.task
+        ? `Only "${c.task}" stands in the way. I'd hate for it to win.`
+        : "Only one task stands in the way. I'd hate for it to win.",
+  },
+  {
+    title: () => "Tonight's to-do: one",
+    body: (c) =>
+      c.task
+        ? `"${c.task}", then the couch. In that order, ideally.`
+        : 'One task, then the couch. In that order, ideally.',
+  },
+  {
+    title: () => 'Tomorrow-you says hi',
+    body: (c) =>
+      c.task
+        ? `They'd love "${c.task}" done tonight. Just passing it on.`
+        : "They'd love the last task done tonight. Just passing it on.",
   },
 ];
 
 const EVENING_BASE_MANY: Line[] = [
   {
-    title: (c) => `${c.count} left — still doable`,
+    title: (c) => `${c.count} left, still doable`,
     body: (c) =>
       c.task
         ? `One more tonight and we sleep happy. "${c.task}" is right there.`
         : 'One more tonight and we sleep happy.',
   },
   {
-    title: () => 'About tonight…',
-    body: (c) =>
-      c.task
-        ? `${c.count} tasks hoped you forgot them. Prove "${c.task}" wrong.`
-        : `${c.count} tasks hoped you forgot them. Prove one wrong.`,
-  },
-  {
     title: (c) => `${c.count} still open`,
     body: (c) =>
       c.task
-        ? `I'm not judging. I'm watching "${c.task}" not happen.`
-        : "I'm not judging. I'm just watching.",
+        ? `No judgment. Just a frog, a list, and "${c.task}" looking easy.`
+        : 'No judgment. Just a frog, a list, and one easy-looking task.',
   },
   {
-    title: () => 'Evening check',
+    title: () => 'Evening check-in',
     body: (c) =>
       c.task
-        ? `${c.count} open. "${c.task}" is the one I'd close out.`
-        : `${c.count} open. Close out the smallest one.`,
+        ? `${c.count} open. "${c.task}" is the one I'd close out tonight.`
+        : `${c.count} open. I'd close out the smallest one tonight.`,
   },
   {
-    title: (c) => `${c.count} to go`,
+    title: (c) => `${c.count} to go, no stress`,
     body: (c) =>
       c.task
-        ? `Tomorrow you would rather "${c.task}" was already done.`
-        : 'Tomorrow you would rather one of these was already done.',
+        ? `Pick "${c.task}" and call it a night. One counts.`
+        : 'Pick one and call it a night. One counts.',
   },
   {
     title: () => 'One more and we call it',
@@ -446,6 +580,48 @@ const EVENING_BASE_MANY: Line[] = [
         : `${c.count} left. Any of them counts as the one.`,
   },
   {
+    title: () => "The day isn't over yet",
+    body: (c) =>
+      c.task
+        ? `${c.count} open, and "${c.task}" is right there. Just saying.`
+        : `${c.count} open, and one is right there. Just saying.`,
+  },
+  {
+    title: () => 'Quick win before bed?',
+    body: (c) =>
+      c.task
+        ? `Knock out "${c.task}", then feet up. ${others(c)} can wait.`
+        : 'Knock one out, then feet up. The rest can wait.',
+  },
+  {
+    title: (c) => `${c.count} tasks, one evening`,
+    body: (c) =>
+      c.task
+        ? `Do "${c.task}" and let the rest wait for morning. They're used to it.`
+        : "Do one and let the rest wait for morning. They're used to it.",
+  },
+  {
+    title: () => 'Your list is getting cocky',
+    body: (c) =>
+      c.task
+        ? `${c.count} still open. Knock "${c.task}" off and humble it.`
+        : `${c.count} still open. Knock one off and humble it.`,
+  },
+  {
+    title: () => 'Before the couch claims you',
+    body: (c) =>
+      c.task
+        ? `${c.count} left. Clear "${c.task}" and the couch is yours.`
+        : `${c.count} left. Clear one and the couch is yours.`,
+  },
+  {
+    title: (c) => `Evening report from ${c.frog}`,
+    body: (c) =>
+      c.task
+        ? `${c.count} open. I'd pick off "${c.task}", then rest.`
+        : `${c.count} open. I'd pick off the smallest, then rest.`,
+  },
+  {
     title: (c) => `Still ${c.count} on the list`,
     body: (c) =>
       c.task
@@ -453,11 +629,18 @@ const EVENING_BASE_MANY: Line[] = [
         : 'Pick one. Then the pond goes quiet for the night.',
   },
   {
-    title: () => 'The day is not over yet',
+    title: () => 'Not over till the frog sleeps',
     body: (c) =>
       c.task
-        ? `${c.count} open, and "${c.task}" takes the least effort.`
-        : `${c.count} open. Take the one with the least effort.`,
+        ? `${c.count} left, and I'm still up. "${c.task}", maybe?`
+        : `${c.count} left, and I'm still up. One more, maybe?`,
+  },
+  {
+    title: () => 'A little one before bed?',
+    body: (c) =>
+      c.task
+        ? `"${c.task}". ${c.count} are open, but one is plenty.`
+        : `${c.count} are open, but one is plenty.`,
   },
 ];
 
@@ -467,35 +650,49 @@ const EVENING_DRY_ONE: Line[] = [
     body: (c) =>
       c.task
         ? `"${c.task}". Do it and I'll say nothing more tonight.`
-        : "Do it and I'll say nothing more tonight.",
+        : "One task. Do it and I'll say nothing more tonight.",
   },
   {
     title: () => 'Still one open',
     body: (c) =>
       c.task
         ? `"${c.task}" made it to evening. Impressive, in its way.`
-        : 'It made it to evening. Impressive, in its way.',
+        : 'The last task made it to evening. Impressive, in its way.',
   },
   {
-    title: () => 'One task, still standing',
+    title: () => 'Undefeated since morning',
     body: (c) =>
       c.task
-        ? `"${c.task}". Undefeated since this morning.`
-        : 'Undefeated since this morning.',
-  },
-  {
-    title: () => 'The one survivor',
-    body: (c) =>
-      c.task
-        ? `"${c.task}". I admire its persistence.`
-        : 'I admire its persistence.',
+        ? `"${c.task}". I admire its stubbornness. I'd still beat it.`
+        : "The last task. I admire its stubbornness. I'd still beat it.",
   },
   {
     title: () => 'Evening count: one',
     body: (c) =>
       c.task
-        ? `"${c.task}". Same as this morning. No change to report.`
-        : 'Same as this morning. No change to report.',
+        ? `"${c.task}". No speech. You know where it lives.`
+        : 'One task. No speech. You know where it lives.',
+  },
+  {
+    title: () => 'The lone survivor',
+    body: (c) =>
+      c.task
+        ? `"${c.task}". One tap ends its reign.`
+        : 'One task left. One tap ends its reign.',
+  },
+  {
+    title: () => 'Brief, as usual',
+    body: (c) =>
+      c.task
+        ? `"${c.task}" is the last one. That's the whole croak.`
+        : "One task left. That's the whole croak.",
+  },
+  {
+    title: () => 'Just one, just saying',
+    body: (c) =>
+      c.task
+        ? `"${c.task}". I'll be on my rock if you need me.`
+        : "One task. I'll be on my rock if you need me.",
   },
 ];
 
@@ -504,133 +701,174 @@ const EVENING_DRY_MANY: Line[] = [
     title: (c) => `${c.count} still open`,
     body: (c) =>
       c.task
-        ? `"${c.task}" among them. I'd start there. I'm a frog, though.`
-        : 'The list does not do itself. I checked.',
+        ? `"${c.task}" is a good start. I'd do it myself, but no thumbs.`
+        : "I'd do one myself, but no thumbs.",
   },
   {
     title: (c) => `Evening count: ${c.count}`,
     body: (c) =>
       c.task
-        ? `"${c.task}" is still sitting there. So am I.`
-        : 'Still sitting there. So am I. Lily pads are patient.',
-  },
-  {
-    title: (c) => `${c.count} unchanged`,
-    body: (c) =>
-      c.task
-        ? `"${c.task}" has now outlasted the whole day.`
-        : 'They have now outlasted the whole day.',
-  },
-  {
-    title: () => 'Same list, later light',
-    body: (c) =>
-      c.task
-        ? `${c.count} open, "${c.task}" included. Just the facts.`
-        : `${c.count} open. Just the facts.`,
+        ? `"${c.task}" is still sitting there. So am I. We're very patient.`
+        : "They're still sitting there. So am I. We're very patient.",
   },
   {
     title: (c) => `${c.count} left, for the record`,
     body: (c) =>
       c.task
-        ? `"${c.task}" leads the pack. I have no further comment.`
-        : 'I have no further comment.',
+        ? `"${c.task}" leads the pack. No further comment.`
+        : 'Just the number. No further comment.',
   },
   {
-    title: () => 'The tally, unasked for',
+    title: (c) => `The evening tally: ${c.count}`,
     body: (c) =>
       c.task
-        ? `${c.count} open. "${c.task}" is not one of the hard ones.`
-        : `${c.count} open. None of them are the hard ones.`,
+        ? `"${c.task}" is right on top. That's the report.`
+        : "That's the whole report.",
+  },
+  {
+    title: () => 'Quick one tonight',
+    body: (c) =>
+      c.task
+        ? `${c.count} left. "${c.task}" if you've got it in you. If not, tomorrow.`
+        : `${c.count} left. One if you've got it in you. If not, tomorrow.`,
+  },
+  {
+    title: () => 'Not a lecture',
+    body: (c) =>
+      c.task
+        ? `Just ${c.count} open tasks and a frog who believes you can do "${c.task}".`
+        : `Just ${c.count} open tasks and a frog who believes in you.`,
+  },
+  {
+    title: () => 'Short and sweet',
+    body: (c) =>
+      c.task
+        ? `${c.count} to go. "${c.task}" first, or don't. Either way, goodnight.`
+        : `${c.count} to go. One, or none. Either way, goodnight.`,
   },
 ];
 
 function eveningQuietBody(c: Ctx): string {
   if (c.count === 1) {
     return c.task
-      ? `"${c.task}" is still open. One more ignored croak and I stop.`
-      : 'One task still open. One more ignored croak and I stop.';
+      ? `"${c.task}" is open. If this reminder misses too, I'll give you some quiet.`
+      : "One task still open. If this reminder misses too, I'll give you some quiet.";
   }
   return c.task
-    ? `${c.count} still open, "${c.task}" included. Ignore this and I go quiet.`
-    : `${c.count} still open. One more ignored croak and I stop.`;
+    ? `${c.count} open, "${c.task}" first. If this reminder misses too, I'll ease off.`
+    : `${c.count} still open. If this reminder misses too, I'll give you some quiet.`;
 }
 
 function eveningLastBody(c: Ctx): string {
   if (c.count === 1) {
     return c.task
-      ? `"${c.task}" is open. Ignore this and I stop sending these.`
-      : 'One task is open. Ignore this and I stop sending these.';
+      ? `"${c.task}" is open. One more miss and I'll stop sending these.`
+      : "One task is open. One more miss and I'll stop sending these.";
   }
   return c.task
-    ? `${c.count} open, starting with "${c.task}". Then I go quiet.`
-    : `${c.count} open. Ignore this and I go quiet.`;
+    ? `${c.count} open, starting with "${c.task}". One more miss and I'll ease off.`
+    : `${c.count} open. One more miss and I'll stop sending these.`;
 }
 
 const EVENING_FINAL: Line[] = [
   { title: () => 'Before I go quiet', body: eveningQuietBody },
-  { title: () => 'The last one for a while', body: eveningLastBody },
+  { title: () => 'The last croak for a while', body: eveningLastBody },
+  { title: () => 'Quick, honest question', body: honestQuestionBody },
 ];
 
 const HUNGER: Line[] = [
   {
     title: (c) => `${c.frog} is hungry`,
-    body: () => "One task and dinner's served.",
+    body: () => 'One finished task and dinner is served.',
   },
   {
-    title: (c) => `${c.frog} hasn't eaten`,
-    body: () => 'Finish anything today and I eat.',
+    title: (c) => `${c.frog}'s belly is empty`,
+    body: () => "Any task feeds me. Small ones count. I'm not picky.",
   },
   {
-    title: () => 'My belly is empty',
-    body: () => 'One task feeds me. Any task.',
+    title: () => 'Dinner is running late',
+    body: () => "Tick one thing off and I eat. I'll act surprised.",
   },
   {
-    title: (c) => `${c.frog} is eyeing the pond`,
-    body: () => 'One finished task and I get a snack tonight.',
+    title: () => 'A small, hungry update',
+    body: () => 'My belly is empty. One finished task fixes that.',
   },
   {
-    title: () => 'Dinner is late',
-    body: () => "Tick one thing off and I'm fed.",
+    title: (c) => `${c.frog} is staring at you`,
+    body: () => 'Politely. Hungrily. One finished task feeds me.',
   },
   {
-    title: (c) => `${c.frog} needs feeding`,
-    body: () => 'Any task will do. Small ones count.',
+    title: () => 'Feed the frog?',
+    body: () =>
+      'Any finished task does it. Even a tiny one. Especially a tiny one.',
+  },
+  {
+    title: () => 'Rumble from the pond',
+    body: () => 'That was my stomach. One task and it settles down.',
+  },
+  {
+    title: (c) => `${c.frog} would like a snack`,
+    body: () => "Finish anything today and I'm fed. I'll be dramatic about it.",
+  },
+  {
+    title: () => 'Tummy status: empty',
+    body: () => 'One finished task feeds me. Any task at all.',
+  },
+  {
+    title: () => 'Running on empty here',
+    body: () => "One task feeds me. I'll do the happy wiggle and everything.",
   },
 ];
 
 const FAREWELL: Line[] = [
   {
-    title: (c) => `${c.frog} will stop croaking`,
-    body: () =>
-      "These nudges aren't landing, so I'll go quiet. Open the app and I'm right back.",
-  },
-  {
     title: (c) => `${c.frog} is going quiet`,
     body: () =>
-      "You've heard enough from me. Open the app whenever and I'll start again.",
+      "These reminders aren't helping, so I'll stop. Open the app anytime and I'm back.",
+  },
+  {
+    title: () => "I'll give you some quiet",
+    body: () =>
+      "No more reminders for now. I'll be on my rock. Open the app and I'm back.",
+  },
+  {
+    title: () => 'Taking the hint',
+    body: () =>
+      "I'll stop sending these. No hard feelings, I'm a frog. Open the app and I'm back.",
   },
   {
     title: () => 'Signing off for now',
-    body: (c) => `${c.frog} will stop sending these. Open the app and I'm back.`,
+    body: () =>
+      "I'll pause the reminders. Open the app whenever and they pick up again.",
   },
 ];
 
 const FLIES_ONE: Line[] = [
   {
     title: () => 'A friend earned you a fly',
-    body: () => 'It expires at midnight. Claim it before it buzzes off.',
+    body: () => "It's in your pond until midnight, then it buzzes off.",
   },
   {
-    title: () => 'There is a fly in the pond',
-    body: () => 'A friend put it there. Gone at midnight if you leave it.',
+    title: () => "There's a fly in your pond",
+    body: () => 'A friend put it there. Grab it before midnight.',
   },
   {
-    title: () => 'Someone fed the pond',
-    body: () => 'One fly, yours until midnight. Then it buzzes off.',
+    title: () => 'Free fly, courtesy of a friend',
+    body: () => 'Yours until midnight. Flies are famously bad at waiting.',
   },
   {
     title: () => 'A friend caught you one',
-    body: () => 'One fly waiting. It does not survive midnight.',
+    body: () => 'One fly is waiting in your pond. It leaves at midnight.',
+  },
+  {
+    title: () => 'Your friends have been busy',
+    body: () =>
+      'Their wins dropped a fly in your pond. Claim it before midnight.',
+  },
+  {
+    title: () => 'Fly delivery',
+    body: () =>
+      "A friend's finished task sent a fly your way. Gone at midnight.",
   },
 ];
 
@@ -640,16 +878,25 @@ const FLIES_MANY: Line[] = [
     body: () => "They're gone at midnight. Claim them before they buzz off.",
   },
   {
-    title: (c) => `${c.owed} flies in the pond`,
+    title: (c) => `${c.owed} flies in your pond`,
     body: () => 'Your friends put them there. Midnight takes them back.',
   },
   {
-    title: (c) => `The pond is busy — ${c.owed} flies`,
+    title: (c) => `Your pond is buzzing: ${c.owed} flies`,
     body: () => 'All yours until midnight, and not a minute after.',
   },
   {
-    title: (c) => `${c.owed} flies waiting on you`,
-    body: () => 'Friends earned them. Claim them before midnight.',
+    title: (c) => `${c.owed} flies waiting for you`,
+    body: () => 'Your friends earned them. You just collect. Before midnight.',
+  },
+  {
+    title: (c) => `Great friends, ${c.owed} flies`,
+    body: () =>
+      'Their finished tasks filled your pond. Claim them before midnight.',
+  },
+  {
+    title: () => 'Your friends have been busy',
+    body: (c) => `${c.owed} flies landed in your pond. Midnight is the deadline.`,
   },
 ];
 
@@ -657,43 +904,47 @@ const bodyOnly = (bodies: string[]): Line[] =>
   bodies.map((body) => ({ title: () => '', body: () => body }));
 
 const REMINDER_AT_TIME = bodyOnly([
-  "Starts now. I'd help, but — no thumbs.",
-  "It's time. I believe in you. Mostly.",
-  'Now o’clock. Hop to it.',
-  'This is the moment. No notes, just go.',
-  'Starting now. I will be watching from the pad.',
-  'Right now. The pond has cleared its schedule.',
+  "It's time. I'd help, but no thumbs.",
+  "Now's the moment. I believe in you.",
+  "Starting now. I'll cheer from a safe distance.",
+  "Right now. You've got this.",
+  "It's go time. Small steps count.",
+  "Right on time. I'm very punctual, for a frog.",
+  'Time to start. Future you is already relieved.',
+  'Now. Not later-now. Now-now.',
+  "It's time. Go be great, or at least present.",
+  'Starts now. Starting is the hardest part, so start.',
+  "Right on schedule. Let's do this thing.",
+  "Go time. I'll be here when you're done.",
+  "It's now. I checked the clock twice.",
+  'Starting time. Deep breath, then go.',
+  "Now's good. Honestly, now's great.",
+  'The moment has arrived. No pressure. Some pressure.',
 ]);
 
 const REMINDER_HOUR = bodyOnly([
-  'One hour out. Future you already says thanks.',
-  "Starts in an hour. Finish what you're doing — then it's us.",
-  'An hour from now. Plenty of time to dread it properly.',
-  'One hour. Consider this your gentle warning croak.',
+  'Starts in an hour. Future you says thanks for the heads-up.',
+  'One hour out. Time to get ready, or at least to snack.',
+  "In an hour. Wrap up what you're doing, then it's this.",
+  'An hour from now. Consider this a gentle croak.',
+  'One hour to go. No rush yet. Rush later, gently.',
+  'Coming up in an hour. Plenty of time to prepare.',
+  "An hour away. Early is an option, if you're feeling heroic.",
+  "Starts in an hour. I'm counting down. Frogs love a countdown.",
 ]);
 
 const REMINDER_MINUTES: Line[] = [
-  {
-    title: () => '',
-    body: (c) => `${c.minutes} minutes out. Stretch, hydrate, hop.`,
-  },
-  {
-    title: () => '',
-    body: (c) => `Starts in ${c.minutes} minutes. I'm excited. And judging.`,
-  },
-  {
-    title: () => '',
-    body: (c) => `${c.minutes} minutes. Wrap up whatever this is.`,
-  },
-  {
-    title: () => '',
-    body: (c) => `${c.minutes} minutes to go. I'd start moving now.`,
-  },
-  {
-    title: () => '',
-    body: (c) => `In ${c.minutes} minutes. The pad is ready when you are.`,
-  },
-];
+  (m: number) => `${m} minutes out. Stretch, sip some water, go.`,
+  (m: number) => `Starts in ${m} minutes. I'm excited for you.`,
+  (m: number) => `${m} minutes. Start wrapping up whatever this is.`,
+  (m: number) => `${m} minutes to go. Good time to get moving.`,
+  (m: number) => `In ${m} minutes. Ready when you are.`,
+  (m: number) => `${m} minutes away. Deep breath. You've done harder things.`,
+  (m: number) => `T-minus ${m} minutes. Very official. Very exciting.`,
+  (m: number) => `${m} minutes left. Finish your thought, then this.`,
+  (m: number) => `Starts in ${m} minutes. Just enough time to get set up.`,
+  (m: number) => `${m} minutes. Time to look busy, then be busy.`,
+].map((body) => ({ title: () => '', body: (c: Ctx) => body(c.minutes) }));
 
 type RoutineOpts = {
   count: number;
@@ -794,15 +1045,13 @@ export function buddyBothFinishedMessage(
 ): Push {
   const task = shortTaskText(taskText);
   return {
-    title: task
-      ? `You both did "${task}"`
-      : `You and ${partnerName} both finished`,
+    title: task ? `You both did "${task}"` : 'You both finished your shared task',
     body: pick([
-      "Bonus flies for both of you. I'll pretend I never doubted.",
-      `Bonus flies, both sides. You and ${partnerName} make it look easy.`,
-      'Bonus flies all round. Two frogs fed, metaphorically.',
+      'Bonus flies for both of you. Teamwork works. Who knew.',
+      `Bonus flies all around. ${partnerName} and you make it look easy.`,
       `Both halves done. ${partnerName} held up their end, and so did you.`,
-      'Bonus flies for the pair of you. My favourite kind of day.',
+      'Bonus flies for the pair of you. My favorite kind of day.',
+      'Double finish, bonus flies. You two are a menace to to-do lists.',
     ]),
   };
 }
@@ -817,11 +1066,97 @@ export function buddyPartnerFinishedMessage(
       ? `${partnerName} did "${task}"`
       : `${partnerName} finished your shared task`,
     body: pick([
-      "Your half's still open. Your move.",
-      `Don't leave ${partnerName} hanging. Your move.`,
+      'Your half is still open. Your move.',
+      `Don't leave ${partnerName} hanging. Your half is waiting.`,
       `${partnerName} went first. The other half is yours.`,
-      'One side done, one side waiting. Guess which is which.',
-      `${partnerName} is done and watching. No pressure.`,
+      'Half the team is done. The other half is reading this.',
+      `${partnerName} did their part. Your turn, whenever you're ready.`,
     ]),
   };
+}
+
+export function wishlistDealMessage(opts: {
+  itemName: string;
+  discountPercent: number;
+  dealPrice: string;
+  fullPrice: string;
+}): Push {
+  const { itemName, discountPercent, dealPrice, fullPrice } = opts;
+  return {
+    title: `${itemName} is ${discountPercent}% off today`,
+    body: pick([
+      `The one you're saving for. ${dealPrice} flies instead of ${fullPrice}.`,
+      `Your wishlist called. It's ${dealPrice} flies today, down from ${fullPrice}.`,
+      `${dealPrice} flies instead of ${fullPrice}. I'd pounce, personally.`,
+      `Straight off your wishlist: ${dealPrice} flies, not ${fullPrice}.`,
+    ]),
+  };
+}
+
+type TimerPhase = 'focus' | 'break';
+
+export type TimerPhaseEndType =
+  | 'timer_complete'
+  | 'break_started'
+  | 'break_complete';
+
+const FOCUS_DONE_BODIES = [
+  'Nice work. Take a break, you earned it.',
+  'You stayed focused longer than I ever have. Break time.',
+  "That's a whole session. Stand up, wiggle a bit.",
+  'Session done. Your brain deserves a snack. So do I.',
+];
+
+const BREAK_STARTED_BODIES = [
+  "Your break has started. Look at something that isn't a screen.",
+  "Break's running. Stretch, sip, stare at a wall. Your call.",
+  "Your break already started. I'll ring when it's over.",
+  "You focused. Now you rest. That's the deal.",
+];
+
+const BREAK_DONE_BODIES = [
+  'Ready for another round? Start whenever you are.',
+  'Back to it? No rush. Okay, a little rush.',
+  "Rested? Mostly? Good enough. Start when you're ready.",
+  "One more focus session? I'll be right here.",
+];
+
+export function timerPhaseEndMessage(
+  phase: TimerPhase,
+  autoStartBreak: boolean,
+): Push & { type: TimerPhaseEndType } {
+  if (phase === 'focus' && autoStartBreak) {
+    return {
+      type: 'break_started',
+      title: 'Focus done, break time',
+      body: pick(BREAK_STARTED_BODIES),
+    };
+  }
+  if (phase === 'focus') {
+    return {
+      type: 'timer_complete',
+      title: 'Focus done',
+      body: pick(FOCUS_DONE_BODIES),
+    };
+  }
+  return {
+    type: 'break_complete',
+    title: "Break's over",
+    body: pick(BREAK_DONE_BODIES),
+  };
+}
+
+/** The ringing alert for a finished phase, naming any flies left to collect. */
+export function timerFinishedAlert(
+  phase: TimerPhase,
+  fliesCaught: number,
+): Push {
+  if (phase === 'focus' && fliesCaught > 0) {
+    return {
+      title: 'Focus done',
+      body: `Nice focus. ${fliesCaught} ${fliesCaught === 1 ? 'fly' : 'flies'} caught. Tap Done to collect.`,
+    };
+  }
+  const { title, body } = timerPhaseEndMessage(phase, false);
+  return { title, body };
 }

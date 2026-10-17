@@ -17,10 +17,14 @@ import { isPremiumUser } from '@/lib/quests/engine';
 import { findTaskStreaksAtRisk } from '@/lib/streak/taskStreaks';
 import { sendStreakPush } from '@/lib/streak/push';
 import type { TaskStreakAtRisk } from '@/lib/streak/types';
-import { rotateIndex, type CopyCursors } from '@/lib/notifications/frogVoice';
+import {
+  rotateIndex,
+  shortTaskText,
+  type CopyCursors,
+} from '@/lib/notifications/frogVoice';
 
 const MIN_HOURS_BETWEEN_NOTIFICATIONS = 4;
-const SAVER_NAMED_HABITS = 3;
+const SAVER_NAMED_HABITS = 2;
 
 function getCurrentHourInTz(tz: string): number {
   try {
@@ -76,74 +80,99 @@ function nextOption<T>(
 // Lily Pads are not spent from a push — they apply on their own the next
 // morning. So the angle is "don't waste one", not "buy your way out".
 const SHIELD_NOTES_LEFT: ((n: number) => string)[] = [
-  (n) => ` Otherwise it costs you one of your ${n} Lily Pads.`,
-  (n) => ` Otherwise a Lily Pad covers it. You have ${n}.`,
-  (n) => ` Skip it and one of your ${n} Lily Pads is spent.`,
-  (n) => ` Otherwise a Lily Pad pays for it in the morning. You have ${n}.`,
+  (n) =>
+    n === 1
+      ? ' Otherwise your last Lily Pad covers the day.'
+      : ` Otherwise a Lily Pad covers the day. You have ${n}.`,
+  (n) =>
+    n === 1
+      ? ' If not, your only Lily Pad steps in.'
+      : ` If not, one of your ${n} Lily Pads steps in.`,
+  () => ' A Lily Pad would cover the day, but why spend one?',
+  (n) =>
+    n === 1
+      ? ' Skip tonight and your last Lily Pad gets used.'
+      : ` Skip tonight and a Lily Pad gets used. You have ${n}.`,
 ];
 
 const SHIELD_NOTES_NONE: string[] = [
-  ' You have no Lily Pad left to catch it.',
-  ' There is no Lily Pad left to cover the miss.',
-  ' No Lily Pads left, so nothing catches this one.',
-  ' Nothing left in the jar to cover it.',
+  ' No Lily Pads left to cover the day.',
+  ' There is no Lily Pad left to cover a miss.',
+  ' No Lily Pads in reserve, so this one counts.',
+  " You're out of Lily Pads, so tonight really counts.",
 ];
 
 const SAVER_MULTI_TITLES: ((n: number) => string)[] = [
   (n) => `${n} streaks end at midnight`,
-  (n) => `${n} streaks are on the line tonight`,
-  (n) => `Midnight takes ${n} streaks`,
-  (n) => `${n} streaks expire tonight`,
+  (n) => `${n} streaks need you tonight`,
+  (n) => `Midnight is coming for ${n} streaks`,
+  (n) => `${n} streaks, one evening to save them`,
+];
+
+const SAVER_MULTI_BODIES: ((list: string, one: boolean) => string)[] = [
+  (list, one) => `${list} ${one ? 'needs' : 'need'} a tick tonight.`,
+  (list, one) => `${list} ${one ? 'is' : 'are'} waiting on a tick.`,
+  (list) => `Still to tick: ${list}.`,
+  (list, one) => `${list} ${one ? 'is' : 'are'} one tick from safe.`,
 ];
 
 const SAVER_HABIT_TITLES: ((text: string, count: number) => string)[] = [
-  (text, count) => `${text} — ${count}-day streak ends at midnight`,
-  (text, count) => `${text}: ${count} days, ending tonight`,
-  (text, count) => `Midnight ends your ${count} days of ${text}`,
-  (text, count) => `${text} — ${count} days on the line`,
+  (text, count) => `Your ${count}-day "${text}" streak ends tonight`,
+  (text, count) => `${count} days of "${text}" end at midnight`,
+  (text, count) => `Midnight ends ${count} days of "${text}"`,
+  (text, count) => `Save ${count} days of "${text}" tonight`,
 ];
 
 const SAVER_HABIT_CLOSERS: string[] = [
-  'Ticking it off saves it.',
-  'One tick keeps it alive.',
-  'Check it off and it survives the night.',
-  'A single tick is all it takes.',
+  'One tick saves it.',
+  'Tick it off and it survives the night.',
+  "It only needs one tick. I'd hate to see it go.",
+  'Tick it off and it lives to see tomorrow.',
 ];
 
 const SAVER_LOGIN_TITLES: ((n: number) => string)[] = [
   (n) => `Your ${n}-day streak ends at midnight`,
-  (n) => `${n} days, gone at midnight`,
-  (n) => `Midnight ends your ${n}-day streak`,
+  (n) => `Midnight is coming for ${n} days`,
   (n) => `${n} days on the line tonight`,
+  (n) => `Save your ${n}-day streak tonight`,
 ];
 
 const SAVER_LOGIN_CLOSERS: string[] = [
-  'One finished task saves it.',
-  'Any task ticked off saves it.',
-  'One small task and it carries on.',
-  'Tick off anything and it survives.',
+  'One finished task saves it. Any task.',
+  'Finish anything today and it carries on.',
+  "One small task keeps it alive. I'd pick the smallest.",
+  'Tick off one thing and it survives. Even a tiny thing.',
 ];
 
 const FREEZE_TITLES: ((n: number) => string)[] = [
-  (n) => `A Lily Pad caught your ${n}-day streak`,
-  (n) => `Your ${n}-day streak was saved overnight`,
-  (n) => `${n} days, rescued by a Lily Pad`,
-  (n) => `A Lily Pad took the hit for ${n} days`,
+  (n) => `A Lily Pad saved your ${n}-day streak`,
+  (n) => `Your ${n}-day streak survived the night`,
+  (n) => `${n} days, saved by a Lily Pad`,
+  (n) => `Close call: your ${n}-day streak is safe`,
 ];
 
 const FREEZE_BODIES_LEFT: ((n: number, plural: string) => string)[] = [
-  (n, s) => `${n} Lily Pad${s} left. Finish a task today and keep climbing.`,
-  (n, s) => `${n} Lily Pad${s} left in the jar. Today's first task spends none.`,
-  (n, s) => `You have ${n} Lily Pad${s} left. Finish a task and keep them.`,
-  (n, s) => `${n} Lily Pad${s} remain. Finish a task today and the streak is safe.`,
+  (n, s) => `${n} Lily Pad${s} left. One task today keeps the streak rolling.`,
+  (n, s) =>
+    `${n} Lily Pad${s} left for a rainy day. A task today keeps it that way.`,
+  (n, s) =>
+    `${n} Lily Pad${s} still in reserve. Finish a task today and keep ${n === 1 ? 'it' : 'them'}.`,
+  (n, s) =>
+    `No harm done. ${n} Lily Pad${s} left. Today's first task keeps the streak going.`,
 ];
 
 const FREEZE_BODIES_NONE: string[] = [
-  'That was your last one. Finish a task today — your streak is on its own now.',
-  'No Lily Pads left. The streak survives only if you finish a task today.',
-  "That was the last Lily Pad. Today it's all on your first task.",
-  'Nothing left to catch the next miss. Finish a task today.',
+  'That was your last Lily Pad. One task today keeps the streak going.',
+  "No Lily Pads left, so today's task really counts. Any task will do.",
+  'Last Lily Pad used. Finish one task today and the streak carries on.',
+  'Nothing left in reserve now. One finished task today keeps it alive.',
 ];
+
+function listOf(items: string[], rest: number): string {
+  if (rest > 0) return `${items.join(', ')} and ${rest} more`;
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
 
 /**
  * One evening message for everything expiring tonight. Names what is actually
@@ -161,8 +190,7 @@ function buildSaverMessage(args: {
   const total = habits.length + (loginCount > 0 ? 1 : 0);
   const named = habits
     .slice(0, SAVER_NAMED_HABITS)
-    .map((h) => `${h.text} (${h.count})`)
-    .join(', ');
+    .map((h) => `"${shortTaskText(h.text, 20) ?? h.text}" (${h.count} days)`);
   const rest = habits.length - Math.min(habits.length, SAVER_NAMED_HABITS);
   const shieldNote =
     shields > 0
@@ -178,12 +206,14 @@ function buildSaverMessage(args: {
       cursors,
       writes,
     )(total);
-    return {
-      title,
-      body: named
-        ? `${named}${rest > 0 ? ` and ${rest} more` : ''}.${shieldNote}`
-        : `Finish a task to keep them all.${shieldNote}`,
-    };
+    const body =
+      named.length > 0
+        ? nextOption('saver_multi_body', SAVER_MULTI_BODIES, cursors, writes)(
+            listOf(named, rest),
+            habits.length === 1,
+          )
+        : 'Finish a task to keep them all.';
+    return { title, body: `${body}${shieldNote}` };
   }
 
   if (habits.length === 1) {
@@ -193,7 +223,7 @@ function buildSaverMessage(args: {
       SAVER_HABIT_TITLES,
       cursors,
       writes,
-    )(h.text, h.count);
+    )(shortTaskText(h.text, 20) ?? h.text, h.count);
     const closer = nextOption(
       'saver_habit_close',
       SAVER_HABIT_CLOSERS,

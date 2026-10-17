@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       void buddyDisplayName(userId).then((name) =>
         sendBuddyPush(targetId, {
           title: `${name} accepted your request`,
-          body: "You're friends now. Their daily wins earn you flies.",
+          body: "You're friends now. Their daily wins earn you flies, and yours earn them some.",
           path: '/friends',
           type: 'friend_accepted',
         }),
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       void buddyDisplayName(userId).then((name) =>
         sendBuddyPush(targetId, {
           title: `${name} wants to be friends`,
-          body: "Accept and you'll earn flies from each other's wins.",
+          body: "Accept and you'll both earn flies from each other's wins.",
           path: '/friends',
           type: 'friend_request',
         }),
@@ -211,7 +211,7 @@ export async function PATCH(req: NextRequest) {
       void buddyDisplayName(userId).then((name) =>
         sendBuddyPush(request.fromUserId, {
           title: `${name} accepted your request`,
-          body: "You're friends now. Their daily wins earn you flies.",
+          body: "You're friends now. Their daily wins earn you flies, and yours earn them some.",
           path: '/friends',
           type: 'friend_accepted',
         }),

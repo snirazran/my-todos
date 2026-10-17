@@ -86,7 +86,7 @@ export async function runPlusTrialReminders() {
     await sendPlusPush(user._id, {
       type: 'plus_trial_reminder',
       title: `Your Plus trial ends ${when}`,
-      body: `Plus renews on ${dateIn(sub.expiresAt, tz)}. Loving it? Do nothing. Not for you? Cancel before then in Settings → Frogress Plus.`,
+      body: `Plus renews on ${dateIn(sub.expiresAt, tz)}. Staying? Do nothing. Leaving? Cancel before then in Settings → Frogress Plus.`,
     });
     await UserModel.updateOne(
       { _id: user._id },

@@ -67,6 +67,14 @@ export async function POST(req: NextRequest) {
         $or: [
           { 'quests.loginStreak.goal': null },
           { 'quests.loginStreak.goal': { $exists: false } },
+          {
+            $expr: {
+              $lt: [
+                '$quests.loginStreak.count',
+                '$quests.loginStreak.goal.startCount',
+              ],
+            },
+          },
         ],
       },
       { $set: { 'quests.loginStreak.goal': goal } },

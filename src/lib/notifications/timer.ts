@@ -1,6 +1,7 @@
 import UserModel from '@/lib/models/User';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import type { PomodoroPhase } from '@/lib/frogodoroStore';
+import { timerPhaseEndMessage } from '@/lib/notifications/frogVoice';
 
 type TimerNotificationType =
   | 'timer_complete'
@@ -11,31 +12,8 @@ export function getTimerNotification(
   phase: PomodoroPhase,
   autoStartBreak: boolean,
 ): { title: string; body: string; type: TimerNotificationType } | null {
-  if (phase === 'focus' && autoStartBreak) {
-    return {
-      type: 'break_started',
-      title: 'Break started',
-      body: 'Focus time finished. Your break has started.',
-    };
-  }
-
-  if (phase === 'focus') {
-    return {
-      type: 'timer_complete',
-      title: 'Focus timer finished',
-      body: 'Time for a break. You earned it!',
-    };
-  }
-
-  if (phase === 'break') {
-    return {
-      type: 'break_complete',
-      title: 'Break finished',
-      body: 'Ready to focus? Start again whenever you are.',
-    };
-  }
-
-  return null;
+  if (phase !== 'focus' && phase !== 'break') return null;
+  return timerPhaseEndMessage(phase, autoStartBreak);
 }
 
 export async function sendTimerPushToUser({

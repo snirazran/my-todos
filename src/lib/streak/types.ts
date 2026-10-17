@@ -74,6 +74,7 @@ export type StreakRescue = {
   adsWatched: number;
   adEligible: boolean;
   dismissed?: boolean;
+  goal?: LoginStreakGoal | null;
 };
 
 export type RescueMethod = 'ad';

@@ -7,6 +7,7 @@ import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
 import { sendWardrobePush } from '@/lib/skins/push';
 import { readWishlistPins } from '@/lib/skins/wishlist';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { wishlistDealMessage } from '@/lib/notifications/frogVoice';
 
 /**
  * Local hours the alert may fire in. A deal dies at local midnight, so waiting
@@ -178,8 +179,12 @@ export async function runWishlistDealAlerts(): Promise<{
     if (!claimed) continue;
 
     const ok = await sendWardrobePush(user._id, {
-      title: `${item.name} is ${deal.discountPercent}% off today`,
-      body: `The one you're saving for — ${deal.dealPrice.toLocaleString()} flies instead of ${deal.priceFlies.toLocaleString()}.`,
+      ...wishlistDealMessage({
+        itemName: item.name,
+        discountPercent: deal.discountPercent,
+        dealPrice: deal.dealPrice.toLocaleString(),
+        fullPrice: deal.priceFlies.toLocaleString(),
+      }),
       type: 'wishlist_deal',
       path: `/wardrobe?tab=shop&item=${encodeURIComponent(pin.itemId)}&kind=item`,
     });

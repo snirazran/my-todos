@@ -56,7 +56,7 @@ export async function POST(
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(partnerId, {
         title: `${name} wants to tweak your shared task`,
-        body: 'Take a look and approve the new schedule.',
+        body: 'Have a look. Nothing changes until you approve it.',
         path: '/planner',
         type: 'buddy_repeat_request',
       }),

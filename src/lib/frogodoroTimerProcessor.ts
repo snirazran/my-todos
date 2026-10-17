@@ -19,6 +19,7 @@ import {
   nativeControlTokens,
 } from '@/lib/frogodoroSync';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
+import { timerFinishedAlert } from '@/lib/notifications/frogVoice';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
@@ -519,11 +520,7 @@ async function processOneDueTimer(
         alert: suppressAlarm
           ? undefined
           : {
-              title: "Time's up",
-              body:
-                next.completedPhase === 'focus' && extras.fliesCaught > 0
-                  ? `${extras.fliesCaught} ${extras.fliesCaught === 1 ? 'fly' : 'flies'} caught — tap Done to collect.`
-                  : 'Your session finished.',
+              ...timerFinishedAlert(next.completedPhase, extras.fliesCaught),
               sound: iosAlarmFile(timer.settings.timerSound),
             },
       });

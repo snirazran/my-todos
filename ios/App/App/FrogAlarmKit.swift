@@ -50,7 +50,7 @@ enum FrogAlarmKit {
                 guard state == .authorized else { return }
 
                 let title: LocalizedStringResource =
-                    phase == "break" ? "Break finished" : "Focus finished"
+                    phase == "break" ? "Break's over" : "Focus done"
                 let alert = AlarmPresentation.Alert(
                     title: title,
                     stopButton: AlarmButton(
