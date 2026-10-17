@@ -439,7 +439,9 @@ const TaskRowBody = React.memo(function TaskRowBody(
       onSwipeOpenChange,
     }: TaskRowBodyProps,
   ) {
-    const [skipMountFade] = useState(() => revealingRowIds.has(task.id));
+    const [skipMountFade] = useState(
+      () => revealingRowIds.has(task.id) || isFreshTask(task.id),
+    );
     const checklist = task.checklist ?? [];
     const checklistPayoutState = React.useMemo(
       () => checklistPayout(checklist),
@@ -873,6 +875,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
     return (
       <motion.div
         ref={containerRef}
+        data-task-card
         style={{ overflow: isDragging ? 'visible' : 'hidden' }}
         className={`relative w-full ${isDragging ? `${HOME_CARD_RADIUS} bg-muted/60` : HOME_CARD_SURFACE} ${hintRowGlow ? 'hint-row-glow' : ''}`}
         initial={skipMountFade ? false : { opacity: 0 }}
@@ -1299,7 +1302,9 @@ const SortableTaskItem = React.forwardRef<
 
   useLayoutEffect(() => {
     if (rowRef.current && isFreshTask(task.id)) {
-      playTaskEntrance(rowRef.current, task.id);
+      playTaskEntrance(rowRef.current, task.id, {
+        card: rowRef.current.querySelector<HTMLElement>('[data-task-card]'),
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

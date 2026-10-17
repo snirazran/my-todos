@@ -2,6 +2,7 @@
 
 type FlightOptions = {
   from: DOMRect;
+  to?: Element | null;
   count: number;
   onFirstLand?: () => void;
   onAllLanded?: () => void;
@@ -42,15 +43,33 @@ const MAX_FLIES = 8;
 const STAGGER_MS = 55;
 const BURST_MS = 280;
 
+function onScreen(node: Element) {
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
+function painted(node: Element) {
+  return typeof node.checkVisibility === 'function'
+    ? node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+    : true;
+}
+
 function findVisible(selector: string): HTMLElement | null {
   const nodes = Array.from(document.querySelectorAll<HTMLElement>(selector));
   for (const node of nodes) {
-    const rect = node.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight) {
-      return node;
-    }
+    if (onScreen(node) && painted(node)) return node;
   }
   return null;
+}
+
+export function flyCounterState(): 'shown' | 'faded' | 'absent' {
+  let faded = false;
+  for (const node of Array.from(document.querySelectorAll('[data-fly-counter]'))) {
+    if (!onScreen(node)) continue;
+    if (painted(node)) return 'shown';
+    faded = true;
+  }
+  return faded ? 'faded' : 'absent';
 }
 
 function findCounterTarget(): DOMRect | null {
@@ -73,8 +92,13 @@ function createLayer() {
   return layer;
 }
 
-export function flyFliesToCounter({ from, count, onFirstLand, onAllLanded }: FlightOptions): void {
-  const target = typeof document !== 'undefined' ? findCounterTarget() : null;
+export function flyFliesToCounter({ from, to, count, onFirstLand, onAllLanded }: FlightOptions): void {
+  const target =
+    typeof document === 'undefined'
+      ? null
+      : to
+        ? to.getBoundingClientRect()
+        : findCounterTarget();
   const reduceMotion = prefersReducedMotion();
 
   if (!target || reduceMotion || typeof document.body.animate !== 'function') {

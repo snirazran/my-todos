@@ -393,7 +393,7 @@ export default function TaskCard({
     playTaskEntrance(
       el.closest<HTMLElement>('[data-row]') ?? el,
       task.id,
-      { moveFollowers: false },
+      { card: el, followers: 'column' },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

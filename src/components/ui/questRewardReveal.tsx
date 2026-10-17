@@ -17,7 +17,11 @@ import {
   patchInventoryFlies,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
-import { flyFliesToCounter, holdFlyCounter } from '@/lib/flyFlight';
+import {
+  flyCounterState,
+  flyFliesToCounter,
+  holdFlyCounter,
+} from '@/lib/flyFlight';
 import {
   preloadRewardedAd,
   rewardedAdFailureMessage,
@@ -73,6 +77,8 @@ type FlyGainToast = {
   amount: number;
   from: number;
   to: number;
+  launch?: DOMRect;
+  onLanded?: () => void;
 };
 
 type RevealHostState = {
@@ -195,15 +201,6 @@ function launchRect(source?: Element | DOMRect | null): DOMRect {
 
 let flyOfferCounter = 0;
 
-function visibleCounter() {
-  return Array.from(
-    document.querySelectorAll<HTMLElement>('[data-fly-counter]'),
-  ).some((node) => {
-    const rect = node.getBoundingClientRect();
-    return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
-  });
-}
-
 const COUNTER_WAIT_MS = 900;
 
 function landFlies(
@@ -240,9 +237,11 @@ function landFlies(
           amount,
           from: Math.max(0, before),
           to: Math.max(0, before) + amount,
+          launch: from,
+          onLanded: done,
         },
       });
-      window.setTimeout(done, 1200);
+      window.setTimeout(done, 3200);
       return;
     }
     flyFliesToCounter({
@@ -255,17 +254,18 @@ function landFlies(
     window.setTimeout(done, 3200);
   };
 
-  if (visibleCounter()) {
+  const counter = flyCounterState();
+  if (counter === 'shown') {
     start(true);
     return;
   }
-  if (!useUIStore.getState().isFirstRunGuided) {
+  if (counter === 'faded' || !useUIStore.getState().isFirstRunGuided) {
     start(false);
     return;
   }
   const waitStarted = Date.now();
   const poll = () => {
-    if (visibleCounter()) {
+    if (flyCounterState() === 'shown') {
       window.setTimeout(() => start(true), 120);
     } else if (Date.now() - waitStarted > COUNTER_WAIT_MS) {
       start(false);
@@ -1036,21 +1036,39 @@ function FlyGainToastPill({ toast }: { toast: FlyGainToast | null }) {
 // Shows the same FlyCounter used in the home header, sliding in at the top of
 // the event overlay. Mounts at `from` so the count-up + "+N" pulse fire when
 // the balance ticks to `to` (FlyCounter skips the bump on its first render).
+const PILL_ENTER_MS = 420;
+
 function FlyGainPill({ toast }: { toast: FlyGainToast }) {
   const [value, setValue] = useState(toast.from);
+  const pillRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const startTimer = window.setTimeout(() => setValue(toast.to), 260);
-    return () => window.clearTimeout(startTimer);
-  }, [toast.to]);
+    const { launch, onLanded } = toast;
+    if (!launch) {
+      const startTimer = window.setTimeout(() => setValue(toast.to), 260);
+      return () => window.clearTimeout(startTimer);
+    }
+    const launchTimer = window.setTimeout(() => {
+      const pill = pillRef.current;
+      flyFliesToCounter({
+        from: launch,
+        to: pill?.querySelector('.fly-purse-pad') ?? pill,
+        count: toast.amount,
+        onFirstLand: () => setValue(toast.to),
+        onAllLanded: onLanded,
+      });
+    }, PILL_ENTER_MS);
+    return () => window.clearTimeout(launchTimer);
+  }, [toast]);
 
   return (
     <motion.div
+      ref={pillRef}
       className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+3rem)] z-[10000] flex justify-center px-4"
       initial={{ opacity: 1, y: -42, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 1, y: -140, scale: 0.96 }}
-      transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
+      transition={{ duration: PILL_ENTER_MS / 1000, ease: [0.32, 0.72, 0, 1] }}
     >
       <FlyCounter balance={value} variant="desktop" alwaysCelebrate />
     </motion.div>

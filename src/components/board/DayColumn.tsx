@@ -152,6 +152,7 @@ export default function DayColumn({
 
   const card = (
     <section
+      data-column
       className={[
         `relative flex flex-col overflow-hidden ${BOARD_LIST_SURFACE}`,
         fill ? (headingOutside ? 'min-h-0' : 'max-h-full') : appliedMax,
@@ -170,6 +171,7 @@ export default function DayColumn({
 
       <div
         ref={listRef}
+        data-column-list
         className={[
           'relative flex-auto overflow-x-hidden',
           disableVerticalScroll

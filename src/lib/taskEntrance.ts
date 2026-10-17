@@ -117,7 +117,6 @@ function springCurve(stiffness: number, damping: number, fallback: string): Curv
   return curve;
 }
 
-const rowPop = () => springCurve(300, 22, 'cubic-bezier(0.34, 1.36, 0.64, 1)');
 const flyPop = () => springCurve(520, 20, 'cubic-bezier(0.34, 1.8, 0.64, 1)');
 export const listSlide = () =>
   springCurve(380, 36, 'cubic-bezier(0.2, 0, 0, 1)');
@@ -353,10 +352,102 @@ export function revealRows(rows: HTMLElement[], curve: Curve = SMOOTH_SPRING) {
   });
 }
 
+const LIFT_SHADOW =
+  '0 22px 44px -14px rgba(15, 23, 42, 0.38), 0 6px 14px -6px rgba(15, 23, 42, 0.18)';
+const SETTLED_SHADOW =
+  '0 22px 44px -14px rgba(15, 23, 42, 0), 0 6px 14px -6px rgba(15, 23, 42, 0)';
+const LAND_MS = 440;
+const LAND_AT = 0.45;
+
+function slideDown(el: Element, by: number, delay: number) {
+  const slide = listSlide();
+  el.animate(
+    [
+      { transform: `translate3d(0, ${-by}px, 0)` },
+      { transform: 'translate3d(0, 0, 0)' },
+    ],
+    {
+      duration: slide.duration,
+      easing: slide.easing,
+      delay,
+      fill: 'backwards',
+      composite: 'add',
+    },
+  );
+}
+
+function openColumnGap(
+  row: HTMLElement,
+  column: HTMLElement,
+  height: number,
+  delay: number,
+) {
+  const list = column.querySelector<HTMLElement>('[data-column-list]');
+  if (!list || !list.contains(row)) return;
+  for (const el of followersOf(row, list)) slideDown(el, height, delay);
+  if (list.querySelectorAll('[data-row]').length < 2) return;
+  const growth = Math.max(
+    0,
+    Math.min(height, list.clientHeight - (list.scrollHeight - height)),
+  );
+  if (growth < 1) return;
+  for (let sib = list.nextElementSibling; sib; sib = sib.nextElementSibling) {
+    if (isInFlow(sib)) slideDown(sib, growth, delay);
+  }
+  const slide = listSlide();
+  const radius = getComputedStyle(column).borderBottomLeftRadius;
+  column.animate(
+    [
+      { clipPath: `inset(0 0 ${growth}px 0 round ${radius})` },
+      { clipPath: `inset(0 0 0px 0 round ${radius})` },
+    ],
+    { duration: slide.duration, easing: slide.easing, delay, fill: 'backwards' },
+  );
+}
+
+function landCard(card: HTMLElement, delay: number) {
+  card.animate(
+    [
+      {
+        transform: 'translate3d(0, -6px, 0) scale(1.035)',
+        easing: 'cubic-bezier(0.4, 0, 0.7, 0.6)',
+      },
+      {
+        transform: 'translate3d(0, 0, 0) scale(0.985)',
+        offset: LAND_AT,
+        easing: 'cubic-bezier(0.2, 0.6, 0.35, 1)',
+      },
+      { transform: 'translate3d(0, 0, 0) scale(1)' },
+    ],
+    { duration: LAND_MS, delay, fill: 'backwards', composite: 'add' },
+  );
+  card.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: 180,
+    easing: 'ease-out',
+    delay,
+    fill: 'backwards',
+  });
+  const base = getComputedStyle(card).boxShadow;
+  const over = (shadow: string) =>
+    base && base !== 'none' ? `${base}, ${shadow}` : shadow;
+  card.animate(
+    [{ boxShadow: over(LIFT_SHADOW) }, { boxShadow: over(SETTLED_SHADOW) }],
+    {
+      duration: Math.round(LAND_MS * LAND_AT),
+      easing: 'cubic-bezier(0.4, 0, 1, 1)',
+      delay,
+      fill: 'backwards',
+    },
+  );
+}
+
 export function playTaskEntrance(
   row: HTMLElement,
   id: string,
-  { moveFollowers = true }: { moveFollowers?: boolean } = {},
+  {
+    card: cardEl,
+    followers = 'page',
+  }: { card?: HTMLElement | null; followers?: 'page' | 'column' } = {},
 ) {
   playedIds.add(id);
   if (playedRows.has(row) || typeof row.animate !== 'function') return;
@@ -365,12 +456,13 @@ export function playTaskEntrance(
   const rect = row.getBoundingClientRect();
   if (rect.right < 0 || rect.left > window.innerWidth || rect.height === 0) return;
 
+  const card = cardEl ?? row;
   const scroller = scrollParent(row);
   const scrollDelta = revealInScroller(row, scroller);
   const origin = takeOrigin();
 
   if (prefersReducedMotion()) {
-    row.animate([{ opacity: 0 }, { opacity: 1 }], {
+    card.animate([{ opacity: 0 }, { opacity: 1 }], {
       duration: 220,
       easing: 'ease-out',
     });
@@ -380,56 +472,28 @@ export function playTaskEntrance(
   const stagger = Math.round((Math.max(0, rect.left) / window.innerWidth) * 140);
   const height = row.offsetHeight;
 
-  if (moveFollowers && height > 0) {
-    const slide = listSlide();
-    for (const el of followersOf(row, scroller)) {
-      el.animate(
-        [
-          { transform: `translate3d(0, ${-height}px, 0)` },
-          { transform: 'translate3d(0, 0, 0)' },
-        ],
-        {
-          duration: slide.duration,
-          easing: slide.easing,
-          delay: stagger,
-          fill: 'backwards',
-          composite: 'add',
-        },
-      );
+  if (height > 0) {
+    if (followers === 'page') {
+      for (const el of followersOf(row, scroller)) slideDown(el, height, stagger);
+    } else {
+      const column = row.closest<HTMLElement>('[data-column]');
+      if (column) openColumnGap(row, column, height, stagger);
     }
   }
 
-  const pop = rowPop();
-  const enterDelay = stagger + 70;
-  row.animate(
-    [
-      { transform: 'translate3d(0, 16px, 0) scale(0.93)' },
-      { transform: 'translate3d(0, 0, 0) scale(1)' },
-    ],
-    {
-      duration: pop.duration,
-      easing: pop.easing,
-      delay: enterDelay,
-      fill: 'backwards',
-      composite: 'add',
-    },
-  );
-  row.animate([{ opacity: 0 }, { opacity: 1 }], {
-    duration: 260,
-    easing: 'cubic-bezier(0.2, 0, 0, 1)',
-    delay: enterDelay,
-    fill: 'backwards',
-  });
+  const enterDelay = stagger + 90;
+  landCard(card, enterDelay);
+  const impactAt = enterDelay + Math.round(LAND_MS * LAND_AT);
 
   const fx = document.createElement('span');
   fx.setAttribute('aria-hidden', 'true');
   fx.className = 'task-enter-fx';
-  fx.style.setProperty('--fx-delay', `${enterDelay}ms`);
-  row.appendChild(fx);
-  window.setTimeout(() => fx.remove(), enterDelay + 1400);
+  fx.style.setProperty('--fx-delay', `${impactAt - 40}ms`);
+  card.appendChild(fx);
+  window.setTimeout(() => fx.remove(), impactAt + 1200);
 
   const fly = row.querySelector<HTMLElement>('[data-fly-slot]');
-  let landAt = enterDelay + 170;
+  let landAt = impactAt;
   if (fly && origin) {
     flyIntoSlot(origin, fly, scrollDelta);
     landAt = Math.max(landAt, FLIGHT_MS - 30);
