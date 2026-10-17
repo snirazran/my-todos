@@ -465,6 +465,18 @@ const ALLOWED_PROPERTY_KEYS = new Set([
   'prices_loaded',
   'stage',
   'error_code',
+  'mark',
+  'hops',
+  'scheduled',
+  'league',
+  'league_before',
+  'league_after',
+  'lily',
+  'outcome',
+  'first',
+  'items',
+  'shields',
+  'leap_kind',
 ]);
 
 export function sanitizeAnalyticsProperties(
