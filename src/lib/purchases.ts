@@ -88,73 +88,120 @@ async function syncPremiumWithServer() {
   }
 }
 
-async function purchasePlusNative(uid: string, plan: PlusPlan): Promise<PurchaseOutcome> {
+type PlusPurchaseResult = { outcome: PurchaseOutcome; environment?: 'SANDBOX' | 'PRODUCTION' };
+
+const PAYMENT_PENDING_CODE = '20';
+
+export function purchaseErrorCode(error: unknown): string {
+  const source = error as { code?: unknown; errorCode?: unknown } | null;
+  const code = source?.code ?? source?.errorCode;
+  if (typeof code === 'string' || typeof code === 'number') return String(code);
+  return error instanceof Error ? error.name : 'unknown';
+}
+
+export function isPaymentPending(error: unknown) {
+  return purchaseErrorCode(error) === PAYMENT_PENDING_CODE;
+}
+
+function plusEnvironment(isSandbox: boolean | undefined): PlusPurchaseResult['environment'] {
+  if (isSandbox === undefined) return undefined;
+  return isSandbox ? 'SANDBOX' : 'PRODUCTION';
+}
+
+async function purchasePlusNative(
+  uid: string,
+  plan: PlusPlan,
+  placement: string,
+  onSheet: () => void,
+): Promise<PlusPurchaseResult> {
   const { Purchases } = await getNativePurchases(uid);
   const { PURCHASES_ERROR_CODE } = await import('@revenuecat/purchases-capacitor');
   const offerings = await Purchases.getOfferings();
   const offering = offerings.current;
   const pkg = plan === 'yearly' ? offering?.annual : offering?.monthly;
   if (!pkg) throw new Error(`No ${plan} package available`);
+  await Purchases.setAttributes({ paywall_placement: placement }).catch(() => {});
+  onSheet();
+  let isSandbox: boolean | undefined;
   try {
-    await Purchases.purchasePackage({ aPackage: pkg });
+    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
+    isSandbox = customerInfo.entitlements.active['plus']?.isSandbox;
   } catch (err: any) {
     if (
       err?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
       err?.userCancelled
     ) {
-      return 'cancelled';
+      return { outcome: 'cancelled' };
     }
     throw err;
   }
   await syncPremiumWithServer();
-  return 'purchased';
+  return { outcome: 'purchased', environment: plusEnvironment(isSandbox) };
 }
 
-async function purchasePlusWeb(uid: string, plan: PlusPlan): Promise<PurchaseOutcome> {
+async function purchasePlusWeb(
+  uid: string,
+  plan: PlusPlan,
+  placement: string,
+  onSheet: () => void,
+): Promise<PlusPurchaseResult> {
   const purchases = await getWebPurchases(uid);
   const { ErrorCode, PurchasesError } = await import('@revenuecat/purchases-js');
   const offerings = await purchases.getOfferings();
   const offering = offerings.current;
   const pkg = plan === 'yearly' ? offering?.annual : offering?.monthly;
   if (!pkg) throw new Error(`No ${plan} package available`);
+  await purchases.setAttributes({ paywall_placement: placement }).catch(() => {});
+  onSheet();
+  let isSandbox: boolean | undefined;
   try {
-    await purchases.purchase({
+    const { customerInfo } = await purchases.purchase({
       rcPackage: pkg,
       customerEmail: auth?.currentUser?.email ?? undefined,
     });
+    isSandbox = customerInfo.entitlements.active['plus']?.isSandbox;
   } catch (err) {
     if (
       err instanceof PurchasesError &&
       err.errorCode === ErrorCode.UserCancelledError
     ) {
-      return 'cancelled';
+      return { outcome: 'cancelled' };
     }
     throw err;
   }
   await syncPremiumWithServer();
-  return 'purchased';
+  return { outcome: 'purchased', environment: plusEnvironment(isSandbox) };
 }
 
-export async function purchasePlus(plan: PlusPlan, placement = 'unknown'): Promise<PurchaseOutcome> {
+export async function purchasePlus(
+  plan: PlusPlan,
+  placement = 'unknown',
+  paywallSession?: string,
+): Promise<PurchaseOutcome> {
   const uid = requireUid();
   const store = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
-  trackAnalyticsEvent('purchase_started', { plan, store, placement });
+  const context = { plan, store, placement, paywall_session: paywallSession };
+  const progress: { stage: 'setup' | 'sheet' } = { stage: 'setup' };
+  const onSheet = () => {
+    progress.stage = 'sheet';
+  };
+  trackAnalyticsEvent('purchase_started', context);
   try {
-    const outcome = Capacitor.isNativePlatform()
-      ? await purchasePlusNative(uid, plan)
-      : await purchasePlusWeb(uid, plan);
+    const result = Capacitor.isNativePlatform()
+      ? await purchasePlusNative(uid, plan, placement, onSheet)
+      : await purchasePlusWeb(uid, plan, placement, onSheet);
     trackAnalyticsEvent(
-      outcome === 'purchased' ? 'purchase_completed' : 'purchase_cancelled',
-      { plan, store, placement },
+      result.outcome === 'purchased' ? 'purchase_completed' : 'purchase_cancelled',
+      { ...context, environment: result.environment },
     );
-    return outcome;
+    return result.outcome;
   } catch (error) {
     markNegativeMoment('purchase_failed');
     trackAnalyticsEvent('purchase_failed', {
-      plan,
-      store,
-      placement,
-      reason: error instanceof Error ? error.name : 'unknown',
+      ...context,
+      stage: progress.stage,
+      error_code: purchaseErrorCode(error),
+      reason: error instanceof Error ? error.message.slice(0, 80) : 'unknown',
     });
     throw error;
   }

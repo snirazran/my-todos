@@ -19,6 +19,8 @@ import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { useSettled } from '@/hooks/useSettled';
 import {
   getPlusPricing,
+  isPaymentPending,
+  purchaseErrorCode,
   purchasePlus,
   restorePlusPurchases,
   type PlusPriceInfo,
@@ -48,6 +50,19 @@ import { cn } from '@/lib/utils';
 
 type View = 'offer' | 'compare';
 type PlanId = 'yearly' | 'monthly';
+type CloseMethod = 'close_button' | 'continue_free' | 'escape' | 'outside' | 'external';
+type PaywallSession = {
+  id: string;
+  openedAt: number;
+  ctaTaps: number;
+  sheetResult: 'none' | 'purchased' | 'cancelled' | 'failed' | 'pending';
+  sawCompare: boolean;
+  planChanged: boolean;
+  closeMethod: CloseMethod | null;
+  outcome: 'purchased' | 'restored' | null;
+};
+
+const PAYWALL_VARIANT = 'reward_first_v2';
 
 const APPLE_EULA_URL =
   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
@@ -138,6 +153,19 @@ export function PlusUpgradeModal({
   const isDesktop = useIsDesktop();
   const reduceMotion = useReducedMotion();
   const [pricingAttempt, setPricingAttempt] = useState(0);
+  const sessionRef = React.useRef<PaywallSession | null>(null);
+  const planRef = React.useRef(plan);
+  planRef.current = plan;
+  const pricesLoadedRef = React.useRef(false);
+  pricesLoadedRef.current = !!(pricing?.yearly || pricing?.monthly);
+  const paywallProps = () => ({
+    placement,
+    variant: PAYWALL_VARIANT,
+    paywall_session: sessionRef.current?.id,
+  });
+  const markClose = (method: CloseMethod) => {
+    if (sessionRef.current) sessionRef.current.closeMethod = method;
+  };
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
   const [moreBelow, setMoreBelow] = useState(false);
@@ -173,10 +201,19 @@ export function PlusUpgradeModal({
         setPricing(prices);
         setPricingFailed(!prices.yearly && !prices.monthly);
         setPlan((current) => prices[current] ? current : prices.yearly ? 'yearly' : 'monthly');
+        if (!prices.yearly && !prices.monthly) {
+          trackAnalyticsEvent('paywall_prices_failed', { ...paywallProps(), error_code: 'no_packages' });
+        }
       })
       .catch((err) => {
         console.error('Could not read Plus prices from the store', err);
-        if (!cancelled) setPricingFailed(true);
+        if (cancelled) return;
+        setPricingFailed(true);
+        trackAnalyticsEvent('paywall_prices_failed', {
+          ...paywallProps(),
+          error_code: purchaseErrorCode(err),
+          reason: err instanceof Error ? err.message.slice(0, 80) : 'unknown',
+        });
       });
     return () => {
       cancelled = true;
@@ -184,17 +221,54 @@ export function PlusUpgradeModal({
   }, [open, pricingAttempt]);
 
   useEffect(() => {
-    if (open) {
-      setView('offer');
-      setPlan('yearly');
-      setPurchasing(false);
-      setPurchaseError(null);
-      setNeedsAccount(false);
-      setLinkError(null);
-      trackAnalyticsEvent('paywall_viewed', { placement, variant: 'reward_first_v2' });
-      trackAnalyticsEvent('paywall_step_viewed', { placement, step: 1, variant: 'reward_first_v2' });
-    }
+    if (!open) return;
+    setView('offer');
+    setPlan('yearly');
+    setPurchasing(false);
+    setPurchaseError(null);
+    setNeedsAccount(false);
+    setLinkError(null);
+    const session: PaywallSession = {
+      id: crypto.randomUUID(),
+      openedAt: Date.now(),
+      ctaTaps: 0,
+      sheetResult: 'none',
+      sawCompare: false,
+      planChanged: false,
+      closeMethod: null,
+      outcome: null,
+    };
+    sessionRef.current = session;
+    trackAnalyticsEvent('paywall_viewed', { placement, variant: PAYWALL_VARIANT, paywall_session: session.id });
+    return () => {
+      if (session.outcome) return;
+      trackAnalyticsEvent('paywall_dismissed', {
+        placement,
+        variant: PAYWALL_VARIANT,
+        paywall_session: session.id,
+        seconds_elapsed: Math.round((Date.now() - session.openedAt) / 1000),
+        close_method: session.closeMethod ?? 'external',
+        plan: planRef.current,
+        plan_changed: session.planChanged,
+        saw_compare: session.sawCompare,
+        cta_taps: session.ctaTaps,
+        sheet_result: session.sheetResult,
+        prices_loaded: pricesLoadedRef.current,
+      });
+    };
   }, [open, placement]);
+
+  const selectPlan = (next: PlanId) => {
+    if (next === plan) return;
+    if (sessionRef.current) sessionRef.current.planChanged = true;
+    trackAnalyticsEvent('paywall_plan_selected', { ...paywallProps(), plan: next, from_plan: plan });
+    setPlan(next);
+  };
+
+  const dismissAccountPrompt = () => {
+    trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'dismissed' });
+    setNeedsAccount(false);
+  };
 
   const linkGuestAccount = async (provider: 'google' | 'apple') => {
     const current = auth?.currentUser;
@@ -218,6 +292,7 @@ export function PlusUpgradeModal({
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
+      trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'linked', provider });
       setNeedsAccount(false);
       void mutate(() => true);
       // Linking can change offer eligibility. Refresh before the user confirms.
@@ -227,9 +302,16 @@ export function PlusUpgradeModal({
         err instanceof GoogleAccountExistsError ||
         err instanceof AppleAccountExistsError
       ) {
+        trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'existing_account', provider });
         window.location.assign('/login?upgrade=1');
         return;
       }
+      trackAnalyticsEvent('paywall_account_result', {
+        ...paywallProps(),
+        status: 'failed',
+        provider,
+        error_code: purchaseErrorCode(err),
+      });
       setLinkError(
         provider === 'google'
           ? getGoogleAuthErrorMessage(err)
@@ -242,14 +324,28 @@ export function PlusUpgradeModal({
 
   const startPurchase = async () => {
     if (purchasing || !pricing?.[plan]) return;
-    if (auth?.currentUser?.isAnonymous) {
+    const session = sessionRef.current;
+    const isGuest = !!auth?.currentUser?.isAnonymous;
+    if (session) session.ctaTaps += 1;
+    trackAnalyticsEvent('paywall_cta_tapped', {
+      ...paywallProps(),
+      plan,
+      has_trial: !!pricing[plan]?.trialDuration,
+      is_guest: isGuest,
+    });
+    if (isGuest) {
+      trackAnalyticsEvent('paywall_account_required', { ...paywallProps(), plan });
       setNeedsAccount(true);
       return;
     }
     setPurchaseError(null);
     setPurchasing(true);
     try {
-      const outcome = await purchasePlus(plan, placement);
+      const outcome = await purchasePlus(plan, placement, session?.id);
+      if (session) {
+        session.sheetResult = outcome;
+        if (outcome === 'purchased') session.outcome = 'purchased';
+      }
       if (outcome === 'purchased') {
         const confirmed = await confirmPremiumActive(60000);
         await refreshPremiumState();
@@ -274,6 +370,7 @@ export function PlusUpgradeModal({
       }
     } catch (err) {
       console.error('Plus purchase failed', err);
+      if (session) session.sheetResult = isPaymentPending(err) ? 'pending' : 'failed';
       setPurchaseError("Purchase didn't go through. Please try again.");
     } finally {
       setPurchasing(false);
@@ -286,7 +383,9 @@ export function PlusUpgradeModal({
     setPurchasing(true);
     try {
       const restored = await restorePlusPurchases();
+      trackAnalyticsEvent('paywall_restore_result', { ...paywallProps(), status: restored ? 'restored' : 'nothing' });
       if (restored) {
+        if (sessionRef.current) sessionRef.current.outcome = 'restored';
         await confirmPremiumActive(60000);
         await refreshPremiumState();
         const deliver = onStartTrial;
@@ -297,6 +396,11 @@ export function PlusUpgradeModal({
       }
     } catch (err) {
       console.error('Restore purchases failed', err);
+      trackAnalyticsEvent('paywall_restore_result', {
+        ...paywallProps(),
+        status: 'failed',
+        error_code: purchaseErrorCode(err),
+      });
       setPurchaseError('Restore failed. Please try again.');
     } finally {
       setPurchasing(false);
@@ -310,9 +414,9 @@ export function PlusUpgradeModal({
   const changeView = (next: View) => {
     setView(next);
     scrollRef.current?.scrollTo({ top: 0 });
-    trackAnalyticsEvent('paywall_step_viewed', {
-      placement, step: next === 'compare' ? 2 : 1, view: next, variant: 'reward_first_v2',
-    });
+    if (next !== 'compare') return;
+    if (sessionRef.current) sessionRef.current.sawCompare = true;
+    trackAnalyticsEvent('paywall_compare_viewed', paywallProps());
   };
 
   return (
@@ -341,9 +445,11 @@ export function PlusUpgradeModal({
                 onEscapeKeyDown={(event) => {
                   if (needsAccount) {
                     event.preventDefault();
-                    if (!linking) setNeedsAccount(false);
+                    if (!linking) dismissAccountPrompt();
                   } else if (purchasing) event.preventDefault();
+                  else markClose('escape');
                 }}
+                onPointerDownOutside={() => markClose('outside')}
               >
                 <motion.div
                   initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 32 }}
@@ -370,7 +476,7 @@ export function PlusUpgradeModal({
                         </span>
                       )}
                       <Dialog.Close asChild>
-                        <button type="button" disabled={purchasing} aria-label="Close Plus" className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-[background-color,transform] hover:bg-muted/70 active:scale-90 disabled:opacity-50">
+                        <button type="button" disabled={purchasing} onClick={() => markClose('close_button')} aria-label="Close Plus" className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-[background-color,transform] hover:bg-muted/70 active:scale-90 disabled:opacity-50">
                           <X className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                         </button>
                       </Dialog.Close>
@@ -397,7 +503,7 @@ export function PlusUpgradeModal({
                             <PrimaryButton onClick={() => changeView('offer')}>Choose your plan</PrimaryButton>
                           ) : (
                             <>
-                              <PlanPicker plan={plan} onSelect={setPlan} pricing={pricing}
+                              <PlanPicker plan={plan} onSelect={selectPlan} pricing={pricing}
                                 pricingFailed={pricingFailed} busy={purchasing}
                                 onRetry={() => setPricingAttempt((attempt) => attempt + 1)} />
                               <p aria-live="polite" className={cn('mb-2 mt-2 text-center text-xs font-bold text-muted-foreground', selected && !selected.trialDuration && 'short:hidden')}>
@@ -412,7 +518,7 @@ export function PlusUpgradeModal({
                               <PlanFooter plan={plan} selected={selected} busy={purchasing} error={purchaseError} onRestore={restorePurchases} />
                             </>
                           )}
-                          <button type="button" onClick={onClose} disabled={purchasing} className="mt-0.5 min-h-8 w-full rounded-xl text-center text-xs font-bold text-muted-foreground hover:bg-muted disabled:opacity-50">
+                          <button type="button" onClick={() => { markClose('continue_free'); onClose(); }} disabled={purchasing} className="mt-0.5 min-h-8 w-full rounded-xl text-center text-xs font-bold text-muted-foreground hover:bg-muted disabled:opacity-50">
                             Continue free
                           </button>
                         </footer>
@@ -427,7 +533,7 @@ export function PlusUpgradeModal({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-[10011] flex items-center justify-center bg-black/60 px-6 backdrop-blur-sm"
-                    onClick={() => setNeedsAccount(false)}
+                    onClick={dismissAccountPrompt}
                   >
                     <motion.div
                       initial={{ scale: 0.95, y: 10 }}
@@ -489,9 +595,10 @@ export function PlusUpgradeModal({
                       )}
                       <button
                         type="button"
-                        onClick={() =>
-                          window.location.assign('/login?upgrade=1')
-                        }
+                        onClick={() => {
+                          trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'email' });
+                          window.location.assign('/login?upgrade=1');
+                        }}
                         disabled={!!linking}
                         className="mt-2 h-10 w-full rounded-2xl text-sm font-bold text-slate-500 transition-colors hover:text-slate-700"
                       >

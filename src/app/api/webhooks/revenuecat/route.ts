@@ -174,6 +174,7 @@ export async function POST(req: NextRequest) {
       const proceeds = Number.isFinite(price)
         ? price * (1 - (Number.isFinite(tax) ? tax : 0)) * (1 - (Number.isFinite(commission) ? commission : 0))
         : undefined;
+      const paywallPlacement = event?.subscriber_attributes?.paywall_placement?.value;
       await recordAnalyticsEvent({
         userId,
         name,
@@ -198,6 +199,10 @@ export async function POST(req: NextRequest) {
           pack_id: flyPack?.id,
           fly_amount: flyPack?.flies,
           price_usd: Number.isFinite(price) ? price : undefined,
+          placement:
+            name === 'subscription_started' && typeof paywallPlacement === 'string'
+              ? paywallPlacement
+              : undefined,
         },
       });
       if (flyPack) {

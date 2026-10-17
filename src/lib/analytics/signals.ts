@@ -59,7 +59,7 @@ function actionFor(metricKey: string, level: SignalLevel): string {
     flies_per_dau: 'Per-player income has drifted off the rate every price in the catalog was set against. Find the faucet that moved.',
     median_balance_days: 'People are sitting on flies with nothing to buy. Add stock or lower prices before adding another faucet.',
     breaker_trips: 'Someone reached the daily hard cap. No legitimate user does. Investigate the user and the source.',
-    paywall_conversion: 'The paywall is being seen and not converting. Check the step drop-off table to find which screen loses people.',
+    paywall_conversion: 'The paywall is being seen and not converting. Open "Where each Plus paywall showing ended" on Money: it separates quick exits, people who weighed the offer, sign-in and store failures, and back-outs at the payment sheet.',
     plus_share: 'Subscription base is thin. Add value to the Plus season track rather than to the fly multiplier.',
     subscription_churn: 'Subscribers are leaving faster than they arrive. Check billing issues and the cancellation reasons.',
     ad_completion_rate: 'Requests are not reaching a reward. That is usually fill or a broken placement, not user choice.',
