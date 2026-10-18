@@ -144,8 +144,8 @@ export function SeenOnFriendsRow({
                     <BackgroundArt bg={entry.bg} />
                   )}
                 </TileArt>
-                <span className="flex h-5 items-center justify-center text-[12.5px] font-black tabular-nums leading-none">
-                  <FlyAmount amount={price} size={12.5} className="text-foreground" />
+                <span className="flex h-6 items-center justify-center text-[12.5px] font-black tabular-nums leading-none">
+                  <FlyAmount amount={price} size={15} className="text-foreground" />
                 </span>
                 <span className="-mt-1 truncate px-1 text-center text-[11px] font-bold text-muted-foreground">
                   {wornBy}

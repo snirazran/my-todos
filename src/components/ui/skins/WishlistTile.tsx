@@ -63,7 +63,7 @@ export function WishlistTile({
           )}
         </TileArt>
 
-        <span className="flex h-5 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
+        <span className="flex h-6 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
           {entry.tradeOnly ? (
             <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
               <Repeat className="h-3 w-3" strokeWidth={3.5} />
@@ -72,13 +72,13 @@ export function WishlistTile({
           ) : (
             <>
               {entry.onDeal && (
-                <span className="text-[11px] font-bold text-muted-foreground line-through decoration-2 opacity-70">
+                <span className="text-[12px] font-bold text-muted-foreground line-through decoration-2 opacity-70">
                   {entry.fullPrice.toLocaleString()}
                 </span>
               )}
               <FlyAmount
                 amount={entry.price}
-                size={12.5}
+                size={15}
                 className={entry.affordable ? 'text-foreground' : 'text-muted-foreground'}
               />
             </>

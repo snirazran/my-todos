@@ -85,10 +85,8 @@ import {
   CollectionBook,
   DealTileRow,
   ItemArt,
-  RAIL_ITEM_CLASS,
   ShelfHeader,
   TileArt,
-  TileRail,
   TryOnBar,
   YoursCard,
   summarizeCloset,
@@ -1051,7 +1049,7 @@ function WardrobeManagerContent({
     const wearing =
       data?.wardrobe?.equipped?.[card.item.slot] === card.item.id;
     return (
-      <div key={card.item.id} className={RAIL_ITEM_CLASS}>
+      <div key={card.item.id}>
         <button
           type="button"
           onClick={() => {
@@ -1086,14 +1084,11 @@ function WardrobeManagerContent({
     );
   };
 
-  const renderGiftTile = (card: WardrobeCard, inRail: boolean) => {
+  const renderGiftTile = (card: WardrobeCard) => {
     if (card.kind !== 'item') return null;
     const count = data?.wardrobe?.inventory?.[card.item.id] ?? 0;
     return (
-      <div
-        key={card.item.id}
-        className={cn('relative', inRail && RAIL_ITEM_CLASS)}
-      >
+      <div key={card.item.id} className="relative">
         <button
           type="button"
           onClick={() => handleItemAction(card.item)}
@@ -1411,7 +1406,7 @@ function WardrobeManagerContent({
                   />
                 ) : (
                   <div className={cn(shelfGridClass, 'pb-4')}>
-                    {ownedGiftCards.map((card) => renderGiftTile(card, false))}
+                    {ownedGiftCards.map(renderGiftTile)}
                   </div>
                 )
               ) : (
@@ -1424,9 +1419,9 @@ function WardrobeManagerContent({
                         tone="text-primary"
                         meta={ownedGiftCards.length > 1 ? ownedGiftCards.length : undefined}
                       />
-                      <TileRail>
-                        {ownedGiftCards.map((card) => renderGiftTile(card, true))}
-                      </TileRail>
+                      <div className={shelfGridClass}>
+                        {ownedGiftCards.map(renderGiftTile)}
+                      </div>
                     </section>
                   )}
                   {activeFilter === 'all' && newOwnedCards.length > 0 && (
@@ -1436,7 +1431,9 @@ function WardrobeManagerContent({
                         tone="text-rose-500"
                         meta={newOwnedCards.length > 1 ? newOwnedCards.length : undefined}
                       />
-                      <TileRail>{newOwnedCards.map(renderNewTile)}</TileRail>
+                      <div className={shelfGridClass}>
+                        {newOwnedCards.map(renderNewTile)}
+                      </div>
                     </section>
                   )}
                   {renderCollection(

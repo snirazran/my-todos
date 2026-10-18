@@ -297,7 +297,7 @@ function ClosetTile({
         ) : null}
       </TileArt>
 
-      <span className="flex h-5 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
+      <span className="flex h-6 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
         {owned ? (
           <span className={equipped ? 'text-primary' : 'text-muted-foreground/70'}>
             {equipped ? 'Wearing' : 'Wear'}
@@ -307,13 +307,13 @@ function ClosetTile({
         ) : showPrice ? (
           <>
             {showWas && onSale && (
-              <span className="text-[11px] font-bold text-muted-foreground line-through decoration-2 opacity-70">
+              <span className="text-[12px] font-bold text-muted-foreground line-through decoration-2 opacity-70">
                 {entry.price.toLocaleString()}
               </span>
             )}
             <FlyAmount
               amount={price}
-              size={12.5}
+              size={15}
               className={
                 !affordable
                   ? 'text-muted-foreground'
