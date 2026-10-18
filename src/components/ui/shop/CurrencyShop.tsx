@@ -12,7 +12,7 @@ import { FlyCounter } from '@/components/ui/FlyCounter';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
-import { rewardedAdFailureMessage, rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import { creditRewardedAd, rewardedAdFailureMessage, rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -308,6 +308,7 @@ function FreeFliesCard({
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok || !payload.granted) {
+        creditRewardedAd('daily_flies');
         setError('Could not grant flies — try again.');
         mutate();
         return;
@@ -355,6 +356,7 @@ function FreeFliesCard({
         type="button"
         onClick={handleWatch}
         disabled={busy || exhausted || waiting}
+        aria-label={idle ? `Watch an ad for ${reward} flies` : undefined}
         className={cn(
           'group relative flex w-full items-center gap-3 rounded-[24px] p-3 text-left ring-1 transition-all sm:p-3.5',
           exhausted
@@ -393,7 +395,7 @@ function FreeFliesCard({
               ? 'All caught for today'
               : waiting
                 ? 'Warming up the next one'
-                : `Watch an ad for ${reward} flies`}
+                : `Get ${reward} flies`}
           </span>
           <span
             className={cn(
@@ -405,7 +407,7 @@ function FreeFliesCard({
               ? `Your ${cap} free rounds refill tomorrow.`
               : waiting
                 ? 'One at a time — just a moment.'
-                : 'They land in your jar right after.'}
+                : 'They land straight in your jar.'}
           </span>
           {/* Rounds left is the only honest scarcity in this sheet, so it is
               drawn as something countable rather than buried in a fraction. */}

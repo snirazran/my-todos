@@ -13,6 +13,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { dismissStreakRescue, rescueStreak } from '@/hooks/useLoginStreak';
 import { useRewardGate } from '@/hooks/useRewardGate';
+import { creditRewardedAd } from '@/lib/ads';
 import { Icon } from '@/components/ui/Icon';
 import { hapticCelebrate } from '@/lib/haptics';
 import { StreakCelebration } from './StreakCelebration';
@@ -126,6 +127,7 @@ export function StreakRescueSheet({
   const performSave = async (method: RescueMethod = 'ad') => {
     const result = await rescueStreak(offer.id, method);
     if (!result || !result.granted) {
+      if (mode === 'ad') creditRewardedAd('streak_rescue');
       setError('Could not save your streaks — try again.');
       return;
     }

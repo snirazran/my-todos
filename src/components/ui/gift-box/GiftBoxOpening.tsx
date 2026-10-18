@@ -9,6 +9,7 @@ import { X } from 'lucide-react';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import {
+  creditRewardedAd,
   rewardedAdsAvailable,
   rewardedAdFailureMessage,
   showRewardedAd,
@@ -211,6 +212,7 @@ export default function GiftBoxOpening({
           setTimeout(() => setShowPlusOffer(true), 1600);
         }
       } else {
+        if (!viaPlus) creditRewardedAd('gift_double');
         setAdError(
           data.reason
             ? 'Could not open another gift — try again later.'
@@ -220,6 +222,7 @@ export default function GiftBoxOpening({
       setPhase('revealed');
     } catch (err) {
       console.error(err);
+      if (!viaPlus) creditRewardedAd('gift_double');
       setPhase('revealed');
       setAdError('Could not open another gift — try again.');
     } finally {

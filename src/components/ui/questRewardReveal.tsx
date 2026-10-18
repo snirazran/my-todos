@@ -23,6 +23,7 @@ import {
   holdFlyCounter,
 } from '@/lib/flyFlight';
 import {
+  creditRewardedAd,
   preloadRewardedAd,
   rewardedAdFailureMessage,
   rewardedAdsAvailable,
@@ -692,7 +693,10 @@ function FlyDoubleOffer() {
         if (outcome === 'failed') showNotification(rewardedAdFailureMessage());
         return;
       }
-      const { bonus, balanceAfter } = await offer.run();
+      const { bonus, balanceAfter } = await offer.run().catch((err) => {
+        creditRewardedAd(offer.placement);
+        throw err;
+      });
       landFlies(bonus, balanceAfter, panelRef.current);
       setVisible(false);
       if (takePlusOfferAfterAd()) {

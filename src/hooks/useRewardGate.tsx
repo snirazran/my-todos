@@ -3,6 +3,7 @@
 import React, { useCallback, useState } from 'react';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import {
+  creditRewardedAd,
   rewardedAdFailureMessage,
   rewardedAdsAvailable,
   showRewardedAd,
@@ -66,7 +67,10 @@ export function useRewardGate(
           }
           return;
         }
-        await action();
+        await action().catch((err) => {
+          creditRewardedAd(placement);
+          throw err;
+        });
       } catch (err) {
         setError(
           err instanceof Error && err.message

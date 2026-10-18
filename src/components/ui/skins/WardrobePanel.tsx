@@ -75,6 +75,7 @@ import {
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { celebratePurchase } from '@/lib/purchaseCelebration';
 import {
+  creditRewardedAd,
   rewardedAdsAvailable,
   rewardedAdFailureMessage,
   showRewardedAd,
@@ -407,6 +408,7 @@ function WardrobeManagerContent({
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (!isPlus) creditRewardedAd('shop_reroll');
         setNotif({
           msg: payload?.error ?? 'Could not reroll deals.',
           type: 'error',
@@ -431,6 +433,7 @@ function WardrobeManagerContent({
         setTimeout(() => openPlus('premium_daily_deal'), 1200);
       }
     } catch {
+      if (!isPlus) creditRewardedAd('shop_reroll');
       setNotif({ msg: 'Could not reroll deals.', type: 'error' });
     } finally {
       setRerolling(false);

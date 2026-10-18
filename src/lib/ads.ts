@@ -58,6 +58,7 @@ const DEFAULT_AD_FAILURE_MESSAGE =
 const PRELOAD_MAX_AGE_MS = 50 * 60 * 1000;
 const SHOW_TIMEOUT_MS = 20_000;
 const REWARD_GRACE_MS = 800;
+const AD_CREDIT_TTL_MS = 10 * 60 * 1000;
 
 let lastFailureMessage = DEFAULT_AD_FAILURE_MESSAGE;
 
@@ -358,8 +359,33 @@ export async function preloadRewardedAd(placement: string): Promise<boolean> {
   return load;
 }
 
+const adCredits = new Map<string, { at: number; spent: boolean }>();
+
+function adCreditKey(placement: string) {
+  return `${placement}|${auth?.currentUser?.uid ?? ''}`;
+}
+
+export function creditRewardedAd(placement: string) {
+  const key = adCreditKey(placement);
+  if (adCredits.get(key)?.spent) {
+    adCredits.delete(key);
+    return;
+  }
+  adCredits.set(key, { at: Date.now(), spent: false });
+}
+
+function spendAdCredit(placement: string) {
+  const credit = adCredits.get(adCreditKey(placement));
+  if (!credit || credit.spent || Date.now() - credit.at >= AD_CREDIT_TTL_MS) {
+    return false;
+  }
+  credit.spent = true;
+  return true;
+}
+
 export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdResult> {
   lastFailureMessage = DEFAULT_AD_FAILURE_MESSAGE;
+  if (spendAdCredit(placement)) return 'rewarded';
   trackAnalyticsEvent('ad_requested', { placement });
   if (!rewardedAdsAvailable()) {
     trackAnalyticsEvent('ad_failed', { placement, reason: 'unsupported_platform' });
@@ -407,7 +433,10 @@ export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdR
         if (showTimer) clearTimeout(showTimer);
         if (graceTimer) clearTimeout(graceTimer);
         resetPreload();
-        if (result === 'rewarded') recordRewardedAdCompleted();
+        if (result === 'rewarded') {
+          recordRewardedAdCompleted();
+          adCredits.delete(adCreditKey(placement));
+        }
         if (result === 'failed') markNegativeMoment('ad_failed');
         trackAnalyticsEvent(
           result === 'rewarded'

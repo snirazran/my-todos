@@ -28,6 +28,7 @@ import {
   type QuestRewardCatalogItem,
 } from '@/components/ui/QuestCards';
 import { rewardStackTileStyle } from '@/lib/questClaims';
+import { CATALOG } from '@/lib/skins/catalog';
 import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
@@ -1436,7 +1437,9 @@ export function StreakSheet({
   const rewardCatalog = useMemo<Record<string, QuestRewardCatalogItem>>(
     () =>
       Object.fromEntries(
-        (inventoryData?.catalog ?? []).map((item) => [item.id, item]),
+        (inventoryData?.catalog?.length ? inventoryData.catalog : CATALOG).map(
+          (item) => [item.id, item],
+        ),
       ),
     [inventoryData?.catalog],
   );

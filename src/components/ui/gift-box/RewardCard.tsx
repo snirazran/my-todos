@@ -328,14 +328,16 @@ export function PlusOfferButton({
               {title}
             </span>
           )}
-          <span className="mt-1 flex items-center gap-1 text-[12px] font-bold text-white/90">
-            {plus ? (
+          {plus ? (
+            <span className="mt-1 flex items-center gap-1 text-[12px] font-bold text-white/90">
               <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
-            ) : (
+              {subline}
+            </span>
+          ) : (
+            <span className="mt-1 flex items-center text-white/90">
               <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
-            )}
-            {subline}
-          </span>
+            </span>
+          )}
         </span>
 
         <span

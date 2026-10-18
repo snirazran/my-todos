@@ -3,23 +3,35 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppImage } from '@/components/ui/AppImage';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  useAnimationControls,
+  useReducedMotion,
+} from 'framer-motion';
 import {
   Check,
+  ChevronRight,
   Gift,
   Loader2,
   X,
 } from 'lucide-react';
 import useSWR from 'swr';
+import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftOutfitPreview } from '@/components/ui/friends/GiftOutfitPreview';
+import { GiftRive } from '@/components/ui/gift-box/GiftBox';
+import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { RarityBadge } from '@/components/ui/skins/RarityBadge';
+import { TileArt } from '@/components/ui/skins/DressingRoom';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
+import { hapticSelect } from '@/lib/haptics';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuestReward } from '@/lib/quests/types';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { shareLink } from '@/lib/share';
-import { POND_PRIMARY } from '@/components/ui/friends/PondSocial';
 import { cn } from '@/lib/utils';
 import { giftPreviewIndices } from '@/lib/friends/social';
 
@@ -62,6 +74,7 @@ type InviteConfig = {
 
 type InviteStatus = { claimedCount: number; pendingCount: number };
 type Step = 'overview' | 'pick';
+type SentVia = 'shared' | 'copied';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -89,10 +102,11 @@ export function InviteFriendsModal({
     { revalidateOnFocus: false },
   );
 
-  const [step, setStep] = useState<Step>('overview');
+  const [step, setStep] = useState<Step>('pick');
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [sentVia, setSentVia] = useState<SentVia | null>(null);
   const closeInvite = React.useCallback(() => {
     onClose();
   }, [onClose]);
@@ -128,32 +142,34 @@ export function InviteFriendsModal({
 
   const totalTiers = config?.rewards?.length ?? 0;
   const claimedCount = status?.claimedCount ?? 0;
-  const allRewardsClaimed = totalTiers > 0 && claimedCount >= totalTiers;
-  const autoSkippedRef = React.useRef(false);
+  const giftOptions = config?.giftOptions ?? [];
+  const activeGift =
+    giftOptions.find((gift) => gift.id === selectedGiftId) ?? giftOptions[0] ?? null;
 
   useEffect(() => {
     if (!open) return;
-    setStep('overview');
+    setStep('pick');
     setInviteError(null);
     setSelectedGiftId(null);
-    autoSkippedRef.current = false;
+    setSentVia(null);
   }, [open]);
 
-  // With every tier already earned the reward track has nothing left to
-  // promise, so it's a page you tap straight through — open on the gift
-  // picker instead. Latched per-open so Back still works from there.
-  useEffect(() => {
-    if (!open || !allRewardsClaimed || autoSkippedRef.current) return;
-    autoSkippedRef.current = true;
-    setStep('pick');
-  }, [open, allRewardsClaimed]);
+  const handleSelectGift = (id: string) => {
+    if (id === activeGift?.id) return;
+    hapticSelect();
+    setSelectedGiftId(id);
+    setSentVia(null);
+    setInviteError(null);
+  };
 
-  const shareInviteUrl = React.useCallback(async (url: string) => {
+  const shareInviteUrl = React.useCallback(async (url: string, giftName: string | null) => {
     const result = await shareLink({
-      title: 'Come join me on Frogress!',
-      text: 'I have a gift for you on Frogress. Tap the link to claim it!',
+      title: 'A gift for you on Frogress',
+      text: giftName
+        ? `I picked a gift for you on Frogress: the ${giftName} 🎁 Join with my link to claim it!`
+        : 'I picked a gift for you on Frogress 🎁 Join with my link to claim it!',
       url,
-      dialogTitle: 'Invite a friend',
+      dialogTitle: 'Send a gift',
     });
     if (result === 'shared' || result === 'copied') {
       trackAnalyticsEvent('referral_invite_shared', {
@@ -165,14 +181,15 @@ export function InviteFriendsModal({
   }, []);
 
   const handleSendInvite = async () => {
-    if (!selectedGiftId) return;
+    if (!activeGift) return;
     setCreatingInvite(true);
     setInviteError(null);
+    setSentVia(null);
     try {
       const res = await fetch('/api/invite/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ giftOptionId: selectedGiftId }),
+        body: JSON.stringify({ giftOptionId: activeGift.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create invite');
@@ -182,7 +199,9 @@ export function InviteFriendsModal({
           ? `${window.location.origin}/?ref=${encodeURIComponent(data.code)}`
           : `/?ref=${encodeURIComponent(data.code)}`;
       void refreshStatus();
-      await shareInviteUrl(url);
+      const result = await shareInviteUrl(url, giftDisplayName(activeGift));
+      if (result === 'shared' || result === 'copied') setSentVia(result);
+      else if (result === 'failed') setInviteError('Could not share your gift link. Try again.');
     } catch (err) {
       console.error(err);
       setInviteError('Could not create your gift invite. Try again.');
@@ -226,7 +245,7 @@ export function InviteFriendsModal({
                       claimedCount={claimedCount}
                       totalTiers={totalTiers}
                       onClose={closeInvite}
-                      onInviteFriends={() => setStep('pick')}
+                      onPickGift={() => setStep('pick')}
                     />
                     )}
                   </StepShell>
@@ -239,14 +258,14 @@ export function InviteFriendsModal({
                       ready={entered && stepEntered}
                       error={inviteError}
                       config={config}
-                      selectedGiftId={selectedGiftId}
-                      onSelect={setSelectedGiftId}
+                      claimedCount={claimedCount}
+                      gift={activeGift}
+                      onSelect={handleSelectGift}
                       onClose={closeInvite}
-                      onBack={
-                        allRewardsClaimed ? closeInvite : () => setStep('overview')
-                      }
+                      onOpenRewards={() => setStep('overview')}
                       onSend={handleSendInvite}
                       creating={creatingInvite}
+                      sentVia={sentVia}
                     />
                     )}
                   </StepShell>
@@ -313,14 +332,14 @@ function OverviewStep({
   claimedCount,
   totalTiers,
   onClose,
-  onInviteFriends,
+  onPickGift,
   ready,
 }: {
   config?: InviteConfig;
   claimedCount: number;
   totalTiers: number;
   onClose: () => void;
-  onInviteFriends: () => void;
+  onPickGift: () => void;
   ready: boolean;
 }) {
   const reduceMotion = useReducedMotion();
@@ -359,11 +378,10 @@ function OverviewStep({
           className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center"
         >
           <h2 className="text-[25px] font-black leading-[1.08] tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)] sm:text-3xl">
-            Share Frogress, get rewards!
+            Your thank-you rewards
           </h2>
           <p className="mt-1.5 max-w-md text-[13px] font-medium text-white/95 [text-shadow:0_1px_0_rgba(25,83,43,0.7),0_3px_10px_rgba(0,0,0,0.28)] sm:mt-2 sm:text-[15px]">
-            Invite a friend to gift them an outfit and earn rewards for
-            yourself!
+            Earn these as friends join with your gifts.
           </p>
         </Reveal>
       </div>
@@ -387,11 +405,12 @@ function OverviewStep({
       >
         <Reveal delay={0.22}>
           <button
-            onClick={onInviteFriends}
+            onClick={onPickGift}
             disabled={!config.giftOptions?.length}
-            className="h-12 w-full rounded-2xl bg-[#447d3f] font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] transition-all hover:bg-[#5aa354] active:translate-y-1 active:shadow-none disabled:opacity-60"
+            className={GIFT_CTA}
           >
-            {config.giftOptions?.length ? 'Invite friends' : 'No gifts configured yet'}
+            <Gift className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+            {config.giftOptions?.length ? 'Pick a gift' : 'No gifts configured yet'}
           </button>
         </Reveal>
       </div>
@@ -561,43 +580,278 @@ function rewardSentence(reward: RewardTier): string {
   return `Earn ${earned} when your ${ordinal} friend joins Frogress!`;
 }
 
-function PickStep({ ready, config, selectedGiftId, onSelect, onClose, onBack, onSend, creating, error }: {
-  ready: boolean; config?: InviteConfig; selectedGiftId: string | null; onSelect: (id: string) => void;
-  onClose: () => void; onBack: () => void; onSend: () => void; creating: boolean; error?: string | null;
+const GIFT_CTA =
+  'flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-4 text-[15px] font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] transition-all hover:bg-[#5aa354] active:translate-y-1 active:shadow-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
+
+function giftDisplayName(gift: GiftOption | null) {
+  if (!gift) return null;
+  return gift.name || gift.item?.name || 'Welcome outfit';
+}
+
+function PickStep({ ready, config, claimedCount, gift, onSelect, onClose, onOpenRewards, onSend, creating, error, sentVia }: {
+  ready: boolean; config?: InviteConfig; claimedCount: number; gift: GiftOption | null; onSelect: (id: string) => void;
+  onClose: () => void; onOpenRewards: () => void; onSend: () => void; creating: boolean; error?: string | null;
+  sentVia: SentVia | null;
 }) {
   if (!config) return <Loading onClose={onClose} />;
-  const selected = config.giftOptions.find((gift) => gift.id === selectedGiftId) ?? null;
+  const giftName = giftDisplayName(gift);
+  const nextReward = config.rewards.find((reward) => reward.tier > claimedCount) ?? null;
   return (
     <div role="dialog" aria-modal="true" aria-label="Choose a welcome gift" className="flex h-full min-h-0 flex-col bg-background text-foreground md:max-h-[calc(100dvh-2rem)]">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-5">
-        <div><p className="text-[11px] font-bold text-primary">A welcome gift, from you</p><h2 className="mt-1 text-xl font-black tracking-tight">Pick their first look</h2></div>
-        <button type="button" onClick={onClose} aria-label="Close gift picker" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X className="h-5 w-5" aria-hidden /></button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
-        <div className="relative mt-4 flex h-[146px] items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-b from-primary/10 to-primary/[0.03]">
-          <div className="h-full w-[160px]">{selected ? <GiftOutfitPreview item={selected.item} ready={ready} /> : <FrogSnapshot width={160} height={150} indices={giftPreviewIndices(null)} visualOffsetY={0} cachedOnly={!ready} />}</div>
-          <div className="absolute bottom-3 right-3 flex max-w-[50%] flex-col items-end gap-1"><RarityBadge rarity={selected?.item?.rarity} /><span className="rounded-full border border-border/50 bg-card px-2.5 py-1.5 text-[11px] font-bold text-primary">Their new pond look</span></div>
-        </div>
-        <p className="mb-4 mt-4 text-[13px] font-medium leading-relaxed text-muted-foreground">Choose an outfit, then share their gift invite. It’s free for them to claim when they join.</p>
-        <div role="group" aria-label="Welcome outfits" className="grid grid-cols-2 gap-3 min-[440px]:grid-cols-3">
-          {config.giftOptions.map((gift) => {
-            const chosen = gift.id === selectedGiftId;
-            return <button key={gift.id} type="button" aria-pressed={chosen} aria-label={'Choose ' + (gift.name || gift.item?.name || 'this outfit') + (gift.item?.rarity ? ', ' + gift.item.rarity : '')} onClick={() => onSelect(gift.id)} className={cn('relative flex min-w-0 touch-manipulation flex-col overflow-hidden rounded-2xl border-2 p-2 text-left transition-[border-color,background-color,transform] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2', chosen ? 'border-primary bg-primary/5' : 'border-border/60 bg-card hover:border-primary/40')}>
-              <span className="pointer-events-none block aspect-square w-full overflow-hidden rounded-xl bg-muted/40"><GiftOutfitPreview item={gift.item} ready={ready} /></span>
-              <span className="mt-2 text-[12px] font-black leading-tight">{gift.name || gift.item?.name || 'Welcome outfit'}</span><RarityBadge rarity={gift.item?.rarity} className="mt-1.5" />
-              {chosen && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /></span>}
-            </button>;
-          })}
+      <GiftStage gift={gift} ready={ready} onClose={onClose} />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
+        <p className="text-center text-[13px] font-semibold text-muted-foreground">
+          Free for them when they join with your link
+        </p>
+        <div role="group" aria-label="Welcome outfits" className="mt-4 grid grid-cols-3 gap-x-2.5 gap-y-4 min-[520px]:grid-cols-4">
+          {config.giftOptions.map((option) => (
+            <GiftTile
+              key={option.id}
+              gift={option}
+              chosen={option.id === gift?.id}
+              ready={ready}
+              onSelect={() => onSelect(option.id)}
+            />
+          ))}
         </div>
         {!config.giftOptions.length && <p role="status" className="py-8 text-center text-[13px] font-medium text-muted-foreground">Welcome gifts are being restocked. Try again a little later.</p>}
-        <button type="button" onClick={onBack} className="mt-4 min-h-11 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">See your invite rewards</button>
       </div>
-      <div className="shrink-0 border-t border-border/50 bg-card px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4">
-        {error && <p role="alert" className="mb-3 text-[12px] font-bold text-destructive">{error}</p>}
-        <button type="button" onClick={onSend} disabled={!selected || creating} className={cn(POND_PRIMARY, 'min-h-12 w-full rounded-2xl text-[14px]')}>{creating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Gift className="h-4 w-4" aria-hidden />}{creating ? 'Preparing their gift…' : selected ? 'Share this gift invite' : 'Choose an outfit above'}</button>
+      <div className="shrink-0 border-t border-border/50 bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3">
+        {nextReward && <NextRewardRow reward={nextReward} onClick={onOpenRewards} />}
+        <AnimatePresence initial={false} mode="wait">
+          {error ? (
+            <motion.p key="error" role="alert" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-2.5 text-center text-[12.5px] font-bold text-destructive">
+              {error}
+            </motion.p>
+          ) : sentVia ? (
+            <motion.p key={sentVia} role="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-2.5 flex items-center justify-center gap-1.5 text-[12.5px] font-black text-primary">
+              <Check className="h-4 w-4" strokeWidth={3} aria-hidden />
+              {sentVia === 'copied' ? 'Link copied. Paste it to a friend.' : 'Gift sent! They get it when they join.'}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
+        <button type="button" onClick={onSend} disabled={!gift || creating} className={GIFT_CTA}>
+          {creating ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden /> : <Gift className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden />}
+          <span className="truncate">
+            {creating ? 'Wrapping their gift…' : sentVia ? 'Send to another friend' : giftName ? `Send the ${giftName}` : 'No gifts yet'}
+          </span>
+        </button>
       </div>
     </div>
   );
+}
+
+function PondBackdrop() {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <div className="h-full w-full bg-gradient-to-b from-sky-200 via-emerald-100 to-emerald-200 dark:from-sky-950 dark:via-emerald-950 dark:to-emerald-900" />;
+  }
+  return (
+    <picture className="block h-full w-full">
+      <source media="(min-width: 768px)" srcSet={DEFAULT_BACKGROUND_IMAGES.tablet} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={DEFAULT_BACKGROUND_IMAGES.mobile}
+        alt=""
+        draggable={false}
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover object-bottom"
+      />
+    </picture>
+  );
+}
+
+function GiftStage({ gift, ready, onClose }: { gift: GiftOption | null; ready: boolean; onClose: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const roomy = useMediaQuery('(min-width: 380px)');
+  const hop = useAnimationControls();
+  const frogRef = React.useRef<FrogHandle | null>(null);
+  const [dressed, setDressed] = useState(false);
+  const shownGiftRef = React.useRef<string | null>(null);
+  const item = gift?.item ?? null;
+  const isBox = item?.slot === 'container';
+  const live = ready && !reduceMotion;
+  const frogWidth = roomy ? 248 : 216;
+  const frogHeight = Math.round(frogWidth * 1.125);
+  const indices = React.useMemo(() => giftPreviewIndices(item), [item]);
+
+  useEffect(() => {
+    const id = gift?.id ?? null;
+    const previous = shownGiftRef.current;
+    shownGiftRef.current = id;
+    if (!id || !previous || previous === id || reduceMotion) return;
+    void hop.start({
+      y: [0, -18, 0, 0],
+      scaleX: [1, 0.96, 1.05, 1],
+      scaleY: [1, 1.05, 0.94, 1],
+      transition: { duration: 0.5, times: [0, 0.38, 0.72, 1], ease: 'easeOut' },
+    });
+    frogRef.current?.fireEmote('love');
+  }, [gift?.id, hop, reduceMotion]);
+
+  return (
+    <div className="relative h-[calc(env(safe-area-inset-top)+clamp(12rem,31dvh,15rem))] shrink-0 overflow-hidden md:h-60">
+      <div className="absolute inset-0">
+        <PondBackdrop />
+        <div className="absolute inset-0 dark:bg-black/20" />
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/45 via-black/15 to-transparent" />
+      </div>
+
+      <div className="absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-5 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-5">
+        <div className="min-w-0 text-white [text-shadow:0_1px_0_rgba(25,83,43,0.55),0_2px_12px_rgba(0,0,0,0.35)]">
+          <p className="text-[12px] font-black text-white/90">A welcome gift from you</p>
+          <h2 className="mt-0.5 text-[23px] font-black leading-tight tracking-tight">Pick their first look</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close gift picker"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-colors hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <X className="h-5 w-5" aria-hidden />
+        </button>
+      </div>
+
+      <span aria-hidden className="absolute bottom-[13px] left-1/2 z-10 h-4 w-32 -translate-x-1/2 rounded-[50%] bg-black/25 blur-[6px]" />
+      <svg
+        aria-hidden
+        preserveAspectRatio="none"
+        viewBox="0 0 100 16"
+        className="absolute inset-x-0 bottom-[-1px] z-10 h-5 w-full fill-background"
+      >
+        <path d="M0 0 Q50 12 100 0 L100 16 L0 16 Z" />
+      </svg>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-[6px] z-20 flex justify-center">
+        <motion.div animate={hop} style={{ transformOrigin: '50% 100%' }}>
+          {isBox && item ? (
+            <div className="h-[150px] w-[150px]">
+              <GiftRive width={150} height={150} color={item.riveIndex} isMilestone={false} paused={!live} />
+            </div>
+          ) : (
+            <div className="relative" style={{ width: frogWidth, height: frogHeight }}>
+              {(!live || !dressed) && (
+                <div className="absolute inset-0">
+                  <FrogSnapshot width={frogWidth} height={frogHeight} indices={indices} cachedOnly={!ready} />
+                </div>
+              )}
+              {live && (
+                <div className={cn('absolute inset-0 transition-opacity duration-200', dressed ? 'opacity-100' : 'opacity-0')}>
+                  <Frog
+                    ref={frogRef}
+                    width={frogWidth}
+                    height={frogHeight}
+                    indices={indices}
+                    onDressed={() => setDressed(true)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+function GiftTile({ gift, chosen, ready, onSelect }: {
+  gift: GiftOption; chosen: boolean; ready: boolean; onSelect: () => void;
+}) {
+  const item = gift.item ?? null;
+  const name = giftDisplayName(gift);
+  return (
+    <button
+      type="button"
+      aria-pressed={chosen}
+      aria-label={`Choose ${name}${item?.rarity ? ', ' + RARITY_CONFIG[item.rarity].label : ''}`}
+      onClick={onSelect}
+      className="group flex min-w-0 touch-manipulation flex-col items-center gap-1.5 rounded-2xl text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    >
+      <TileArt
+        rarity={item?.rarity ?? 'common'}
+        className={cn(
+          'transition-transform duration-150 group-active:scale-95',
+          chosen && 'ring-[3px] ring-primary dark:ring-primary',
+        )}
+      >
+        {item && !isContainer(item) ? (
+          <span className="absolute inset-0 flex items-end justify-center">
+            <FrogSnapshot
+              className="pointer-events-none shrink-0"
+              indices={giftPreviewIndices(item)}
+              width="124%"
+              height="124%"
+              cachedOnly={!ready}
+            />
+          </span>
+        ) : (
+          <span className="absolute inset-0">
+            <GiftOutfitPreview item={item} ready={ready} />
+          </span>
+        )}
+        {chosen && (
+          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Check className="h-3 w-3" strokeWidth={4} aria-hidden />
+          </span>
+        )}
+      </TileArt>
+      <span className={cn('w-full truncate px-0.5 text-[12px] font-black leading-tight', chosen ? 'text-primary' : 'text-foreground')}>
+        {name}
+      </span>
+      <RarityBadge rarity={item?.rarity} className="-mt-0.5" />
+    </button>
+  );
+}
+
+function isContainer(item: CatalogItem) {
+  return item.slot === 'container';
+}
+
+function NextRewardRow({ reward, onClick }: { reward: RewardTier; onClick: () => void }) {
+  const flies = rewardFlies(reward);
+  const prize = [reward.item?.name, flies].filter(Boolean).join(' + ') || 'A reward';
+  const ordinal = reward.label.replace(/\s*friend.*$/i, '').trim() || 'next';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mb-3 flex w-full items-center gap-3 rounded-2xl text-left transition-opacity active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      {reward.item ? (
+        <span className={cn('relative flex h-10 w-10 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-br', RARITY_CONFIG[reward.item.rarity ?? 'common'].gradient)}>
+          {isContainer(reward.item) ? (
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="h-[124%] w-[124%] -translate-y-[13%]">
+                <GiftRive className="h-full w-full" color={reward.item.riveIndex} paused />
+              </span>
+            </span>
+          ) : (
+            <span className="shrink-0">
+              <FrogSnapshot width={52} height={52} indices={giftPreviewIndices(reward.item)} visualOffsetY={0} />
+            </span>
+          )}
+        </span>
+      ) : (
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/[0.12]">
+          <img src="/fly.svg" width={26} height={26} alt="" />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] font-black leading-tight text-foreground">{prize} for you</span>
+        <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-muted-foreground">When your {ordinal} friend joins</span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
+    </button>
+  );
+}
+
+function rewardFlies(reward: RewardTier): string | null {
+  for (const r of reward.rewards ?? []) {
+    if (r.type !== 'FLIES') continue;
+    if (r.amountMode === 'random' && r.maxAmount) return `up to ${r.maxAmount} flies`;
+    if (r.amount) return `${r.amount} flies`;
+  }
+  return reward.flies ? `${reward.flies} flies` : null;
 }
 
 function CloseButton({

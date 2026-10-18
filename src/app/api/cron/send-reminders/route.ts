@@ -25,6 +25,8 @@ import {
   farewellMessage,
   friendFliesMessage,
   hungerMessage,
+  leapHoldMessage,
+  leapPromotionMessage,
   morningMessage,
   type CopyCursors,
 } from '@/lib/notifications/frogVoice';
@@ -130,14 +132,13 @@ async function getUncompletedTasks(
   dateYMD: string,
   nowMinutes: number,
   tz: string,
-): Promise<{ count: number; exampleText: string | null }> {
+): Promise<{ count: number; done: number; exampleText: string | null }> {
   const tasks = await TaskModel.find(dayCandidateFilter(userId, dateYMD))
     .lean<TaskDoc[]>()
     .exec();
 
-  const uncompleted = tasks.filter(
-    (t) => occursOnDate(t, dateYMD, tz) && !isCompletedOnDate(t, dateYMD),
-  );
+  const today = tasks.filter((t) => occursOnDate(t, dateYMD, tz));
+  const uncompleted = today.filter((t) => !isCompletedOnDate(t, dateYMD));
 
   const dueSoon = uncompleted
     .map((t: any) => ({ task: t, startMinutes: parseHHMM(t.startTime) }))
@@ -159,6 +160,7 @@ async function getUncompletedTasks(
 
   return {
     count: uncompleted.length,
+    done: today.length - uncompleted.length,
     exampleText: (example as any)?.text ?? null,
   };
 }
@@ -226,6 +228,7 @@ async function leapMessage(
   userId: string,
   tz: string,
   slot: 'morning' | 'evening',
+  cursors?: CopyCursors,
 ): Promise<PushMessage | null> {
   try {
     const { getLeapView } = await import('@/lib/leap/view');
@@ -260,8 +263,6 @@ async function leapMessage(
 
     const { week } = view;
     if (week.openToday === 0 || week.leap.reached || !week.leap.available) return null;
-    const habits = (n: number) => `${n} habit${n === 1 ? '' : 's'}`;
-    const them = (n: number) => (n === 1 ? 'it' : 'them');
     const holdLeft = week.hold.reached
       ? 0
       : Math.max(0, lineGoal(week.hold, week.hops, week.activeDays) - week.hops);
@@ -272,8 +273,7 @@ async function leapMessage(
       holdLeft <= week.openToday
     ) {
       return {
-        title: `${habits(holdLeft)} to leave the demotion zone`,
-        body: `Finish ${them(holdLeft)} tonight to stay in the ${league(view.league)} League. You've got this.`,
+        ...leapHoldMessage(league(view.league), holdLeft, cursors),
         data: { type: 'leap_reminder', path: '/' },
       };
     }
@@ -281,8 +281,7 @@ async function leapMessage(
     const next = view.leagues[view.league + 1]?.label;
     if (next && left <= Math.min(2, week.openToday)) {
       return {
-        title: `${habits(left)} to the promotion zone`,
-        body: `Finish ${them(left)} tonight to advance to the ${next} League. So close.`,
+        ...leapPromotionMessage(next, left, cursors),
         data: { type: 'leap_reminder', path: '/' },
       };
     }
@@ -381,7 +380,11 @@ export async function GET(req: NextRequest) {
     }
 
     const todayYMD = getTodayInTz(tz);
-    const { count: uncompletedCount, exampleText } = await getUncompletedTasks(
+    const {
+      count: uncompletedCount,
+      done: doneCount,
+      exampleText,
+    } = await getUncompletedTasks(
       userId,
       todayYMD,
       getCurrentMinutesInTz(tz),
@@ -406,6 +409,7 @@ export async function GET(req: NextRequest) {
       if (ignoredCount < REMINDER_MUTE_THRESHOLD) {
         const ctx = {
           count: uncompletedCount,
+          done: doneCount,
           frog,
           exampleTask: exampleText,
           ignoredStreak: ignoredCount,
@@ -445,13 +449,13 @@ export async function GET(req: NextRequest) {
         isFrogStarving(wardrobe) &&
         ignoredCount < REMINDER_MUTE_THRESHOLD
       ) {
-        message = withData(hungerMessage(frog, cursors), {
+        message = withData(hungerMessage(frog, cursors, exampleText), {
           type: 'frog_hunger',
           path: '/',
         });
         isRoutine = true;
       } else {
-        const leapNudge = await leapMessage(userId, tz, 'evening');
+        const leapNudge = await leapMessage(userId, tz, 'evening', cursors);
         if (leapNudge) {
           message = leapNudge;
         } else {

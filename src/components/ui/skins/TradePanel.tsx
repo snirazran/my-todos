@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
 import {
+  creditRewardedAd,
   rewardedAdsAvailable,
   rewardedAdFailureMessage,
   showRewardedAd,
@@ -833,6 +834,7 @@ export function TradePanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.granted || !data.reward) {
+        if (!isPremium && !viaPlus) creditRewardedAd('trade_reroll');
         setRerollError(data.error ?? 'Could not reroll — try again.');
         return;
       }
