@@ -55,7 +55,7 @@ export function BuddyNudgeSheet({
         {({ entered, bindScroll }) => (
           <div
             ref={bindScroll}
-            className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-9 text-center sm:max-h-[calc(100dvh-3rem)]"
+            className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] flex-col overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-9 text-center sm:max-h-[calc(100dvh-3rem)]"
           >
             <div
               aria-hidden

@@ -144,7 +144,7 @@ export function AddFriendsSheet({
         {({ entered, bindScroll }) => (
           <div
             ref={bindScroll}
-            className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-3rem)]"
+            className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] flex-col overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-3rem)]"
           >
             {/* The art carries no copy: text baked over an image gets cropped,
                 fights the illustration and can't be sized per screen. It sets

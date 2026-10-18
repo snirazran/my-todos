@@ -296,7 +296,7 @@ export function LookLikesSheet({
       {({ entered, bindScroll }) => (
         <div
           ref={bindScroll}
-          className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-4 sm:max-h-[calc(100dvh-3rem)]"
+          className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-4 sm:max-h-[calc(100dvh-3rem)]"
         >
           <h2 className="text-xl font-black tracking-tight text-foreground">
             Your look, noticed

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   requestFrogStamp,
   drawCachedFrogStamp,
@@ -30,7 +30,6 @@ export function FrogSnapshot({
   cachedOnly?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCachedFrame, setHasCachedFrame] = useState(false);
   const indicesRef = useRef(indices);
   indicesRef.current = indices;
   const resolvedVisualOffsetY =
@@ -59,8 +58,7 @@ export function FrogSnapshot({
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       cancelStamp?.();
-      const cached = drawCachedFrogStamp(canvas, indicesRef.current ?? {});
-      setHasCachedFrame(cached);
+      drawCachedFrogStamp(canvas, indicesRef.current ?? {});
       if (!cachedOnly) cancelStamp = requestFrogStamp(canvas, indicesRef.current ?? {});
     };
     applySize();
@@ -78,7 +76,6 @@ export function FrogSnapshot({
       className={className}
       style={{ width, height, position: 'relative', overflow: 'visible' }}
     >
-      {cachedOnly && !hasCachedFrame && <img src="/frog.png" alt="" width={240} height={270} className="absolute inset-0 h-full w-full object-contain" />}
       <canvas
         ref={canvasRef}
         style={{

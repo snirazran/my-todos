@@ -730,7 +730,7 @@ function GiftStage({ gift, ready, onClose }: { gift: GiftOption | null; ready: b
             </div>
           ) : (
             <div className="relative" style={{ width: frogWidth, height: frogHeight }}>
-              {(!live || !dressed) && (
+              {reduceMotion && (
                 <div className="absolute inset-0">
                   <FrogSnapshot width={frogWidth} height={frogHeight} indices={indices} cachedOnly={!ready} />
                 </div>

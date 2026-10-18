@@ -7,7 +7,6 @@ import {
   Variants,
 } from 'framer-motion';
 import { ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
-import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
@@ -297,14 +296,14 @@ export function PlusOfferButton({
 
         <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
           {busy ? (
-            <span className="truncate text-[18px] font-black tracking-tight">
+            <span className="truncate text-[21px] font-black tracking-tight">
               {busyLabel ?? 'Loading...'}
             </span>
           ) : anchor ? (
             <span className="flex items-baseline gap-1.5 whitespace-nowrap">
               <span
                 className={cn(
-                  'text-[14px] font-black tabular-nums line-through decoration-2',
+                  'text-[16px] font-black tabular-nums line-through decoration-2',
                   plus ? 'text-white/50 decoration-[#fde68a]/80' : 'text-white/75 decoration-white/80',
                 )}
               >
@@ -315,27 +314,23 @@ export function PlusOfferButton({
                 animate={landed ? { scale: [1, 1.18, 1] } : { scale: 1 }}
                 transition={{ duration: 0.35, ease: 'easeOut' }}
                 className={cn(
-                  'origin-left text-[24px] font-black tabular-nums leading-none tracking-tight',
+                  'origin-left text-[28px] font-black tabular-nums leading-none tracking-tight',
                   plus && 'text-[#fde68a]',
                 )}
               >
                 {shown}
               </motion.span>
-              <span className="text-[14px] font-black">{anchor.unit}</span>
+              <span className="text-[16px] font-black">{anchor.unit}</span>
             </span>
           ) : (
-            <span className="truncate whitespace-nowrap text-[18px] font-black tracking-tight">
+            <span className="truncate whitespace-nowrap text-[21px] font-black tracking-tight">
               {title}
             </span>
           )}
-          {plus ? (
+          {plus && (
             <span className="mt-1 flex items-center gap-1 text-[12px] font-bold text-white/90">
               <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
               {subline}
-            </span>
-          ) : (
-            <span className="mt-1 flex items-center text-white/90">
-              <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
             </span>
           )}
         </span>

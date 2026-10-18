@@ -181,7 +181,7 @@ export default function CalendarConnectSheet({
             />
             <div
               ref={bindScroll}
-              className="relative flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-8 sm:max-h-[calc(100dvh-3rem)]"
+              className="relative flex max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] flex-col overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-8 sm:max-h-[calc(100dvh-3rem)]"
             >
 
             <AnimatePresence mode="wait" initial={false}>
