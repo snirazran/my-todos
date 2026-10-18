@@ -16,6 +16,7 @@ import {
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 export type ClosetSlot =
@@ -214,6 +215,16 @@ function entryRarity(entry: ClosetEntry): Rarity {
   return entry.kind === 'item' ? entry.item.rarity : (entry.bg.rarity as Rarity);
 }
 
+function isEntryEquipped(
+  entry: ClosetEntry,
+  equipped: Partial<Record<WardrobeSlot, string | null>>,
+  equippedBgId: string | null,
+) {
+  return entry.kind === 'item'
+    ? equipped[entry.item.slot] === entry.item.id
+    : equippedBgId === entry.bg.id;
+}
+
 function ClosetTile({
   entry,
   equipped,
@@ -289,7 +300,7 @@ function ClosetTile({
       <span className="flex h-5 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
         {owned ? (
           <span className={equipped ? 'text-primary' : 'text-muted-foreground/70'}>
-            {equipped ? 'Wearing' : 'Owned'}
+            {equipped ? 'Wearing' : 'Wear'}
           </span>
         ) : entry.locked ? (
           <span className="text-amber-700 dark:text-amber-400">Gift or trade</span>
@@ -448,6 +459,22 @@ function useStuckHeaderTop() {
   return top;
 }
 
+const TIER_DOT: Record<Rarity, string> = {
+  common: 'bg-slate-400',
+  uncommon: 'bg-emerald-500',
+  rare: 'bg-sky-500',
+  epic: 'bg-violet-500',
+  legendary: 'bg-amber-500',
+};
+
+const TIER_TONE: Record<Rarity, string> = {
+  common: 'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500/40 dark:bg-slate-500/15 dark:text-slate-200',
+  uncommon: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300',
+  rare: 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300',
+  epic: 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-300',
+  legendary: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300',
+};
+
 export function CollectionBook({
   slot,
   catalog,
@@ -462,6 +489,8 @@ export function CollectionBook({
   wishlistedIds,
   balance,
   shuffleSeed,
+  show,
+  empty = null,
   onTapItem,
   onTapBackground,
 }: {
@@ -478,11 +507,18 @@ export function CollectionBook({
   wishlistedIds: Set<string>;
   balance: number;
   shuffleSeed: string;
+  show: 'owned' | 'unowned';
+  empty?: ReactNode;
   onTapItem: (item: ItemDef, dealPrice: number | null) => void;
   onTapBackground: (bg: BackgroundItem) => void;
 }) {
   const { gridClass } = useShelfGrid();
   const stuckTop = useStuckHeaderTop();
+  const barRef = useRef<HTMLDivElement>(null);
+  const pillRowRef = useRef<HTMLElement>(null);
+  const shelfRefs = useRef(new Map<Rarity, HTMLElement>());
+  const spyLockRef = useRef(0);
+  const [activeTier, setActiveTier] = useState<Rarity | null>(null);
 
   const shelves = useMemo(() => {
     const entries = buildClosetEntries(
@@ -494,59 +530,160 @@ export function CollectionBook({
       dealPrices,
     );
     return SHELF_ORDER.map((rarity) => {
-      const list = entries
-        .filter((entry) => entryRarity(entry) === rarity)
-        .map((entry) => ({
-          entry,
-          rank: seededRank(shuffleSeed, `${entry.kind}:${entryId(entry)}`),
-        }))
-        .sort((a, b) => a.rank - b.rank)
-        .map(({ entry }) => entry);
+      const tier = entries.filter((entry) => entryRarity(entry) === rarity);
+      const list =
+        show === 'owned'
+          ? tier
+              .filter((entry) => entry.owned > 0)
+              .sort(
+                (a, b) =>
+                  entrySlotRank(a) - entrySlotRank(b) ||
+                  entryName(a).localeCompare(entryName(b)),
+              )
+          : tier
+              .filter((entry) => entry.owned === 0)
+              .map((entry) => ({
+                entry,
+                rank: seededRank(shuffleSeed, `${entry.kind}:${entryId(entry)}`),
+              }))
+              .sort((a, b) => a.rank - b.rank)
+              .map(({ entry }) => entry);
       return {
         rarity,
         list,
-        owned: list.filter((entry) => entry.owned > 0).length,
+        total: tier.length,
+        owned: tier.filter((entry) => entry.owned > 0).length,
       };
     }).filter((shelf) => shelf.list.length > 0);
-  }, [slot, catalog, backgrounds, inventory, bgInventory, dealPrices, shuffleSeed]);
+  }, [slot, catalog, backgrounds, inventory, bgInventory, dealPrices, shuffleSeed, show]);
 
-  const isEquipped = (entry: ClosetEntry) =>
-    entry.kind === 'item'
-      ? equipped[entry.item.slot] === entry.item.id
-      : equippedBgId === entry.bg.id;
+  const showTierBar = shelves.length > 1;
+
+  useEffect(() => {
+    if (!showTierBar) return;
+    const root = document.getElementById('main-scroll');
+    if (!root) return;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      if (Date.now() < spyLockRef.current) return;
+      const line =
+        root.getBoundingClientRect().top +
+        (stuckTop ?? 0) +
+        (barRef.current?.offsetHeight ?? 0) +
+        24;
+      let current: Rarity | null = null;
+      shelves.forEach((shelf) => {
+        const el = shelfRefs.current.get(shelf.rarity);
+        if (el && el.getBoundingClientRect().top <= line) current = shelf.rarity;
+      });
+      setActiveTier((prev) => (prev === current ? prev : current));
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      root.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [showTierBar, shelves, stuckTop]);
+
+  useEffect(() => {
+    const row = pillRowRef.current;
+    if (!row || !activeTier) return;
+    const pill = row.querySelector<HTMLElement>(`[data-tier="${activeTier}"]`);
+    if (!pill) return;
+    row.scrollTo({
+      left: pill.offsetLeft - (row.clientWidth - pill.offsetWidth) / 2,
+      behavior: 'smooth',
+    });
+  }, [activeTier]);
+
+  const jumpToTier = (rarity: Rarity) => {
+    const root = document.getElementById('main-scroll');
+    const shelf = shelfRefs.current.get(rarity);
+    if (!root || !shelf) return;
+    hapticTick();
+    setActiveTier(rarity);
+    spyLockRef.current = Date.now() + 800;
+    const offset = (stuckTop ?? 0) + (barRef.current?.offsetHeight ?? 0) + 8;
+    const top =
+      root.scrollTop +
+      shelf.getBoundingClientRect().top -
+      root.getBoundingClientRect().top -
+      offset;
+    root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  };
+
+  if (!shelves.length) return <>{empty}</>;
 
   return (
     <div className="flex flex-col gap-5 pb-4">
+      {showTierBar && (
+        <div
+          ref={barRef}
+          style={stuckTop != null ? { top: stuckTop } : undefined}
+          className={cn(
+            '-mx-4 -mb-3 bg-background py-2 md:-mx-6',
+            stuckTop != null && 'sticky z-30',
+          )}
+        >
+          <nav
+            ref={pillRowRef}
+            aria-label="Jump to a rarity"
+            className="relative flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden"
+          >
+            {shelves.map((shelf) => {
+              const isActive = activeTier === shelf.rarity;
+              return (
+                <button
+                  key={shelf.rarity}
+                  type="button"
+                  data-tier={shelf.rarity}
+                  onClick={() => jumpToTier(shelf.rarity)}
+                  aria-current={isActive || undefined}
+                  className={cn(
+                    'flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-black transition-colors duration-150',
+                    isActive
+                      ? TIER_TONE[shelf.rarity]
+                      : 'border-border/60 bg-card text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <span className={cn('h-2 w-2 shrink-0 rounded-full', TIER_DOT[shelf.rarity])} />
+                  {RARITY_CONFIG[shelf.rarity].label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      )}
       {shelves.map((shelf) => {
         const premium = shelf.rarity === 'legendary' || shelf.rarity === 'epic';
         return (
           <section
             key={shelf.rarity}
+            ref={(el) => {
+              if (el) shelfRefs.current.set(shelf.rarity, el);
+              else shelfRefs.current.delete(shelf.rarity);
+            }}
             data-shelf={shelf.rarity}
             aria-label={RARITY_CONFIG[shelf.rarity].label}
           >
-            <div
-              style={stuckTop != null ? { top: stuckTop } : undefined}
-              className={cn(
-                '-mx-4 mb-1 bg-background px-4 py-1 md:-mx-6 md:px-6',
-                stuckTop != null && 'sticky z-30',
-              )}
-            >
-              <ShelfHeader
-                className="mb-0"
-                icon={premium ? <Sparkles className="h-3.5 w-3.5" strokeWidth={2.75} /> : undefined}
-                label={RARITY_CONFIG[shelf.rarity].label}
-                tone={RARITY_CONFIG[shelf.rarity].text}
-                meta={
-                  <span>
-                    {shelf.owned}
-                    <span className="opacity-60">/{shelf.list.length}</span>
-                  </span>
-                }
-                progress={shelf.owned / shelf.list.length}
-                barTone={BAR_TONE[shelf.rarity]}
-              />
-            </div>
+            <ShelfHeader
+              icon={premium ? <Sparkles className="h-3.5 w-3.5" strokeWidth={2.75} /> : undefined}
+              label={RARITY_CONFIG[shelf.rarity].label}
+              tone={RARITY_CONFIG[shelf.rarity].text}
+              meta={
+                <span>
+                  {shelf.owned}
+                  <span className="opacity-60">/{shelf.total}</span>
+                </span>
+              }
+              progress={shelf.owned / shelf.total}
+              barTone={BAR_TONE[shelf.rarity]}
+            />
             <div className={gridClass}>
               {shelf.list.map((entry) => {
                 const id = entryId(entry);
@@ -554,7 +691,7 @@ export function CollectionBook({
                   <ClosetTile
                     key={`${entry.kind}-${id}`}
                     entry={entry}
-                    equipped={isEquipped(entry)}
+                    equipped={isEntryEquipped(entry, equipped, equippedBgId)}
                     trying={tryOnId === id}
                     isNew={unseen.has(id)}
                     wishlisted={entry.kind === 'item' && wishlistedIds.has(id)}
@@ -573,6 +710,18 @@ export function CollectionBook({
       })}
     </div>
   );
+}
+
+const SLOT_ORDER: ClosetSlot[] = ['skin', 'hat', 'body', 'hand_item', 'background'];
+
+function entrySlotRank(entry: ClosetEntry) {
+  return SLOT_ORDER.indexOf(
+    entry.kind === 'item' ? (entry.item.slot as ClosetSlot) : 'background',
+  );
+}
+
+function entryName(entry: ClosetEntry) {
+  return entry.kind === 'item' ? entry.item.name : entry.bg.name;
 }
 
 export function TryOnBar({

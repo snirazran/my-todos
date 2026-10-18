@@ -33,7 +33,7 @@ export default function CircularTimer() {
   const [expanded, setExpanded] = useState(false);
   const { armed: pauseArmed, guardPause } = useDeepFocusPauseGuard();
   const wardrobeDockVisible = useUIStore(
-    (s) => s.isWardrobeStuck && s.wardrobeTab === 'inventory',
+    (s) => s.isWardrobeStuck && s.wardrobeTab !== 'trade',
   );
 
   useEffect(() => setPortalTarget(document.body), []);
