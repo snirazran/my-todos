@@ -55,7 +55,16 @@ import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { Icon as AppIcon } from '@/components/ui/Icon';
-import { ItemCard } from './ItemCard';
+import {
+  BAR_TONE,
+  BackgroundArt,
+  ItemArt,
+  ShelfHeader,
+  TILE_TONE,
+  TileArt,
+  shelfActionClass,
+  useShelfGrid,
+} from './DressingRoom';
 
 // Import from gift-box for the reward UI
 import {
@@ -137,10 +146,8 @@ const RARITY_CONFIG: Record<
 };
 
 import { FilterCategory } from './FilterBar';
-import { SortOrder } from './SortMenu';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { BackgroundCard } from './BackgroundCard';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 import { WardrobeEmptyState } from './WardrobeEmptyState';
@@ -187,7 +194,6 @@ type TradePanelProps = {
   unseenItems: string[];
   onTradeSuccess?: () => void;
   activeFilter?: FilterCategory;
-  sortBy?: SortOrder;
   paused?: boolean;
   pageScroll?: boolean;
   isPremium?: boolean;
@@ -207,7 +213,6 @@ export function TradePanel({
   unseenItems,
   onTradeSuccess,
   activeFilter = 'all',
-  sortBy = 'rarity_asc',
   paused = false,
   pageScroll = false,
   isPremium = false,
@@ -239,12 +244,8 @@ export function TradePanel({
   const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
   const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
-  const threeCol = useMediaQuery('(min-width: 380px)');
   const isLarge = useMediaQuery('(min-width: 1024px)');
-  const cardGridClass = cn(
-    'grid md:grid-cols-4 md:gap-4',
-    threeCol ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-3',
-  );
+  const { gridClass: cardGridClass } = useShelfGrid();
   // The mobile dock rests as a peek bar so the grid keeps the screen; expanding
   // raises the full contract stage. Desktop (lg+) is always expanded.
   const [isContractExpanded, setIsContractExpanded] = useState(false);
@@ -324,7 +325,7 @@ export function TradePanel({
 
   useEffect(() => {
     setInventoryHasScrolled(false);
-  }, [activeFilter, sortBy, targetRarity]);
+  }, [activeFilter, targetRarity]);
 
   useEffect(() => {
     if (selectedIds.length === 0) {
@@ -355,36 +356,21 @@ export function TradePanel({
       return entry.item.slot === activeFilter;
     };
 
-    const price = (entry: TradeEntry) =>
-      entry.kind === 'item'
-        ? entry.item?.priceFlies ?? 0
-        : entry.bg?.priceFlies ?? 0;
-
     const result = Array.from(entryMap.values()).filter(
       (entry) =>
         matchesFilter(entry) && (!gridScope || gridScope.has(entry.rarity)),
     );
 
-    return result.sort((a, b) => {
-      switch (sortBy) {
-        case 'rarity_asc':
-          return rarityRank[a.rarity] - rarityRank[b.rarity];
-        case 'rarity_desc':
-          return rarityRank[b.rarity] - rarityRank[a.rarity];
-        case 'price_asc':
-          return price(a) - price(b);
-        case 'price_desc':
-          return price(b) - price(a);
-        default:
-          return 0;
-      }
-    });
-  }, [entryMap, gridScope, activeFilter, sortBy]);
+    return result.sort(
+      (a, b) =>
+        rarityRank[a.rarity] - rarityRank[b.rarity] || b.owned - a.owned,
+    );
+  }, [entryMap, gridScope, activeFilter]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
     initial: availableItems.length,
     batch: availableItems.length || 1,
-    resetKey: `${activeFilter}|${sortBy}|${availableItems.length}`,
+    resetKey: `${activeFilter}|${availableItems.length}`,
     rootRef: inventoryScrollRef,
     enabled: false,
   });
@@ -419,7 +405,6 @@ export function TradePanel({
     availableGrid.loadMore,
     gridBatchSize,
     gridInitialSize,
-    sortBy,
     targetRarity,
   ]);
 
@@ -636,7 +621,7 @@ export function TradePanel({
 
   // One tap from "a pile of spares" to "a signed contract". Deep stacks are
   // spent first so a one-of-a-kind item is only ever burned as a last resort.
-  const quickFillPlan = useMemo(() => {
+  const buildFillPlan = React.useCallback((forRarity: Rarity | null) => {
     const remaining = new Map<string, number>();
     entryMap.forEach((entry) => remaining.set(entry.uid, entry.owned));
     [...selectedIds, ...fuelIds].forEach((uid) =>
@@ -669,6 +654,7 @@ export function TradePanel({
     };
 
     const startRarity =
+      forRarity ??
       targetRarity ??
       (() => {
         const copies = new Map<Rarity, number>();
@@ -730,13 +716,37 @@ export function TradePanel({
     };
   }, [entryMap, selectedIds, fuelIds, targetRarity, modifiers, isPremium]);
 
-  const handleQuickFill = () => {
-    if (!quickFillPlan) return;
+  const quickFillPlan = useMemo(() => buildFillPlan(null), [buildFillPlan]);
+
+  const shelfFillPlans = useMemo(() => {
+    const plans = new Map<Rarity, NonNullable<ReturnType<typeof buildFillPlan>>>();
+    if (targetRarity) return plans;
+    const rarities = new Set<Rarity>();
+    entryMap.forEach((entry) => rarities.add(entry.rarity));
+    rarities.forEach((rarity) => {
+      const plan = buildFillPlan(rarity);
+      if (plan?.completes) plans.set(rarity, plan);
+    });
+    return plans;
+  }, [buildFillPlan, entryMap, targetRarity]);
+
+  const copiesByRarity = useMemo(() => {
+    const copies = new Map<Rarity, number>();
+    entryMap.forEach((entry) =>
+      copies.set(entry.rarity, (copies.get(entry.rarity) ?? 0) + entry.owned),
+    );
+    return copies;
+  }, [entryMap]);
+
+  const applyFillPlan = (plan: ReturnType<typeof buildFillPlan>) => {
+    if (!plan) return;
     hapticTick();
-    setSelectedIds(quickFillPlan.selected);
-    setFuelIds(quickFillPlan.fuel);
+    setSelectedIds(plan.selected);
+    setFuelIds(plan.fuel);
     setError(null);
   };
+
+  const handleQuickFill = () => applyFillPlan(quickFillPlan);
 
   const toPick = (uid: string) => {
     const [kind, ...rest] = uid.split(':');
@@ -1105,7 +1115,6 @@ export function TradePanel({
         {Array.from({ length: count }).map((_, i) => {
           const uid = uids[i];
           const entry = uid ? entryMap.get(uid) : null;
-          const config = entry ? RARITY_CONFIG[entry.rarity] : null;
           const slotKey = `${keyPrefix}-${i}`;
           const arriving = inFlightSlots.has(slotKey);
           const name =
@@ -1127,13 +1136,13 @@ export function TradePanel({
                     : `Empty slot ${i + 1}`
               }
               className={cn(
-                'aspect-square rounded-xl border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
+                'aspect-square rounded-2xl border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
                 !entry && 'border-dashed',
                 !entry &&
                   (expectConfig
                     ? cn(expectConfig.border, expectConfig.bg, 'opacity-60')
                     : 'border-border bg-muted/40'),
-                entry && config && cn(config.border, config.bg, 'shadow-sm'),
+                entry && cn('border-transparent ring-1', TILE_TONE[entry.rarity]),
               )}
             >
               <AnimatePresence>
@@ -1545,7 +1554,7 @@ export function TradePanel({
   const dockNode = (
     <div
       ref={dockRef}
-      className="lg:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full z-[60] max-h-[72svh] overflow-y-auto bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col"
+      className="tryon-bar-enter lg:hidden fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-6 z-[60] mx-auto flex max-h-[72svh] max-w-md flex-col overflow-y-auto rounded-[22px] bg-card shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/70"
     >
       {renderContract(false)}
     </div>
@@ -1704,7 +1713,7 @@ export function TradePanel({
           }
         }}
         className={cn(
-          'flex-1 flex flex-col bg-background lg:bg-muted/40 lg:rounded-[20px] lg:border lg:border-border/40',
+          'flex-1 flex flex-col bg-background',
           pageScroll
             ? 'pb-[150px] lg:pb-4'
             : 'lg:min-h-0 lg:overflow-y-auto lg:overscroll-none',
@@ -1714,12 +1723,10 @@ export function TradePanel({
         <div
           ref={gridTopRef}
           style={
-            dockHeight > 0 ? { paddingBottom: dockHeight + 24 } : undefined
+            dockHeight > 0 ? { paddingBottom: dockHeight + 36 } : undefined
           }
           className={cn(
-            pageScroll
-              ? '-mx-4 rounded-none border border-x-0 border-border/40 bg-muted/40 p-3 pb-52 md:mx-0 md:rounded-[20px] md:border-x md:px-4 md:pt-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4'
-              : 'px-4 pb-52 lg:p-4',
+            pageScroll ? 'pt-1 pb-52 lg:pb-4' : 'px-4 pb-52 lg:p-4',
           )}
         >
           {targetRarity && (
@@ -1775,7 +1782,6 @@ export function TradePanel({
               {(() => {
                 const renderTradeEntry = (
                   entry: (typeof availableGrid.visibleItems)[number],
-                  index: number,
                 ) => {
                   const selected = selectedCounts[entry.uid] || 0;
                   const remaining = entry.owned - selected;
@@ -1794,51 +1800,15 @@ export function TradePanel({
                         isDimmed && 'opacity-40 grayscale pointer-events-none',
                       )}
                     >
-                      {entry.kind === 'item' && entry.item ? (
-                        <ItemCard
-                          item={entry.item}
-                          mode="trade"
-                          ownedCount={entry.owned}
-                          isEquipped={false}
-                          canAfford={true}
-                          actionLoading={false}
-                          selectedCount={selected}
-                          onAction={() => handleToggle(entry)}
-                          actionLabel={null}
-                          isNew={unseenItems.includes(entry.id)}
-                          deferPreview
-                          centerFrogPreview
-                          compact
-                          pausePreview={true}
-                          previewDelayMs={index * 20}
-                        />
-                      ) : entry.bg ? (
-                        <BackgroundCard
-                          item={entry.bg}
-                          owned
-                          ownedCount={entry.owned}
-                          isEquipped={false}
-                          canAfford
-                          mode="trade"
-                          compact
-                          actionLoading={false}
-                          selectedCount={selected}
-                          onAction={() => handleToggle(entry)}
-                        />
-                      ) : null}
+                      <TradeTile
+                        entry={entry}
+                        selected={selected}
+                        isNew={unseenItems.includes(entry.id)}
+                        onTap={() => handleToggle(entry)}
+                      />
                     </div>
                   );
                 };
-
-                if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
-                  return (
-                    <div className={cn(cardGridClass, 'pb-4')}>
-                      {availableGrid.visibleItems.map((entry, index) =>
-                        renderTradeEntry(entry, index),
-                      )}
-                    </div>
-                  );
-                }
 
                 const groups: {
                   rarity: Rarity;
@@ -1850,31 +1820,100 @@ export function TradePanel({
                     last.entries.push(entry);
                   else groups.push({ rarity: entry.rarity, entries: [entry] });
                 }
-                let entryIndex = 0;
-                return groups.map((group) => (
-                  <div
-                    key={group.rarity}
-                    ref={(el) => {
-                      if (el) groupRefs.current.set(group.rarity, el);
-                      else groupRefs.current.delete(group.rarity);
-                    }}
-                    className="pb-2 last:pb-4"
-                  >
-                    <p
+
+                const shelfHeader = (rarity: Rarity) => {
+                  const config = RARITY_CONFIG[rarity];
+                  const shelfRecipe = recipeFor(modifiers, rarity);
+                  const arrow = (to: Rarity) => (
+                    <span
                       className={cn(
-                        'mb-2 px-1 text-[12px] font-black',
-                        RARITY_CONFIG[group.rarity].text,
+                        'shrink-0 text-[12px] font-black',
+                        RARITY_CONFIG[to].text,
                       )}
                     >
-                      {RARITY_CONFIG[group.rarity].label}
-                    </p>
-                    <div className={cardGridClass}>
-                      {group.entries.map((entry) =>
-                        renderTradeEntry(entry, entryIndex++),
-                      )}
-                    </div>
+                      → {RARITY_CONFIG[to].label}
+                    </span>
+                  );
+
+                  if (targetRarity === rarity) {
+                    return (
+                      <ShelfHeader
+                        label={config.label}
+                        tone={config.text}
+                        meta={`${selectedIds.length}/${slotCount}`}
+                        progress={selectedIds.length / slotCount}
+                        barTone={mainFilled ? 'bg-primary' : BAR_TONE[rarity]}
+                        action={nextRarity ? arrow(nextRarity) : undefined}
+                      />
+                    );
+                  }
+                  if (targetRarity) {
+                    return (
+                      <ShelfHeader
+                        label={`${config.label} extras`}
+                        tone={config.text}
+                        meta={
+                          fuelQuote.count > 0
+                            ? `${fuelIds.length}/${fuelQuote.count}`
+                            : undefined
+                        }
+                        progress={
+                          fuelQuote.count > 0
+                            ? fuelIds.length / fuelQuote.count
+                            : null
+                        }
+                        barTone={fuelFilled ? 'bg-primary' : BAR_TONE[rarity]}
+                      />
+                    );
+                  }
+
+                  const need = shelfRecipe?.itemCount ?? 0;
+                  const copies = copiesByRarity.get(rarity) ?? 0;
+                  const plan = shelfFillPlans.get(rarity);
+                  return (
+                    <ShelfHeader
+                      label={config.label}
+                      tone={config.text}
+                      meta={need > 0 ? `${Math.min(copies, need)}/${need}` : undefined}
+                      progress={need > 0 ? copies / need : null}
+                      barTone={plan ? 'bg-primary' : BAR_TONE[rarity]}
+                      action={
+                        plan ? (
+                          <button
+                            type="button"
+                            onClick={() => applyFillPlan(plan)}
+                            className={shelfActionClass('primary')}
+                          >
+                            <Zap className="h-3.5 w-3.5" strokeWidth={3} />
+                            Fill
+                          </button>
+                        ) : shelfRecipe ? (
+                          arrow(shelfRecipe.to)
+                        ) : undefined
+                      }
+                    />
+                  );
+                };
+
+                return (
+                  <div className="flex flex-col gap-5 pb-4">
+                    {groups.map((group) => (
+                      <section
+                        key={group.rarity}
+                        ref={(el) => {
+                          if (el) groupRefs.current.set(group.rarity, el);
+                          else groupRefs.current.delete(group.rarity);
+                        }}
+                        aria-label={RARITY_CONFIG[group.rarity].label}
+                      >
+                        {shelfHeader(group.rarity)}
+                        <div className={cardGridClass}>
+                          {group.entries.map(renderTradeEntry)}
+                        </div>
+                      </section>
+                    ))}
                   </div>
-                ));
+                );
               })()}
               {availableGrid.hasMore && (
                 <div
@@ -1929,7 +1968,6 @@ function captureCardPixels(source: HTMLElement): string | null {
 function FlightGhost({ flight }: { flight: Flight }) {
   const { from, to, image, rarity, cover } = flight;
   const size = Math.min(from.width, from.height, 88);
-  const config = RARITY_CONFIG[rarity];
   const at = (rect: DOMRect) => ({
     x: rect.left + rect.width / 2 - size / 2,
     y: rect.top + rect.height / 2 - size / 2,
@@ -1942,9 +1980,8 @@ function FlightGhost({ flight }: { flight: Flight }) {
       transition={{ duration: FLIGHT_MS / 1000, ease: [0.32, 0.72, 0.3, 1] }}
       style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }}
       className={cn(
-        'flex items-center justify-center overflow-hidden rounded-xl border-2 bg-gradient-to-b shadow-lg',
-        config.border,
-        config.gradient,
+        'flex items-center justify-center overflow-hidden rounded-2xl shadow-lg ring-1',
+        TILE_TONE[rarity],
       )}
     >
       {image && (
@@ -2139,58 +2176,92 @@ function RewardSummary({
   );
 }
 
+function TradeTile({
+  entry,
+  selected,
+  isNew,
+  onTap,
+}: {
+  entry: TradeEntry;
+  selected: number;
+  isNew: boolean;
+  onTap: () => void;
+}) {
+  const name = entry.item?.name ?? entry.bg?.name ?? '';
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-pressed={selected > 0}
+      aria-label={`${name}, ${RARITY_CONFIG[entry.rarity].label}, ${entry.owned} owned${selected > 0 ? `, ${selected} added` : ''}`}
+      className="group flex w-full flex-col items-stretch gap-1 text-left"
+    >
+      <TileArt
+        rarity={entry.rarity}
+        className={cn(
+          'transition-transform duration-150 group-active:scale-95',
+          selected > 0 && 'ring-2 ring-primary',
+        )}
+      >
+        {entry.kind === 'item' && entry.item ? (
+          <ItemArt item={entry.item} />
+        ) : entry.bg ? (
+          <BackgroundArt bg={entry.bg} />
+        ) : null}
+        {selected > 0 ? (
+          <motion.span
+            key={selected}
+            initial={{ scale: 0.6 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 22 }}
+            className="absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-black tabular-nums text-primary-foreground shadow-sm"
+          >
+            {selected}
+          </motion.span>
+        ) : isNew ? (
+          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
+        ) : null}
+      </TileArt>
+      <span
+        className={cn(
+          'flex h-5 items-center justify-center text-[12.5px] font-black tabular-nums leading-none',
+          selected > 0 ? 'text-primary' : 'text-muted-foreground/70',
+        )}
+      >
+        {selected > 0 ? `${selected}/${entry.owned} added` : `×${entry.owned}`}
+      </span>
+    </button>
+  );
+}
+
 function RewardPoolTile({ prize }: { prize: RewardPreview }) {
-  const config = RARITY_CONFIG[prize.item?.rarity ?? prize.bg?.rarity ?? 'common'];
+  const rarity = prize.item?.rarity ?? prize.bg?.rarity ?? 'common';
 
   return (
     <div
-      className={cn(
-        'relative flex flex-col overflow-hidden rounded-xl border-2 bg-gradient-to-br p-1.5 shadow-sm',
-        config.border,
-        config.gradient,
-        prize.owned && 'opacity-55',
-      )}
+      aria-label={`${prize.name}, ${prize.owned ? 'owned' : 'new to you'}`}
+      className={cn('flex flex-col items-stretch gap-1', prize.owned && 'opacity-55')}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-background/50">
+      <TileArt rarity={rarity}>
         {prize.bg ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={backgroundPreview(prize.bg)}
-            alt={prize.name}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+          <BackgroundArt bg={prize.bg} />
         ) : prize.item ? (
-          <FrogSnapshot
-            indices={{
-              skin: 0,
-              hat: 0,
-              body: 0,
-              hand_item: 0,
-              [prize.item.slot]: prize.item.riveIndex,
-            }}
-            width="100%"
-            height="100%"
-            visualOffsetY={0}
-            className="pointer-events-none translate-y-[6%]"
-          />
+          <ItemArt item={prize.item} />
         ) : null}
         {prize.wishlisted && (
-          <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-            <Bookmark className="h-3 w-3" strokeWidth={3.5} fill="currentColor" />
+          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
           </span>
         )}
-      </div>
-      <p className="mt-1 truncate px-0.5 text-[11px] font-bold leading-tight text-foreground">
-        {prize.name}
-      </p>
-      <p
+      </TileArt>
+      <span
         className={cn(
-          'px-0.5 text-[11px] font-black',
+          'flex h-5 items-center justify-center text-[12.5px] font-black leading-none',
           prize.owned ? 'text-muted-foreground' : 'text-primary',
         )}
       >
         {prize.owned ? 'Owned' : 'New'}
-      </p>
+      </span>
     </div>
   );
 }

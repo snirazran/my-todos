@@ -1,23 +1,14 @@
 'use client';
 
 import React from 'react';
-import {
-  Bookmark,
-  ChevronRight,
-  Clock,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react';
+import { ChevronRight, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
-import { FlyAmount } from '@/components/ui/FlyAmount';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { DragScrollRow } from '@/components/ui/DragScrollRow';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { rewardedAdsAvailable } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type { DailyDeal } from '@/lib/skins/dailyDeal';
+import { ShelfHeader, shelfActionClass } from './DressingRoom';
 
 export function useCountdown(endsAt: string | undefined) {
   const [label, setLabel] = React.useState('');
@@ -82,7 +73,6 @@ export function DailyDealsShelf({
   rerollsLeft = 0,
   rerolling = false,
   wishlistedIds,
-  onBuy,
   onReroll,
   onUpgrade,
   renderEntries,
@@ -93,10 +83,9 @@ export function DailyDealsShelf({
   rerollsLeft?: number;
   rerolling?: boolean;
   wishlistedIds?: Set<string>;
-  onBuy: (item: ItemDef, dealPrice: number) => void;
   onReroll: () => void;
   onUpgrade: () => void;
-  renderEntries?: (
+  renderEntries: (
     entries: { deal: DailyDeal; item: ItemDef }[],
   ) => React.ReactNode;
 }) {
@@ -106,8 +95,6 @@ export function DailyDealsShelf({
     [catalog],
   );
   const isWishlisted = (id: string) => !!wishlistedIds?.has(id);
-  // Sales lead, then pins, then the rest — the shelf keeps its six slots either
-  // way, so the ordering is what carries "there is something for you today".
   const entries = deals
     .map((deal) => ({ deal, item: byId.get(deal.itemId) }))
     .filter((e): e is { deal: DailyDeal; item: ItemDef } => !!e.item)
@@ -116,9 +103,6 @@ export function DailyDealsShelf({
         Number(b.deal.onSale) - Number(a.deal.onSale) ||
         Number(isWishlisted(b.item.id)) - Number(isWishlisted(a.item.id)),
     );
-  const wishlistHits = entries.filter(
-    (entry) => isWishlisted(entry.item.id) && entry.deal.onSale,
-  ).length;
 
   if (!entries.length) return null;
 
@@ -127,31 +111,30 @@ export function DailyDealsShelf({
   const rerollUnavailable = !isPremium && !adReroll;
 
   return (
-    <div className="mb-3">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <span className="inline-flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-          Today at the shop
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          {/* Plus rerolls the shelf for free; everyone else pays for it with a
-              rewarded ad. On a platform with no ads the control becomes the
-              upgrade pitch, so the perk is concrete rather than abstract. */}
+    <section aria-label="Today's deals">
+      <ShelfHeader
+        icon={<Sparkles className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />}
+        label="Today's deals"
+        meta={
+          <>
+            <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+            {countdown}
+          </>
+        }
+        action={
           <button
             type="button"
             onClick={
               rerollUnavailable ? onUpgrade : canReroll ? onReroll : undefined
             }
             disabled={!rerollUnavailable && !canReroll}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-black shadow-sm transition-colors',
-              !rerollUnavailable && !canReroll
-                ? 'border-border/50 bg-muted/50 text-muted-foreground'
-                : 'border-amber-400/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400',
+            className={shelfActionClass(
+              !rerollUnavailable && !canReroll ? 'quiet' : 'amber',
             )}
           >
             <RefreshCw
               className={cn('h-3.5 w-3.5', rerolling && 'animate-spin')}
+              strokeWidth={2.75}
             />
             {rerollUnavailable ? (
               <>
@@ -159,7 +142,7 @@ export function DailyDealsShelf({
                 <Icon name="frogPlus" label="Plus" className="h-5 w-5" />
               </>
             ) : !canReroll ? (
-              'Rerolled today'
+              'Rerolled'
             ) : adReroll ? (
               <>
                 Reroll
@@ -169,90 +152,9 @@ export function DailyDealsShelf({
               'Reroll'
             )}
           </button>
-          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2.5 py-1 text-[11px] font-black tabular-nums text-foreground shadow-sm">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            {countdown}
-          </span>
-        </span>
-      </div>
-
-      {renderEntries ? renderEntries(entries) : (
-      <DragScrollRow>
-        {entries.map(({ deal, item }) => {
-          const config = RARITY_CONFIG[item.rarity];
-          const wishlisted = isWishlisted(item.id);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onBuy(item, deal.dealPrice)}
-              className={cn(
-                'relative flex w-[148px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-gradient-to-br p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
-                config.border,
-                config.gradient,
-              )}
-            >
-              <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
-                <div
-                  className={cn(
-                    'px-2 py-1 rounded-br-2xl text-[11px] font-black border-b border-r',
-                    config.bg,
-                    config.text,
-                    config.border,
-                  )}
-                >
-                  {config.label}
-                </div>
-              </div>
-              {wishlisted && (
-                <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-black text-primary-foreground shadow-sm">
-                  <Bookmark
-                    className="h-2.5 w-2.5"
-                    strokeWidth={3.5}
-                    fill="currentColor"
-                  />
-                  Wishlist
-                </span>
-              )}
-              <div className="relative flex h-24 items-end justify-center overflow-hidden rounded-lg bg-background/50">
-                <FrogSnapshot
-                  className="h-[120%] w-[120%] object-contain"
-                  indices={{ [item.slot]: item.riveIndex }}
-                  width={170}
-                  height={170}
-                />
-              </div>
-              <div className="mt-1.5 flex items-center justify-center gap-1.5">
-                {deal.onSale && (
-                  <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">
-                    {deal.priceFlies.toLocaleString()}
-                  </span>
-                )}
-                <FlyAmount
-                  amount={deal.dealPrice}
-                  size={14}
-                  className="font-black text-foreground"
-                />
-              </div>
-              {/* Held even when there is no sale, so the cards in a row keep
-                  one baseline instead of jumping by a line. */}
-              <span className="mt-0.5 text-center text-[12px] font-black text-emerald-600 dark:text-emerald-400">
-                {deal.onSale ? `${deal.discountPercent}% off today` : ' '}
-              </span>
-            </button>
-          );
-        })}
-      </DragScrollRow>
-      )}
-
-      {wishlistHits > 0 && (
-        <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
-          <Bookmark className="h-3 w-3 shrink-0" strokeWidth={3.5} fill="currentColor" />
-          {wishlistHits === 1
-            ? 'Something from your wishlist is on sale today.'
-            : `${wishlistHits} of your wishlist picks are on sale today.`}
-        </p>
-      )}
-    </div>
+        }
+      />
+      {renderEntries(entries)}
+    </section>
   );
 }

@@ -35,7 +35,6 @@ import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { GiftOddsButton } from './ItemCard';
 import { PurchaseSheet, type PurchaseTarget } from './PurchaseSheet';
 import { FilterBar, FilterCategory } from './FilterBar';
-import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
 import { type DragControls } from 'framer-motion';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -55,8 +54,6 @@ import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { WardrobeEmptyState } from './WardrobeEmptyState';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
-import { DragScrollRow } from '@/components/ui/DragScrollRow';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
 import {
   useBackgroundActions,
@@ -82,10 +79,15 @@ import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import {
   CollectionBook,
   DealTileRow,
-  RarityRail,
+  ItemArt,
+  RAIL_ITEM_CLASS,
+  ShelfHeader,
+  TileArt,
+  TileRail,
   TryOnBar,
   YoursCard,
   summarizeCloset,
+  useShelfGrid,
   type ClosetSlot,
 } from './DressingRoom';
 import {
@@ -235,15 +237,6 @@ function WardrobeManagerContent({
   useEffect(() => {
     setActiveTab(normalizeTab(defaultTab));
   }, [defaultTab]);
-  useEffect(() => {
-    setSortBy(
-      activeTab === 'inventory'
-        ? 'latest'
-        : activeTab === 'shop'
-          ? 'featured'
-          : 'rarity_asc',
-    );
-  }, [activeTab]);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
@@ -262,7 +255,6 @@ function WardrobeManagerContent({
     setPlusPlacement(placement);
     setPlusOpen(true);
   };
-  const [sortBy, setSortBy] = useState<SortOrder>('latest');
   const { showNotification } = useNotification();
   const setNotif = React.useCallback(
     (n: { msg: string; type: 'error' | 'success' } | null) => {
@@ -528,6 +520,8 @@ function WardrobeManagerContent({
   const neverWorn = !Object.values(data?.wardrobe?.equipped ?? {}).some(Boolean);
   const showTapToWear =
     !!user && seenIntros !== undefined && !seenIntros.tapToWear && neverWorn;
+  const showTryOnHint =
+    !!user && seenIntros !== undefined && !seenIntros.tryOn;
 
   const handleItemAction = (item: ItemDef) => {
     if (!user) {
@@ -639,6 +633,7 @@ function WardrobeManagerContent({
       return;
     }
     hapticSelect();
+    if (showTryOnHint) markIntroSeen('tryOn');
     setTryTarget({ kind: 'item', item, dealPrice });
     setStageTryOn({
       kind: 'item',
@@ -663,6 +658,7 @@ function WardrobeManagerContent({
       return;
     }
     hapticSelect();
+    if (showTryOnHint) markIntroSeen('tryOn');
     setTryTarget({ kind: 'bg', bg: bgItem });
     setStageTryOn({
       kind: 'bg',
@@ -742,65 +738,10 @@ function WardrobeManagerContent({
           activeFilter === 'background'
         ? activeFilter
         : 'all';
-  const raritySummary = useMemo(
-    () =>
-      summarizeCloset(
-        closetSlot,
-        data?.catalog ?? [],
-        bg.catalog,
-        data?.wardrobe?.inventory ?? {},
-        bg.inventory,
-      ),
-    [closetSlot, data?.catalog, bg.catalog, data?.wardrobe?.inventory, bg.inventory],
-  );
-  const [activeShelf, setActiveShelf] = useState<Rarity | null>(null);
-  const stickyBottom = () => {
-    const group = document.querySelector<HTMLElement>('[data-wardrobe-sticky]');
-    if (!group) return 0;
-    const rect = group.getBoundingClientRect();
-    const stuckTop = window.matchMedia('(min-width: 768px)').matches ? -96 : -90;
-    return rect.top <= stuckTop + 1 ? rect.bottom : group.offsetHeight + stuckTop;
-  };
-  useEffect(() => {
-    if (!embedded || activeTab !== 'inventory') return;
-    const root = document.getElementById('main-scroll');
-    if (!root) return;
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const line = stickyBottom() + 24;
-      let current: Rarity | null = null;
-      document
-        .querySelectorAll<HTMLElement>('[data-shelf]')
-        .forEach((shelf) => {
-          if (shelf.getBoundingClientRect().top <= line)
-            current = shelf.dataset.shelf as Rarity;
-        });
-      setActiveShelf((prev) => (prev === current ? prev : current));
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
-    };
-    measure();
-    root.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      root.removeEventListener('scroll', onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [embedded, activeTab, activeFilter]);
-  const jumpToShelf = (rarity: Rarity) => {
-    const root = document.getElementById('main-scroll');
-    const shelf = document.querySelector<HTMLElement>(`[data-shelf="${rarity}"]`);
-    if (!root || !shelf) return;
-    hapticTick();
-    const top =
-      root.scrollTop +
-      shelf.getBoundingClientRect().top -
-      root.getBoundingClientRect().top -
-      stickyBottom() -
-      10;
-    root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-  };
+  const { gridClass: shelfGridClass } = useShelfGrid();
+  const shopDayKey =
+    data?.dailyDeals?.[0]?.endsAt ?? new Date().toDateString();
+  const shuffleSeed = `${user?.uid ?? 'guest'}|${shopDayKey}`;
 
   const dealPrices = useMemo(
     () =>
@@ -1043,71 +984,99 @@ function WardrobeManagerContent({
               : null
         }
         unseen={unseenInventorySet}
+        wishlistedIds={wishlistedItemIds}
+        balance={balance}
+        shuffleSeed={shuffleSeed}
         onTapItem={tapClosetItem}
         onTapBackground={tapClosetBackground}
       />
     ) : null;
 
-  const renderWornRowCard = (card: WardrobeCard) =>
-    card.kind === 'item' ? (
-      <WardrobeRowCard
-        key={card.item.id}
-        rarity={card.rarity}
-        sublabel={SLOT_LABEL[card.item.slot]}
-        equipped={data?.wardrobe?.equipped?.[card.item.slot] === card.item.id}
-        rarityBadge
-        cta={showTapToWear ? 'Tap to wear' : undefined}
-        onClick={() => handleItemAction(card.item)}
-      >
-        <FrogSnapshot
-          className="h-[125%] w-[125%] object-contain"
-          indices={{ [card.item.slot]: card.item.riveIndex }}
-          width={120}
-          height={120}
-        />
-      </WardrobeRowCard>
-    ) : (
-      <WardrobeRowCard
-        key={`bg-${card.bg.id}`}
-        rarity={card.rarity}
-        sublabel="Background"
-        equipped={bg.equipped === card.bg.id}
-        rarityBadge
-        onClick={() => bg.handleEquip(card.bg)}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={backgroundPreview(card.bg)}
-          alt={card.bg.name}
-          className="h-full w-full object-cover"
-        />
-      </WardrobeRowCard>
+  const renderNewTile = (card: WardrobeCard) => {
+    if (card.kind !== 'item') return null;
+    const wearing =
+      data?.wardrobe?.equipped?.[card.item.slot] === card.item.id;
+    return (
+      <div key={card.item.id} className={RAIL_ITEM_CLASS}>
+        <button
+          type="button"
+          onClick={() => {
+            if (showTapToWear) markIntroSeen('tapToWear');
+            tapClosetItem(card.item, null);
+          }}
+          aria-label={`${card.item.name}, ${wearing ? 'wearing' : 'tap to wear'}`}
+          aria-pressed={wearing}
+          className="group flex w-full flex-col items-stretch gap-1"
+        >
+          <TileArt
+            rarity={card.rarity}
+            className={cn(
+              'transition-transform duration-150 group-active:scale-95',
+              wearing && 'ring-2 ring-primary',
+            )}
+          >
+            <ItemArt item={card.item} />
+            {wearing ? (
+              <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                <Check className="h-3 w-3" strokeWidth={4} />
+              </span>
+            ) : (
+              <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
+            )}
+          </TileArt>
+          <span className="flex h-5 items-center justify-center text-[12.5px] font-black leading-none text-primary">
+            {wearing ? 'Wearing' : showTapToWear ? 'Tap to wear' : 'Wear'}
+          </span>
+        </button>
+      </div>
     );
+  };
 
-  const renderGiftRowCard = (card: WardrobeCard) =>
-    card.kind === 'item' ? (
-      <WardrobeRowCard
+  const renderGiftTile = (card: WardrobeCard, inRail: boolean) => {
+    if (card.kind !== 'item') return null;
+    const count = data?.wardrobe?.inventory?.[card.item.id] ?? 0;
+    return (
+      <div
         key={card.item.id}
-        rarity={card.rarity}
-        sublabel={SLOT_LABEL[card.item.slot]}
-        count={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
-        isNew={unseenInventorySet.has(card.item.id)}
-        rarityBadge
-        cta="Open"
-        corner={
-          <GiftOddsButton giftId={card.item.id} name={card.item.name} />
-        }
-        onClick={() => handleItemAction(card.item)}
+        className={cn('relative', inRail && RAIL_ITEM_CLASS)}
       >
-        <div className="h-[115%] w-[115%]">
-          <GiftRive
-            color={card.item.riveIndex}
-            animation="box_shake"
-            paused={isDragging}
-          />
-        </div>
-      </WardrobeRowCard>
-    ) : null;
+        <button
+          type="button"
+          onClick={() => handleItemAction(card.item)}
+          aria-label={`Open ${card.item.name}`}
+          className="group flex w-full flex-col items-stretch gap-1"
+        >
+          <TileArt
+            rarity={card.rarity}
+            className="transition-transform duration-150 group-active:scale-95"
+          >
+            <span className="absolute inset-0 flex items-end justify-center">
+              <span className="block h-[112%] w-[112%] shrink-0">
+                <GiftRive
+                  color={card.item.riveIndex}
+                  animation="box_shake"
+                  paused={isDragging}
+                />
+              </span>
+            </span>
+            {count > 1 && (
+              <span className="absolute left-1 top-1 rounded-md bg-black/55 px-1 text-[10px] font-black leading-[16px] text-white">
+                ×{count}
+              </span>
+            )}
+          </TileArt>
+          <span className="flex h-5 items-center justify-center text-[12.5px] font-black leading-none text-primary">
+            Open
+          </span>
+        </button>
+        <GiftOddsButton
+          giftId={card.item.id}
+          name={card.item.name}
+          className="absolute right-1 top-1 h-5 w-5"
+        />
+      </div>
+    );
+  };
 
   return (
     <div
@@ -1189,6 +1158,10 @@ function WardrobeManagerContent({
           >
             {embedded && (
               <>
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute left-[calc(50%-50vw)] top-0 bottom-0 z-0 w-screen bg-background"
+                />
                 <div
                   aria-hidden
                   data-fly-page-bg
@@ -1275,12 +1248,6 @@ function WardrobeManagerContent({
                       onClick={openWishlist}
                     />
                   )}
-                  <SortMenu
-                    value={sortBy}
-                    onChange={setSortBy}
-                    showLatest={false}
-                    showFeatured={false}
-                  />
                 </div>
               )}
             </div>
@@ -1293,8 +1260,7 @@ function WardrobeManagerContent({
                   : 'mt-2 w-full min-w-0',
               )}
             >
-              <div className="flex items-center">
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0">
                 <FilterBar
                   active={activeFilter}
                   onChange={handleFilterChange}
@@ -1326,27 +1292,6 @@ function WardrobeManagerContent({
                   }
                 />
               </div>
-              {embedded && activeTab === 'trade' && (
-                <div className="relative z-10 flex shrink-0 items-center gap-1.5 self-stretch border-l border-border/40 pl-2.5 md:border-l-0 md:pl-1">
-                  <SortMenu
-                    value={sortBy}
-                    onChange={setSortBy}
-                    showLatest={false}
-                    showFeatured={false}
-                  />
-                </div>
-              )}
-              </div>
-              {embedded &&
-                activeTab === 'inventory' &&
-                activeFilter !== 'container' &&
-                canRenderItems && (
-                  <RarityRail
-                    rows={raritySummary}
-                    active={activeShelf}
-                    onJump={jumpToShelf}
-                  />
-                )}
             </div>
           </div>
 
@@ -1389,14 +1334,35 @@ function WardrobeManagerContent({
               {!canRenderItems || !data ? (
                 <WardrobeGridSkeleton />
               ) : activeFilter === 'all' ? (
-                <div className="flex flex-col gap-1 pb-4">
+                <div className="flex flex-col gap-5 pb-4">
+                  {showTryOnHint && (
+                    <p className="-mb-2 flex items-center justify-center gap-1.5 text-[12px] font-bold text-muted-foreground">
+                      <Shirt className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+                      Tap anything to try it on your frog
+                    </p>
+                  )}
                   {ownedGiftCards.length > 0 && (
-                    <div className="pb-2">
-                      <p className="mb-2 px-1 text-[13px] font-black text-foreground">
-                        Gifts to open
-                      </p>
-                      <DragScrollRow>{ownedGiftCards.map(renderGiftRowCard)}</DragScrollRow>
-                    </div>
+                    <section aria-label="Gifts to open">
+                      <ShelfHeader
+                        icon={<Gift className="h-3.5 w-3.5" strokeWidth={2.75} />}
+                        label="Gifts to open"
+                        tone="text-primary"
+                        meta={ownedGiftCards.length > 1 ? ownedGiftCards.length : undefined}
+                      />
+                      <TileRail>
+                        {ownedGiftCards.map((card) => renderGiftTile(card, true))}
+                      </TileRail>
+                    </section>
+                  )}
+                  {newOwnedCards.length > 0 && (
+                    <section aria-label="New in your closet">
+                      <ShelfHeader
+                        label="New in your closet"
+                        tone="text-rose-500"
+                        meta={newOwnedCards.length > 1 ? newOwnedCards.length : undefined}
+                      />
+                      <TileRail>{newOwnedCards.map(renderNewTile)}</TileRail>
+                    </section>
                   )}
                   {!!data.dailyDeals?.length && (
                     <DailyDealsShelf
@@ -1406,7 +1372,6 @@ function WardrobeManagerContent({
                       rerollsLeft={data.dealRerollsLeft ?? 0}
                       rerolling={rerolling}
                       wishlistedIds={wishlistedItemIds}
-                      onBuy={(item, dealPrice) => tapClosetItem(item, dealPrice)}
                       onReroll={() => void rerollDeals()}
                       onUpgrade={() => void rerollDeals()}
                       renderEntries={(entries) => (
@@ -1419,20 +1384,13 @@ function WardrobeManagerContent({
                           inventory={data.wardrobe?.inventory ?? {}}
                           equipped={data.wardrobe?.equipped ?? {}}
                           tryOnId={tryTarget?.kind === 'item' ? tryTarget.item.id : null}
+                          wishlistedIds={wishlistedItemIds}
+                          balance={balance}
                           onTapItem={tapClosetItem}
                         />
                       )}
                     />
                   )}
-                  {newOwnedCards.length > 0 && (
-                    <div className="pb-2">
-                      <p className="mb-2 px-1 text-[13px] font-black text-rose-500">
-                        New in your closet
-                      </p>
-                      <DragScrollRow>{newOwnedCards.map(renderWornRowCard)}</DragScrollRow>
-                    </div>
-                  )}
-                  {renderCollection('all')}
                   {!isGuest && (
                     <WishlistShelf
                       entries={shelfWishlistEntries}
@@ -1445,6 +1403,7 @@ function WardrobeManagerContent({
                       onSeeAll={openWishlist}
                     />
                   )}
+                  {renderCollection('all')}
                   {!isGuest && (
                     <SeenOnFriendsRow
                       enabled={activeTab === 'inventory' && activeFilter === 'all'}
@@ -1465,8 +1424,8 @@ function WardrobeManagerContent({
                     description="Finish quests and keep your streak to earn gifts. Every one can hold something rare."
                   />
                 ) : (
-                  <div className="flex flex-wrap gap-2 pb-4">
-                    {ownedGiftCards.map(renderGiftRowCard)}
+                  <div className={cn(shelfGridClass, 'pb-4')}>
+                    {ownedGiftCards.map((card) => renderGiftTile(card, false))}
                   </div>
                 )
               ) : (
@@ -1496,7 +1455,6 @@ function WardrobeManagerContent({
                   activeFilter={
                     activeFilter === 'container' ? 'all' : activeFilter
                   }
-                  sortBy={sortBy}
                   paused={isDragging}
                   pageScroll={embedded}
                   isPremium={!!data.isPremium}
@@ -1685,120 +1643,6 @@ function WardrobeManagerContent({
           mutateInventoryCaches();
         }}
       />
-    </div>
-  );
-}
-
-function WardrobeRowCard({
-  rarity,
-  name,
-  sublabel,
-  sublabelClass,
-  count,
-  isNew,
-  equipped,
-  rarityBadge,
-  corner,
-  cta,
-  onClick,
-  children,
-}: {
-  rarity: ItemDef['rarity'];
-  name?: string;
-  sublabel: string;
-  sublabelClass?: string;
-  count?: number;
-  isNew?: boolean;
-  equipped?: boolean;
-  rarityBadge?: boolean;
-  corner?: React.ReactNode;
-  cta?: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  const config = RARITY_CONFIG[rarity];
-  return (
-    <div className="relative w-[132px] shrink-0">
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'relative flex w-full flex-col items-stretch overflow-hidden rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
-          config.border,
-        )}
-      >
-        {rarityBadge && (
-          <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
-            <span
-              className={cn(
-                'block rounded-br-2xl border-b border-r px-2 py-1 text-[10px] font-black',
-                config.bg,
-                config.text,
-                config.border,
-              )}
-            >
-              {config.label}
-            </span>
-          </span>
-        )}
-        <div className="relative flex h-20 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
-          {children}
-          {isNew && (
-            <span
-              className={cn(
-                'absolute left-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-sm',
-                rarityBadge ? 'bottom-1' : 'top-1',
-              )}
-            >
-              New
-            </span>
-          )}
-          {(count ?? 0) > 1 && (
-            <span className="absolute right-1 top-1 z-20 rounded-md border border-white/10 bg-black/50 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-              x{count}
-            </span>
-          )}
-          {equipped && (
-            <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-[#447d3f] p-0.5 text-white shadow-md">
-              <Check className="h-3 w-3 stroke-[4]" />
-            </span>
-          )}
-        </div>
-        {name && (
-          <p
-            className={cn(
-              'mt-1.5 truncate text-xs font-black text-foreground',
-              corner && 'pr-7',
-            )}
-          >
-            {name}
-          </p>
-        )}
-        {cta ? (
-          <span
-            className={cn(
-              'mt-1.5 flex h-6 items-center justify-center rounded-lg bg-primary text-[11px] font-black text-primary-foreground shadow-sm',
-              corner && 'mr-7',
-            )}
-          >
-            {cta}
-          </span>
-        ) : (
-          <p
-            className={cn(
-              'truncate text-[10px] font-semibold',
-              !name && 'mt-1.5',
-              corner && 'pr-7',
-              sublabelClass ?? 'text-muted-foreground',
-            )}
-          >
-            {sublabel}
-          </p>
-        )}
-      </button>
-      {corner && (
-        <div className="absolute bottom-2 right-2 z-30">{corner}</div>
-      )}
     </div>
   );
 }

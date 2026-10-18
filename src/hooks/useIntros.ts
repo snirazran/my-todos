@@ -10,7 +10,8 @@ export type IntroKey =
   | 'quickAddNl'
   | 'quickAddTagEdit'
   | 'firstRun'
-  | 'tapToWear';
+  | 'tapToWear'
+  | 'tryOn';
 
 type IntrosResponse = { seenIntros?: Partial<Record<IntroKey, boolean>> };
 

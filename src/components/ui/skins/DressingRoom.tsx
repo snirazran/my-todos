@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Check, Loader2, Lock, Sparkles, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Bookmark, Check, Loader2, Lock, Sparkles, X } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
+import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import {
   RARITY_ORDER,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/skins/catalog';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
 
 export type ClosetSlot =
@@ -36,13 +38,169 @@ export const TILE_TONE: Record<Rarity, string> = {
     'bg-gradient-to-b from-amber-50 via-amber-100 to-orange-100 ring-amber-300 shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_6px_16px_-8px_rgba(245,158,11,0.65)] dark:from-amber-500/15 dark:via-amber-500/20 dark:to-orange-500/20 dark:ring-amber-400/50',
 };
 
-const BAR_TONE: Record<Rarity, string> = {
+export const BAR_TONE: Record<Rarity, string> = {
   common: 'bg-slate-400',
   uncommon: 'bg-emerald-500',
   rare: 'bg-sky-500',
   epic: 'bg-violet-500',
   legendary: 'bg-gradient-to-r from-amber-400 to-orange-500',
 };
+
+export const RAIL_ITEM_CLASS =
+  'w-[calc((100%-1rem)/3.3)] shrink-0 snap-start md:w-[calc((100%-2.5rem)/6)]';
+
+export function useShelfGrid() {
+  const tiny = useMediaQuery('(max-width: 359px)');
+  const wide = useMediaQuery('(min-width: 768px)');
+  return {
+    cols: wide ? 6 : tiny ? 3 : 4,
+    gridClass: cn(
+      'grid gap-2 md:grid-cols-6 md:gap-2.5',
+      tiny ? 'grid-cols-3' : 'grid-cols-4',
+    ),
+  };
+}
+
+function seededRank(seed: string, key: string) {
+  const s = `${seed}|${key}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+export function shelfActionClass(tone: 'quiet' | 'primary' | 'amber' = 'quiet') {
+  return cn(
+    'inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-black transition-colors disabled:pointer-events-none',
+    tone === 'quiet' &&
+      '-mr-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+    tone === 'primary' &&
+      'bg-primary/10 text-primary hover:bg-primary/15 active:scale-[0.97]',
+    tone === 'amber' &&
+      'bg-amber-100 text-amber-800 hover:bg-amber-200/70 active:scale-[0.97] dark:bg-amber-500/15 dark:text-amber-300',
+  );
+}
+
+export function ShelfHeader({
+  label,
+  icon,
+  tone = 'text-foreground',
+  meta,
+  progress,
+  barTone = 'bg-primary',
+  action,
+  className,
+}: {
+  label: ReactNode;
+  icon?: ReactNode;
+  tone?: string;
+  meta?: ReactNode;
+  progress?: number | null;
+  barTone?: string;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('mb-2 flex min-h-7 items-center gap-2 px-0.5', className)}>
+      <span
+        className={cn(
+          'flex shrink-0 items-center gap-1 text-[13px] font-black uppercase tracking-wide',
+          tone,
+        )}
+      >
+        {icon}
+        {label}
+      </span>
+      {meta != null && (
+        <span className="flex shrink-0 items-center gap-1 text-[12px] font-black tabular-nums text-muted-foreground">
+          {meta}
+        </span>
+      )}
+      {progress != null ? (
+        <span className="relative h-1.5 min-w-6 flex-1 overflow-hidden rounded-full bg-foreground/[0.07]">
+          <span
+            className={cn(
+              'absolute inset-y-0 left-0 rounded-full transition-[width] duration-500',
+              barTone,
+            )}
+            style={{ width: `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%` }}
+          />
+        </span>
+      ) : (
+        <span className="flex-1" />
+      )}
+      {action}
+    </div>
+  );
+}
+
+export function TileArt({
+  rarity,
+  className,
+  children,
+}: {
+  rarity: Rarity;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={cn(
+        'closet-tile relative block aspect-square w-full overflow-hidden rounded-2xl ring-1',
+        TILE_TONE[rarity],
+        (rarity === 'epic' || rarity === 'legendary') && 'closet-foil',
+        rarity === 'legendary' && 'closet-foil-gold',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function ItemArt({ item }: { item: Pick<ItemDef, 'slot' | 'riveIndex'> }) {
+  return (
+    <span className="absolute inset-0 flex items-end justify-center">
+      <FrogSnapshot
+        className="pointer-events-none shrink-0"
+        indices={{ [item.slot as WardrobeSlot]: item.riveIndex }}
+        width="124%"
+        height="124%"
+      />
+    </span>
+  );
+}
+
+export function BackgroundArt({ bg }: { bg: BackgroundItem }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={backgroundPreview(bg)}
+      alt=""
+      draggable={false}
+      loading="lazy"
+      onError={(e) => {
+        e.currentTarget.style.visibility = 'hidden';
+      }}
+      className="absolute inset-0 h-full w-full object-cover"
+    />
+  );
+}
+
+export function TileRail({ children }: { children: ReactNode }) {
+  return (
+    <DragScrollRow className="-mx-4 -my-1 snap-x scroll-px-4 gap-2 px-4 py-1 md:-mx-6 md:scroll-px-6 md:px-6">
+      {children}
+    </DragScrollRow>
+  );
+}
 
 type ClosetEntry =
   | { kind: 'item'; item: ItemDef; owned: number; locked: boolean; price: number; dealPrice: number | null }
@@ -61,12 +219,18 @@ function ClosetTile({
   equipped,
   trying,
   isNew,
+  wishlisted = false,
+  balance = Number.POSITIVE_INFINITY,
+  showWas = false,
   onTap,
 }: {
   entry: ClosetEntry;
   equipped: boolean;
   trying: boolean;
   isNew: boolean;
+  wishlisted?: boolean;
+  balance?: number;
+  showWas?: boolean;
   onTap: () => void;
 }) {
   const rarity = entryRarity(entry);
@@ -74,75 +238,55 @@ function ClosetTile({
   const name = entry.kind === 'item' ? entry.item.name : entry.bg.name;
   const showPrice = !owned && !entry.locked && entry.price > 0;
   const onSale = showPrice && entry.dealPrice != null && entry.dealPrice < entry.price;
+  const price = entry.dealPrice ?? entry.price;
+  const affordable = balance >= price;
 
   return (
     <button
       type="button"
       onClick={onTap}
-      aria-label={`${name}, ${RARITY_CONFIG[rarity].label}${owned ? (equipped ? ', wearing' : ', owned') : entry.locked ? ', not found yet' : `, ${entry.dealPrice ?? entry.price} flies`}`}
+      aria-label={`${name}, ${RARITY_CONFIG[rarity].label}${owned ? (equipped ? ', wearing' : ', owned') : entry.locked ? ', not found yet' : `, ${price} flies`}`}
       aria-pressed={equipped || trying}
       className="group flex w-full flex-col items-stretch gap-1 text-left"
     >
-      <span
+      <TileArt
+        rarity={rarity}
         className={cn(
-          'closet-tile relative block aspect-square w-full overflow-hidden rounded-2xl ring-1 transition-transform duration-150 group-active:scale-95',
-          TILE_TONE[rarity],
-          (rarity === 'epic' || rarity === 'legendary') && 'closet-foil',
-          rarity === 'legendary' && 'closet-foil-gold',
+          'transition-transform duration-150 group-active:scale-95',
           equipped && 'ring-2 ring-primary',
           trying && !equipped && 'ring-2 ring-foreground/80',
         )}
       >
-        <span className="absolute inset-0 flex items-end justify-center">
-          {entry.kind === 'item' ? (
-            <FrogSnapshot
-              className="pointer-events-none shrink-0"
-              indices={{ [entry.item.slot as WardrobeSlot]: entry.item.riveIndex }}
-              width="124%"
-              height="124%"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={backgroundPreview(entry.bg)}
-              alt=""
-              draggable={false}
-              loading="lazy"
-              onError={(e) => {
-                e.currentTarget.style.visibility = 'hidden';
-              }}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          )}
-        </span>
+        {entry.kind === 'item' ? <ItemArt item={entry.item} /> : <BackgroundArt bg={entry.bg} />}
 
-        {entry.locked && !owned && (
+        {onSale ? (
+          <span className="absolute left-1 top-1 rounded-md bg-[#447d3f] px-1 text-[10px] font-black leading-[16px] text-white">
+            −{Math.round((1 - price / entry.price) * 100)}%
+          </span>
+        ) : entry.locked && !owned ? (
           <span className="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-white/90 text-amber-600 shadow-sm dark:bg-black/50 dark:text-amber-300">
             <Lock className="h-3 w-3" strokeWidth={3} />
           </span>
-        )}
-
-        {equipped && (
-          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
-            <Check className="h-3 w-3" strokeWidth={4} />
-          </span>
-        )}
-        {!equipped && isNew && (
-          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
-        )}
-        {owned && entry.owned > 1 && (
+        ) : owned && entry.owned > 1 ? (
           <span className="absolute left-1 top-1 rounded-md bg-black/55 px-1 text-[10px] font-black leading-[16px] text-white">
             ×{entry.owned}
           </span>
-        )}
-        {onSale && (
-          <span className="absolute left-1 top-1 rounded-md bg-[#447d3f] px-1 text-[10px] font-black leading-[16px] text-white">
-            −{Math.round((1 - entry.dealPrice! / entry.price) * 100)}%
-          </span>
-        )}
-      </span>
+        ) : null}
 
-      <span className="flex h-5 items-center justify-center gap-0.5 text-[12.5px] font-black tabular-nums leading-none">
+        {equipped ? (
+          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Check className="h-3 w-3" strokeWidth={4} />
+          </span>
+        ) : isNew ? (
+          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
+        ) : wishlisted && !owned ? (
+          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
+          </span>
+        ) : null}
+      </TileArt>
+
+      <span className="flex h-5 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
         {owned ? (
           <span className={equipped ? 'text-primary' : 'text-muted-foreground/70'}>
             {equipped ? 'Wearing' : 'Owned'}
@@ -150,11 +294,24 @@ function ClosetTile({
         ) : entry.locked ? (
           <span className="text-amber-700 dark:text-amber-400">Gift or trade</span>
         ) : showPrice ? (
-          <FlyAmount
-            amount={entry.dealPrice ?? entry.price}
-            size={12.5}
-            className={onSale ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground'}
-          />
+          <>
+            {showWas && onSale && (
+              <span className="text-[11px] font-bold text-muted-foreground line-through decoration-2 opacity-70">
+                {entry.price.toLocaleString()}
+              </span>
+            )}
+            <FlyAmount
+              amount={price}
+              size={12.5}
+              className={
+                !affordable
+                  ? 'text-muted-foreground'
+                  : onSale
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : 'text-foreground'
+              }
+            />
+          </>
         ) : null}
       </span>
     </button>
@@ -227,81 +384,27 @@ export function summarizeCloset(
   }).filter((row) => row.total > 0);
 }
 
-const RAIL_DOT: Record<Rarity, string> = {
-  common: 'bg-slate-400',
-  uncommon: 'bg-emerald-500',
-  rare: 'bg-sky-500',
-  epic: 'bg-violet-500',
-  legendary: 'bg-amber-500',
-};
-
-const RAIL_TONE: Record<Rarity, string> = {
-  common: 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300',
-  uncommon: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
-  rare: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300',
-  epic: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300',
-  legendary: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
-};
-
-export function RarityRail({
-  rows,
-  active,
-  onJump,
-}: {
-  rows: RaritySummary[];
-  active: Rarity | null;
-  onJump: (rarity: Rarity) => void;
-}) {
-  if (rows.length < 2) return null;
-  return (
-    <nav aria-label="Collection rarities" className="-mx-4 flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
-      {rows.map((row) => {
-        const isActive = active === row.rarity;
-        return (
-          <button
-            key={row.rarity}
-            type="button"
-            onClick={() => onJump(row.rarity)}
-            aria-current={isActive || undefined}
-            aria-label={`${RARITY_CONFIG[row.rarity].label}, ${row.owned} of ${row.total} collected`}
-            className={cn(
-              'flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold transition-shadow duration-150 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-              RAIL_TONE[row.rarity],
-              isActive && 'ring-1 ring-current shadow-sm',
-            )}
-          >
-            <span className={cn('h-2 w-2 shrink-0 rounded-full', RAIL_DOT[row.rarity])} />
-            {RARITY_CONFIG[row.rarity].label}
-            <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] tabular-nums">
-              {row.owned}<span className="opacity-60">/{row.total}</span>
-            </span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
 export function DealTileRow({
   deals,
   inventory,
   equipped,
   tryOnId,
+  wishlistedIds,
+  balance,
   onTapItem,
 }: {
   deals: { item: ItemDef; dealPrice: number; onSale: boolean }[];
   inventory: Record<string, number>;
   equipped: Partial<Record<WardrobeSlot, string | null>>;
   tryOnId: string | null;
+  wishlistedIds: Set<string>;
+  balance: number;
   onTapItem: (item: ItemDef, dealPrice: number | null) => void;
 }) {
   return (
-    <div className="-mx-4 -my-1 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] md:-mx-6 md:scroll-px-6 md:px-6 [&::-webkit-scrollbar]:hidden">
+    <TileRail>
       {deals.map(({ item, dealPrice, onSale }) => (
-        <div
-          key={item.id}
-          className="w-[calc((100%-1.5rem)/4)] shrink-0 snap-start md:w-[calc((100%-3.125rem)/6)]"
-        >
+        <div key={item.id} className={RAIL_ITEM_CLASS}>
           <ClosetTile
             entry={{
               kind: 'item',
@@ -314,12 +417,35 @@ export function DealTileRow({
             equipped={equipped[item.slot] === item.id}
             trying={tryOnId === item.id}
             isNew={false}
+            wishlisted={wishlistedIds.has(item.id)}
+            balance={balance}
+            showWas
             onTap={() => onTapItem(item, onSale ? dealPrice : null)}
           />
         </div>
       ))}
-    </div>
+    </TileRail>
   );
+}
+
+function useStuckHeaderTop() {
+  const [top, setTop] = useState<number | null>(null);
+  useEffect(() => {
+    const group = document.querySelector<HTMLElement>('[data-wardrobe-sticky]');
+    if (!group || getComputedStyle(group).position !== 'sticky') return;
+    const wide = window.matchMedia('(min-width: 768px)');
+    const update = () =>
+      setTop(Math.max(0, group.offsetHeight + (wide.matches ? -96 : -90)));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(group);
+    wide.addEventListener('change', update);
+    return () => {
+      observer.disconnect();
+      wide.removeEventListener('change', update);
+    };
+  }, []);
+  return top;
 }
 
 export function CollectionBook({
@@ -333,6 +459,9 @@ export function CollectionBook({
   dealPrices,
   tryOnId,
   unseen,
+  wishlistedIds,
+  balance,
+  shuffleSeed,
   onTapItem,
   onTapBackground,
 }: {
@@ -346,9 +475,15 @@ export function CollectionBook({
   dealPrices: Map<string, number>;
   tryOnId: string | null;
   unseen: Set<string>;
+  wishlistedIds: Set<string>;
+  balance: number;
+  shuffleSeed: string;
   onTapItem: (item: ItemDef, dealPrice: number | null) => void;
   onTapBackground: (bg: BackgroundItem) => void;
 }) {
+  const { gridClass } = useShelfGrid();
+  const stuckTop = useStuckHeaderTop();
+
   const shelves = useMemo(() => {
     const entries = buildClosetEntries(
       slot,
@@ -358,37 +493,31 @@ export function CollectionBook({
       bgInventory,
       dealPrices,
     );
-
-    const isEquipped = (entry: ClosetEntry) =>
-      entry.kind === 'item'
-        ? equipped[entry.item.slot] === entry.item.id
-        : equippedBgId === entry.bg.id;
-    const weight = (entry: ClosetEntry) =>
-      isEquipped(entry) ? 0 : entry.owned > 0 ? 1 : entry.locked ? 3 : 2;
-
     return SHELF_ORDER.map((rarity) => {
       const list = entries
         .filter((entry) => entryRarity(entry) === rarity)
-        .sort(
-          (a, b) =>
-            weight(a) - weight(b) ||
-            (a.dealPrice ?? a.price) - (b.dealPrice ?? b.price),
-        );
+        .map((entry) => ({
+          entry,
+          rank: seededRank(shuffleSeed, `${entry.kind}:${entryId(entry)}`),
+        }))
+        .sort((a, b) => a.rank - b.rank)
+        .map(({ entry }) => entry);
       return {
         rarity,
         list,
         owned: list.filter((entry) => entry.owned > 0).length,
-        isEquipped,
       };
     }).filter((shelf) => shelf.list.length > 0);
-  }, [slot, catalog, backgrounds, inventory, bgInventory, equipped, equippedBgId, dealPrices]);
+  }, [slot, catalog, backgrounds, inventory, bgInventory, dealPrices, shuffleSeed]);
+
+  const isEquipped = (entry: ClosetEntry) =>
+    entry.kind === 'item'
+      ? equipped[entry.item.slot] === entry.item.id
+      : equippedBgId === entry.bg.id;
 
   return (
     <div className="flex flex-col gap-5 pb-4">
       {shelves.map((shelf) => {
-        const pct = shelf.list.length
-          ? Math.round((shelf.owned / shelf.list.length) * 100)
-          : 0;
         const premium = shelf.rarity === 'legendary' || shelf.rarity === 'epic';
         return (
           <section
@@ -396,36 +525,40 @@ export function CollectionBook({
             data-shelf={shelf.rarity}
             aria-label={RARITY_CONFIG[shelf.rarity].label}
           >
-            <div className="mb-2 flex items-center gap-2 px-0.5">
-              <span
-                className={cn(
-                  'flex items-center gap-1 text-[13px] font-black uppercase tracking-wide',
-                  RARITY_CONFIG[shelf.rarity].text,
-                )}
-              >
-                {premium && <Sparkles className="h-3.5 w-3.5" strokeWidth={2.75} />}
-                {RARITY_CONFIG[shelf.rarity].label}
-              </span>
-              <span className="text-[12px] font-black tabular-nums text-muted-foreground">
-                {shelf.owned}/{shelf.list.length}
-              </span>
-              <span className="relative h-1.5 min-w-8 flex-1 overflow-hidden rounded-full bg-foreground/[0.07]">
-                <span
-                  className={cn('absolute inset-y-0 left-0 rounded-full', BAR_TONE[shelf.rarity])}
-                  style={{ width: `${pct}%` }}
-                />
-              </span>
+            <div
+              style={stuckTop != null ? { top: stuckTop } : undefined}
+              className={cn(
+                '-mx-4 mb-1 bg-background px-4 py-1 md:-mx-6 md:px-6',
+                stuckTop != null && 'sticky z-30',
+              )}
+            >
+              <ShelfHeader
+                className="mb-0"
+                icon={premium ? <Sparkles className="h-3.5 w-3.5" strokeWidth={2.75} /> : undefined}
+                label={RARITY_CONFIG[shelf.rarity].label}
+                tone={RARITY_CONFIG[shelf.rarity].text}
+                meta={
+                  <span>
+                    {shelf.owned}
+                    <span className="opacity-60">/{shelf.list.length}</span>
+                  </span>
+                }
+                progress={shelf.owned / shelf.list.length}
+                barTone={BAR_TONE[shelf.rarity]}
+              />
             </div>
-            <div className="grid grid-cols-4 gap-2 [@media(max-width:359px)]:grid-cols-3 md:grid-cols-6 md:gap-2.5">
+            <div className={gridClass}>
               {shelf.list.map((entry) => {
                 const id = entryId(entry);
                 return (
                   <ClosetTile
                     key={`${entry.kind}-${id}`}
                     entry={entry}
-                    equipped={shelf.isEquipped(entry)}
+                    equipped={isEquipped(entry)}
                     trying={tryOnId === id}
                     isNew={unseen.has(id)}
+                    wishlisted={entry.kind === 'item' && wishlistedIds.has(id)}
+                    balance={balance}
                     onTap={() =>
                       entry.kind === 'item'
                         ? onTapItem(entry.item, entry.dealPrice)

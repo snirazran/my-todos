@@ -2,15 +2,19 @@
 
 import React from 'react';
 import useSWR from 'swr';
-import { cn } from '@/lib/utils';
+import { Users } from 'lucide-react';
 import { FlyAmount } from '@/components/ui/FlyAmount';
-import { DragScrollRow } from '@/components/ui/DragScrollRow';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
-import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import type { FriendSummary } from '@/lib/friends/indices';
+import {
+  BackgroundArt,
+  ItemArt,
+  RAIL_ITEM_CLASS,
+  ShelfHeader,
+  TileArt,
+  TileRail,
+} from './DressingRoom';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -99,11 +103,12 @@ export function SeenOnFriendsRow({
   if (!entries.length) return null;
 
   return (
-    <div className="mb-3">
-      <p className="mb-2 px-1 text-[12px] font-black text-muted-foreground">
-        Seen on your friends
-      </p>
-      <DragScrollRow>
+    <section aria-label="Seen on your friends">
+      <ShelfHeader
+        icon={<Users className="h-3.5 w-3.5" strokeWidth={2.75} />}
+        label="Seen on your friends"
+      />
+      <TileRail>
         {entries.map((entry) => {
           const id = entry.kind === 'item' ? entry.item.id : entry.bg.id;
           const name = entry.kind === 'item' ? entry.item.name : entry.bg.name;
@@ -117,53 +122,39 @@ export function SeenOnFriendsRow({
             entry.friendNames.length === 1
               ? entry.friendNames[0]
               : `${entry.friendNames[0]} +${entry.friendNames.length - 1}`;
-          const config = RARITY_CONFIG[rarity];
           return (
-            <button
-              key={`${entry.kind}-${id}`}
-              type="button"
-              onClick={() =>
-                entry.kind === 'item'
-                  ? onPickItem(entry.item)
-                  : onPickBackground(entry.bg)
-              }
-              className={cn(
-                'flex w-[132px] shrink-0 flex-col items-stretch rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
-                config.border,
-              )}
-            >
-              <div className="flex h-16 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
-                {entry.kind === 'item' ? (
-                  <FrogSnapshot
-                    className="h-[125%] w-[125%] object-contain"
-                    indices={{ [entry.item.slot]: entry.item.riveIndex }}
-                    width={120}
-                    height={120}
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={backgroundPreview(entry.bg)}
-                    alt={name}
-                    className="h-full w-full object-cover"
-                  />
-                )}
-              </div>
-              <p className="mt-1.5 truncate text-xs font-black text-foreground">
-                {name}
-              </p>
-              <p className="truncate text-[10px] font-semibold text-muted-foreground">
-                Worn by {wornBy}
-              </p>
-              <FlyAmount
-                amount={price}
-                size={12}
-                className="mt-1 font-black text-foreground"
-              />
-            </button>
+            <div key={`${entry.kind}-${id}`} className={RAIL_ITEM_CLASS}>
+              <button
+                type="button"
+                onClick={() =>
+                  entry.kind === 'item'
+                    ? onPickItem(entry.item)
+                    : onPickBackground(entry.bg)
+                }
+                aria-label={`${name}, worn by ${wornBy}`}
+                className="group flex w-full flex-col items-stretch gap-1 text-left"
+              >
+                <TileArt
+                  rarity={rarity}
+                  className="transition-transform duration-150 group-active:scale-95"
+                >
+                  {entry.kind === 'item' ? (
+                    <ItemArt item={entry.item} />
+                  ) : (
+                    <BackgroundArt bg={entry.bg} />
+                  )}
+                </TileArt>
+                <span className="flex h-5 items-center justify-center text-[12.5px] font-black tabular-nums leading-none">
+                  <FlyAmount amount={price} size={12.5} className="text-foreground" />
+                </span>
+                <span className="-mt-1 truncate px-1 text-center text-[11px] font-bold text-muted-foreground">
+                  {wornBy}
+                </span>
+              </button>
+            </div>
           );
         })}
-      </DragScrollRow>
-    </div>
+      </TileRail>
+    </section>
   );
 }
