@@ -16,6 +16,7 @@ import { keepsakeEmoji } from '@/lib/friends/social';
 import type { FriendSummary } from '@/lib/friends/indices';
 import { cn } from '@/lib/utils';
 import { hapticTick } from '@/lib/haptics';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const PLACES = [
   'left-[16%] md:left-[22%] lg:left-[28%]',
@@ -27,9 +28,104 @@ const NO_CATALOG = {};
 const FROG_SEAT_OFFSET = 57;
 const NAME_PILL = 'flex max-w-[105px] items-center gap-1 rounded-full border border-border/50 bg-card px-2.5 py-1 text-[11px] font-black text-foreground shadow-sm';
 
+const SEAT_TRACK_MAX = 8;
+const SEAT_HINT_KEY = 'pond-seat-swipe-hint';
+
 function firstName(friend: FriendSummary) {
   const name = friend.name || friend.frogName;
   return name.trim().split(/\s+/)[0] || name;
+}
+
+function seatRank(friend: FriendSummary) {
+  if (friend.focusing) return 2;
+  return (friend.tasksToday ?? 0) > 0 ? 1 : 0;
+}
+
+function seatOrder(friends: FriendSummary[]) {
+  return friends
+    .map((friend, index) => ({ friend, index }))
+    .sort(
+      (a, b) =>
+        seatRank(b.friend) - seatRank(a.friend) ||
+        (b.friend.tasksToday ?? 0) - (a.friend.tasksToday ?? 0) ||
+        a.index - b.index,
+    )
+    .map(({ friend }) => friend);
+}
+
+function SeatFrog({ friend, index, paused, className, style, onOpen }: {
+  friend: FriendSummary; index: number; paused: boolean; className?: string; style?: React.CSSProperties;
+  onOpen: (friend: FriendSummary) => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const tasksToday = friend.tasksToday ?? 0;
+  return (
+    <motion.button type="button" onClick={() => { hapticTick(); onOpen(friend); }}
+      aria-label={'Visit ' + (friend.name || friend.frogName) + "'s pond" + (friend.focusing ? ', focusing now' : tasksToday > 0 ? ', ' + tasksToday + ' done today' : '')}
+      initial={reduceMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 24, delay: Math.min(index, 3) * 0.055 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+      style={style}
+      className={cn('group absolute bottom-0 z-20 -ml-[58px] flex w-[116px] touch-manipulation flex-col items-center rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', className)}>
+      <span className="relative block h-[124px] w-[116px]">
+        <span aria-hidden className="absolute inset-x-3 bottom-2 h-5 rounded-[50%] border border-primary/20 bg-primary/20 shadow-sm" />
+        {index === 0 && !reduceMotion ? <Frog width={116} height={124} indices={friend.indices} visualOffsetY={0} paused={paused} /> : <FrogSnapshot width={116} height={124} indices={friend.indices} visualOffsetY={0} />}
+        {keepsakeEmoji(friend.pinnedKeepsakeId) && <span className="absolute bottom-0 right-2 grid h-7 w-7 place-items-center rounded-full border border-border/60 bg-card text-sm shadow-sm" aria-label="Friendship keepsake">{keepsakeEmoji(friend.pinnedKeepsakeId)}</span>}
+      </span>
+      <span className={NAME_PILL}>
+        {friend.focusing ? (
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#447d3f]" />
+        ) : tasksToday > 0 ? (
+          <Check aria-hidden className="h-3 w-3 shrink-0 text-[#447d3f]" strokeWidth={4} />
+        ) : null}
+        <span className="truncate">{friend.name || friend.frogName}</span>
+      </span>
+    </motion.button>
+  );
+}
+
+function SeatTrack({ friends, paused, onOpen }: {
+  friends: FriendSummary[]; paused: boolean; onOpen: (friend: FriendSummary) => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [hint, setHint] = React.useState(false);
+
+  React.useEffect(() => {
+    if (reduceMotion) return;
+    try {
+      if (localStorage.getItem(SEAT_HINT_KEY)) return;
+      localStorage.setItem(SEAT_HINT_KEY, '1');
+    } catch {
+      return;
+    }
+    setHint(true);
+  }, [reduceMotion]);
+
+  const last = friends.length - 1;
+  return (
+    <motion.div
+      role="group"
+      aria-label="Friends in your pond"
+      animate={hint ? { x: [0, -34, 0] } : undefined}
+      transition={{ duration: 0.9, delay: 1.1, ease: 'easeInOut' }}
+      className="no-scrollbar absolute inset-x-0 bottom-1.5 z-20 flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain pb-3"
+    >
+      {friends.map((friend, index) => (
+        <div
+          key={friend.userId}
+          className="relative h-[156px] shrink-0 snap-start"
+          style={{ width: index === last ? '32%' : '68%' }}
+        >
+          <SeatFrog
+            friend={friend}
+            index={index}
+            paused={paused}
+            onOpen={onOpen}
+            style={{ left: index === last ? '50%' : '23.53%' }}
+          />
+        </div>
+      ))}
+    </motion.div>
+  );
 }
 
 function PondStatusRow({ friends, claimable, claiming, gate, onClaim, onInvite }: {
@@ -125,28 +221,21 @@ export function PondHero({ indices, paused = false, friends, claimable, claiming
   const frogBoxRef = React.useRef<HTMLDivElement | null>(null);
   const [mouthOpen, setMouthOpen] = React.useState(false);
   const pin = keepsakeEmoji(pinnedKeepsakeId);
+  const seated = React.useMemo(() => seatOrder(friends), [friends]);
+  const narrow = useMediaQuery('(max-width: 767px)');
+  const rotate = narrow && seated.length > 2;
   return (
     <div className="relative flex w-full flex-col items-center">
       <h1 className="sr-only">Friends</h1>
       <div className="relative isolate z-[26] h-[232px] w-full max-w-[480px] md:h-[286px] md:max-w-[760px]">
         <div aria-hidden className="pointer-events-none absolute inset-x-[4%] bottom-3 h-12 rounded-[50%] bg-primary/[0.07]" />
-        {friends.slice(0, 4).map((friend, index) => (
-          <motion.button key={friend.userId} type="button" onClick={() => { hapticTick(); onOpenFriend(friend); }}
-            aria-label={'Visit ' + (friend.name || friend.frogName) + "'s pond" + (friend.focusing ? ', focusing now' : '')}
-            initial={reduceMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 24, delay: index * 0.055 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.94 }}
-            className={cn('group absolute bottom-[18px] z-20 -ml-[58px] flex w-[116px] touch-manipulation flex-col items-center rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', PLACES[index])}>
-            <span className="relative block h-[124px] w-[116px]">
-              <span aria-hidden className="absolute inset-x-3 bottom-2 h-5 rounded-[50%] border border-primary/20 bg-primary/20 shadow-sm" />
-              {index === 0 && !reduceMotion ? <Frog width={116} height={124} indices={friend.indices} visualOffsetY={0} paused={paused} /> : <FrogSnapshot width={116} height={124} indices={friend.indices} visualOffsetY={0} />}
-              {keepsakeEmoji(friend.pinnedKeepsakeId) && <span className="absolute bottom-0 right-2 grid h-7 w-7 place-items-center rounded-full border border-border/60 bg-card text-sm shadow-sm" aria-label="Friendship keepsake">{keepsakeEmoji(friend.pinnedKeepsakeId)}</span>}
-            </span>
-            <span className={NAME_PILL}>
-              {friend.focusing ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#447d3f]" /> : null}
-              <span className="truncate">{friend.name || friend.frogName}</span>
-            </span>
-          </motion.button>
-        ))}
+        {rotate ? (
+          <SeatTrack friends={seated.slice(0, SEAT_TRACK_MAX)} paused={paused} onOpen={onOpenFriend} />
+        ) : (
+          seated.slice(0, 4).map((friend, index) => (
+            <SeatFrog key={friend.userId} friend={friend} index={index} paused={paused} onOpen={onOpenFriend} className={cn('bottom-[18px]', PLACES[index])} />
+          ))
+        )}
         {!friends.length && [16, 84].map((left) => <button key={left} type="button" onClick={onInvite} aria-label="Invite a friend to sit beside you" className="absolute bottom-9 z-10 -ml-11 flex h-24 w-[88px] touch-manipulation flex-col items-center justify-center gap-2 rounded-[30px] border-2 border-dashed border-primary/20 bg-card/40 text-primary/60 transition-colors hover:border-primary/50 hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" style={{ left: left + '%' }}><UserPlus className="h-6 w-6" aria-hidden /><span className="text-[11px] font-bold">A spot for a friend</span></button>)}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center">
           <FlyCatchSwipeLauncher source="friends" shouldStart={(x, y) => frogRef.current?.hitTest(x, y) !== false}>
@@ -161,7 +250,7 @@ export function PondHero({ indices, paused = false, friends, claimable, claiming
       </div>
       <StatusDock>
         <div className="hidden md:contents"><FrogBellyDeck bare hunger={hunger ?? undefined} maxHunger={maxHunger} animateHunger={!paused && !reduceMotion} className="rounded-[19px] md:w-[250px] md:shrink-0 group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none" /></div>
-        <PondStatusRow friends={friends} claimable={claimable} claiming={claiming} gate={gate} onClaim={onClaim} onInvite={onInvite} />
+        <PondStatusRow friends={seated} claimable={claimable} claiming={claiming} gate={gate} onClaim={onClaim} onInvite={onInvite} />
       </StatusDock>
     </div>
   );

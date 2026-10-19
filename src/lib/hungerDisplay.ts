@@ -4,7 +4,7 @@ import {
   TASK_HUNGER_REWARD_MS,
 } from '@/lib/hungerLogic';
 
-/** The belly reads as 6 fly-meals, one per 8h of the 48h bar. */
+/** The belly reads as 6 fly-meals, one per 4h of the 24h bar. */
 export const HUNGER_SEGMENTS = 6;
 
 export type HungerState = {

@@ -1,14 +1,14 @@
 import { UserDoc } from '@/lib/types/UserDoc';
 
-export const MAX_HUNGER_MS = 48 * 60 * 60 * 1000; // 48 hours (6 units * 8h)
-export const TASK_HUNGER_REWARD_MS = 8 * 60 * 60 * 1000; // 8 hours (1 unit)
+export const MAX_HUNGER_MS = 24 * 60 * 60 * 1000; // 24 hours (6 units * 4h)
+export const TASK_HUNGER_REWARD_MS = 8 * 60 * 60 * 1000; // 8 hours (2 units)
 // Each fly caught during focus feeds the frog too: 2h of belly per fly, so a
 // 25-minute session (~5 flies) roughly matches one task completion.
 export const FLY_HUNGER_REWARD_MS = 2 * 60 * 60 * 1000;
 // Continuous drain means a task's +8h almost never lands exactly on MAX; the
 // belly pips round up visually, so awards within half a pip snap to full to
 // match what the user sees.
-export const HUNGER_FULL_SNAP_MS = 4 * 60 * 60 * 1000;
+export const HUNGER_FULL_SNAP_MS = 2 * 60 * 60 * 1000;
 export const HUNGRY_MOOD_THRESHOLD = 0.2;
 
 export type HungerStatus = {

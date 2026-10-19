@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import {
@@ -23,6 +24,24 @@ import { STREAK_EXTENDED_HEADER } from '@/lib/streak/types';
 
 const NATIVE_SYNC_INTERVAL_MS = 10_000;
 const TASK_EVENT_LAST_ID_KEY = 'frogress.taskSyncLastEventId';
+
+function onNativeResume(callback: () => void): () => void {
+  if (!Capacitor.isNativePlatform()) return () => {};
+  let handle: PluginListenerHandle | undefined;
+  let removed = false;
+  void App.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) callback();
+  })
+    .then((h) => {
+      if (removed) void h.remove();
+      else handle = h;
+    })
+    .catch(() => {});
+  return () => {
+    removed = true;
+    void handle?.remove();
+  };
+}
 
 function isTaskMutation(input: RequestInfo | URL, init?: RequestInit) {
   const method =
@@ -157,10 +176,12 @@ export function TaskSyncProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', announceResume);
     window.addEventListener('pageshow', announceResume);
     document.addEventListener('visibilitychange', onVisibility);
+    const unbindResume = onNativeResume(announceResume);
 
     return () => {
       window.fetch = originalFetch;
       unbindMessages();
+      unbindResume();
       window.removeEventListener(TASK_SYNC_EVENT, onTaskSync);
       window.removeEventListener('focus', announceResume);
       window.removeEventListener('online', announceResume);
@@ -220,9 +241,11 @@ export function TaskSyncProvider({ children }: { children: ReactNode }) {
     const onOnline = () => reconnect();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
+    const unbindResume = onNativeResume(reconnect);
 
     return () => {
       cancelled = true;
+      unbindResume();
       window.clearInterval(reconnectPoll);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);

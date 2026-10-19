@@ -53,7 +53,8 @@ export function WidgetSyncProvider() {
   const uid = user?.uid ?? '';
   const guest = user?.isAnonymous ?? false;
 
-  const tasksKey = enabled ? todayTasksKey(todayKey(), clientTimezone()) : null;
+  const [day, setDay] = useState(() => todayKey());
+  const tasksKey = enabled ? todayTasksKey(day, clientTimezone()) : null;
 
   // revalidateOnMount:false — read whatever the app already fetched rather than
   // firing a request just to feed the widget. The tasks key keeps a real
@@ -125,6 +126,7 @@ export function WidgetSyncProvider() {
     let handle: PluginListenerHandle | undefined;
     void App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
+        setDay(todayKey());
         drain();
         void refreshPinState();
       }
@@ -143,11 +145,13 @@ export function WidgetSyncProvider() {
   useEffect(() => {
     if (!enabled) return;
     const onTaskSync = () => {
-      void refreshTasks();
+      const today = todayKey();
+      if (today !== day) setDay(today);
+      else void refreshTasks();
     };
     window.addEventListener(TASK_SYNC_EVENT, onTaskSync);
     return () => window.removeEventListener(TASK_SYNC_EVENT, onTaskSync);
-  }, [enabled, refreshTasks]);
+  }, [enabled, refreshTasks, day]);
 
   // --- the ask ----------------------------------------------------------
   useEffect(() => {

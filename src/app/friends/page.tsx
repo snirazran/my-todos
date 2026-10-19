@@ -202,6 +202,7 @@ export default function FriendsPage() {
     return [...friends].sort((a, b) =>
       Number(!!buddyInviteByFriend.get(b.userId)) - Number(!!buddyInviteByFriend.get(a.userId)) ||
       Number(!!b.focusing) - Number(!!a.focusing) ||
+      (b.tasksToday ?? 0) - (a.tasksToday ?? 0) ||
       Number(buddies.has(b.userId)) - Number(buddies.has(a.userId)) ||
       (a.name || a.frogName).localeCompare(b.name || b.frogName),
     );

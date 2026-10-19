@@ -301,8 +301,9 @@ async function leapMessage(
  * Morning slot: plan-your-day nudge (only if open tasks exist).
  * Evening slot: highest-value message wins —
  *   1. unclaimed friend flies expiring at midnight (loss)
- *   2. frog's belly is empty (nudge — hunger never costs flies)
- *   3. open tasks remaining (nudge)
+ *   2. Leap league rescue or promotion within reach
+ *   3. frog's belly is empty (nudge — hunger never costs flies)
+ *   4. open tasks remaining (nudge)
  */
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent unauthorized calls
@@ -445,19 +446,19 @@ export async function GET(req: NextRequest) {
           type: 'friend_flies',
           path: '/friends',
         });
-      } else if (
-        isFrogStarving(wardrobe) &&
-        ignoredCount < REMINDER_MUTE_THRESHOLD
-      ) {
-        message = withData(hungerMessage(frog, cursors, exampleText), {
-          type: 'frog_hunger',
-          path: '/',
-        });
-        isRoutine = true;
       } else {
         const leapNudge = await leapMessage(userId, tz, 'evening', cursors);
         if (leapNudge) {
           message = leapNudge;
+        } else if (
+          isFrogStarving(wardrobe) &&
+          ignoredCount < REMINDER_MUTE_THRESHOLD
+        ) {
+          message = withData(hungerMessage(frog, cursors, exampleText), {
+            type: 'frog_hunger',
+            path: '/',
+          });
+          isRoutine = true;
         } else {
           message = routineNudge('evening');
           isRoutine = message !== null;
