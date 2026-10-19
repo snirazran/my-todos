@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, Check, Loader2, Lock, Sparkles, X } from 'lucide-react';
+import { Bookmark, Check, Crown, Loader2, Lock, Sparkles, X } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
@@ -329,6 +329,76 @@ function ClosetTile({
   );
 }
 
+function VaultTwinkle({ className, delay }: { className: string; delay: number }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 10 10"
+      style={{ animationDelay: `${delay}s` }}
+      className={cn(
+        'vault-twinkle pointer-events-none absolute fill-[color:var(--vault-star)]',
+        className,
+      )}
+    >
+      <path d="M5 0C5.4 3.2 6.8 4.6 10 5 6.8 5.4 5.4 6.8 5 10 4.6 6.8 3.2 5.4 0 5 3.2 4.6 4.6 3.2 5 0Z" />
+    </svg>
+  );
+}
+
+function VaultTile({
+  entry,
+  index,
+  trying,
+  wishlisted,
+  onTap,
+}: {
+  entry: ClosetEntry;
+  index: number;
+  trying: boolean;
+  wishlisted: boolean;
+  onTap: () => void;
+}) {
+  const name = entryName(entry);
+  const delay = (index * 0.9) % 3.2;
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-label={`${name}, ${RARITY_CONFIG.legendary.label}, not for sale`}
+      aria-pressed={trying}
+      className="group flex w-full flex-col items-stretch gap-1.5 text-left"
+    >
+      <span
+        className={cn(
+          'vault-case closet-foil closet-foil-gold relative block aspect-square w-full overflow-hidden rounded-[20px] bg-[color:var(--vault-well)] ring-1 ring-[color:var(--vault-well-line)] shadow-[0_3px_0_0_var(--vault-line)] transition-transform duration-150 group-active:scale-95',
+          trying && 'ring-2 ring-foreground/80',
+        )}
+      >
+        {entry.kind === 'item' ? <ItemArt item={entry.item} /> : <BackgroundArt bg={entry.bg} />}
+        <VaultTwinkle className="left-[18%] top-[20%] h-3 w-3" delay={delay} />
+        <VaultTwinkle className="right-[16%] top-[38%] h-2 w-2" delay={delay + 1.5} />
+        <span className="absolute left-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-gradient-to-b from-amber-300 to-amber-500 text-amber-950 shadow-[0_2px_0_0_#b45309]">
+          <Crown className="h-3.5 w-3.5" strokeWidth={2.5} fill="currentColor" />
+        </span>
+        {wishlisted && (
+          <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Bookmark className="h-3 w-3" strokeWidth={3.5} fill="currentColor" />
+          </span>
+        )}
+      </span>
+      <span className="flex min-w-0 flex-col items-center gap-1 px-1">
+        <span className="w-full truncate text-center text-[13.5px] font-black leading-tight text-[color:var(--vault-ink)]">
+          {name}
+        </span>
+        <span className="flex items-center gap-1 whitespace-nowrap text-[10.5px] font-black uppercase leading-none tracking-[0.08em] text-[color:var(--vault-eyebrow)]">
+          <Lock className="h-2.5 w-2.5" strokeWidth={3.25} />
+          Not for sale
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function buildClosetEntries(
   slot: ClosetSlot,
   catalog: ItemDef[],
@@ -493,6 +563,7 @@ export function CollectionBook({
   empty = null,
   onTapItem,
   onTapBackground,
+  onTradeUp,
 }: {
   slot: ClosetSlot;
   catalog: ItemDef[];
@@ -511,6 +582,7 @@ export function CollectionBook({
   empty?: ReactNode;
   onTapItem: (item: ItemDef, dealPrice: number | null) => void;
   onTapBackground: (bg: BackgroundItem) => void;
+  onTradeUp?: () => void;
 }) {
   const { gridClass } = useShelfGrid();
   const stuckTop = useStuckHeaderTop();
@@ -651,7 +723,11 @@ export function CollectionBook({
                       : 'border-border/60 bg-card text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <span className={cn('h-2 w-2 shrink-0 rounded-full', TIER_DOT[shelf.rarity])} />
+                  {shelf.rarity === 'legendary' ? (
+                    <Crown className="h-3 w-3 shrink-0 text-amber-500" strokeWidth={2.5} fill="currentColor" />
+                  ) : (
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', TIER_DOT[shelf.rarity])} />
+                  )}
                   {RARITY_CONFIG[shelf.rarity].label}
                 </button>
               );
@@ -661,6 +737,7 @@ export function CollectionBook({
       )}
       {shelves.map((shelf) => {
         const premium = shelf.rarity === 'legendary' || shelf.rarity === 'epic';
+        const vault = show === 'unowned' && isTradeOnlyRarity(shelf.rarity);
         return (
           <section
             key={shelf.rarity}
@@ -670,11 +747,18 @@ export function CollectionBook({
             }}
             data-shelf={shelf.rarity}
             aria-label={RARITY_CONFIG[shelf.rarity].label}
+            className={vault ? 'vault-panel rounded-[24px] p-3 md:p-4' : undefined}
           >
             <ShelfHeader
-              icon={premium ? <Sparkles className="h-3.5 w-3.5" strokeWidth={2.75} /> : undefined}
+              icon={
+                vault ? (
+                  <Crown className="h-3.5 w-3.5" strokeWidth={2.5} fill="currentColor" />
+                ) : premium ? (
+                  <Sparkles className="h-3.5 w-3.5" strokeWidth={2.75} />
+                ) : undefined
+              }
               label={RARITY_CONFIG[shelf.rarity].label}
-              tone={RARITY_CONFIG[shelf.rarity].text}
+              tone={vault ? 'text-[color:var(--vault-eyebrow)]' : RARITY_CONFIG[shelf.rarity].text}
               meta={
                 <span>
                   {shelf.owned}
@@ -683,10 +767,42 @@ export function CollectionBook({
               }
               progress={shelf.owned / shelf.total}
               barTone={BAR_TONE[shelf.rarity]}
+              action={
+                vault && onTradeUp ? (
+                  <button
+                    type="button"
+                    onClick={onTradeUp}
+                    className="inline-flex h-7 shrink-0 items-center rounded-full bg-amber-400 px-3 text-[12px] font-black text-amber-950 shadow-[0_2px_0_0_#b45309] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+                  >
+                    Trade up
+                  </button>
+                ) : undefined
+              }
             />
-            <div className={gridClass}>
-              {shelf.list.map((entry) => {
+            {vault && (
+              <p className="-mt-1 mb-3 px-0.5 text-[12.5px] font-bold leading-snug text-[color:var(--vault-ink-muted)]">
+                Never sold. Found only in gifts and trade-ups.
+              </p>
+            )}
+            <div className={vault ? 'grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3' : gridClass}>
+              {shelf.list.map((entry, index) => {
                 const id = entryId(entry);
+                if (vault) {
+                  return (
+                    <VaultTile
+                      key={`${entry.kind}-${id}`}
+                      entry={entry}
+                      index={index}
+                      trying={tryOnId === id}
+                      wishlisted={entry.kind === 'item' && wishlistedIds.has(id)}
+                      onTap={() =>
+                        entry.kind === 'item'
+                          ? onTapItem(entry.item, entry.dealPrice)
+                          : onTapBackground(entry.bg)
+                      }
+                    />
+                  );
+                }
                 return (
                   <ClosetTile
                     key={`${entry.kind}-${id}`}
@@ -768,7 +884,12 @@ export function TryOnBar({
             {name}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 text-[12px] font-bold leading-none">
-            <span className={RARITY_CONFIG[rarity].text}>{RARITY_CONFIG[rarity].label}</span>
+            <span className={cn('flex shrink-0 items-center gap-1', RARITY_CONFIG[rarity].text)}>
+              {rarity === 'legendary' && (
+                <Crown className="h-3 w-3" strokeWidth={2.5} fill="currentColor" />
+              )}
+              {RARITY_CONFIG[rarity].label}
+            </span>
             {locked && (
               <span className="truncate text-muted-foreground">
                 · Find it in gifts or trade up

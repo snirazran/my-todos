@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         equipped: {},
         inventory: { [itemId]: 1 },
         inventoryHistory: { [itemId]: new Date().toISOString() },
-        unseenItems: [itemId],
+        unseenItems: [],
         flies: 0,
       };
       await UserModel.updateOne(
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         [`wardrobe.inventory.${itemId}`]: 1,
         'wardrobe.flies': -price,
       },
-      $addToSet: { 'wardrobe.unseenItems': itemId },
+      $pull: { 'wardrobe.unseenItems': itemId },
       $set: {},
     };
 

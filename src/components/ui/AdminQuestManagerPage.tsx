@@ -171,7 +171,6 @@ type AdminRecipe = {
   recipeId: string;
   name: string;
   isActive: boolean;
-  priceByEffort?: boolean;
   coverImageUrl?: string;
   slots: AdminRecipeSlot[];
 };
@@ -1409,18 +1408,6 @@ export function AdminQuestManagerPage() {
                   )}
                 >
                   {r.isActive ? 'Generated daily quest on' : 'Generated daily quest off'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, priceByEffort: !prev.priceByEffort }))}
-                  className={cn(
-                    'ml-2 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition',
-                    r.priceByEffort
-                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30',
-                  )}
-                >
-                  {r.priceByEffort ? 'Flies priced by effort' : 'Flies flat per slot'}
                 </button>
                 <label className="grid gap-1.5">
                   <span className="text-[12px] font-black text-muted-foreground">Quest title</span>

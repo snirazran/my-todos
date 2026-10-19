@@ -908,85 +908,6 @@ function scaledTargetFor(args: {
     : clamped;
 }
 
-function effortUnits(args: {
-  entry: RecipePoolEntry;
-  target: number;
-}): number {
-  const { entry, target } = args;
-  const amount = Math.max(1, target);
-  switch (entry.type) {
-    case 'focus_minutes':
-      return amount / 5;
-    case 'deep_session':
-      return amount * (Math.max(5, entry.sessionMinutes ?? 25) / 5) * 1.25;
-    case 'day_parts':
-      return amount * 1.6;
-    case 'distinct_days':
-      return amount * 2;
-    case 'metric_count':
-      return amount * 2.5;
-    default:
-      if (entry.action === 'add') {
-        return amount * (entry.requiresFollowThrough ? 1.2 : 0.5);
-      }
-      return amount * (typeof entry.beforeHour === 'number' ? 1.3 : 1);
-  }
-}
-
-function midTarget(entry: RecipePoolEntry): number {
-  const min = Math.max(1, Math.floor(entry.minTarget));
-  const max = Math.max(min, Math.floor(entry.maxTarget));
-  return Math.round((min + max) / 2);
-}
-
-const EFFORT_PRICE_MIN = 0.7;
-const EFFORT_PRICE_MAX = 1.5;
-
-function effortPriceMultiplier(args: {
-  pool: RecipePoolEntry[];
-  entry: RecipePoolEntry;
-  target: number;
-}): number {
-  const reference = activeDayMedian(
-    args.pool.map((entry) => effortUnits({ entry, target: midTarget(entry) })),
-  );
-  if (!reference) return 1;
-  const rolled = effortUnits({ entry: args.entry, target: args.target });
-  return Math.min(
-    EFFORT_PRICE_MAX,
-    Math.max(EFFORT_PRICE_MIN, rolled / reference),
-  );
-}
-
-function flyRewardTotal(rewards: QuestRewards): number {
-  return rewards.reduce((sum, reward) => {
-    if (reward.type !== 'FLIES') return sum;
-    return (
-      sum +
-      Math.max(0, reward.amount ?? reward.minAmount ?? reward.maxAmount ?? 0)
-    );
-  }, 0);
-}
-
-function scaleFlyRewards(
-  rewards: QuestRewards,
-  multiplier: number,
-): QuestRewards {
-  if (multiplier === 1) return rewards;
-  const scale = (value: number | undefined) =>
-    typeof value === 'number' ? Math.max(1, Math.round(value * multiplier)) : value;
-  return rewards.map((reward) =>
-    reward.type === 'FLIES'
-      ? {
-          ...reward,
-          amount: scale(reward.amount),
-          minAmount: scale(reward.minAmount),
-          maxAmount: scale(reward.maxAmount),
-        }
-      : reward,
-  );
-}
-
 function shiftDateKey(dateKey: string, deltaDays: number) {
   const base = new Date(`${dateKey}T00:00:00Z`);
   base.setUTCDate(base.getUTCDate() + deltaDays);
@@ -1428,7 +1349,6 @@ function rollDailyLogic(args: {
   const usedShapes = new Set<string>();
   const blocks: QuestLogicBlock[] = [];
   const localHour = getZonedHour(new Date(), timezone) ?? undefined;
-  let previousSlotFlies = 0;
 
   (recipe.slots ?? []).forEach((slot, index) => {
     if ((slot.rewards ?? []).length === 0) return;
@@ -1484,29 +1404,11 @@ function rollDailyLogic(args: {
       resolveLogicTarget(base, `${slotSeed}:target`, 1);
     const rewards = rollSlotRewards(slot, slotSeed);
 
-    let priced = rewards;
-    if (recipe.priceByEffort) {
-      const authoredFlies = flyRewardTotal(rewards);
-      let multiplier = effortPriceMultiplier({
-        pool: candidates,
-        entry: pick,
-        target,
-      });
-      // Slot order promises a rising payout, and that promise outranks the
-      // effort adjustment: a cheap roll late in the ladder is held at the
-      // previous slot's amount rather than dropping below it.
-      if (authoredFlies > 0 && previousSlotFlies > 0) {
-        multiplier = Math.max(multiplier, previousSlotFlies / authoredFlies);
-      }
-      priced = scaleFlyRewards(rewards, multiplier);
-    }
-    previousSlotFlies = Math.max(previousSlotFlies, flyRewardTotal(priced));
-
     blocks.push({
       ...base,
       amountMode: 'fixed',
       amount: target,
-      rewards: priced,
+      rewards,
     });
   });
 

@@ -16,7 +16,7 @@ import {
   mutateInventoryCaches,
   patchInventoryFlies,
 } from '@/hooks/useInventory';
-import { markFlyEarn } from '@/lib/flyEarn';
+import { markFlyEarn, markFliesFlown } from '@/lib/flyEarn';
 import {
   flyCounterState,
   flyFliesToCounter,
@@ -224,6 +224,7 @@ function landFlies(
       typeof balanceAfter === 'number' ? balanceAfter - amount : knownFlyBalance;
     const release = holdFlyCounter();
     markFlyEarn();
+    markFliesFlown(amount);
     if (typeof balanceAfter === 'number') {
       knownFlyBalance = balanceAfter;
       patchInventoryFlies(balanceAfter);

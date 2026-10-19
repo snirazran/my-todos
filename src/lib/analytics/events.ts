@@ -36,6 +36,7 @@ export const ANALYTICS_EVENTS = [
   'ad_consent_resolved',
   'ad_consent_failed',
   'app_review_requested',
+  'app_review_skipped',
   'app_review_suppressed',
   'paywall_viewed',
   'paywall_prices_failed',
@@ -192,6 +193,7 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   ad_consent_resolved: 'ads',
   ad_consent_failed: 'ads',
   app_review_requested: 'retention',
+  app_review_skipped: 'retention',
   app_review_suppressed: 'retention',
   paywall_viewed: 'monetization',
   paywall_prices_failed: 'monetization',
@@ -477,6 +479,11 @@ const ALLOWED_PROPERTY_KEYS = new Set([
   'items',
   'shields',
   'leap_kind',
+  'moment',
+  'attempt',
+  'usage_days',
+  'positive_moments',
+  'blocker',
 ]);
 
 export function sanitizeAnalyticsProperties(

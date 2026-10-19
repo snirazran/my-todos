@@ -2166,6 +2166,70 @@ body.dragging {
   animation-duration: 2.8s;
 }
 
+.vault-panel {
+  --vault-top: #fffaf0;
+  --vault-bottom: #fcecc8;
+  --vault-line: rgba(176, 112, 12, 0.26);
+  --vault-shadow: rgba(176, 112, 12, 0.22);
+  --vault-well: #fffdf8;
+  --vault-well-line: rgba(214, 150, 30, 0.5);
+  --vault-ink: #3b2504;
+  --vault-ink-muted: rgba(59, 37, 4, 0.62);
+  --vault-eyebrow: #a35d00;
+  --vault-light: rgba(255, 208, 102, 0.5);
+  --vault-floor: rgba(205, 135, 20, 0.26);
+  --vault-star: #eab308;
+  background:
+    radial-gradient(90% 55% at 50% 0%, var(--vault-light), transparent 72%),
+    linear-gradient(180deg, var(--vault-top), var(--vault-bottom));
+  border: 1px solid var(--vault-line);
+  box-shadow: 0 4px 0 0 var(--vault-shadow);
+}
+
+.dark .vault-panel {
+  --vault-top: #2a2114;
+  --vault-bottom: #15110a;
+  --vault-line: rgba(251, 191, 36, 0.22);
+  --vault-shadow: rgba(0, 0, 0, 0.5);
+  --vault-well: rgba(255, 236, 190, 0.05);
+  --vault-well-line: rgba(251, 191, 36, 0.36);
+  --vault-ink: #fbf0d9;
+  --vault-ink-muted: rgba(251, 240, 217, 0.6);
+  --vault-eyebrow: #f6c453;
+  --vault-light: rgba(251, 191, 36, 0.2);
+  --vault-floor: rgba(251, 191, 36, 0.18);
+  --vault-star: #ffd66b;
+}
+
+.vault-case::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 50% 0%, var(--vault-light), transparent 70%),
+    radial-gradient(42% 10% at 50% 93%, var(--vault-floor), transparent 75%);
+}
+
+.vault-twinkle {
+  opacity: 0;
+  animation: vault-twinkle 3.2s ease-in-out infinite backwards;
+}
+
+@keyframes vault-twinkle {
+  0%,
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  20%,
+  40% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
 .closet-silhouette {
   filter: brightness(0);
   opacity: 0.16;
@@ -2202,6 +2266,10 @@ body.dragging {
   .closet-foil::after,
   .tryon-bar-enter {
     animation: none;
+  }
+  .vault-twinkle {
+    animation: none;
+    opacity: 0.8;
   }
 }
 

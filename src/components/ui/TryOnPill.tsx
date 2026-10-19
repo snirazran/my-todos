@@ -1,16 +1,16 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { useTryOnStore } from '@/lib/tryOnStore';
-import { useInventory, mutateInventoryCaches } from '@/hooks/useInventory';
+import { useInventory } from '@/hooks/useInventory';
 import { useWishlist } from '@/hooks/useWishlist';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { hapticSuccess, hapticTick } from '@/lib/haptics';
-import { markFlyEarn } from '@/lib/flyEarn';
+import { hapticTick } from '@/lib/haptics';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const AUTO_DISMISS_MS = 14_000;
@@ -21,18 +21,17 @@ const AUTO_DISMISS_MS = 14_000;
  * completely without blocking anything.
  */
 export function TryOnPill({ className }: { className?: string }) {
+  const router = useRouter();
   const offer = useTryOnStore((s) => s.offer);
   const clear = useTryOnStore((s) => s.clear);
-  const { data, mutate } = useInventory(!!offer, true);
+  const { data } = useInventory(!!offer, true);
   const { pin } = useWishlist(!!offer);
-  const [busy, setBusy] = React.useState(false);
-  const [bought, setBought] = React.useState(false);
 
   const balance = data?.wardrobe?.flies ?? 0;
   const canAfford = !!offer && balance >= offer.price;
 
   React.useEffect(() => {
-    if (!offer || bought) return;
+    if (!offer) return;
     const timer = window.setTimeout(() => {
       trackAnalyticsEvent('tryon_dismissed', {
         item_id: offer.itemId,
@@ -41,11 +40,7 @@ export function TryOnPill({ className }: { className?: string }) {
       clear();
     }, AUTO_DISMISS_MS);
     return () => window.clearTimeout(timer);
-  }, [offer, bought, clear]);
-
-  React.useEffect(() => {
-    setBought(false);
-  }, [offer?.itemId]);
+  }, [offer, clear]);
 
   if (!offer) return null;
 
@@ -61,7 +56,6 @@ export function TryOnPill({ className }: { className?: string }) {
   };
 
   const keep = async () => {
-    if (busy) return;
     if (!canAfford) {
       trackAnalyticsEvent('tryon_kept', {
         item_id: offer.itemId,
@@ -71,41 +65,16 @@ export function TryOnPill({ className }: { className?: string }) {
       clear();
       return;
     }
-    setBusy(true);
-    try {
-      const res = await fetch('/api/skins/shop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemId: offer.itemId,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      });
-      if (!res.ok) return;
-      markFlyEarn();
-      hapticSuccess();
-      setBought(true);
-      trackAnalyticsEvent('tryon_kept', {
-        item_id: offer.itemId,
-        outcome: 'purchased',
-        price: offer.price,
-      });
-
-      // Equip it for real, so the look they were just shown is the look they
-      // keep — then drop the local preview.
-      await fetch('/api/skins/inventory', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot: offer.slot, itemId: offer.itemId }),
-      }).catch(() => {});
-
-      await mutate();
-      mutateInventoryCaches();
-      window.dispatchEvent(new Event('wardrobe-refresh'));
-      window.setTimeout(() => clear(), 1400);
-    } finally {
-      setBusy(false);
-    }
+    hapticTick();
+    trackAnalyticsEvent('tryon_kept', {
+      item_id: offer.itemId,
+      outcome: 'shop_opened',
+      price: offer.price,
+    });
+    clear();
+    router.push(
+      `/wardrobe?tab=shop&item=${encodeURIComponent(offer.itemId)}&kind=item`,
+    );
   };
 
   return (
@@ -124,12 +93,10 @@ export function TryOnPill({ className }: { className?: string }) {
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-black leading-tight tracking-tight text-foreground">
-            {bought ? `${offer.name} is yours!` : `Trying on: ${offer.name}`}
+            Trying on: {offer.name}
           </span>
           <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            {bought ? (
-              'Wearing it now.'
-            ) : canAfford ? (
+            {canAfford ? (
               <>
                 Keep it for
                 <FlyAmount amount={offer.price} size={11} className="text-foreground" />
@@ -144,22 +111,13 @@ export function TryOnPill({ className }: { className?: string }) {
           </span>
         </span>
 
-        {!bought && (
-          <button
-            type="button"
-            onClick={keep}
-            disabled={busy}
-            className="flex h-9 shrink-0 items-center justify-center rounded-xl bg-[#447d3f] px-3 text-xs font-black tracking-wide text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-60"
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : canAfford ? (
-              'Keep it'
-            ) : (
-              'Save for it'
-            )}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={keep}
+          className="flex h-9 shrink-0 items-center justify-center rounded-xl bg-[#447d3f] px-3 text-xs font-black tracking-wide text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
+        >
+          {canAfford ? 'Keep it' : 'Save for it'}
+        </button>
 
         <button
           type="button"

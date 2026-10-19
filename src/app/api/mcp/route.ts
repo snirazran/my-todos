@@ -10,6 +10,7 @@ import { callRoute } from '@/lib/mcp/callRoute';
 import { readLoginStreakState } from '@/lib/streak/loginStreak';
 import { readShieldState } from '@/lib/shields/engine';
 import { getZonedToday } from '@/lib/utils';
+import { storedEconomyTimezone } from '@/lib/economy/guards';
 import {
   GET as tasksGet,
   POST as tasksPost,
@@ -51,8 +52,6 @@ async function resolveContext(authInfo?: AuthInfo): Promise<ToolContext> {
   if (typeof userId !== 'string' || !userId) {
     throw new Error('Unauthorized');
   }
-  await connectMongo();
-  const user = await UserModel.findById(userId).select('timezone').lean();
   return {
     auth: {
       uid: userId,
@@ -60,7 +59,7 @@ async function resolveContext(authInfo?: AuthInfo): Promise<ToolContext> {
       scopes: authInfo?.scopes ?? [],
       clientId: authInfo?.clientId,
     },
-    timezone: (user as { timezone?: string } | null)?.timezone || 'UTC',
+    timezone: await storedEconomyTimezone(userId),
   };
 }
 
@@ -371,7 +370,7 @@ const handler = createMcpHandler(
           assertScope(toolCtx, 'progress:read');
           await connectMongo();
           const user = await UserModel.findById(toolCtx.auth.uid)
-            .select('wardrobe.flies quests timezone')
+            .select('wardrobe.flies quests')
             .lean();
           const streak = readLoginStreakState(user);
           return textResult({

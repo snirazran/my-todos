@@ -16,6 +16,44 @@ import { useUIStore } from '@/lib/uiStore';
 import { GiftBadge } from '@/components/ui/GiftBadge';
 
 const NAV_STUCK_MS = 5000;
+const RING_RADIUS = 6.5;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+function QuestProgressRing({ progress }: { progress: number }) {
+  return (
+    <span
+      role="img"
+      aria-label={`Quests ${Math.round(progress * 100)}% done`}
+      className="absolute -top-1.5 -right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow-sm"
+    >
+      <svg viewBox="0 0 18 18" className="h-[18px] w-[18px] -rotate-90">
+        <circle
+          cx="9"
+          cy="9"
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth="3"
+          className="stroke-muted-foreground/25"
+        />
+        <circle
+          cx="9"
+          cy="9"
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeDashoffset={RING_CIRCUMFERENCE * (1 - progress)}
+          className="stroke-primary"
+          style={{
+            opacity: progress > 0 ? 1 : 0,
+            transition: 'stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)',
+          }}
+        />
+      </svg>
+    </span>
+  );
+}
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -59,6 +97,7 @@ export default function MobileNav() {
   const { data: questsData } = useSWR<{
     claimableCount?: number;
     activeCount?: number;
+    activeProgress?: number;
   }>(
     user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
     bootstrapFetcher,
@@ -66,6 +105,7 @@ export default function MobileNav() {
   );
   const questClaimableCount = questsData?.claimableCount ?? 0;
   const questActiveCount = questsData?.activeCount ?? 0;
+  const questActiveProgress = Math.min(1, Math.max(0, questsData?.activeProgress ?? 0));
 
   const { data: friendRequestsData } = useSWR<{ incoming?: { id: string }[] }>(
     user ? '/api/friends/request' : null,
@@ -173,9 +213,7 @@ export default function MobileNav() {
                       {questClaimableCount > 99 ? '99+' : questClaimableCount}
                     </span>
                   ) : item.label === 'Quests' && questActiveCount > 0 ? (
-                    <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-muted-foreground rounded-full border-2 border-background shadow-sm">
-                      {questActiveCount > 9 ? '9+' : questActiveCount}
-                    </span>
+                    <QuestProgressRing progress={questActiveProgress} />
                   ) : null}
                   {item.label === 'Friends' && friendClaimable > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">

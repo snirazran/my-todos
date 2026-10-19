@@ -7,7 +7,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { useInventory } from '@/hooks/useInventory';
 import { useSheetStore } from '@/lib/sheetStore';
-import { isFlyEarnActive } from '@/lib/flyEarn';
+import { isFlyEarnActive, takeFlownFlies } from '@/lib/flyEarn';
 
 type Toast = { id: number; from: number; to: number };
 
@@ -40,7 +40,9 @@ export function FlyGainPopup() {
     // revalidations (first load, page changes, sync echoes) reconcile the
     // cached balance silently.
     if (!isFlyEarnActive()) return;
-    setPending((curr) => ({ from: curr?.from ?? prev, to: balance }));
+    const flown = takeFlownFlies(balance - prev);
+    if (balance - prev - flown <= 0) return;
+    setPending((curr) => ({ from: (curr?.from ?? prev) + flown, to: balance }));
   }, [balance]);
 
   // Hold the toast while any sheet/overlay is up (e.g. a reward reveal) and

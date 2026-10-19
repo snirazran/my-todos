@@ -696,8 +696,8 @@ const EVENING_PROGRESS: Line[] = [
     title: () => 'The pond is impressed',
     body: (c) =>
       c.task
-        ? `${tasks(c.done)} today. "${c.task}" next, then feet up.`
-        : `${tasks(c.done)} today. One more, then feet up.`,
+        ? `${c.done} done today. "${c.task}" next, then feet up.`
+        : `${c.done} done today. One more, then feet up.`,
   },
   {
     title: () => 'On a roll',

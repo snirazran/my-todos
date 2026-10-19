@@ -47,7 +47,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { DailyDealsShelf } from './DailyDealsShelf';
-import { ShopGiftPopup } from '@/components/ui/shop/ShopGiftPopup';
+import { ShopGiftPopup, ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
 import { GiftBadge } from '@/components/ui/GiftBadge';
 import { WishlistButton } from './WishlistButton';
 import { WishlistShelf } from './WishlistShelf';
@@ -232,8 +232,7 @@ function WardrobeManagerContent({
   bindScroll?: (el: HTMLElement | null) => void;
 }) {
   const { user } = useAuth();
-  const { data, mutate, unseenItems, unseenContainers, markItemSeen } =
-    useInventory(open);
+  const { data, mutate, markItemSeen, markAllSeen } = useInventory(open);
 
   const tradeReadiness = useTradeReadiness(!!user);
   const readyTrades = tradeReadiness.trades;
@@ -286,6 +285,7 @@ function WardrobeManagerContent({
   }, [embedded, activeTab, setWardrobeTab, setLastWardrobeTab]);
 
   const shopGiftReady = activeTab !== 'shop' && !!data?.shopGift?.available;
+  const [shopGiftClaimRequest, setShopGiftClaimRequest] = useState(0);
   const tradeTabBadge = activeTab === 'trade' ? 0 : readyTrades;
   const closetTabBadge =
     activeTab === 'inventory' ? 0 : (data?.wardrobe?.unseenItems?.length ?? 0);
@@ -331,15 +331,36 @@ function WardrobeManagerContent({
     'data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground',
   );
 
+  const serverUnseen = data?.wardrobe?.unseenItems;
+  const [visitUnseen, setVisitUnseen] = useState<string[]>([]);
+  useEffect(() => {
+    if (!open || activeTab !== 'inventory' || !serverUnseen?.length) return;
+    setVisitUnseen((prev) =>
+      prev.concat(serverUnseen.filter((id) => prev.indexOf(id) === -1)),
+    );
+    void markAllSeen();
+  }, [open, activeTab, serverUnseen]);
+
+  const visibleUnseenIds = useMemo(() => {
+    const server = serverUnseen ?? [];
+    return server.concat(visitUnseen.filter((id) => server.indexOf(id) === -1));
+  }, [serverUnseen, visitUnseen]);
   const unseenInventorySet = useMemo(
-    () => new Set(data?.wardrobe?.unseenItems ?? []),
-    [data?.wardrobe?.unseenItems],
+    () => new Set(visibleUnseenIds),
+    [visibleUnseenIds],
   );
+  const markSeenNow = (itemId: string) => {
+    markItemSeen(itemId);
+    setVisitUnseen((prev) =>
+      prev.indexOf(itemId) === -1 ? prev : prev.filter((id) => id !== itemId),
+    );
+  };
 
   // Handle Mark Seen on Close — call API directly since data is cleared when open→false
   const prevOpen = React.useRef(open);
   useEffect(() => {
     if (prevOpen.current && !open) {
+      setVisitUnseen([]);
       fetch('/api/skins/inventory', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -464,11 +485,10 @@ function WardrobeManagerContent({
 
   // Compute Badges
   const filterBadges = useMemo(() => {
-    const unseenCatalogIds = [...unseenItems, ...unseenContainers];
-    if (!data || !unseenCatalogIds.length) return {};
+    if (!data || !visibleUnseenIds.length) return {};
     const counts: Partial<Record<FilterCategory, number>> = {};
 
-    unseenCatalogIds.forEach((id) => {
+    visibleUnseenIds.forEach((id) => {
       const item = data.catalog.find((i) => i.id === id);
       if (!item) return;
 
@@ -489,7 +509,7 @@ function WardrobeManagerContent({
       }
     });
     return counts;
-  }, [data, unseenItems, unseenContainers, visitedCategories]);
+  }, [data, visibleUnseenIds, visitedCategories]);
 
   const canRenderItems = !!data;
 
@@ -579,7 +599,7 @@ function WardrobeManagerContent({
     }
 
     if (unseenInventorySet.has(item.id)) {
-      markItemSeen(item.id);
+      markSeenNow(item.id);
     }
 
     if (item.slot === 'container') {
@@ -604,6 +624,12 @@ function WardrobeManagerContent({
   useEffect(() => {
     clearTryOn();
   }, [activeTab, clearTryOn]);
+  const goToTradeUp = () => {
+    clearTryOn();
+    setActiveTab('trade');
+    setActiveFilter('all');
+    scrollPageToTop();
+  };
 
   const announceEquip = () =>
     window.dispatchEvent(new Event(WARDROBE_EQUIPPED_EVENT));
@@ -663,7 +689,7 @@ function WardrobeManagerContent({
   };
 
   const tapClosetItem = (item: ItemDef, dealPrice: number | null) => {
-    if (unseenInventorySet.has(item.id)) markItemSeen(item.id);
+    if (unseenInventorySet.has(item.id)) markSeenNow(item.id);
     const owned = (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0;
     if (owned) {
       if (!user) {
@@ -1044,6 +1070,7 @@ function WardrobeManagerContent({
         empty={empty}
         onTapItem={tapClosetItem}
         onTapBackground={tapClosetBackground}
+        onTradeUp={show === 'unowned' && !isGuest ? goToTradeUp : undefined}
       />
     ) : null;
 
@@ -1470,6 +1497,12 @@ function WardrobeManagerContent({
                 <WardrobeGridSkeleton />
               ) : (
                 <div className="flex flex-col gap-5 pb-4">
+                  {!isGuest && data.shopGift?.available && (
+                    <ShopGiftTile
+                      gift={data.shopGift}
+                      onClaim={() => setShopGiftClaimRequest((n) => n + 1)}
+                    />
+                  )}
                   {showTryOnHint && (
                     <p className="-mb-2 flex items-center justify-center gap-1.5 text-[12px] font-bold text-muted-foreground">
                       <Shirt className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
@@ -1548,7 +1581,7 @@ function WardrobeManagerContent({
                   catalog={data.catalog}
                   backgrounds={bg.catalog}
                   backgroundInventory={bg.inventory}
-                  unseenItems={unseenItems}
+                  unseenItems={visibleUnseenIds}
                   onTradeSuccess={refreshInventory}
                   activeFilter={
                     activeFilter === 'container' ? 'all' : activeFilter
@@ -1581,8 +1614,9 @@ function WardrobeManagerContent({
       )}
 
       <ShopGiftPopup
-        active={open && activeTab === 'shop' && activeFilter === 'all' && !isGuest}
+        active={open && activeTab === 'shop' && !isGuest}
         gift={data?.shopGift}
+        claimRequest={shopGiftClaimRequest}
       />
 
       <PurchaseSheet
@@ -1692,12 +1726,7 @@ function WardrobeManagerContent({
             busy={tryBuying}
             onBuy={() => void buyTriedOn()}
             onGetFlies={(short) => openFlyShop(short)}
-            onTradeUp={() => {
-              clearTryOn();
-              setActiveTab('trade');
-              setActiveFilter('all');
-              scrollPageToTop();
-            }}
+            onTradeUp={goToTradeUp}
             onClose={clearTryOn}
           />
         );

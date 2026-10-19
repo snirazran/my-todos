@@ -77,7 +77,6 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
     name: 'Daily Roll',
     placement: 'daily',
     isActive: true,
-    priceByEffort: true,
     slots: [
       slot(
         [

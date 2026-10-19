@@ -2,8 +2,14 @@ import type { StatSection } from '@/lib/analytics/catalog';
 import { groupByProperties, kpi, rate, type ReportContext } from './context';
 import { mixTable, propertyMix } from './dimensions';
 
+const REVIEW_OUTCOMES: Record<string, string> = {
+  app_review_requested: 'Asked the store',
+  app_review_skipped: 'Skipped',
+  app_review_suppressed: 'Paused after a bad moment',
+};
+
 export async function buildFrog(context: ReportContext): Promise<StatSection> {
-  const [streakMix, notificationRows, openRows, hungerRows] = await Promise.all([
+  const [streakMix, notificationRows, openRows, hungerRows, reviewRows] = await Promise.all([
     propertyMix({ occurredAt: context.window, name: 'streak_checked_in' }, [
       'streak_tier',
       'is_premium',
@@ -20,6 +26,13 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
     groupByProperties(
       { occurredAt: context.window, name: 'hunger_resolved' },
       { method: 'method' },
+    ),
+    groupByProperties(
+      {
+        occurredAt: context.window,
+        name: { $in: ['app_review_requested', 'app_review_skipped', 'app_review_suppressed'] },
+      },
+      { event: '$name', reason: 'reason', blocker: 'blocker', moment: 'moment' },
     ),
   ]);
 
@@ -134,6 +147,35 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
           users: row.users,
           share: rate(row.count, hungerStarted.events),
         })),
+      },
+      {
+        key: 'frog.app_review',
+        title: 'App review prompt',
+        question: 'Do people reach the review prompt, and what stops them?',
+        columns: [
+          { key: 'outcome', label: 'Outcome' },
+          { key: 'reason', label: 'Reason' },
+          { key: 'blocker', label: 'Blocked by' },
+          { key: 'moment', label: 'Moment' },
+          { key: 'events', label: 'Events', format: 'integer' },
+          { key: 'users', label: 'Users', format: 'integer' },
+        ],
+        rows: reviewRows
+          .map((row) => ({
+            outcome: REVIEW_OUTCOMES[String(row._id.event)] ?? String(row._id.event),
+            reason: String(row._id.reason),
+            blocker: String(row._id.blocker),
+            moment: String(row._id.moment),
+            events: row.count,
+            users: row.users,
+          }))
+          .sort(
+            (a, b) =>
+              Number(b.outcome === REVIEW_OUTCOMES.app_review_requested) -
+                Number(a.outcome === REVIEW_OUTCOMES.app_review_requested) ||
+              b.events - a.events,
+          ),
+        note: 'The store decides whether the prompt actually appears (iOS allows 3 a year) and never tells the app, so "Asked the store" is as far as we can see. Skip reasons are tracked from 2026-10-19.',
       },
     ],
   };

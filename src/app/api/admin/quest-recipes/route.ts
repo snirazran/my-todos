@@ -129,7 +129,6 @@ function recipeToJSON(recipe: QuestRecipeDoc) {
     recipeId: recipe.recipeId,
     name: recipe.name,
     isActive: recipe.isActive,
-    priceByEffort: recipe.priceByEffort === true,
     coverImageUrl: recipe.coverImageUrl,
     slots: recipe.slots ?? [],
   };
@@ -150,7 +149,6 @@ function parseRecipeBody(body: any) {
           : 'Daily Roll',
       placement: 'daily' as const,
       isActive: body?.isActive !== false,
-      priceByEffort: body?.priceByEffort === true,
       slots,
     },
   };

@@ -8,8 +8,9 @@ import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
 import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { economyDayKey, resolveEconomyTimezone } from '@/lib/economy/guards';
-import { fliesGrantedOnDay, logFlyGrant } from '@/lib/economy/ledger';
+import { logFlyGrant } from '@/lib/economy/ledger';
 import { rollShopGift } from '@/lib/economy/shopGift';
+import { shopGiftHeadroom } from '@/lib/economy/shopGiftServer';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, status = 200) =>
@@ -64,8 +65,7 @@ export async function POST(req: NextRequest) {
     const roll = rollShopGift(balanceBefore, premium, config.shopGift, first);
 
     const ledgerDay = economyDayKey(tz);
-    const grantedToday = await fliesGrantedOnDay(userId, ledgerDay);
-    const headroom = Math.max(0, config.circuitBreaker.dailyCap - grantedToday);
+    const headroom = await shopGiftHeadroom(userId, tz, config);
     const amount = Math.min(roll.amount, headroom);
     if (amount <= 0) {
       return json({ granted: false, reason: 'breaker', endsAt: shop.endsAt });

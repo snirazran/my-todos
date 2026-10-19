@@ -684,9 +684,22 @@ export async function GET(req: Request) {
     }
 
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
-    const activeCount = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests].filter(
+    const openQuests = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests];
+    const activeCount = openQuests.filter(
       (quest) => !quest.claimed && !quest.claimable,
     ).length;
+    const activeProgress = openQuests.length
+      ? openQuests.reduce(
+          (sum, quest) =>
+            sum +
+            (quest.claimed || quest.claimable
+              ? 1
+              : quest.target > 0
+                ? Math.min(1, quest.progress / quest.target)
+                : 0),
+          0,
+        ) / openQuests.length
+      : 0;
     const lightMacroCategories = dashboard.macroCategories.map(lightenCategory);
 
     if (isSummary) {
@@ -698,6 +711,7 @@ export async function GET(req: Request) {
           trackables,
           claimablesRewardCatalog,
           activeCount,
+          activeProgress,
           dailySweep,
           onboarding: {
             complete: !!dashboard.focusProfile.completedAt,
@@ -748,6 +762,7 @@ export async function GET(req: Request) {
         isPremium: dashboard.isPremium,
         claimableCount,
         activeCount,
+        activeProgress,
         frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
         dailySweep,
         moveToWeb,

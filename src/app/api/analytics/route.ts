@@ -36,6 +36,7 @@ const CLIENT_EVENTS = new Set([
   'store_product_purchase_cancelled',
   'store_product_purchase_failed',
   'app_review_requested',
+  'app_review_skipped',
   'app_review_suppressed',
   'try_funnel_viewed',
   'try_task_added',

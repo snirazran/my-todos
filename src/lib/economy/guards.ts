@@ -46,38 +46,50 @@ export async function resolveEconomyTimezone(
   requested: unknown,
 ): Promise<string> {
   await connectMongo();
-  const user = await UserModel.findById(userId)
-    .select('notificationPrefs.timezone timezoneGuard')
-    .lean<{
-      notificationPrefs?: { timezone?: string };
-      timezoneGuard?: TimezoneGuardState;
-    } | null>();
+  const [user, config] = await Promise.all([
+    UserModel.findById(userId)
+      .select(ECONOMY_TIMEZONE_FIELDS)
+      .lean<EconomyTimezoneUser>(),
+    loadFlyEconomyConfig(),
+  ]);
+  const { zone, guard } = economyTimezoneFor(
+    user,
+    requested,
+    config.timezone.changesPerDay,
+  );
+  if (guard) {
+    await UserModel.updateOne({ _id: userId }, { $set: { timezoneGuard: guard } });
+  }
+  return zone;
+}
 
+export const ECONOMY_TIMEZONE_FIELDS = 'notificationPrefs.timezone timezoneGuard';
+
+export type EconomyTimezoneUser = {
+  notificationPrefs?: { timezone?: string };
+  timezoneGuard?: TimezoneGuardState;
+} | null;
+
+export function economyTimezoneFor(
+  user: EconomyTimezoneUser,
+  requested: unknown,
+  changesPerDay: number,
+): { zone: string; guard?: TimezoneGuardState } {
   const prefsZone = user?.notificationPrefs?.timezone;
   const stored =
     (isValidTimezone(user?.timezoneGuard?.zone) && user?.timezoneGuard?.zone) ||
     (isValidTimezone(prefsZone) && prefsZone) ||
     undefined;
 
-  if (!isValidTimezone(requested)) return stored ?? 'UTC';
+  if (!isValidTimezone(requested)) return { zone: stored ?? 'UTC' };
   if (!stored) {
-    await UserModel.updateOne(
-      { _id: userId },
-      {
-        $set: {
-          timezoneGuard: {
-            zone: requested,
-            windowStartedAt: new Date(),
-            changesInWindow: 0,
-          },
-        },
-      },
-    );
-    return requested;
+    return {
+      zone: requested,
+      guard: { zone: requested, windowStartedAt: new Date(), changesInWindow: 0 },
+    };
   }
-  if (requested === stored) return stored;
+  if (requested === stored) return { zone: stored };
 
-  const config = await loadFlyEconomyConfig();
   const guard = user?.timezoneGuard ?? {};
   const windowStartedAt = guard.windowStartedAt
     ? new Date(guard.windowStartedAt)
@@ -86,21 +98,16 @@ export async function resolveEconomyTimezone(
     !windowStartedAt || Date.now() - windowStartedAt.getTime() >= 86_400_000;
   const used = windowOpen ? 0 : guard.changesInWindow ?? 0;
 
-  if (used >= config.timezone.changesPerDay) return stored;
+  if (used >= changesPerDay) return { zone: stored };
 
-  await UserModel.updateOne(
-    { _id: userId },
-    {
-      $set: {
-        timezoneGuard: {
-          zone: requested,
-          windowStartedAt: windowOpen ? new Date() : windowStartedAt,
-          changesInWindow: used + 1,
-        },
-      },
+  return {
+    zone: requested,
+    guard: {
+      zone: requested,
+      windowStartedAt: windowOpen ? new Date() : windowStartedAt ?? new Date(),
+      changesInWindow: used + 1,
     },
-  );
-  return requested;
+  };
 }
 
 /**

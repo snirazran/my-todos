@@ -21,6 +21,8 @@ const DAY_MS = 86_400_000;
 const YEAR_MS = 365 * DAY_MS;
 const NEGATIVE_QUIET_MS = 2 * DAY_MS;
 const PROMPT_DELAY_MS = 1200;
+const SCREEN_POLL_MS = 400;
+const SCREEN_WAIT_MS = 8000;
 
 const PLATFORM_POLICY = {
   ios: { cooldownMs: 120 * DAY_MS, maxPerYear: 3 },
@@ -79,12 +81,17 @@ function recentPrompts(now: number) {
   );
 }
 
-function interrupted() {
-  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-    return true;
-  }
-  const { active, pending, busyReasons } = useCampaignStore.getState();
-  return !!active || !!pending || busyReasons.length > 0 || isScreenBusy();
+function campaignBlocker() {
+  const { active, pending } = useCampaignStore.getState();
+  if (active) return 'campaign_open';
+  if (pending) return 'campaign_pending';
+  return null;
+}
+
+function screenBlocker() {
+  const { busyReasons } = useCampaignStore.getState();
+  if (busyReasons.length > 0) return busyReasons[0];
+  return isScreenBusy() ? 'screen' : null;
 }
 
 async function appVersion(): Promise<string | null> {
@@ -119,27 +126,39 @@ export function maybeRequestAppRating(moment: RatingMoment) {
   writeString(POSITIVE_KEY, String(positive));
 
   if (requestInFlight) return;
-  if (positive < MIN_POSITIVE_MOMENTS) return;
 
   const usageDays = readJson<string[]>(USAGE_DAYS_KEY, []);
-  if (usageDays.length < MIN_USAGE_DAYS) return;
+  const skip = (reason: string, blocker?: string) =>
+    trackAnalyticsEvent('app_review_skipped', {
+      moment,
+      reason,
+      ...(blocker ? { blocker } : {}),
+      usage_days: usageDays.length,
+      positive_moments: positive,
+    });
+
+  if (positive < MIN_POSITIVE_MOMENTS) return skip('few_good_moments');
+  if (usageDays.length < MIN_USAGE_DAYS) return skip('few_usage_days');
 
   const now = Date.now();
   const negativeAt = Number(readString(NEGATIVE_AT_KEY)) || 0;
-  if (now - negativeAt < NEGATIVE_QUIET_MS) return;
+  if (now - negativeAt < NEGATIVE_QUIET_MS) return skip('bad_moment_pause');
 
   const { cooldownMs, maxPerYear } = policy();
   const prompts = recentPrompts(now);
-  if (prompts.length >= maxPerYear) return;
-  if (prompts.some((ts) => now - ts < cooldownMs)) return;
-  if (interrupted()) return;
+  if (prompts.length >= maxPerYear) return skip('yearly_cap');
+  if (prompts.some((ts) => now - ts < cooldownMs)) return skip('cooldown');
 
   requestInFlight = true;
-  window.setTimeout(async () => {
+  const deadline = Date.now() + SCREEN_WAIT_MS;
+
+  const request = async () => {
     try {
       const version = await appVersion();
-      if (version && readString(VERSION_KEY) === version) return;
-      if (interrupted()) return;
+      if (version && readString(VERSION_KEY) === version) {
+        skip('asked_this_version');
+        return;
+      }
       await InAppReview.requestReview();
       const at = Date.now();
       writeJson(PROMPTS_KEY, [...recentPrompts(at), at]);
@@ -151,8 +170,25 @@ export function maybeRequestAppRating(moment: RatingMoment) {
         positive_moments: positive,
       });
     } catch {
+      skip('plugin_error');
     } finally {
       requestInFlight = false;
     }
-  }, PROMPT_DELAY_MS);
+  };
+
+  const tryRequest = () => {
+    const stop = (reason: string, blocker?: string) => {
+      requestInFlight = false;
+      skip(reason, blocker);
+    };
+    if (document.visibilityState !== 'visible') return stop('app_hidden');
+    const campaign = campaignBlocker();
+    if (campaign) return stop('campaign', campaign);
+    const busy = screenBlocker();
+    if (!busy) return void request();
+    if (Date.now() > deadline) return stop('busy', busy);
+    window.setTimeout(tryRequest, SCREEN_POLL_MS);
+  };
+
+  window.setTimeout(tryRequest, PROMPT_DELAY_MS);
 }

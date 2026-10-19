@@ -28,6 +28,19 @@ type Reveal = {
 
 type Phase = 'hidden' | 'offer' | 'claiming' | 'revealed';
 
+type Notice = { title: string; body: string };
+
+const REFUSALS: Record<string, Notice> = {
+  claimed: {
+    title: 'Already collected',
+    body: "You've opened today's gift. A new one arrives with tomorrow's shop.",
+  },
+  breaker: {
+    title: 'Daily fly limit reached',
+    body: "You've earned today's max flies. A new gift arrives with tomorrow's shop.",
+  },
+};
+
 let dismissedDayKey: string | null = null;
 
 function hoursUntil(iso: string) {
@@ -39,15 +52,18 @@ function hoursUntil(iso: string) {
 export function ShopGiftPopup({
   active,
   gift,
+  claimRequest = 0,
 }: {
   active: boolean;
   gift?: ShopGiftStatus;
+  claimRequest?: number;
 }) {
   const [phase, setPhase] = useState<Phase>('hidden');
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [shownAmount, setShownAmount] = useState(0);
   const [flewAway, setFlewAway] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [mounted, setMounted] = useState(false);
   const closeTimer = useRef<number>(0);
   const medallionRef = useRef<HTMLDivElement | null>(null);
@@ -73,13 +89,15 @@ export function ShopGiftPopup({
   const close = () => {
     window.clearTimeout(closeTimer.current);
     if (gift) dismissedDayKey = gift.dayKey;
+    setNotice(null);
     setPhase('hidden');
   };
 
   const collect = async () => {
-    if (phase !== 'offer') return;
+    if (phase !== 'offer' && phase !== 'hidden') return;
     hapticTick();
     setError(null);
+    setNotice(null);
     setPhase('claiming');
     try {
       const res = await fetch('/api/skins/shop-gift', {
@@ -94,7 +112,13 @@ export function ShopGiftPopup({
 
       patchInventoryShopGiftClaimed();
       if (!data.granted) {
-        close();
+        const refusal = REFUSALS[data.reason];
+        if (!refusal) {
+          close();
+          return;
+        }
+        setNotice(refusal);
+        setPhase('offer');
         return;
       }
 
@@ -140,6 +164,10 @@ export function ShopGiftPopup({
       setPhase('offer');
     }
   };
+
+  useEffect(() => {
+    if (claimRequest > 0) void collect();
+  }, [claimRequest]);
 
   if (!mounted) return null;
 
@@ -283,7 +311,11 @@ export function ShopGiftPopup({
                       {firstGift ? 'Welcome gift' : 'Daily shop gift'}
                     </p>
                     <p className="mt-1 text-[26px] font-black leading-tight tracking-tight text-foreground">
-                      {offerAmount > 0 ? `${offerAmount} free flies` : 'Free flies'}
+                      {notice
+                        ? notice.title
+                        : offerAmount > 0
+                          ? `${offerAmount} free flies`
+                          : 'Free flies'}
                     </p>
                     <p
                       className={cn(
@@ -291,14 +323,15 @@ export function ShopGiftPopup({
                         error ? 'text-rose-500' : 'text-muted-foreground',
                       )}
                     >
-                      {error ??
+                      {notice?.body ??
+                        error ??
                         (firstGift
                           ? 'A first-visit bonus. Come back daily for more.'
                           : 'Waiting for you today.')}
                     </p>
                     <button
                       type="button"
-                      onClick={collect}
+                      onClick={notice ? close : collect}
                       disabled={phase === 'claiming'}
                       className={cn(
                         'mt-5 h-14 w-full rounded-2xl text-lg font-black tracking-tight text-white transition-[transform,box-shadow] duration-100',
@@ -307,11 +340,13 @@ export function ShopGiftPopup({
                         'disabled:opacity-70',
                       )}
                     >
-                      {phase === 'claiming'
-                        ? 'Opening…'
-                        : offerAmount > 0
-                          ? `Claim ${offerAmount} flies`
-                          : 'Claim'}
+                      {notice
+                        ? 'Got it'
+                        : phase === 'claiming'
+                          ? 'Opening…'
+                          : offerAmount > 0
+                            ? `Claim ${offerAmount} flies`
+                            : 'Claim'}
                     </button>
                   </motion.div>
                 )}
@@ -322,5 +357,39 @@ export function ShopGiftPopup({
       )}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+export function ShopGiftTile({
+  gift,
+  onClaim,
+}: {
+  gift: ShopGiftStatus;
+  onClaim: () => void;
+}) {
+  const amount = gift.amount ?? 0;
+  return (
+    <button
+      type="button"
+      onClick={onClaim}
+      className="flex w-full items-center gap-3 rounded-[20px] border-2 border-[#b9e29b] bg-card p-2.5 pr-3 text-left transition-transform active:scale-[0.98] dark:border-emerald-700"
+    >
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-b from-[#f4fbe9] to-[#dff3cf] dark:from-emerald-950 dark:to-emerald-900">
+        <span className="gift-float">
+          <Fly size={38} paused interactive={false} />
+        </span>
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block text-[12px] font-black text-[#447d3f] dark:text-emerald-400">
+          {gift.first ? 'Welcome gift' : 'Daily shop gift'}
+        </span>
+        <span className="mt-0.5 block truncate text-[15px] font-black text-foreground">
+          {amount > 0 ? `${amount} free flies` : 'Free flies'}
+        </span>
+      </span>
+      <span className="grid h-10 shrink-0 place-items-center rounded-xl bg-[#447d3f] px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#2c511a]">
+        Claim
+      </span>
+    </button>
   );
 }

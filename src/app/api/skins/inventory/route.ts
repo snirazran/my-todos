@@ -16,7 +16,9 @@ import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
-import { shopGiftStatus } from '@/lib/economy/shopGift';
+import { loadShopGiftStatus } from '@/lib/economy/shopGiftServer';
+import { ECONOMY_TIMEZONE_FIELDS, type EconomyTimezoneUser } from '@/lib/economy/guards';
+import type { ShopSalesConfig } from '@/lib/skins/shopSales';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, {
@@ -171,10 +173,21 @@ export async function GET(req: NextRequest) {
     if (!wardrobe) return json({ error: 'User not found' }, 404);
     const fullCatalog = await getFullCatalog();
     const premiumUser = (await UserModel.findById(userId)
-      .select('premiumUntil')
-      .lean()) as { premiumUntil?: Date | null } | null;
+      .select(`premiumUntil ${ECONOMY_TIMEZONE_FIELDS}`)
+      .lean()) as ({ premiumUntil?: Date | null } & EconomyTimezoneUser) | null;
     const isPremium = isPremiumActive(premiumUser?.premiumUntil);
     const economy = await loadFlyEconomyConfig();
+    const giftStatus = (salesConfig: ShopSalesConfig) =>
+      loadShopGiftStatus({
+        userId,
+        user: premiumUser,
+        claimedDayKey: wardrobe.shopGift?.dayKey,
+        requestedTimezone: timezone,
+        salesConfig,
+        economy,
+        balance: wardrobe.flies ?? 0,
+        premium: isPremium,
+      });
     if (isSummary) {
       const unseenIds = wardrobe.unseenItems ?? [];
       const containerIds = new Set(
@@ -231,12 +244,7 @@ export async function GET(req: NextRequest) {
         dailyDeals,
         dealRerollsLeft: rotation.rerollsLeft,
         dealRerollsAllowed: rotation.rerollsAllowed,
-        shopGift: shopGiftStatus(
-          wardrobe.shopGift?.dayKey,
-          rotation,
-          economy.shopGift.enabled,
-          { balance: wardrobe.flies ?? 0, premium: isPremium, config: economy.shopGift },
-        ),
+        shopGift: await giftStatus(rotation.config),
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
           .length,
@@ -263,12 +271,7 @@ export async function GET(req: NextRequest) {
       dailyDeals: rotation.deals,
       dealRerollsLeft: rotation.rerollsLeft,
       dealRerollsAllowed: rotation.rerollsAllowed,
-      shopGift: shopGiftStatus(
-        wardrobe.shopGift?.dayKey,
-        rotation,
-        economy.shopGift.enabled,
-        { balance: wardrobe.flies ?? 0, premium: isPremium, config: economy.shopGift },
-      ),
+      shopGift: await giftStatus(rotation.config),
       isPremium,
     });
   } catch {
