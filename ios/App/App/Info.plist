@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Frogress</string>
+	<string>Frogress</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -18,40 +18,31 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.324868480648-qv2h2spg5jl3mmhek4u6vvefm7k7m0f4</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
-	<key>UIRequiredDeviceCapabilities</key>
-	<array>
-		<string>armv7</string>
-	</array>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<true/>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-9295411240414755~8082369649</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Frogress rings a real alarm when your focus timer finishes, even in Silent mode.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Frogress uses the camera to scan a friend’s QR code so you can add them.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
-	<key>NSAlarmKitUsageDescription</key>
-	<string>Frogress rings a real alarm when your focus timer finishes, even in Silent mode.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>Frogress uses the camera to scan a friend&#8217;s QR code so you can add them.</string>
-	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-9295411240414755~8082369649</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Your data will be used to show you more relevant ads.</string>
 	<key>SKAdNetworkItems</key>
@@ -257,14 +248,23 @@
 			<string>3qcr597p9d.skadnetwork</string>
 		</dict>
 	</array>
-	<key>CFBundleURLTypes</key>
+	<key>UIBackgroundModes</key>
 	<array>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.324868480648-qv2h2spg5jl3mmhek4u6vvefm7k7m0f4</string>
-			</array>
-		</dict>
+		<string>remote-notification</string>
 	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
 </dict>
 </plist>

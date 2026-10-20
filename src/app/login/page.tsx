@@ -66,7 +66,7 @@ const slide = {
   exit: (dir: number) => ({ x: dir * -50, opacity: 0 }),
 };
 
-const PASSWORD_LOGIN_ENABLED = false;
+const PASSWORD_LOGIN_ENABLED = true;
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 const POST_LOGIN_ROUTE_KEY = 'frogress.post-login-route';
 
