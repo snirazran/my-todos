@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Flame, ShieldCheck } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
+import { SkipAdsLink } from '@/components/ui/gift-box/RewardCard';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
@@ -83,6 +84,7 @@ export function StreakRescueSheet({
     error,
     setError,
     plusModal,
+    skipAds,
   } = useRewardGate('streak_rescue', {
     isPlus: offer?.adsRequired === 0,
     preload: open,
@@ -350,6 +352,16 @@ export function StreakRescueSheet({
                                 : 'Save my streaks'}
                           </button>
                         ))}
+                      {canWatchAd && mode === 'ad' && (
+                        <SkipAdsLink
+                          disabled={busy}
+                          onClick={() => {
+                            if (saved) return;
+                            skipAds(() => performSave('ad'));
+                          }}
+                          className="-mt-1"
+                        />
+                      )}
                     </div>
                   )}
 

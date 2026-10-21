@@ -205,6 +205,22 @@ type ItemFlightOptions = {
   onLand?: () => void;
 };
 
+let itemFlightsInAir = 0;
+let landedWaiters: Array<() => void> = [];
+
+export function afterItemFlightsLand(callback: () => void): void {
+  if (itemFlightsInAir === 0) callback();
+  else landedWaiters.push(callback);
+}
+
+function itemFlightEnded() {
+  itemFlightsInAir = Math.max(0, itemFlightsInAir - 1);
+  if (itemFlightsInAir > 0) return;
+  const waiters = landedWaiters;
+  landedWaiters = [];
+  waiters.forEach((waiter) => waiter());
+}
+
 export function canFlyToInventory(): boolean {
   return (
     typeof document !== 'undefined' &&
@@ -225,6 +241,7 @@ export function flyItemToInventory({ from, visual, rarity, onLand }: ItemFlightO
   const color = RARITY_COLORS[rarity] ?? RARITY_COLORS.common;
   const target = targetNode.getBoundingClientRect();
   const layer = createLayer();
+  itemFlightsInAir += 1;
 
   const startX = from.left + from.width / 2 - TOKEN_SIZE / 2;
   const startY = from.top + from.height / 2 - TOKEN_SIZE / 2;
@@ -302,10 +319,12 @@ export function flyItemToInventory({ from, visual, rarity, onLand }: ItemFlightO
       { duration: 460, easing: 'ease-out' },
     );
     onLand?.();
+    itemFlightEnded();
   };
   tokenAnimation.oncancel = () => {
     layer.remove();
     onLand?.();
+    itemFlightEnded();
   };
 }
 

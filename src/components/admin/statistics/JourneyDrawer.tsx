@@ -60,6 +60,7 @@ const EVENT_LABELS: Record<string, string> = {
   item_equipped: 'Equipped an item',
   paywall_viewed: 'Saw the Plus paywall',
   paywall_step_viewed: 'Paywall step',
+  paywall_moment_assigned: 'Put in a paywall timing group',
   paywall_prices_failed: 'Paywall prices failed to load',
   paywall_plan_selected: 'Switched Plus plan',
   paywall_compare_viewed: 'Opened everything in Plus',

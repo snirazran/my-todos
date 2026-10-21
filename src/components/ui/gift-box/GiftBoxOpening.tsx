@@ -21,7 +21,9 @@ import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox, GiftRive } from './GiftBox';
 import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
-import { PlusOfferButton, RewardCard } from './RewardCard';
+import { PlusOfferButton, RewardCard, SkipAdsLink } from './RewardCard';
+import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
+import { queueFirstGiftPaywall } from '@/lib/plus/firstGiftPaywall';
 import { pickFunnySentence } from './funnySentences';
 import { useAutoPopupHold } from '@/lib/popupGate';
 
@@ -60,6 +62,11 @@ export default function GiftBoxOpening({
   const [adError, setAdError] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [showPlusOffer, setShowPlusOffer] = useState(false);
+  const [plusPlacement, setPlusPlacement] = useState('gift_double');
+  const openPlusOffer = (next: string) => {
+    setPlusPlacement(next);
+    setShowPlusOffer(true);
+  };
   const [loadingText, setLoadingText] = useState(
     () => pickFunnySentence(),
   );
@@ -173,6 +180,7 @@ export default function GiftBoxOpening({
     }
     // Prize is already in inventory from the open-gift API call
     // Just close the modal
+    queueFirstGiftPaywall();
     onClose();
   };
 
@@ -209,7 +217,7 @@ export default function GiftBoxOpening({
         setPrizeMeta(data.prizeMeta ?? null);
         if (onWin) onWin(data.prize);
         if (takePlusOfferAfterAd()) {
-          setTimeout(() => setShowPlusOffer(true), 1600);
+          setTimeout(() => openPlusOffer(afterAdPlacement('gift_double')), 1600);
         }
       } else {
         if (!viaPlus) creditRewardedAd('gift_double');
@@ -358,9 +366,16 @@ export default function GiftBoxOpening({
                         busyLabel="Loading ad..."
                         onClick={() => {
                           if (rewardedAdsAvailable()) void handleDouble();
-                          else setShowPlusOffer(true);
+                          else openPlusOffer('gift_double');
                         }}
                       />
+                      {rewardedAdsAvailable() && (
+                        <SkipAdsLink
+                          disabled={adBusy}
+                          onClick={() => openPlusOffer(skipAdsPlacement('gift_double'))}
+                          className="-mt-2"
+                        />
+                      )}
                       {adError && (
                         <p className="text-center text-xs font-bold text-red-300">
                           {adError}
@@ -390,7 +405,7 @@ export default function GiftBoxOpening({
 
       <PlusUpgradeModal
         open={showPlusOffer}
-        placement="gift_double"
+        placement={plusPlacement}
         onStartTrial={async () => {
           if (doubleClaimId) await handleDouble(true);
         }}

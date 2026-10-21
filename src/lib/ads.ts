@@ -103,6 +103,7 @@ async function checkAdBudget(
 
 const PLUS_OFFER_AD_COUNT_KEY = 'plusOffer.rewardedAdCount';
 const PLUS_OFFER_LAST_SHOWN_KEY = 'plusOffer.lastShownAt';
+const PLUS_OFFER_FIRST_SHOWN_KEY = 'plusOffer.firstShown';
 const PLUS_OFFER_AD_THRESHOLD = 3;
 const PLUS_OFFER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -129,16 +130,18 @@ function recordRewardedAdCompleted() {
   );
 }
 
-/** Frequency-capped Plus pitch: true once per 24h at most, and only after the
- *  user has completed a few rewarded ads since the last pitch. Consuming the
- *  offer resets the counter, so callers should show the paywall when it
- *  returns true. */
+/** Frequency-capped Plus pitch: true after the user's first completed rewarded
+ *  ad, then once per 24h at most and only after a few more ads since the last
+ *  pitch. Consuming the offer resets the counter, so callers should show the
+ *  paywall when it returns true. */
 export function takePlusOfferAfterAd(): boolean {
-  if (readStoredNumber(PLUS_OFFER_AD_COUNT_KEY) < PLUS_OFFER_AD_THRESHOLD) {
+  const first = !readStoredNumber(PLUS_OFFER_FIRST_SHOWN_KEY);
+  if (readStoredNumber(PLUS_OFFER_AD_COUNT_KEY) < (first ? 1 : PLUS_OFFER_AD_THRESHOLD)) {
     return false;
   }
   const lastShown = readStoredNumber(PLUS_OFFER_LAST_SHOWN_KEY);
   if (Date.now() - lastShown < PLUS_OFFER_COOLDOWN_MS) return false;
+  writeStoredNumber(PLUS_OFFER_FIRST_SHOWN_KEY, 1);
   writeStoredNumber(PLUS_OFFER_AD_COUNT_KEY, 0);
   writeStoredNumber(PLUS_OFFER_LAST_SHOWN_KEY, Date.now());
   return true;

@@ -1301,9 +1301,129 @@ body.dragging {
   --pond-glow: rgba(108, 187, 95, 0.16);
 }
 
+.plus-paywall {
+  --background: 115 36% 36%;
+  --foreground: 0 0% 100%;
+  --card: 115 38% 30%;
+  --card-foreground: 0 0% 100%;
+  --muted: 115 32% 31%;
+  --muted-foreground: 105 35% 88%;
+  --border: 113 26% 48%;
+  --input: 113 26% 48%;
+  --primary: 45 96% 64%;
+  --primary-foreground: 36 76% 13%;
+  --ring: 45 96% 64%;
+  --plus-band: 115 33% 31%;
+}
+
 .plus-paywall :is(button, a):focus-visible {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 3px;
+}
+
+@keyframes plus-emblem-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(3deg);
+  }
+}
+
+@keyframes plus-emblem-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.72);
+    opacity: 0.55;
+  }
+}
+
+@keyframes plus-sparkle {
+  0%,
+  100% {
+    transform: scale(0.3) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1) rotate(45deg);
+    opacity: 1;
+  }
+}
+
+@keyframes plus-rays-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plus-emblem-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plus-rail-draw {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes plus-halo {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+
+@keyframes plus-cta-shine {
+  0% {
+    opacity: 1;
+    transform: translateX(0) skewX(-20deg);
+  }
+  45%,
+  100% {
+    opacity: 1;
+    transform: translateX(440%) skewX(-20deg);
+  }
+}
+
+@keyframes plus-frog-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 @keyframes plus-chip-in {

@@ -47,6 +47,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { DailyDealsShelf } from './DailyDealsShelf';
+import { afterAdPlacement } from '@/lib/plusPaywall';
 import { ShopGiftPopup, ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
 import { GiftBadge } from '@/components/ui/GiftBadge';
 import { WishlistButton } from './WishlistButton';
@@ -448,7 +449,7 @@ function WardrobeManagerContent({
       );
       mutateInventoryCaches();
       if (!isPlus && takePlusOfferAfterAd()) {
-        setTimeout(() => openPlus('premium_daily_deal'), 1200);
+        setTimeout(() => openPlus(afterAdPlacement('shop_reroll')), 1200);
       }
     } catch {
       if (!isPlus) creditRewardedAd('shop_reroll');

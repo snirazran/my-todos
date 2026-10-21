@@ -72,7 +72,9 @@ import {
   GoldenRewardButton,
   PlusOfferButton,
   RewardCard,
+  SkipAdsLink,
 } from '@/components/ui/gift-box/RewardCard';
+import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useAutoPopupHold } from '@/lib/popupGate';
@@ -237,6 +239,11 @@ export function TradePanel({
   const [rerollBusy, setRerollBusy] = useState(false);
   const [rerollError, setRerollError] = useState<string | null>(null);
   const [showPlusOffer, setShowPlusOffer] = useState(false);
+  const [plusPlacement, setPlusPlacement] = useState('trade_reroll');
+  const openPlusOffer = (next: string) => {
+    setPlusPlacement(next);
+    setShowPlusOffer(true);
+  };
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
@@ -849,7 +856,7 @@ export function TradePanel({
         colors: ['#FFD700', '#FFA500', '#FF4500'],
       });
       if (!isPremium && takePlusOfferAfterAd()) {
-        setTimeout(() => setShowPlusOffer(true), 1600);
+        setTimeout(() => openPlusOffer(afterAdPlacement('trade_reroll')), 1600);
       }
     } finally {
       setRerollBusy(false);
@@ -1657,8 +1664,15 @@ export function TradePanel({
                       busyLabel="Loading ad..."
                       onClick={() => {
                         if (rewardedAdsAvailable()) void handleReroll();
-                        else setShowPlusOffer(true);
+                        else openPlusOffer('trade_reroll');
                       }}
+                    />
+                  )}
+                  {!isPremium && rewardedAdsAvailable() && (
+                    <SkipAdsLink
+                      disabled={rerollBusy}
+                      onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
+                      className="-mt-2"
                     />
                   )}
                   {rerollError && (
@@ -1676,7 +1690,7 @@ export function TradePanel({
 
       <PlusUpgradeModal
         open={showPlusOffer}
-        placement="trade_reroll"
+        placement={plusPlacement}
         onStartTrial={async () => {
           if (rerollClaimId) await handleReroll(true);
         }}

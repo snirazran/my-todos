@@ -24,6 +24,11 @@ const PAYWALL_SESSION_EVENTS = [
   'purchase_failed',
 ];
 
+const MOMENT_PLACEMENTS: Record<string, { label: string; placement: string }> = {
+  onboarding: { label: 'End of onboarding', placement: 'onboarding' },
+  first_gift: { label: 'After first gift', placement: 'first_gift' },
+};
+
 const QUICK_EXIT_SECONDS = 5;
 const PAYMENT_PENDING_CODE = '20';
 const PLANS = ['yearly', 'monthly'];
@@ -155,7 +160,7 @@ function groupByPlacement(sessions: PaywallSession[]) {
 export async function buildMoney(context: ReportContext): Promise<StatSection> {
   const production = { 'properties.environment': { $ne: 'SANDBOX' } };
 
-  const [revenueRows, dailyRevenue, paywallRows, adRows, packRows, productRows, trialRows, expiredRows] =
+  const [revenueRows, dailyRevenue, paywallRows, adRows, packRows, productRows, trialRows, expiredRows, momentRows] =
     await Promise.all([
       AnalyticsEventModel.aggregate<{
         _id: string;
@@ -279,6 +284,10 @@ export async function buildMoney(context: ReportContext): Promise<StatSection> {
           },
         },
         { $group: { _id: '$userId' } },
+      ]),
+      AnalyticsEventModel.aggregate<{ _id: string; users: string[] }>([
+        { $match: { occurredAt: context.window, name: 'paywall_moment_assigned' } },
+        { $group: { _id: '$properties.moment', users: { $addToSet: '$userId' } } },
       ]),
     ]);
 
@@ -505,6 +514,35 @@ export async function buildMoney(context: ReportContext): Promise<StatSection> {
     note: 'Trials started in the range, followed to today. The trigger is saved on the store purchase itself, so trials from before October 2026 show as Not recorded. Sandbox is excluded.',
   };
 
+  const momentTable: StatTable = {
+    key: 'money.paywall_moment',
+    title: 'Paywall timing test',
+    question: 'Do more new users start Plus when the paywall shows at the end of onboarding, or right after they open their first gift?',
+    columns: [
+      { key: 'moment', label: 'Group' },
+      { key: 'assigned', label: 'New users', format: 'integer' },
+      { key: 'saw', label: 'Saw the paywall', format: 'integer' },
+      { key: 'bought', label: 'Started Plus', format: 'integer' },
+      { key: 'rate', label: 'Started per new user', format: 'percent' },
+    ],
+    rows: momentRows
+      .filter((row) => MOMENT_PLACEMENTS[row._id])
+      .map((row) => {
+        const users = new Set(row.users);
+        const { label, placement } = MOMENT_PLACEMENTS[row._id];
+        const sessions = paywallSessions.filter((session) => session.placement === placement && users.has(session.userId));
+        const bought = new Set(sessions.filter((session) => session.completed).map((session) => session.userId)).size;
+        return {
+          moment: label,
+          assigned: users.size,
+          saw: new Set(sessions.map((session) => session.userId)).size,
+          bought,
+          rate: rate(bought, users.size),
+        };
+      }),
+    note: 'New accounts are split 50/50 by user id. Started Plus counts a trial or purchase from that group’s own paywall. Compare the last column; it includes people who left before seeing the paywall. Sandbox is excluded.',
+  };
+
   const adPlacements = new Map<string, Record<string, number>>();
   for (const row of adRows) {
     const values = adPlacements.get(row._id.placement) ?? {};
@@ -628,6 +666,7 @@ export async function buildMoney(context: ReportContext): Promise<StatSection> {
       paywallFunnelTable,
       paywallExitTable,
       paywallPlanTable,
+      momentTable,
       trialTable,
       {
         key: 'money.products',

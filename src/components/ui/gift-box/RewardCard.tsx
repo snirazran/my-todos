@@ -10,6 +10,7 @@ import { ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
+import { afterAdPlacement } from '@/lib/plusPaywall';
 import { useRewardGate } from '@/hooks/useRewardGate';
 import { ItemDef, type Rarity } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
@@ -170,6 +171,31 @@ const AD_OFFER_PALETTE = {
   reroll: { top: '#a78bfa', bottom: '#7c3aed', lip: '#4c1d95', glow: 'rgba(167,139,250,0.6)', ink: '#6d28d9' },
   plus: { top: '#2f7d50', bottom: '#1d5a3f', lip: '#0b271c', glow: 'rgba(251,191,36,0.45)', ink: '#3b2708' },
 } as const;
+
+export function SkipAdsLink({
+  onClick,
+  disabled,
+  className,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'mx-auto flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-[13px] font-bold text-white/80 transition-colors hover:text-white disabled:opacity-50',
+        className,
+      )}
+    >
+      <Icon name="frogPlus" label="Plus" className="h-5 w-5 shrink-0" />
+      Skip ads · Try Plus free
+    </button>
+  );
+}
 
 export function PlusOfferButton({
   mode,
@@ -491,6 +517,7 @@ export const RewardCard = ({
     error: doubleError,
     plusModal,
     openPlus,
+    skipAds,
   } = useRewardGate(doublePlacement, {
     preload: !!showDoubleUpsell && !!onWatchAd,
   });
@@ -505,7 +532,7 @@ export const RewardCard = ({
     void run(async () => {
       await onWatchAd();
       if (canWatchAd && takePlusOfferAfterAd()) {
-        setTimeout(() => openPlus(), 1600);
+        setTimeout(() => openPlus(afterAdPlacement(doublePlacement)), 1600);
       }
     });
   };
@@ -733,6 +760,13 @@ export const RewardCard = ({
             busyLabel={canWatchAd ? 'Loading ad...' : 'Claiming...'}
             disabled={isProcessing || !showContent}
             onClick={handleDoubleClick}
+          />
+        )}
+        {showDoubleUpsell && canWatchAd && onWatchAd && (
+          <SkipAdsLink
+            disabled={watchingAd || isProcessing || !showContent}
+            onClick={() => skipAds(async () => { await onWatchAd(); })}
+            className="-mt-2"
           />
         )}
         {upsell}

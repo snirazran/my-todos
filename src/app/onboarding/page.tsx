@@ -24,6 +24,8 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { paywallMomentFor } from '@/lib/plusPaywall';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { useAutoPopupHold } from '@/lib/popupGate';
 // Answers are drafted before sign-in, so they're persisted locally to survive the
 // email magic-link round trip (which reloads onto a fresh /onboarding). They are
@@ -207,8 +209,13 @@ export default function OnboardingPage() {
 
       savePromiseRef.current = saveOnboarding(timezone);
       if (offerPlus) {
-        setPaywallOpen(true);
-        return;
+        const uid = auth?.currentUser?.uid;
+        const moment = uid ? paywallMomentFor(uid) : 'onboarding';
+        trackAnalyticsEvent('paywall_moment_assigned', { moment });
+        if (moment === 'onboarding') {
+          setPaywallOpen(true);
+          return;
+        }
       }
       await finishOnboarding(savePromiseRef.current);
     }

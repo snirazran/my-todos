@@ -1554,13 +1554,8 @@ function MainView({
           type="button"
           onClick={onOpenPlus}
           aria-label="Unlock Frogress Plus"
-          className="plus-upgrade-button group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-primary"
+          className="plus-upgrade-button group relative isolate w-full text-left rounded-2xl bg-amber-400 px-4 py-4 flex items-center gap-3 text-emerald-950 [--plus-button-base:#d38a0c] transition-transform duration-150 ease-out hover:bg-amber-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-primary"
         >
-          <span
-            aria-hidden
-            className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-          />
-          <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
           <span className="-my-4 -ml-1 shrink-0 inline-flex">
             <Icon
               name="frogPlus"

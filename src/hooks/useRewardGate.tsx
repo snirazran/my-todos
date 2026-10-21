@@ -9,6 +9,7 @@ import {
   showRewardedAd,
 } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
+import { skipAdsPlacement } from '@/lib/plusPaywall';
 
 export type RewardGateMode = 'free' | 'ad' | 'plus';
 
@@ -23,6 +24,7 @@ export function useRewardGate(
   { isPlus = false, adFailedMessage, preload = true }: Options = {},
 ) {
   const [plusOpen, setPlusOpen] = useState(false);
+  const [plusPlacement, setPlusPlacement] = useState(placement);
   const [pending, setPending] = useState<{ run: () => Promise<void> } | null>(
     null,
   );
@@ -52,6 +54,7 @@ export function useRewardGate(
       setError(null);
       if (mode === 'plus') {
         setPending({ run: action });
+        setPlusPlacement(placement);
         setPlusOpen(true);
         return;
       }
@@ -85,6 +88,17 @@ export function useRewardGate(
     [adFailedMessage, busy, execute, mode, placement],
   );
 
+  const skipAds = useCallback(
+    (action: () => Promise<void>) => {
+      if (busy) return;
+      setError(null);
+      setPending({ run: action });
+      setPlusPlacement(skipAdsPlacement(placement));
+      setPlusOpen(true);
+    },
+    [busy, placement],
+  );
+
   const closePlus = useCallback(() => {
     setPlusOpen(false);
     setPending(null);
@@ -93,7 +107,7 @@ export function useRewardGate(
   const plusModal = (
     <PlusUpgradeModal
       open={plusOpen}
-      placement={placement}
+      placement={plusPlacement}
       onStartTrial={async () => {
         const action = pending?.run;
         setPending(null);
@@ -111,6 +125,10 @@ export function useRewardGate(
     setError,
     plusModal,
     plusOpen,
-    openPlus: () => setPlusOpen(true),
+    skipAds,
+    openPlus: (next: string = placement) => {
+      setPlusPlacement(next);
+      setPlusOpen(true);
+    },
   };
 }

@@ -6,6 +6,7 @@ import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
+import { paywallMomentFor } from '@/lib/plusPaywall';
 
 const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
 const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
@@ -112,6 +113,7 @@ export async function POST(req: Request) {
         $set: {
           onboardingCompleted: true,
           'seenIntros.firstRun': false,
+          ...(paywallMomentFor(uid) === 'first_gift' ? { 'seenIntros.firstGiftPaywall': false } : {}),
           frogName,
           ...(humanName ? { name: humanName } : {}),
           ...(ageRange ? { ageRange } : {}),

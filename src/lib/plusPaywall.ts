@@ -10,6 +10,44 @@ export type PaywallContext = {
   benefits: PlusBenefit[];
 };
 
+export const TRIAL_REMINDER_LEAD_MS = 48 * 60 * 60 * 1000;
+
+export type PaywallMoment = 'onboarding' | 'first_gift';
+
+export function paywallMomentFor(uid: string): PaywallMoment {
+  let hash = 0;
+  for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
+  return hash % 2 === 0 ? 'onboarding' : 'first_gift';
+}
+
+export function skipAdsPlacement(placement: string): string {
+  return `skip_ads_${placement}`;
+}
+
+export function afterAdPlacement(placement: string): string {
+  return `after_ad_${placement}`;
+}
+
+const COACH: PlusBenefit = {
+  icon: 'patterns',
+  title: 'A weekly coach for your habits',
+  body: 'See what worked, plus one thing to try next.',
+};
+const DOUBLE: PlusBenefit = {
+  icon: 'x2',
+  title: 'Double flies and gift prizes',
+  body: 'From quests, habits and every gift.',
+};
+const SUPPORT: PlusBenefit = {
+  icon: 'community',
+  title: 'Support a small indie team',
+  body: 'Help us keep making Frogress better.',
+};
+const NO_ADS: PlusBenefit = {
+  icon: 'x2',
+  title: 'Every bonus, no ads',
+  body: 'Quest rewards and gifts double on their own.',
+};
 const REWARDS: PlusBenefit = {
   icon: 'x2',
   title: '2× flies from daily quests',
@@ -29,10 +67,24 @@ const STREAK: PlusBenefit = {
 export function getPlusContext(placement: string, frogName?: string): PaywallContext {
   const name = frogName?.trim() || 'your frog';
   const context: PaywallContext = {
-    headline: 'Make getting things done',
-    accent: 'more rewarding.',
-    sub: `Grow ${name === 'your frog' ? 'your frog’s' : `${name}’s`} wardrobe as you build your routine.`,
-    benefits: [REWARDS, GIFTS, STREAK],
+    headline: 'Commit to your goals.',
+    accent: 'Get 2× the rewards.',
+    sub: `A weekly coach, double rewards and more outfits for ${name}.`,
+    benefits: [COACH, DOUBLE, SUPPORT],
+  };
+  if (placement === 'first_gift') return {
+    ...context,
+    headline: 'Loved that gift?',
+    accent: 'Get two prizes every time.',
+    sub: 'Two prizes in every gift, double flies and a weekly coach.',
+    benefits: [GIFTS, COACH, SUPPORT],
+  };
+  if (placement.startsWith('skip_ads_') || placement.startsWith('after_ad_')) return {
+    ...context,
+    headline: 'Skip the ads.',
+    accent: 'Keep every bonus.',
+    sub: 'Plus doubles quest rewards and gifts for you. No ads to watch.',
+    benefits: [NO_ADS, COACH, SUPPORT],
   };
   if (placement === 'wardrobe_looks') return {
     ...context,
@@ -107,12 +159,28 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   return context;
 }
 
+export type TrialPeriod = { unit: 'D' | 'W' | 'M' | 'Y'; count: number };
+
 /** Store periods are calendar units; never turn a month into a made-up day count. */
-export function formatTrialDuration(period: string | null | undefined, cycles = 1): string | null {
+export function parseTrialPeriod(period: string | null | undefined, cycles = 1): TrialPeriod | null {
   const match = period?.match(/^P(\d+)([DWMY])$/);
   if (!match || !Number.isFinite(cycles) || cycles < 1) return null;
   const count = Number(match[1]) * cycles;
   if (!count) return null;
-  const unit = { D: 'day', W: 'week', M: 'month', Y: 'year' }[match[2]];
-  return `${count} ${unit}${count === 1 ? '' : 's'}`;
+  return { unit: match[2] as TrialPeriod['unit'], count };
+}
+
+export function formatTrialPeriod(trial: TrialPeriod | null): string | null {
+  if (!trial) return null;
+  const unit = { D: 'day', W: 'week', M: 'month', Y: 'year' }[trial.unit];
+  return `${trial.count} ${unit}${trial.count === 1 ? '' : 's'}`;
+}
+
+export function trialEndsAt(trial: TrialPeriod, from: Date): Date {
+  const end = new Date(from);
+  if (trial.unit === 'D') end.setDate(end.getDate() + trial.count);
+  else if (trial.unit === 'W') end.setDate(end.getDate() + trial.count * 7);
+  else if (trial.unit === 'M') end.setMonth(end.getMonth() + trial.count);
+  else end.setFullYear(end.getFullYear() + trial.count);
+  return end;
 }

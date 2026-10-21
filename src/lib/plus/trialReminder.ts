@@ -6,8 +6,8 @@ import {
 import { sendPlusPush } from '@/lib/plus/push';
 import { TRIAL_ENDING_LEAD_MS, trialEndingAt } from '@/lib/plus/trialEnding';
 import { readPlusEarned } from '@/lib/plus/earned';
+import { TRIAL_REMINDER_LEAD_MS } from '@/lib/plusPaywall';
 
-export const TRIAL_REMINDER_LEAD_MS = 48 * 60 * 60 * 1000;
 const QUIET_START_HOUR = 21;
 const QUIET_END_HOUR = 9;
 const LAST_CHANCE_MS = 10 * 60 * 60 * 1000;

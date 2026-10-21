@@ -7,6 +7,7 @@ import { hapticCelebrate } from '@/lib/haptics';
 import { Trophy } from 'lucide-react';
 import { useAutoPopupHold } from '@/lib/popupGate';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
+import { SkipAdsLink } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { Icon } from '@/components/ui/Icon';
@@ -101,6 +102,7 @@ export function StreakCelebration({
     busy: doubling,
     error: doubleError,
     plusModal,
+    skipAds,
   } = useRewardGate('streak_commitment_double', {
     preload: !!claimId && !doubled && baseFlies > 0,
   });
@@ -110,23 +112,25 @@ export function StreakCelebration({
     setDoubled(false);
   }, [baseFlies, claimId]);
 
+  const grantDouble = async () => {
+    const res = await fetch('/api/rewards/double', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claimId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.granted) {
+      throw new Error('Could not double this reward — try again later.');
+    }
+    setDoubled(true);
+    setFlies((current) => current * 2);
+    markFlyEarn();
+    mutateInventoryCaches();
+  };
+
   const handleDouble = () => {
     if (!claimId || doubled || doubling) return;
-    void run(async () => {
-      const res = await fetch('/api/rewards/double', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.granted) {
-        throw new Error('Could not double this reward — try again later.');
-      }
-      setDoubled(true);
-      setFlies((current) => current * 2);
-      markFlyEarn();
-      mutateInventoryCaches();
-    });
+    void run(grantDouble);
   };
 
   return (
@@ -191,6 +195,13 @@ export function StreakCelebration({
                             ? 'Double the flies'
                             : 'Double the flies with Plus'}
                       </button>
+                      {mode === 'ad' && (
+                        <SkipAdsLink
+                          disabled={doubling}
+                          onClick={() => skipAds(grantDouble)}
+                          className="-mt-1"
+                        />
+                      )}
                       {doubleError && (
                         <p className="text-center text-[11px] font-bold text-white/80">
                           {doubleError}

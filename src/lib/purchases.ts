@@ -5,7 +5,7 @@ import { auth } from '@/lib/firebase';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { FLY_PACKS, getFlyPack, type FlyPackId } from '@/lib/flyPacks';
 import { markNegativeMoment } from '@/lib/rateApp';
-import { formatTrialDuration } from '@/lib/plusPaywall';
+import { formatTrialPeriod, parseTrialPeriod, type TrialPeriod } from '@/lib/plusPaywall';
 
 export type PlusPlan = 'yearly' | 'monthly';
 export type PurchaseOutcome = 'purchased' | 'cancelled';
@@ -486,6 +486,7 @@ export type PlusPriceInfo = {
   pricePerMonthString: string | null;
   /** Only populated when the store returns an eligible free introductory offer. */
   trialDuration: string | null;
+  trialPeriod: TrialPeriod | null;
   /** A paid introductory phase can follow a free trial. Checkout shows its terms. */
   hasIntroPrice: boolean;
 };
@@ -532,6 +533,13 @@ export async function getPlusPricing(): Promise<
         INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
       const option = pkg.product.defaultOption;
       const freePhase = option?.freePhase;
+      const trial = Capacitor.getPlatform() === 'ios'
+        ? eligible && intro?.price === 0
+          ? parseTrialPeriod(intro.period, intro.cycles)
+          : null
+        : freePhase
+          ? parseTrialPeriod(freePhase.billingPeriod.iso8601, freePhase.billingCycleCount || 1)
+          : null;
       prices[plan] = {
         priceString: pkg.product.priceString,
         amount: pkg.product.price,
@@ -541,13 +549,8 @@ export async function getPlusPricing(): Promise<
           (typeof pkg.product.pricePerMonth === 'number'
             ? formatMoney(pkg.product.pricePerMonth, pkg.product.currencyCode)
             : null),
-        trialDuration: Capacitor.getPlatform() === 'ios'
-          ? eligible && intro?.price === 0
-            ? formatTrialDuration(intro.period, intro.cycles)
-            : null
-          : freePhase
-            ? formatTrialDuration(freePhase.billingPeriod.iso8601, freePhase.billingCycleCount || 1)
-            : null,
+        trialDuration: formatTrialPeriod(trial),
+        trialPeriod: trial,
         hasIntroPrice: Capacitor.getPlatform() === 'ios'
           ? eligible && !!intro && intro.price > 0
           : !!option?.introPhase,
@@ -567,15 +570,17 @@ export async function getPlusPricing(): Promise<
     const amount = price.amountMicros / 1_000_000;
     // getOfferings returns customer-eligible options, matching purchasePlusWeb.
     const option = pkg.webBillingProduct.defaultSubscriptionOption;
+    const trial = option?.trial
+      ? parseTrialPeriod(option.trial.periodDuration, option.trial.cycleCount || 1)
+      : null;
     prices[plan] = {
       priceString: price.formattedPrice,
       amount,
       currency: price.currency,
       pricePerMonthString:
         plan === 'yearly' ? formatMoney(amount / 12, price.currency) : null,
-      trialDuration: option?.trial
-        ? formatTrialDuration(option.trial.periodDuration, option.trial.cycleCount || 1)
-        : null,
+      trialDuration: formatTrialPeriod(trial),
+      trialPeriod: trial,
       hasIntroPrice: !!option?.introPrice,
     };
   }

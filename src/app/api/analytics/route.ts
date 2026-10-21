@@ -22,6 +22,8 @@ const CLIENT_EVENTS = new Set([
   'paywall_prices_failed',
   'paywall_plan_selected',
   'paywall_compare_viewed',
+  'paywall_step_viewed',
+  'paywall_moment_assigned',
   'paywall_cta_tapped',
   'paywall_account_required',
   'paywall_account_result',
