@@ -48,6 +48,7 @@ import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { DailyDealsShelf } from './DailyDealsShelf';
 import { afterAdPlacement } from '@/lib/plusPaywall';
+import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { ShopGiftPopup, ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
 import { GiftBadge } from '@/components/ui/GiftBadge';
 import { WishlistButton } from './WishlistButton';
@@ -448,9 +449,7 @@ function WardrobeManagerContent({
         { revalidate: false },
       );
       mutateInventoryCaches();
-      if (!isPlus && takePlusOfferAfterAd()) {
-        setTimeout(() => openPlus(afterAdPlacement('shop_reroll')), 1200);
-      }
+      if (!isPlus && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('shop_reroll'));
     } catch {
       if (!isPlus) creditRewardedAd('shop_reroll');
       setNotif({ msg: 'Could not reroll deals.', type: 'error' });

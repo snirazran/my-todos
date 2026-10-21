@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
 import { afterAdPlacement } from '@/lib/plusPaywall';
+import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { useRewardGate } from '@/hooks/useRewardGate';
 import { ItemDef, type Rarity } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
@@ -541,9 +542,7 @@ export const RewardCard = ({
     }
     void run(async () => {
       await onWatchAd();
-      if (canWatchAd && takePlusOfferAfterAd()) {
-        setTimeout(() => openPlus(afterAdPlacement(doublePlacement)), 1600);
-      }
+      if (canWatchAd && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement(doublePlacement));
     });
   };
 

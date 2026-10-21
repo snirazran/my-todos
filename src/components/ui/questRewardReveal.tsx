@@ -7,6 +7,7 @@ import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { FlyGlyph, PlusOfferButton, RewardCard } from './gift-box/RewardCard';
 import { afterAdPlacement } from '@/lib/plusPaywall';
+import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
@@ -640,7 +641,6 @@ const OFFER_ENTER_DELAY_MS = 650;
 function FlyDoubleOffer() {
   const offer = useStore(revealStore, (state) => state.flyOffer);
   const { showNotification } = useNotification();
-  const setPremiumModalOpen = useUIStore((state) => state.setPremiumModalOpen);
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [held, setHeld] = useState(false);
@@ -702,9 +702,7 @@ function FlyDoubleOffer() {
       });
       landFlies(bonus, balanceAfter, panelRef.current);
       setVisible(false);
-      if (takePlusOfferAfterAd()) {
-        window.setTimeout(() => setPremiumModalOpen(true, afterAdPlacement(offer.placement)), 1600);
-      }
+      if (takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement(offer.placement));
     } catch (err) {
       showNotification(
         err instanceof Error && err.message

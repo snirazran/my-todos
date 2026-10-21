@@ -1,10 +1,7 @@
 import { auth } from '@/lib/firebase';
-import { afterItemFlightsLand } from '@/lib/flyFlight';
-import { whenScreenIsFree } from '@/lib/popupGate';
-import { useUIStore } from '@/lib/uiStore';
+import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 
 const DONE_KEY = 'plus.firstGiftPaywall.done';
-const AFTER_LANDING_MS = 600;
 let checking = false;
 
 function doneKey(uid: string) {
@@ -37,12 +34,7 @@ export function queueFirstGiftPaywall() {
       if (!data) return;
       markDone(uid);
       if (!data.show) return;
-      afterItemFlightsLand(() => {
-        whenScreenIsFree(
-          () => useUIStore.getState().setPremiumModalOpen(true, 'first_gift'),
-          { initialDelayMs: AFTER_LANDING_MS },
-        );
-      });
+      queuePlusPaywall('first_gift');
     })
     .catch(() => {})
     .finally(() => {

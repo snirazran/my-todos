@@ -75,6 +75,7 @@ import {
   SkipAdsLink,
 } from '@/components/ui/gift-box/RewardCard';
 import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
+import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useAutoPopupHold } from '@/lib/popupGate';
@@ -855,9 +856,7 @@ export function TradePanel({
         origin: { y: 0.6 },
         colors: ['#FFD700', '#FFA500', '#FF4500'],
       });
-      if (!isPremium && takePlusOfferAfterAd()) {
-        setTimeout(() => openPlusOffer(afterAdPlacement('trade_reroll')), 1600);
-      }
+      if (!isPremium && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('trade_reroll'));
     } finally {
       setRerollBusy(false);
     }

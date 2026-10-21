@@ -24,6 +24,7 @@ import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
 import { PlusOfferButton, RewardCard, SkipAdsLink } from './RewardCard';
 import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
 import { queueFirstGiftPaywall } from '@/lib/plus/firstGiftPaywall';
+import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { pickFunnySentence } from './funnySentences';
 import { useAutoPopupHold } from '@/lib/popupGate';
 
@@ -216,9 +217,7 @@ export default function GiftBoxOpening({
         setPrize(data.prize);
         setPrizeMeta(data.prizeMeta ?? null);
         if (onWin) onWin(data.prize);
-        if (takePlusOfferAfterAd()) {
-          setTimeout(() => openPlusOffer(afterAdPlacement('gift_double')), 1600);
-        }
+        if (takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('gift_double'));
       } else {
         if (!viaPlus) creditRewardedAd('gift_double');
         setAdError(
