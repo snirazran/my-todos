@@ -870,13 +870,13 @@ function Sparkle({ className, delay }: { className: string; delay: string }) {
 
 function FrogBand({ desktop = false }: { desktop?: boolean }) {
   const reduceMotion = useReducedMotion();
-  const settled = useSettled(480);
+  const settled = useSettled(150);
   const [dressed, setDressed] = useState(false);
   const { look, tick } = useShowcaseLook(dressed && !reduceMotion);
   const { shownLook, hop } = useLookHop(look, dressed, !!reduceMotion);
-  const size = desktop ? 300 : 200;
+  const size = desktop ? 354 : 236;
   const height = Math.round(size * 1.125);
-  const lift = desktop ? 63 : 42;
+  const lift = desktop ? 27 : 18;
   const hasHat = look.indices.hat !== 0;
   return (
     <>
@@ -885,8 +885,8 @@ function FrogBand({ desktop = false }: { desktop?: boolean }) {
       <div className={cn(
         'absolute left-1/2 z-20 w-max -translate-x-1/2',
         desktop
-          ? cn('max-w-[80%]', hasHat ? 'bottom-[279px]' : 'bottom-[246px]')
-          : cn('max-w-[min(78%,280px)]', hasHat ? 'bottom-[186px] short:bottom-[130px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[164px]' : 'bottom-[164px] short:bottom-[115px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[144px]'),
+          ? cn('max-w-[80%]', hasHat ? 'bottom-[297px]' : 'bottom-[231px]')
+          : cn('max-w-[min(78%,280px)]', hasHat ? 'bottom-[198px] short:bottom-[139px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[174px]' : 'bottom-[154px] short:bottom-[108px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[136px]'),
       )}>
         <AnimatePresence mode="wait" initial={false}>
           {dressed ? (
@@ -905,9 +905,8 @@ function FrogBand({ desktop = false }: { desktop?: boolean }) {
         </AnimatePresence>
       </div>
       <div className={cn('absolute inset-0 origin-bottom', !desktop && 'short:scale-[0.7] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:scale-[0.88]')}>
-        <span className={cn('absolute left-1/2 rounded-full bg-black/25 blur-[4px] motion-safe:animate-[plus-emblem-shadow_3.6s_ease-in-out_infinite]', desktop ? 'bottom-[29px] -ml-[90px] h-4 w-[180px]' : 'bottom-[19px] -ml-[60px] h-3 w-[120px]')} />
         <div className="absolute inset-0 motion-safe:animate-[plus-frog-float_3.6s_ease-in-out_infinite]">
-          <motion.div animate={hop} className={cn('absolute left-1/2 origin-[50%_77%] transition-opacity duration-300 ease-out', dressed ? 'opacity-100' : 'opacity-0')} style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
+          <motion.div animate={hop} className={cn('absolute left-1/2 origin-[50%_77%] transition-opacity duration-200 ease-out', dressed ? 'opacity-100' : 'opacity-0')} style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
             {settled ? (
               <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
                 paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
@@ -920,8 +919,8 @@ function FrogBand({ desktop = false }: { desktop?: boolean }) {
                 paused={!!reduceMotion}
                 flySize={desktop ? 68 : 52}
                 className={desktop
-                  ? '[--premium-fly-top:12%] [--premium-fly-x-max:112px] [--premium-fly-x-min:-182px] [--premium-fly-y-max:30px] [--premium-fly-y-min:-36px]'
-                  : '[--premium-fly-top:12%] [--premium-fly-x-max:74px] [--premium-fly-x-min:-124px] [--premium-fly-y-max:20px] [--premium-fly-y-min:-24px]'}
+                  ? '[--premium-fly-top:12%] [--premium-fly-x-max:132px] [--premium-fly-x-min:-214px] [--premium-fly-y-max:30px] [--premium-fly-y-min:-36px]'
+                  : '[--premium-fly-top:12%] [--premium-fly-x-max:87px] [--premium-fly-x-min:-146px] [--premium-fly-y-max:20px] [--premium-fly-y-min:-24px]'}
               />
             ) : null}
           </motion.div>
