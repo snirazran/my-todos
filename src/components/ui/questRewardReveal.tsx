@@ -769,7 +769,9 @@ function FlyDoubleOffer() {
             </span>
           </div>
           <SkipAdsLink
+            label="Double it with Plus"
             tone="light"
+            divider={false}
             disabled={busy}
             onClick={() => setPlusOffer(offer)}
             className="mt-2.5"

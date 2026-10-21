@@ -173,43 +173,55 @@ const AD_OFFER_PALETTE = {
 } as const;
 
 export function SkipAdsLink({
+  label,
   onClick,
   disabled,
   tone = 'dark',
+  divider = true,
   className,
 }: {
+  label: string;
   onClick: () => void;
   disabled?: boolean;
   tone?: 'dark' | 'light';
+  divider?: boolean;
   className?: string;
 }) {
   const light = tone === 'light';
   return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      disabled={disabled}
-      aria-label="Get it instantly with Plus. Try it free."
-      className={cn(
-        'group mx-auto flex w-full max-w-[280px] items-center gap-3 rounded-2xl py-2 pl-2 pr-3 text-left ring-1 ring-inset transition-[transform,background-color] duration-150 active:scale-[0.98] disabled:opacity-50',
-        light
-          ? 'bg-white text-slate-900 shadow-[0_6px_16px_-8px_rgba(15,23,42,0.35)] ring-amber-300/80 hover:bg-amber-50'
-          : 'bg-amber-300/10 text-white ring-amber-300/50 hover:bg-amber-300/15',
-        className,
-      )}
-    >
-      <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-300 shadow-[0_2px_0_rgba(146,64,14,0.35)]">
-        <Icon name="frogPlus" className="h-8 w-8" />
-      </span>
-      <span aria-hidden className="min-w-0 flex-1 leading-tight">
-        <span className="block text-[14px] font-black">Get it instantly with Plus</span>
-        <span className={cn('block text-[12px] font-bold', light ? 'text-amber-700' : 'text-amber-200')}>Try it free</span>
-      </span>
-      <ChevronRight aria-hidden className={cn('h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5', light ? 'text-amber-600' : 'text-amber-200')} strokeWidth={2.75} />
-    </button>
+    <div className={cn('mx-auto flex w-full max-w-[280px] flex-col gap-2', className)}>
+      {divider ? (
+        <span aria-hidden className={cn('flex items-center gap-2.5 text-[11px] font-black uppercase tracking-[0.14em]', light ? 'text-white/80' : 'text-white/45')}>
+          <span className={cn('h-px flex-1', light ? 'bg-white/35' : 'bg-white/15')} />
+          or
+          <span className={cn('h-px flex-1', light ? 'bg-white/35' : 'bg-white/15')} />
+        </span>
+      ) : null}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        disabled={disabled}
+        aria-label={`${label}. Instant, try it free.`}
+        className={cn(
+          'group flex w-full items-center gap-3 rounded-2xl py-2 pl-2 pr-3 text-left ring-1 ring-inset transition-[transform,background-color,box-shadow] duration-150 active:translate-y-0.5 disabled:opacity-50',
+          light
+            ? 'bg-white text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_3px_0_rgba(180,83,9,0.35)] ring-amber-300/80 hover:bg-amber-50 active:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_0_rgba(180,83,9,0.35)]'
+            : 'bg-amber-300/[0.12] text-white shadow-[inset_0_1px_0_rgba(253,230,138,0.25),0_3px_0_rgba(0,0,0,0.35)] ring-amber-300/55 hover:bg-amber-300/[0.18] active:shadow-[inset_0_1px_0_rgba(253,230,138,0.25),0_1px_0_rgba(0,0,0,0.35)]',
+        )}
+      >
+        <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-300 shadow-[inset_0_-2px_0_rgba(146,64,14,0.25),0_2px_0_rgba(146,64,14,0.35)]">
+          <Icon name="frogPlus" className="h-8 w-8" />
+        </span>
+        <span aria-hidden className="min-w-0 flex-1 leading-tight">
+          <span className="block text-[15px] font-black">{label}</span>
+          <span className={cn('mt-0.5 block text-[12px] font-bold', light ? 'text-amber-700' : 'text-amber-200')}>Instant · Try it free</span>
+        </span>
+        <ChevronRight aria-hidden className={cn('h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5', light ? 'text-amber-600' : 'text-amber-200')} strokeWidth={2.75} />
+      </button>
+    </div>
   );
 }
 
@@ -780,6 +792,7 @@ export const RewardCard = ({
         )}
         {showDoubleUpsell && canWatchAd && onWatchAd && (
           <SkipAdsLink
+            label="Double it with Plus"
             disabled={watchingAd || isProcessing || !showContent}
             onClick={() => skipAds(async () => { await onWatchAd(); })}
           />
