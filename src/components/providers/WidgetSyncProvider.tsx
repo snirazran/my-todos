@@ -26,6 +26,7 @@ import {
   todayKey,
 } from '@/lib/widget/sync';
 import { WidgetPromptSheet } from '@/components/ui/WidgetPromptSheet';
+import { whenScreenIsFree } from '@/lib/popupGate';
 
 type TasksResponse = {
   tasks?: { id: string; text: string; completed: boolean }[];
@@ -34,6 +35,8 @@ type TasksResponse = {
 type StreakResponse = {
   view?: { count?: number } | null;
 };
+
+const WIDGET_ASK_WAIT_MS = 10 * 60 * 1000;
 
 const cacheFetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -169,21 +172,31 @@ export function WidgetSyncProvider() {
 
   useEffect(() => {
     if (!enabled) return;
+    let cancelWait: (() => void) | null = null;
+    const shouldAsk = () =>
+      shouldAskForWidget({
+        pinState,
+        completedEver: readCompletedEver(),
+        streak,
+      });
     const consider = () => {
-      if (
-        shouldAskForWidget({
-          pinState,
-          completedEver: readCompletedEver(),
-          streak,
-        })
-      ) {
-        setUserInitiated(false);
-        setPromptOpen(true);
-      }
+      if (cancelWait || !shouldAsk()) return;
+      cancelWait = whenScreenIsFree(
+        () => {
+          cancelWait = null;
+          if (!shouldAsk()) return;
+          setUserInitiated(false);
+          setPromptOpen(true);
+        },
+        { dropAfterMs: WIDGET_ASK_WAIT_MS },
+      );
     };
     consider();
     window.addEventListener(TASK_COMPLETED_EVENT, consider);
-    return () => window.removeEventListener(TASK_COMPLETED_EVENT, consider);
+    return () => {
+      window.removeEventListener(TASK_COMPLETED_EVENT, consider);
+      cancelWait?.();
+    };
   }, [enabled, pinState, streak]);
 
   if (!native) return null;

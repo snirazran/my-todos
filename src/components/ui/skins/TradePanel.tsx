@@ -1672,7 +1672,6 @@ export function TradePanel({
                     <SkipAdsLink
                       disabled={rerollBusy}
                       onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
-                      className="-mt-2"
                     />
                   )}
                   {rerollError && (

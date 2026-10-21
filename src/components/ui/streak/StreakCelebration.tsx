@@ -197,9 +197,10 @@ export function StreakCelebration({
                       </button>
                       {mode === 'ad' && (
                         <SkipAdsLink
+                          tone="light"
                           disabled={doubling}
                           onClick={() => skipAds(grantDouble)}
-                          className="-mt-1"
+                          className="max-w-[260px]"
                         />
                       )}
                       {doubleError && (

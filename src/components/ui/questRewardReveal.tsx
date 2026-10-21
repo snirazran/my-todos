@@ -769,9 +769,10 @@ function FlyDoubleOffer() {
             </span>
           </div>
           <SkipAdsLink
+            tone="light"
             disabled={busy}
             onClick={() => setPlusOffer(offer)}
-            className="mt-2.5 w-fit bg-card/95 text-foreground/80 shadow-md ring-1 ring-border/60 backdrop-blur hover:text-foreground"
+            className="mt-2.5"
           />
           <button
             type="button"

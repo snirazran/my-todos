@@ -175,24 +175,40 @@ const AD_OFFER_PALETTE = {
 export function SkipAdsLink({
   onClick,
   disabled,
+  tone = 'dark',
   className,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  tone?: 'dark' | 'light';
   className?: string;
 }) {
+  const light = tone === 'light';
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       disabled={disabled}
+      aria-label="Get it instantly with Plus. Try it free."
       className={cn(
-        'mx-auto flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-[13px] font-bold text-white/80 transition-colors hover:text-white disabled:opacity-50',
+        'group mx-auto flex w-full max-w-[280px] items-center gap-3 rounded-2xl py-2 pl-2 pr-3 text-left ring-1 ring-inset transition-[transform,background-color] duration-150 active:scale-[0.98] disabled:opacity-50',
+        light
+          ? 'bg-white text-slate-900 shadow-[0_6px_16px_-8px_rgba(15,23,42,0.35)] ring-amber-300/80 hover:bg-amber-50'
+          : 'bg-amber-300/10 text-white ring-amber-300/50 hover:bg-amber-300/15',
         className,
       )}
     >
-      <Icon name="frogPlus" label="Plus" className="h-5 w-5 shrink-0" />
-      Skip ads · Try Plus free
+      <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-300 shadow-[0_2px_0_rgba(146,64,14,0.35)]">
+        <Icon name="frogPlus" className="h-8 w-8" />
+      </span>
+      <span aria-hidden className="min-w-0 flex-1 leading-tight">
+        <span className="block text-[14px] font-black">Get it instantly with Plus</span>
+        <span className={cn('block text-[12px] font-bold', light ? 'text-amber-700' : 'text-amber-200')}>Try it free</span>
+      </span>
+      <ChevronRight aria-hidden className={cn('h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5', light ? 'text-amber-600' : 'text-amber-200')} strokeWidth={2.75} />
     </button>
   );
 }
@@ -766,7 +782,6 @@ export const RewardCard = ({
           <SkipAdsLink
             disabled={watchingAd || isProcessing || !showContent}
             onClick={() => skipAds(async () => { await onWatchAd(); })}
-            className="-mt-2"
           />
         )}
         {upsell}

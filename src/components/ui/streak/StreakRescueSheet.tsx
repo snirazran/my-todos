@@ -359,7 +359,6 @@ export function StreakRescueSheet({
                             if (saved) return;
                             skipAds(() => performSave('ad'));
                           }}
-                          className="-mt-1"
                         />
                       )}
                     </div>

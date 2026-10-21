@@ -373,7 +373,6 @@ export default function GiftBoxOpening({
                         <SkipAdsLink
                           disabled={adBusy}
                           onClick={() => openPlusOffer(skipAdsPlacement('gift_double'))}
-                          className="-mt-2"
                         />
                       )}
                       {adError && (
