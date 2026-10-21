@@ -20,6 +20,7 @@ export type PlusStatus = {
     managementUrl: string | null;
     productId: string | null;
   } | null;
+  earned?: { flies: number; rareItems: number };
 };
 
 export type PlusPhase =

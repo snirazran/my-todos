@@ -83,7 +83,10 @@ export function StreakRescueSheet({
     error,
     setError,
     plusModal,
-  } = useRewardGate('streak_rescue', { isPlus: offer?.adsRequired === 0 });
+  } = useRewardGate('streak_rescue', {
+    isPlus: offer?.adsRequired === 0,
+    preload: open,
+  });
 
   useEffect(() => {
     if (!open) return;

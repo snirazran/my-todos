@@ -4,6 +4,8 @@ import {
   type PlusSubscriptionSnapshot,
 } from '@/lib/revenuecat';
 import { sendPlusPush } from '@/lib/plus/push';
+import { TRIAL_ENDING_LEAD_MS, trialEndingAt } from '@/lib/plus/trialEnding';
+import { readPlusEarned } from '@/lib/plus/earned';
 
 export const TRIAL_REMINDER_LEAD_MS = 48 * 60 * 60 * 1000;
 const QUIET_START_HOUR = 21;
@@ -41,6 +43,33 @@ function dateIn(iso: string, tz: string) {
   } catch {
     return new Date(iso).toDateString();
   }
+}
+
+function dayKeyIn(date: Date, tz: string) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+const EARNED_FLIES_WORTH_NAMING = 10;
+
+function endingBody(rawEarned: unknown) {
+  const { flies, rareItems } = readPlusEarned(rawEarned);
+  const parts = [
+    flies >= EARNED_FLIES_WORTH_NAMING ? `${flies.toLocaleString('en-US')} extra flies` : null,
+    rareItems > 0 ? `${rareItems} rare+ ${rareItems === 1 ? 'outfit' : 'outfits'}` : null,
+  ].filter(Boolean);
+  if (!parts.length) {
+    return 'Double flies and your free monthly Lily Pad switch off. Tap to keep them.';
+  }
+  return `Plus got you ${parts.join(' and ')} so far. Tap to keep it going.`;
 }
 
 function isDue(sub: PlusSubscriptionSnapshot | undefined, now: number) {
@@ -91,6 +120,57 @@ export async function runPlusTrialReminders() {
     await UserModel.updateOne(
       { _id: user._id },
       { $set: { 'plusSubscription.trialReminderFor': sub.expiresAt } },
+    );
+    sent += 1;
+  }
+  return { scanned: candidates.length, sent };
+}
+
+export async function runPlusTrialEndingReminders() {
+  const now = Date.now();
+  const candidates = await UserModel.find({
+    'plusSubscription.periodType': 'trial',
+    'plusSubscription.willRenew': false,
+    'plusSubscription.expiresAt': {
+      $gt: new Date(now).toISOString(),
+      $lte: new Date(now + TRIAL_ENDING_LEAD_MS).toISOString(),
+    },
+  })
+    .select('_id plusSubscription notificationPrefs.timezone')
+    .lean<Candidate[]>();
+
+  let sent = 0;
+  for (const user of candidates) {
+    const due = trialEndingAt(user.plusSubscription, now);
+    if (!due || user.plusSubscription?.trialEndingFor === due) continue;
+    const tz = user.notificationPrefs?.timezone || 'UTC';
+    const hour = hourIn(tz);
+    if (hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR) continue;
+
+    try {
+      await syncPremiumFromRevenueCat(user._id);
+    } catch (err) {
+      console.error('Plus trial ending refresh failed:', err);
+    }
+    const fresh = await UserModel.findById(user._id)
+      .select('plusSubscription plusEarned')
+      .lean<{ plusSubscription?: PlusSubscriptionSnapshot; plusEarned?: unknown } | null>();
+    const endsAt = trialEndingAt(fresh?.plusSubscription, now);
+    if (!endsAt || fresh?.plusSubscription?.trialEndingFor === endsAt) continue;
+
+    const when =
+      dayKeyIn(new Date(endsAt), tz) === dayKeyIn(new Date(now), tz)
+        ? 'today'
+        : 'tomorrow';
+    await sendPlusPush(user._id, {
+      type: 'plus_trial_ending',
+      path: '/?plus=ending',
+      title: `Your Plus ends ${when}`,
+      body: endingBody(fresh?.plusEarned),
+    });
+    await UserModel.updateOne(
+      { _id: user._id },
+      { $set: { 'plusSubscription.trialEndingFor': endsAt } },
     );
     sent += 1;
   }

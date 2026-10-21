@@ -22,6 +22,7 @@ import {
 } from '@/lib/attribution/classify';
 import { loadSpend, type SpendRow } from '@/lib/attribution/spend';
 import type { SpendLevel } from '@/lib/attribution/spendImport';
+import { PASSIVE_ANALYTICS_EVENT_SET } from '@/lib/analytics/events';
 import { addUtcDays, kpi, round, startOfUtcDay, ymd, type ReportContext } from './context';
 
 const COHORT_LIMIT = 50_000;
@@ -370,7 +371,9 @@ export async function buildAcquisition(
     outcome.paid += row.paid;
     outcome.revenue += row.revenue;
     const last = ymd(new Date(row.last));
-    if (!outcome.lastSeen || last > outcome.lastSeen) outcome.lastSeen = last;
+    if (!PASSIVE_ANALYTICS_EVENT_SET.has(row._id.name) && (!outcome.lastSeen || last > outcome.lastSeen)) {
+      outcome.lastSeen = last;
+    }
     outcomes.set(userId, outcome);
   }
 

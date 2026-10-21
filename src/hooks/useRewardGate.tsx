@@ -15,11 +15,12 @@ export type RewardGateMode = 'free' | 'ad' | 'plus';
 type Options = {
   isPlus?: boolean;
   adFailedMessage?: string;
+  preload?: boolean;
 };
 
 export function useRewardGate(
   placement: string,
-  { isPlus = false, adFailedMessage }: Options = {},
+  { isPlus = false, adFailedMessage, preload = true }: Options = {},
 ) {
   const [plusOpen, setPlusOpen] = useState(false);
   const [pending, setPending] = useState<{ run: () => Promise<void> } | null>(
@@ -34,7 +35,7 @@ export function useRewardGate(
       ? 'ad'
       : 'plus';
 
-  useRewardedAdPreload(placement, mode === 'ad');
+  useRewardedAdPreload(placement, mode === 'ad' && preload);
 
   const execute = useCallback(async (action: () => Promise<void>) => {
     setBusy(true);

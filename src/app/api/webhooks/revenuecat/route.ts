@@ -16,6 +16,7 @@ function revenueCatEventName(event: any): AnalyticsEventName | null {
     case 'INITIAL_PURCHASE': return 'subscription_started';
     case 'RENEWAL': return 'subscription_renewed';
     case 'CANCELLATION': return 'subscription_cancelled';
+    case 'UNCANCELLATION': return 'subscription_uncancelled';
     case 'EXPIRATION': return 'subscription_expired';
     case 'BILLING_ISSUE': return 'subscription_billing_issue';
     case 'PRODUCT_CHANGE': return 'subscription_product_changed';

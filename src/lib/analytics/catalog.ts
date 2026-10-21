@@ -206,7 +206,7 @@ export const METRICS: MetricDefinition[] = [
     system: 'growth',
     unit: 'users',
     format: 'integer',
-    definition: 'Signed-in accounts that fired at least one event in the range.',
+    definition: 'Signed-in accounts that did something in the app in the range (pushes, renewals and other background events do not count).',
     why: 'The honest size of the audience for the range you picked.',
     direction: 'up',
   }),

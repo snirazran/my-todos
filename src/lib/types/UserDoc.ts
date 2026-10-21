@@ -170,6 +170,7 @@ export type UserDoc = {
   tags?: UserTag[];
   premiumUntil?: Date;
   plusSubscription?: Record<string, unknown>;
+  plusEarned?: Record<string, unknown>;
   adDoubleClaim?: {
     id: string;
     fliesGranted: number;

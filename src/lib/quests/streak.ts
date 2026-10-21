@@ -24,6 +24,7 @@ import {
   setShieldStateOn,
 } from '@/lib/shields/engine';
 import { isPremiumUser, syncQuestState } from './engine';
+import { plusFlyBonus, recordPlusEarned } from '@/lib/plus/earned';
 import type { DailyQuestProgressView, QuestReward } from './types';
 
 export type SweepRollTier = 'standard' | 'golden';
@@ -262,6 +263,11 @@ export async function syncDailySweep(args: {
         ...(flies > 0 ? { $inc: { 'wardrobe.flies': flies } } : {}),
       },
     );
+    if (advanced.modifiedCount === 1) {
+      await recordPlusEarned((user as any)._id, {
+        flies: plusFlyBonus(flies, isPremiumUser(user) ? 2 : 1),
+      });
+    }
     if (advanced.modifiedCount === 0) {
       const fresh = await UserModel.findById((user as any)._id)
         .select('quests')

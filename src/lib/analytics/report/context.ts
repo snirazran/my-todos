@@ -5,6 +5,7 @@ import {
 } from '@/lib/analytics/statsExclusion';
 import UserModel from '@/lib/models/User';
 import type { StatKpi } from '@/lib/analytics/catalog';
+import { PASSIVE_ANALYTICS_EVENTS } from '@/lib/analytics/events';
 
 export const ANONYMOUS_PREFIX = 'anonymous:';
 
@@ -106,6 +107,7 @@ type TotalRow = { _id: string; count: number; users: string[]; lastAt: Date };
 export async function buildContext(range: DateRange): Promise<ReportContext> {
   const window = { $gte: range.start, $lt: range.endExclusive };
   const notAnonymous = { userId: { $not: new RegExp(`^${ANONYMOUS_PREFIX}`) } };
+  const activity = { name: { $nin: PASSIVE_ANALYTICS_EVENTS } };
   const rollingStart = addUtcDays(range.endDay, -29);
 
   const [
@@ -142,7 +144,7 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
         },
       ]),
       AnalyticsEventModel.aggregate<DayUserRow>([
-        { $match: { occurredAt: window, ...notAnonymous } },
+        { $match: { occurredAt: window, ...notAnonymous, ...activity } },
         {
           $group: {
             _id: { $dateToString: { date: '$occurredAt', format: '%Y-%m-%d', timezone: 'UTC' } },
@@ -171,7 +173,7 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
         occurredAt: Date;
       } | null>(),
       AnalyticsEventModel.aggregate<{ _id: string; users: string[] }>([
-        { $match: { occurredAt: { $gte: rollingStart, $lt: range.endExclusive }, ...notAnonymous } },
+        { $match: { occurredAt: { $gte: rollingStart, $lt: range.endExclusive }, ...notAnonymous, ...activity } },
         {
           $group: {
             _id: { $dateToString: { date: '$occurredAt', format: '%Y-%m-%d', timezone: 'UTC' } },
@@ -180,7 +182,7 @@ export async function buildContext(range: DateRange): Promise<ReportContext> {
         },
       ]),
       AnalyticsEventModel.aggregate<{ count: number }>([
-        { $match: { occurredAt: window, ...notAnonymous } },
+        { $match: { occurredAt: window, ...notAnonymous, ...activity } },
         { $group: { _id: null, users: { $addToSet: '$userId' } } },
         { $project: { count: { $size: '$users' } } },
       ]),

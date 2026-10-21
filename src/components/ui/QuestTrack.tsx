@@ -29,12 +29,14 @@ export function QuestTrack({
   action,
   entrance = false,
   notch,
+  size = 'md',
 }: {
   progress: number;
   target: number;
   action?: QuestTrackAction | null;
   entrance?: boolean;
   notch?: number;
+  size?: 'md' | 'lg';
 }) {
   const reduceMotion = useReducedMotion();
   const safeTarget = Math.max(1, target);
@@ -215,6 +217,9 @@ export function QuestTrack({
     notch !== undefined && notch > 0 && notch < safeTarget
       ? (notch / safeTarget) * 100
       : null;
+  const large = size === 'lg';
+  const countLabel = `${hasAction ? safeTarget : clamped} / ${safeTarget}`;
+  const fillTransition = `transform ${fillPct >= 100 ? FILL_MS : STEP_MS}ms cubic-bezier(0.45,0.05,0.2,1)`;
 
   useLayoutEffect(() => {
     const next = showBar ? fillPct : 100;
@@ -234,8 +239,18 @@ export function QuestTrack({
           aria-valuemin={0}
           aria-valuemax={safeTarget}
           aria-valuenow={hasAction ? safeTarget : clamped}
-          className="relative flex h-2.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)]"
+          className={`relative flex flex-1 overflow-hidden rounded-full bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)] ${
+            large ? 'h-[22px]' : 'h-2.5'
+          }`}
         >
+          {large && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center justify-center text-[11.5px] font-black tabular-nums text-foreground/55"
+            >
+              {countLabel}
+            </span>
+          )}
           {notchPct !== null && (
             <span
               aria-hidden="true"
@@ -258,6 +273,18 @@ export function QuestTrack({
               }`}
             />
             <span className="absolute inset-x-[3px] top-px h-[35%] rounded-full bg-white/50" />
+            {large && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center text-[11.5px] font-black tabular-nums text-amber-950/80 will-change-transform"
+                style={{
+                  transform: `translate3d(${100 - fillPct}%, 0, 0)`,
+                  transition: fillTransition,
+                }}
+              >
+                {countLabel}
+              </span>
+            )}
             <span
               ref={shineRef}
               className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-0"
@@ -307,7 +334,7 @@ export function QuestTrack({
           </span>
         </span>
       )}
-      {safeTarget > 1 && showBar && !hasAction && (
+      {!large && safeTarget > 1 && showBar && !hasAction && (
         <span
           className={`shrink-0 text-[11px] font-black tabular-nums transition-colors duration-200 ${
             charged ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'

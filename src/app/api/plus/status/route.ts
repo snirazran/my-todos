@@ -8,10 +8,12 @@ import {
   refreshPlusSnapshot,
   type PlusSubscriptionSnapshot,
 } from '@/lib/revenuecat';
+import { readPlusEarned } from '@/lib/plus/earned';
 
 type LeanUser = {
   premiumUntil?: Date | null;
   plusSubscription?: PlusSubscriptionSnapshot | null;
+  plusEarned?: unknown;
 };
 
 export async function GET() {
@@ -30,9 +32,10 @@ export async function GET() {
 
   await connectMongo();
   const user = await UserModel.findById(userId)
-    .select('premiumUntil plusSubscription')
+    .select('premiumUntil plusSubscription plusEarned')
     .lean<LeanUser | null>();
   const premiumUntil = user?.premiumUntil ? new Date(user.premiumUntil) : null;
+  const earned = readPlusEarned(user?.plusEarned);
   const snapshot = user?.plusSubscription ?? null;
   const storeUntil = snapshot?.expiresAt ? new Date(snapshot.expiresAt) : null;
   const isPremium =
@@ -62,6 +65,7 @@ export async function GET() {
             productId: snapshot.productId,
           }
         : null,
+      earned: { flies: earned.flies, rareItems: earned.rareItems },
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

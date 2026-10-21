@@ -24,7 +24,6 @@ import {
 } from '@/lib/flyFlight';
 import {
   creditRewardedAd,
-  preloadRewardedAd,
   rewardedAdFailureMessage,
   rewardedAdsAvailable,
   showRewardedAd,
@@ -38,6 +37,7 @@ import { maybeRequestAppRating, type RatingMoment } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
 import { useAutoPopupHold } from '@/lib/popupGate';
+import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { cn } from '@/lib/utils';
 
 export type QuestRewardSummary = {
@@ -302,7 +302,6 @@ export function presentFlyReward({
   if (granted <= 0) return;
   landFlies(granted, balanceAfter, source);
   if (double && rewardedAdsAvailable()) {
-    void preloadRewardedAd(placement);
     revealStore.setState({
       flyOffer: {
         id: ++flyOfferCounter,
@@ -646,6 +645,8 @@ function FlyDoubleOffer() {
   const [held, setHeld] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const remainingRef = useRef(OFFER_MS);
+
+  useRewardedAdPreload(offer?.placement ?? 'double_reward', visible && !!offer);
 
   const revealBusy = useStore(
     revealStore,

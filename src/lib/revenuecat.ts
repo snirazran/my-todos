@@ -1,5 +1,6 @@
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
+import { resetPlusEarned } from '@/lib/plus/earned';
 
 const RC_API_BASE = 'https://api.revenuecat.com/v1';
 const PLUS_ENTITLEMENT_ID = 'plus';
@@ -21,10 +22,12 @@ export type PlusSubscriptionSnapshot = {
   startedAt: string | null;
   willRenew: boolean;
   billingIssue: boolean;
+  cancelledAt: string | null;
   managementUrl: string | null;
   sandbox: boolean;
   syncedAt: string;
   trialReminderFor?: string | null;
+  trialEndingFor?: string | null;
 };
 
 function normalizeStore(raw: unknown): PlusStore {
@@ -72,6 +75,7 @@ function snapshotFrom(subscriber: any): PlusSubscriptionSnapshot | null {
       store !== 'promotional' &&
       !subscription?.unsubscribe_detected_at,
     billingIssue: !!subscription?.billing_issues_detected_at,
+    cancelledAt: subscription?.unsubscribe_detected_at ?? null,
     managementUrl:
       typeof subscriber?.management_url === 'string'
         ? subscriber.management_url
@@ -120,6 +124,7 @@ export async function refreshPlusSnapshot(appUserId: string) {
   const next = {
     ...snapshot,
     trialReminderFor: existing?.plusSubscription?.trialReminderFor ?? null,
+    trialEndingFor: existing?.plusSubscription?.trialEndingFor ?? null,
   };
   await UserModel.updateOne(
     { _id: appUserId },
@@ -140,15 +145,19 @@ export async function syncPremiumFromRevenueCat(
     .lean<{ plusSubscription?: PlusSubscriptionSnapshot } | null>();
   const trialReminderFor =
     existing?.plusSubscription?.trialReminderFor ?? null;
+  const trialEndingFor = existing?.plusSubscription?.trialEndingFor ?? null;
 
   await UserModel.updateOne(
     { _id: appUserId },
     {
       $set: {
         premiumUntil,
-        plusSubscription: { ...snapshot, trialReminderFor },
+        plusSubscription: { ...snapshot, trialReminderFor, trialEndingFor },
       },
     },
   );
+  if (snapshot.startedAt && snapshot.store !== 'promotional') {
+    await resetPlusEarned(appUserId, snapshot.startedAt);
+  }
   return premiumUntil;
 }

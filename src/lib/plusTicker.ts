@@ -16,8 +16,11 @@ export function startPlusTicker() {
     g.plusTickerRunning = true;
     try {
       await connectMongo();
-      const { runPlusTrialReminders } = await import('@/lib/plus/trialReminder');
+      const { runPlusTrialReminders, runPlusTrialEndingReminders } = await import(
+        '@/lib/plus/trialReminder'
+      );
       await runPlusTrialReminders();
+      await runPlusTrialEndingReminders();
     } catch (err) {
       console.error('Plus ticker failed:', err);
     } finally {

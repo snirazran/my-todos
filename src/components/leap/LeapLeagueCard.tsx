@@ -4,8 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Clock, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { FlyAmount } from '@/components/ui/FlyAmount';
-import { QUEST_CARD_CLASS, QuestSectionHeader } from '@/components/ui/QuestCards';
-import { HintButton, QuestRewardTileBadge } from '@/lib/questClaims';
+import {
+  QUEST_CARD_CLASS,
+  QuestGoButton,
+  QuestSectionHeader,
+} from '@/components/ui/QuestCards';
+import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { openShieldSheet } from '@/hooks/useShields';
 import { useUIStore } from '@/lib/uiStore';
 import { tileRewards } from '@/lib/leap/format';
@@ -21,7 +25,6 @@ import {
   leapCompeting,
   leapDaysLeft,
   leapHasHabits,
-  leapHint,
   leapRepeating,
   leapRule,
   leapStatus,
@@ -218,14 +221,7 @@ export function LeapLeagueCard() {
             )}
           </div>
           {repeating && !landed && (
-            <span className="-mr-1.5 shrink-0 self-center">
-              <HintButton
-                iconOnly
-                placement="top"
-                text={leapHint(view)}
-                onShowMe={() => startHintGuide('take-leap')}
-              />
-            </span>
+            <QuestGoButton onPress={() => startHintGuide('take-leap')} />
           )}
         </div>
         <PlusRow view={view} />

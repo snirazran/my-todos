@@ -11,6 +11,8 @@ import connectMongo from '@/lib/mongoose';
 import { MAX_HUNGER_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
 import { normalizeWeekStart } from '@/lib/weekStart';
+import { trialEndingAt } from '@/lib/plus/trialEnding';
+import type { PlusSubscriptionSnapshot } from '@/lib/revenuecat';
 import { v4 as uuid } from 'uuid';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
     await connectMongo();
     
     const user = await UserModel.findById(uid)
-      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken name frogName birthday onboardingCompleted weekStartsOn')
+      .select('createdAt premiumUntil plusSubscription calendarSyncEnabled calendarAccessToken name frogName birthday onboardingCompleted weekStartsOn')
       .lean();
 
     if (!user) {
@@ -53,6 +55,9 @@ export async function GET(req: NextRequest) {
       createdAt: user.createdAt.toISOString(),
       premiumUntil: user.premiumUntil,
       isPremium,
+      plusTrialEndsAt: trialEndingAt(
+        user.plusSubscription as PlusSubscriptionSnapshot | undefined,
+      ),
       calendarSyncEnabled: user.calendarSyncEnabled || false,
       hasCalendarToken: !!user.calendarAccessToken,
       name: user.name ?? null,

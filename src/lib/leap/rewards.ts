@@ -10,6 +10,7 @@ import {
 } from '@/lib/shields/engine';
 import { settleFlyGrant } from '@/lib/economy/ledger';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { countRareOutfits, plusFlyBonus, recordPlusEarned } from '@/lib/plus/earned';
 import type {
   BonusRarity,
   BonusRewards,
@@ -153,6 +154,9 @@ export async function applyBonusRewards(args: {
   }
 
   user.markModified('wardrobe');
+  await recordPlusEarned(user._id, {
+    flies: plusFlyBonus(summary.fliesGranted, plusMultiplier),
+  });
   return summary;
 }
 
@@ -196,6 +200,7 @@ export async function grantLeapRewards(args: {
   isPremium: boolean;
   flyMultiplier: number;
   meta?: Record<string, unknown>;
+  plusOnly?: boolean;
 }): Promise<LeapGrantSummary> {
   const { userId, rewards, isPremium } = args;
   const summary = emptyGrant();
@@ -311,5 +316,9 @@ export async function grantLeapRewards(args: {
     }
   }
 
+  await recordPlusEarned(userId, {
+    flies: args.plusOnly ? flies : isPremium ? plusFlyBonus(flies, 2) : 0,
+    rareItems: args.plusOnly ? await countRareOutfits(summary.grantedItemIds) : 0,
+  });
   return summary;
 }

@@ -23,6 +23,7 @@ import {
   setShieldStateOn,
 } from '@/lib/shields/engine';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { countRareOutfits, recordPlusEarned } from '@/lib/plus/earned';
 import type { QuestRewards, SeasonLane } from '@/lib/quests/types';
 
 export async function POST(req: NextRequest) {
@@ -131,13 +132,15 @@ export async function POST(req: NextRequest) {
     }
 
     const rewards: QuestRewards = [];
+    const plusRewards: QuestRewards = [];
     const rewardByTier = new Map(rewardsByTier.map((e) => [e.tier, e]));
     for (const entry of takeFree) {
       rewards.push(...(rewardByTier.get(entry)?.freeRewards ?? []));
     }
     for (const entry of takePlus) {
-      rewards.push(...(rewardByTier.get(entry)?.premiumRewards ?? []));
+      plusRewards.push(...(rewardByTier.get(entry)?.premiumRewards ?? []));
     }
+    rewards.push(...plusRewards);
 
     const rewardSummary = grantRewardsToUser(user, rewards);
 
@@ -177,6 +180,13 @@ export async function POST(req: NextRequest) {
     user.markModified('quests');
     user.markModified('wardrobe');
     await user.save();
+    if (plusRewards.length) {
+      const plusShare = grantRewardsToUser({}, plusRewards);
+      await recordPlusEarned(userId, {
+        flies: plusShare.fliesGranted,
+        rareItems: await countRareOutfits(plusShare.grantedItemIds),
+      });
+    }
 
     await recordAnalyticsEvent({
       userId,

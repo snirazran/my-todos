@@ -8,7 +8,6 @@ import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
 import {
-  CalendarDays,
   Check,
   ChevronRight,
   Clock,
@@ -33,6 +32,8 @@ import {
   JourneyCard,
   MoveToWebCard,
   QUEST_CARD_CLASS,
+  QUEST_ROW_CARD,
+  QuestGoButton,
   QuestSectionHeader,
   RewardTile,
   SideQuestsCard,
@@ -60,6 +61,8 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
 import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
+import { QuestTrack } from './QuestTrack';
+import { StatusDock, statusDockRowClass } from '@/components/home/StatusDock';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -206,59 +209,21 @@ function DailyQuestsLockedCard({
 }) {
   const safeTotal = Math.max(1, targetSteps);
   const shown = Math.max(0, Math.min(completedSteps, safeTotal));
-  const pct = Math.min(100, (shown / safeTotal) * 100);
   const remaining = Math.max(0, safeTotal - shown);
   return (
     <div>
-      <div className="flex items-center gap-1.5 px-1 pb-2 text-[13px] font-black text-muted-foreground">
-        <CalendarDays className="h-3.5 w-3.5 text-primary" strokeWidth={2.75} />
-        Daily quests
-      </div>
-      <div className="relative overflow-hidden rounded-[24px] border border-primary/20 bg-card shadow-sm">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent" />
-        <div className="relative px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-600 shadow-sm shadow-emerald-900/10 dark:from-emerald-900/40 dark:to-emerald-950/40 dark:text-emerald-400">
-              <Lock className="h-5 w-5" strokeWidth={2.75} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-black leading-snug text-foreground">
-                {remaining === 1
-                  ? 'One step from daily quests'
-                  : 'Finish your starter quests'}
-              </p>
-              <div className="relative mt-2 h-5 overflow-hidden rounded-full bg-muted">
-                <div className="absolute inset-[3px]">
-                  <div
-                    className="relative h-full min-w-8 overflow-hidden rounded-full bg-amber-400 transition-all duration-500"
-                    style={{ width: pct > 0 ? `${pct}%` : '2rem' }}
-                  >
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
-                    />
-                  </div>
-                </div>
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
-                  {shown}
-                  {' / '}
-                  {safeTotal}
-                </span>
-                <span
-                  aria-hidden
-                  className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-amber-950/80"
-                  style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
-                >
-                  {shown}
-                  {' / '}
-                  {safeTotal}
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] font-bold leading-snug text-muted-foreground">
-                Then new quests land every morning
-              </p>
-            </div>
-          </div>
+      <QuestSectionHeader title="Daily quests" count="Locked" />
+      <div className={cn(QUEST_ROW_CARD, 'flex items-center gap-3 py-3 pl-3 pr-3.5')}>
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/[0.12] text-primary">
+          <Lock className="h-5 w-5" strokeWidth={2.75} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <span className="text-[15px] font-bold leading-tight text-foreground">
+            {remaining === 1
+              ? 'One step from daily quests'
+              : 'Finish your starter quests'}
+          </span>
+          <QuestTrack progress={shown} target={safeTotal} size="lg" />
         </div>
       </div>
     </div>
@@ -641,15 +606,13 @@ export function QuestsPanel({
                               season={data.activeSeason}
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
-                              flush
                               onView={() => setOpenSeasonKind('active')}
                             />
                           )}
                           <div
                             className={cn(
-                              'mx-auto flex w-full max-w-3xl flex-col gap-7',
-                              data.activeSeason &&
-                                'relative z-10 -mt-8 rounded-t-[24px] bg-background px-3 pt-6 md:mt-8 md:rounded-none md:px-6 md:pt-0',
+                              'mx-auto flex w-full max-w-3xl flex-col gap-7 md:gap-9',
+                              data.activeSeason && 'px-3 pt-7 md:px-6 md:pt-10',
                             )}
                           >
                             {!data.activeSeason && (
@@ -874,13 +837,11 @@ function QuestSeasonBanner({
   season,
   rewardCatalog,
   isPremium,
-  flush = false,
   onView,
 }: {
   season: QuestSeasonView;
   rewardCatalog: Record<string, ItemDef>;
   isPremium: boolean;
-  flush?: boolean;
   onView: () => void;
 }) {
   const timeLeft = useSeasonCountdown(season.endsAt);
@@ -890,21 +851,11 @@ function QuestSeasonBanner({
     focusEntry?.freeRewards?.[0] ?? focusEntry?.premiumRewards?.[0];
   const seasonComplete =
     season.tier >= season.tierCount && season.claimableCount === 0;
-  const stepsLeftToday = Math.max(
-    0,
-    season.maxStepsPerDay - season.stepsToday,
-  );
+  const goal = Math.max(1, season.dailyTaskGoal);
 
   return (
-    <div
-      className={cn(
-        'relative overflow-hidden bg-card shadow-sm',
-        flush
-          ? 'rounded-none border-0 border-b border-border/50'
-          : 'rounded-[28px] border border-border/50',
-      )}
-    >
-      <div className={cn('relative overflow-hidden', flush ? 'h-[430px] md:h-[360px]' : 'h-[390px]')}>
+    <section className="relative">
+      <div className="relative h-[372px] overflow-hidden md:h-[340px]">
         {hasSeasonCover(season.images) ? (
           <SeasonCoverImage
             images={season.images}
@@ -914,9 +865,8 @@ function QuestSeasonBanner({
         ) : (
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
-        {/* Same recessed inset feel as the home background photo. */}
-        <div className="pointer-events-none absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
-        <div className="absolute inset-x-0 top-16 flex justify-center p-4 md:top-[4.5rem]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_88%)]" />
+        <div className="absolute inset-x-0 top-[calc(3rem+env(safe-area-inset-top))] flex justify-center p-4 md:top-[4.5rem]">
           <div className="flex flex-col items-center gap-3 md:gap-2">
             <span
               className="inline-flex items-center gap-1.5 text-base leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)] sm:text-lg md:text-xl"
@@ -952,86 +902,92 @@ function QuestSeasonBanner({
             </h2>
           </div>
         </div>
+      </div>
 
-        <div className="absolute inset-x-3 bottom-14 z-10 mx-auto flex max-w-xl items-center gap-1.5 rounded-[24px] bg-background p-3 shadow-lg sm:gap-3">
-          {seasonComplete ? (
-            <>
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#447d3f] text-white shadow-md">
-                <Check className="h-8 w-8" strokeWidth={4} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-black leading-tight text-foreground">
-                  Season complete!
-                  <br />
-                  All {season.tierCount} tiers claimed
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* The count badge overhangs the tile's corner, so the copy needs
-                  clearance the container's own gap doesn't give it. */}
-              <div className="relative mr-2.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted/60 sm:mr-3 sm:h-20 sm:w-20">
-                {previewReward ? (
-                  <SeasonRewardPreview
-                    reward={previewReward}
-                    rewardCatalog={rewardCatalog}
-                    isPremium={isPremium}
-                    showRays
-                  />
-                ) : (
-                  <Gift className="h-8 w-8 text-muted-foreground" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="whitespace-nowrap font-black text-foreground text-[clamp(0.75rem,calc(5vw_-_0.25rem),1.125rem)] sm:whitespace-normal">
-                  {season.claimableCount > 0
-                    ? `Tier ${focusTier} unlocked!`
-                    : `Tier ${season.tier} of ${season.tierCount}`}
-                </p>
-                <SeasonStepBar season={season} className="mt-2 h-8 sm:mt-3" />
-                <p className="mt-1 hidden text-[11px] font-bold leading-none text-muted-foreground sm:block">
-                  {stepsLeftToday > 0
-                    ? `${season.tasksPerStep} tasks = 1 step · ${stepsLeftToday} left today`
-                    : 'Both steps banked — back tomorrow'}
-                </p>
-              </div>
-            </>
-          )}
-          <div className="relative w-[4.75rem] shrink-0 sm:w-[7.5rem]">
-            <span className={cn('block', season.claimable && 'claim-wobble')}>
-              <button
-                type="button"
-                onClick={onView}
-                aria-label={season.claimable ? 'Claim season rewards' : 'See season rewards'}
-                className={cn(
-                  'relative flex h-[60px] w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl text-white transition active:translate-y-1 active:shadow-none sm:h-[68px]',
-                  season.claimable
-                    ? 'bg-gradient-to-b from-amber-400 to-amber-500 shadow-[0_5px_0_#b45309]'
-                    : 'bg-gradient-to-b from-[#4f9149] to-[#447d3f] shadow-[0_5px_0_#2c511a]',
-                )}
-              >
-                <span
-                  aria-hidden
-                  className="animate-promo-shine pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/45 to-transparent"
+      <div className="relative z-10 -mt-[68px] px-3 md:-mt-14 md:px-6">
+        <StatusDock>
+          <div
+            data-dock-row
+            role="button"
+            tabIndex={0}
+            aria-label={
+              season.claimable ? 'Claim season rewards' : 'See season rewards'
+            }
+            onClick={onView}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              onView();
+            }}
+            className={cn(
+              statusDockRowClass(season.claimable ? 'ready' : 'idle'),
+              'rounded-[19px] border-t-0 py-3 md:flex-1 md:rounded-[19px] md:border-l-0',
+            )}
+          >
+            <span className="relative h-12 w-12 shrink-0">
+              {seasonComplete ? (
+                <span className="grid h-full w-full place-items-center rounded-2xl bg-[#447d3f] text-white">
+                  <Check className="h-6 w-6" strokeWidth={4} />
+                </span>
+              ) : previewReward ? (
+                <SeasonRewardPreview
+                  reward={previewReward}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={isPremium}
+                  showRays
+                  className="[&>div:first-child]:bg-muted/60"
                 />
-                <span className="gift-badge-wiggle relative inline-flex">
-                  <Gift className="h-6 w-6 drop-shadow-[0_1px_0_rgba(0,0,0,0.2)] sm:h-7 sm:w-7" strokeWidth={2.5} />
+              ) : (
+                <span className="grid h-full w-full place-items-center rounded-2xl bg-muted/60">
+                  <Gift className="h-6 w-6 text-muted-foreground" />
                 </span>
-                <span className="relative text-[12.5px] font-black leading-none drop-shadow-[0_1px_0_rgba(0,0,0,0.2)] sm:text-sm">
-                  {season.claimable ? 'Claim' : 'Rewards'}
-                </span>
-              </button>
+              )}
             </span>
-            {season.claimable && season.claimableCount > 0 && (
-              <span className="pointer-events-none absolute -right-1.5 -top-1.5 z-10 grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-black tabular-nums leading-none text-white ring-2 ring-background">
-                {season.claimableCount}
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-bold leading-tight text-foreground">
+                {season.claimable && (
+                  <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white">
+                    <Check className="h-2.5 w-2.5" strokeWidth={4} />
+                  </span>
+                )}
+                <span className="min-w-0 truncate">
+                  {seasonComplete
+                    ? 'Season complete!'
+                    : season.claimableCount > 0
+                      ? `Tier ${focusTier} unlocked!`
+                      : `Tier ${season.tier} of ${season.tierCount}`}
+                </span>
               </span>
+              {seasonComplete ? (
+                <span className="text-[12.5px] font-semibold text-muted-foreground">
+                  All {season.tierCount} tiers claimed
+                </span>
+              ) : (
+                <QuestTrack
+                  progress={Math.min(season.tasksToday, goal)}
+                  target={goal}
+                  size="lg"
+                  action={
+                    season.claimable
+                      ? {
+                          label:
+                            season.claimableCount > 1
+                              ? `Claim ${season.claimableCount}`
+                              : 'Claim',
+                          onPress: onView,
+                        }
+                      : null
+                  }
+                />
+              )}
+            </div>
+            {!season.claimable && (
+              <QuestGoButton onPress={onView} label="See season rewards" />
             )}
           </div>
-        </div>
+        </StatusDock>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -1056,48 +1012,52 @@ function SeasonGraceCard({
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 px-1 pb-2 text-[13px] font-black text-muted-foreground">
-        <Clock className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
-        Finish {season.name}
-      </div>
-      <div className="relative overflow-hidden rounded-[24px] border border-amber-400/30 bg-card shadow-sm">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-400/[0.08] via-transparent to-transparent" />
-        <div className="relative flex items-center gap-3 px-4 py-4">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-700 shadow-sm dark:from-amber-900/40 dark:to-amber-950/40 dark:text-amber-300"
-            aria-label={`Open ${season.name}`}
-          >
-            <span className="text-lg font-black tabular-nums">
-              {season.tier}
-            </span>
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-black leading-snug text-foreground">
-              {season.claimableCount > 0
-                ? `${season.claimableCount} reward${season.claimableCount > 1 ? 's' : ''} still waiting`
-                : `Tier ${season.tier} of ${season.tierCount}`}
-            </p>
-            <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted-foreground">
-              {canClimb
-                ? `Today's tasks still count here · ${timeLeft} left`
-                : `Collect before it closes · ${timeLeft} left`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={season.claimableCount > 0 ? onClaimAll : onOpen}
-            disabled={claiming}
-            className="h-11 shrink-0 touch-manipulation rounded-xl bg-amber-500 px-4 text-xs font-black text-white shadow-[0_3px_0_#b45309] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-          >
+      <QuestSectionHeader
+        title={`Finish ${season.name}`}
+        right={
+          <span className="inline-flex items-center gap-1 pr-1 text-[12px] font-black tabular-nums text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+            {timeLeft}
+          </span>
+        }
+      />
+      <div
+        className={cn(
+          QUEST_ROW_CARD,
+          'flex items-center gap-3 py-3 pl-3 pr-3',
+          season.claimableCount > 0 && 'bg-amber-50 dark:bg-amber-500/10',
+        )}
+      >
+        <button
+          type="button"
+          onClick={onOpen}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-700 dark:from-amber-900/40 dark:to-amber-950/40 dark:text-amber-300"
+          aria-label={`Open ${season.name}`}
+        >
+          <span className="text-lg font-black tabular-nums">{season.tier}</span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-bold leading-tight text-foreground">
             {season.claimableCount > 0
-              ? claiming
-                ? 'Claiming…'
-                : `Claim ${season.claimableCount}`
-              : 'Open'}
-          </button>
+              ? `${season.claimableCount} reward${season.claimableCount > 1 ? 's' : ''} still waiting`
+              : `Tier ${season.tier} of ${season.tierCount}`}
+          </p>
+          <p className="mt-1 text-[12.5px] font-semibold leading-snug text-muted-foreground">
+            {canClimb ? 'Today’s tasks still count here' : 'Collect before it closes'}
+          </p>
         </div>
+        {season.claimableCount > 0 ? (
+          <button
+            type="button"
+            onClick={onClaimAll}
+            disabled={claiming}
+            className="h-11 shrink-0 touch-manipulation rounded-[14px] bg-amber-500 px-4 text-[14px] font-black text-white shadow-[0_3px_0_#b45309] transition active:translate-y-[3px] active:shadow-none disabled:cursor-wait disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+          >
+            {claiming ? 'Claiming…' : `Claim ${season.claimableCount}`}
+          </button>
+        ) : (
+          <QuestGoButton onPress={onOpen} label={`Open ${season.name}`} />
+        )}
       </div>
     </div>
   );

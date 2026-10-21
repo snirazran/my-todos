@@ -138,13 +138,14 @@ function PondStatusRow({ friends, claimable, claiming, gate, onClaim, onInvite }
   if (claimable > 0) {
     const required = Math.max(1, gate?.required ?? 1);
     const remaining = Math.max(1, required - (gate?.done ?? 0));
+    const gateLabel = 'Finish ' + remaining + ' more ' + (remaining === 1 ? 'task' : 'tasks') + ' to collect';
     const goHome = () => router.push('/');
     return (
       <div
         data-dock-row
         role={ready ? undefined : 'button'}
         tabIndex={ready ? undefined : 0}
-        aria-label={ready ? undefined : 'Finish ' + remaining + ' more ' + (remaining === 1 ? 'task' : 'tasks') + ' to collect ' + claimable + ' flies from your friends'}
+        aria-label={ready ? undefined : gateLabel + ' ' + claimable + ' flies from your friends'}
         onClick={() => (ready ? !claiming && onClaim() : goHome())}
         onKeyDown={(event) => { if (!ready && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); goHome(); } }}
         className={cn(statusDockRowClass(ready ? 'ready' : 'idle'), shape)}
@@ -159,7 +160,7 @@ function PondStatusRow({ friends, claimable, claiming, gate, onClaim, onInvite }
                 <Check className="h-2.5 w-2.5" strokeWidth={4} />
               </span>
             )}
-            <span className="min-w-0 truncate">{ready ? 'Flies from your friends' : 'Finish ' + remaining + ' more ' + (remaining === 1 ? 'task' : 'tasks')}</span>
+            <span className="min-w-0 truncate">{ready ? 'Flies from your friends' : gateLabel}</span>
           </span>
           <QuestTrack
             progress={ready ? required : gate?.done ?? 0}

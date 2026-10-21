@@ -3,13 +3,15 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  ArrowRight,
   Check,
-  Clock,
   Copy,
   Gift,
   Lock,
   Monitor,
   RefreshCw,
+  RotateCw,
+  Shuffle,
   Sparkles,
   Sprout,
   Star,
@@ -37,6 +39,7 @@ import { Icon } from './Icon';
 import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { HOME_CARD_SURFACE } from './taskSurfaces';
 import {
   HintButton,
   ObjectiveProgressBar,
@@ -652,25 +655,62 @@ export function DailyChecklistCard({
 }) {
   const timeLeft = useTimeLeft();
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
-  const allDone = quests.every((quest) =>
-    quest.logic.every((block) => {
+  const rows = quests.flatMap((quest) =>
+    quest.logic.map((block) => {
+      const claimed = (quest.claimedObjectiveIds ?? []).includes(block.id);
       const complete = block.progress >= Math.max(1, block.target);
       const hasRewards = (block.rewards?.length ?? 0) > 0;
-      const claimed = (quest.claimedObjectiveIds ?? []).includes(block.id);
-      return claimed || (complete && !hasRewards);
+      const state: QuestPathNodeState =
+        claimed || (complete && !hasRewards) ? 'done' : complete ? 'ready' : 'open';
+      return { quest, block, claimed, state };
     }),
   );
+  const allDone = rows.every((row) => row.state === 'done');
+  const openCount = rows.filter((row) => row.state === 'open').length;
 
-  const openCount = quests.reduce(
-    (sum, quest) =>
-      sum +
-      quest.logic.filter((block) => {
-        const complete = block.progress >= Math.max(1, block.target);
-        const claimed = (quest.claimedObjectiveIds ?? []).includes(block.id);
-        return !claimed && !complete;
-      }).length,
-    0,
-  );
+  const stops: QuestPathStop[] = rows.map((row) => ({
+    key: `${row.quest.id}:${row.block.id}`,
+    state: row.state,
+    content: (
+      <QuestObjectiveRow
+        block={row.block}
+        card
+        claimed={row.claimed}
+        claiming={claimingObjectiveId === row.block.id}
+        isPremium={isPremium}
+        rewardCatalog={rewardCatalog}
+        onOpenRewards={(rewards) =>
+          setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
+        }
+        onClaim={
+          onClaimObjective
+            ? () => onClaimObjective(row.quest.id, row.block.id)
+            : undefined
+        }
+      />
+    ),
+  }));
+  if (sweep) {
+    stops.push({
+      key: 'clean-sweep',
+      prize: true,
+      state: sweep.claimable
+        ? 'ready'
+        : sweep.todayComplete
+          ? 'done'
+          : 'open',
+      content: (
+        <CleanSweepCard
+          sweep={sweep}
+          claiming={claimingSweep}
+          onClaim={onClaimSweep}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          paused={paused}
+        />
+      ),
+    });
+  }
 
   return (
     <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
@@ -686,16 +726,16 @@ export function DailyChecklistCard({
                 disabled={swapping}
                 className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-black text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <RefreshCw
-                  className={cn('h-3.5 w-3.5 shrink-0', swapping && 'animate-spin')}
+                <Shuffle
+                  className={cn('h-3.5 w-3.5 shrink-0', swapping && 'animate-pulse')}
                   strokeWidth={2.75}
                 />
                 {swapping ? 'Swapping' : 'Swap'}
               </button>
             ) : null}
             {timeLeft ? (
-              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-black tabular-nums text-muted-foreground">
-                <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap pr-1 text-[12px] font-black tabular-nums text-muted-foreground">
+                <RotateCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
                 {timeLeft}
               </span>
             ) : null}
@@ -703,68 +743,18 @@ export function DailyChecklistCard({
         }
       />
 
-      <div className={QUEST_CARD_CLASS}>
-        {allDone ? (
-          <div className="flex items-center gap-3 px-3.5 py-3.5">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.14] text-primary ring-1 ring-inset ring-primary/25">
-              <Check className="h-5 w-5" strokeWidth={3.5} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[15px] font-black text-foreground">
-                All three done
-              </span>
-              <span className="block text-[12.5px] font-semibold text-muted-foreground">
-                New quests land tomorrow morning
-              </span>
-            </span>
-          </div>
-        ) : (
-          quests.map((quest, questIndex) => (
-            <DailyChecklistQuestRows
-              key={quest.id}
-              quest={quest}
-              firstQuest={questIndex === 0}
-              rewardCatalog={rewardCatalog}
-              isPremium={isPremium}
-              claimingObjectiveId={claimingObjectiveId}
-              onOpenRewards={(rewards) =>
-                setRewardPopup({
-                  eyebrow: 'Objective',
-                  title: 'Rewards',
-                  rewards,
-                })
-              }
-              onClaimObjective={onClaimObjective}
-            />
-          ))
-        )}
-        {sweep ? (
-          <>
-            <div className="border-t border-border/50">
-              <CleanSweepCard
-                bare
-                sweep={sweep}
-                claiming={claimingSweep}
-                onClaim={onClaimSweep}
-                rewardCatalog={rewardCatalog}
-                isPremium={isPremium}
-                paused={paused}
-              />
-            </div>
-            {sweep.goldenEveryDays > 0 && sweep.goldenRoll.length > 0 ? (
-              <div className="border-t border-border/50">
-                <SweepStreakCard
-                  bare
-                  sweep={sweep}
-                  rewardCatalog={rewardCatalog}
-                  isPremium={isPremium}
-                  paused={paused}
-                />
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </div>
+      <QuestPath stops={stops} />
+
+      {sweep && sweep.goldenEveryDays > 0 && sweep.goldenRoll.length > 0 ? (
+        <div className="mt-2">
+          <SweepStreakCard
+            sweep={sweep}
+            rewardCatalog={rewardCatalog}
+            isPremium={isPremium}
+            paused={paused}
+          />
+        </div>
+      ) : null}
       <RewardDetailsPopup
         open={!!rewardPopup}
         eyebrow={rewardPopup?.eyebrow ?? ''}
@@ -779,8 +769,138 @@ export function DailyChecklistCard({
   );
 }
 
-export const QUEST_CARD_CLASS =
-  'overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)]';
+export const QUEST_CARD_CLASS = `overflow-hidden ${HOME_CARD_SURFACE}`;
+
+export const QUEST_ROW_CARD = HOME_CARD_SURFACE;
+
+export function QuestGoButton({
+  onPress,
+  label = 'Show me how',
+  className,
+}: {
+  onPress: () => void;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
+      className={cn(
+        'grid h-11 w-12 shrink-0 touch-manipulation place-items-center rounded-[14px] bg-muted text-foreground/55 shadow-[0_3px_0_0_rgba(15,23,42,0.13)] transition-[transform,box-shadow,color] duration-150 hover:-translate-y-px hover:text-foreground/80 hover:shadow-[0_4px_0_0_rgba(15,23,42,0.13)] active:translate-y-[3px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:shadow-[0_3px_0_0_rgba(0,0,0,0.5)]',
+        className,
+      )}
+    >
+      <ArrowRight className="h-5 w-5" strokeWidth={3} />
+    </button>
+  );
+}
+
+export type QuestPathNodeState = 'open' | 'ready' | 'done' | 'locked';
+
+function QuestPathNode({
+  state,
+  prize = false,
+  icon,
+}: {
+  state: QuestPathNodeState;
+  prize?: boolean;
+  icon?: React.ReactNode;
+}) {
+  const size = prize ? 'h-8 w-8' : 'h-[26px] w-[26px]';
+  if (state === 'done') {
+    return (
+      <span className={cn('grid place-items-center rounded-full bg-[#4f9149] text-white ring-4 ring-background', size)}>
+        <Check className={prize ? 'h-4 w-4' : 'h-3.5 w-3.5'} strokeWidth={3.5} />
+      </span>
+    );
+  }
+  if (state === 'ready') {
+    return (
+      <span className={cn('grid place-items-center rounded-full bg-amber-500 text-white ring-4 ring-background', size)}>
+        {prize ? <Gift className="h-4 w-4" strokeWidth={2.75} /> : <Check className="h-3.5 w-3.5" strokeWidth={3.5} />}
+      </span>
+    );
+  }
+  if (state === 'locked') {
+    return (
+      <span className={cn('grid place-items-center rounded-full bg-amber-100 text-amber-600 ring-4 ring-background dark:bg-amber-500/15', size)}>
+        {icon ?? <Lock className="h-3.5 w-3.5" strokeWidth={3} />}
+      </span>
+    );
+  }
+  if (prize) {
+    return (
+      <span className={cn('grid place-items-center rounded-full border-[2.5px] border-amber-400/70 bg-amber-50 text-amber-500 ring-4 ring-background dark:bg-amber-500/10', size)}>
+        <Gift className="h-4 w-4" strokeWidth={2.75} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        'grid place-items-center rounded-full border-[2.5px] border-primary bg-card ring-4 ring-background',
+        size,
+      )}
+    />
+  );
+}
+
+export type QuestPathStop = {
+  key: string;
+  state: QuestPathNodeState;
+  prize?: boolean;
+  icon?: React.ReactNode;
+  content: React.ReactNode;
+};
+
+export function QuestPath({ stops }: { stops: QuestPathStop[] }) {
+  const reached = stops.map((stop) => stop.state === 'done' || stop.state === 'ready');
+  return (
+    <ol className="flex flex-col gap-2 lg:-ml-[38px]">
+      {stops.map((stop, index) => {
+        const first = index === 0;
+        const last = index === stops.length - 1;
+        const topReached = !first && reached[index - 1] && reached[index];
+        const bottomReached = !last && reached[index] && reached[index + 1];
+        return (
+          <li key={stop.key} className="flex items-stretch gap-1.5">
+            <span aria-hidden className="relative flex w-8 shrink-0 flex-col items-center">
+              <span
+                className={cn(
+                  'flex-1',
+                  first
+                    ? 'opacity-0'
+                    : topReached
+                      ? 'w-[3px] bg-[#4f9149]'
+                      : 'border-l-[2.5px] border-dashed border-muted-foreground/30',
+                )}
+              />
+              <span className="relative z-10 py-1">
+                <QuestPathNode state={stop.state} prize={stop.prize} icon={stop.icon} />
+              </span>
+              <span
+                className={cn(
+                  '-mb-2 flex-1',
+                  last
+                    ? 'opacity-0'
+                    : bottomReached
+                      ? 'w-[3px] bg-[#4f9149]'
+                      : 'border-l-[2.5px] border-dashed border-muted-foreground/30',
+                )}
+              />
+            </span>
+            <div className="min-w-0 flex-1">{stop.content}</div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export function QuestSectionHeader({
   title,
@@ -801,7 +921,7 @@ export function QuestSectionHeader({
           {title}
         </span>
         {count && (
-          <span className="shrink-0 text-[14px] font-bold text-muted-foreground">
+          <span className="shrink-0 text-[14px] font-bold text-muted-foreground narrow:hidden">
             {count}
           </span>
         )}
@@ -996,13 +1116,14 @@ function sweepEntryRank(
 function sweepPrizeStack(
   table: SweepRollEntryInfo[],
   rewardCatalog: Record<string, QuestRewardCatalogItem>,
+  max = 3,
 ) {
   const ranked = [...table]
     .map((entry) => ({ entry, rank: sweepEntryRank(entry, rewardCatalog) }))
     .sort((a, b) => b.rank - a.rank);
   const shown = ranked
     .filter((row) => row.rank >= 0)
-    .slice(0, 3)
+    .slice(0, max)
     .map((row) => row.entry);
   return { shown, extra: Math.max(0, table.length - shown.length) };
 }
@@ -1028,6 +1149,7 @@ function SweepPrizeStack({
   onOpen,
   label,
   paused = false,
+  max = 3,
 }: {
   table: SweepRollEntryInfo[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1035,8 +1157,9 @@ function SweepPrizeStack({
   onOpen: () => void;
   label: string;
   paused?: boolean;
+  max?: number;
 }) {
-  const { shown, extra } = sweepPrizeStack(table, rewardCatalog);
+  const { shown, extra } = sweepPrizeStack(table, rewardCatalog, max);
 
   return (
     <button
@@ -1240,7 +1363,6 @@ function CleanSweepCard({
   rewardCatalog,
   isPremium,
   paused = false,
-  bare = false,
 }: {
   sweep: DailySweepInfo;
   claiming?: boolean;
@@ -1248,22 +1370,23 @@ function CleanSweepCard({
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   paused?: boolean;
-  bare?: boolean;
 }) {
   const [oddsOpen, setOddsOpen] = useState(false);
   const golden = sweep.nextTier === 'golden';
   const remaining = Math.max(0, sweep.objectivesTotal - sweep.objectivesDone);
-  const total = Math.max(1, sweep.objectivesTotal);
 
   return (
     <div
-      className={
-        bare
-          ? 'px-3.5 py-3.5'
-          : 'rounded-2xl border border-border/50 bg-card px-3.5 py-4 shadow-sm sm:px-4'
-      }
+      className={cn(
+        QUEST_ROW_CARD,
+        'py-2.5 pl-3 pr-3',
+        sweep.claimable &&
+          (golden
+            ? 'bg-gradient-to-r from-amber-100 to-yellow-50 dark:from-amber-500/20 dark:to-amber-500/10'
+            : 'bg-amber-50 dark:bg-amber-500/10'),
+      )}
     >
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-3">
         <SweepPrizeStack
           table={golden ? sweep.goldenRoll : sweep.standardRoll}
           rewardCatalog={rewardCatalog}
@@ -1271,33 +1394,30 @@ function CleanSweepCard({
           onOpen={() => setOddsOpen(true)}
           label="See what you can win"
           paused={paused}
+          max={sweep.claimable ? 1 : 2}
         />
 
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-black leading-tight text-foreground">
+          <p className="text-[15px] font-bold leading-tight text-foreground">
             {sweep.claimable
               ? sweep.nextMega
-                ? 'Your mega prize is ready'
+                ? 'Mega prize ready!'
                 : golden
-                  ? 'Your golden prize is ready'
-                  : 'Your daily prize is ready'
+                  ? 'Golden prize ready!'
+                  : 'Daily prize ready!'
               : sweep.todayComplete
                 ? 'All daily quests done'
                 : remaining === 1
                   ? '1 daily quest left'
                   : 'Finish all daily quests'}
           </p>
-          <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
-            {sweep.claimable
-              ? sweep.nextMega
-                ? 'Golden odds + a guaranteed gift'
-                : golden
-                  ? 'Better odds of rare outfits'
-                  : 'A surprise prize inside'
-              : sweep.todayComplete
+          {!sweep.claimable && (
+            <p className="mt-1 text-[12.5px] font-semibold leading-tight text-muted-foreground">
+              {sweep.todayComplete
                 ? 'New quests tomorrow'
                 : `Win ${sweep.cleanSweepFlies} flies + a surprise prize`}
-          </p>
+            </p>
+          )}
         </div>
 
         {sweep.claimable && onClaim ? (
@@ -1306,12 +1426,7 @@ function CleanSweepCard({
               type="button"
               onClick={onClaim}
               disabled={claiming}
-              className={cn(
-                'inline-flex h-9 items-center justify-center rounded-xl px-4 text-[13px] font-black text-white transition-all hover:translate-y-[-1px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60',
-                golden
-                  ? 'bg-amber-500 shadow-[0_3px_0_0_#b45309] hover:shadow-[0_4px_0_0_#b45309]'
-                  : 'bg-[#447d3f] shadow-[0_3px_0_0_#2c511a] hover:shadow-[0_4px_0_0_#2c511a]',
-              )}
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-amber-500 px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               {claiming
                 ? 'Opening…'
@@ -1320,21 +1435,7 @@ function CleanSweepCard({
                   : 'Open'}
             </button>
           </span>
-        ) : (
-          <div className="flex shrink-0 items-center gap-1" aria-hidden>
-            {Array.from({ length: total }, (_, i) => (
-              <span
-                key={i}
-                className={cn(
-                  'h-2 w-4 rounded-full',
-                  i < sweep.objectivesDone
-                    ? 'bg-emerald-500'
-                    : 'border border-border/60 bg-muted',
-                )}
-              />
-            ))}
-          </div>
-        )}
+        ) : null}
       </div>
 
       <SweepOddsPopup
@@ -1360,13 +1461,11 @@ function SweepStreakCard({
   rewardCatalog,
   isPremium,
   paused = false,
-  bare = false,
 }: {
   sweep: DailySweepInfo;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   paused?: boolean;
-  bare?: boolean;
 }) {
   const [oddsOpen, setOddsOpen] = useState(false);
   const every = Math.max(1, sweep.goldenEveryDays);
@@ -1379,18 +1478,12 @@ function SweepStreakCard({
   return (
     <div
       className={cn(
-        bare
-          ? 'px-3.5 py-3.5'
-          : 'rounded-2xl border px-3.5 py-4 shadow-sm sm:px-4',
-        goldenNext
-          ? cn(
-              'bg-gradient-to-br from-amber-50 to-card dark:from-amber-500/10',
-              !bare && 'border-amber-400/70',
-            )
-          : cn('bg-card', !bare && 'border-border/50'),
+        QUEST_ROW_CARD,
+        'py-2.5 pl-3 pr-3.5',
+        goldenNext && 'bg-gradient-to-br from-amber-50 to-card dark:from-amber-500/10',
       )}
     >
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-3">
         <SweepPrizeStack
           table={sweep.goldenRoll}
           rewardCatalog={rewardCatalog}
@@ -1398,17 +1491,18 @@ function SweepStreakCard({
           onOpen={() => setOddsOpen(true)}
           label="See the golden prizes"
           paused={paused}
+          max={2}
         />
 
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-black leading-tight text-foreground">
+          <p className="text-[15px] font-bold leading-tight text-foreground">
             {megaNext
               ? 'Mega prize next'
               : goldenNext
                 ? 'Golden prize next'
                 : `Golden prize in ${sweep.sweepsToGolden} days`}
           </p>
-          <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
+          <p className="mt-1 text-[12.5px] font-semibold leading-tight text-muted-foreground">
             {goldenNext
               ? 'Finish all daily quests to win it'
               : sweep.count === 0
@@ -1501,8 +1595,8 @@ export function MoveToWebCard({
   };
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
-      <div className="flex items-center gap-2 sm:gap-2.5">
+    <div className={cn(QUEST_ROW_CARD, 'py-3 pl-3 pr-3')}>
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => setRewardPopupOpen(true)}
@@ -1522,12 +1616,12 @@ export function MoveToWebCard({
           />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-black leading-tight text-foreground">
+          <p className="text-[15px] font-bold leading-tight text-foreground">
             {moveToWeb.claimable
               ? 'Your reward is ready!'
               : 'Plan your week on the big screen'}
           </p>
-          <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
+          <p className="mt-1 text-[12.5px] font-semibold leading-tight text-muted-foreground">
             {moveToWeb.claimable
               ? 'Thanks for hopping onto the web'
               : 'Log in on your computer once to unlock this prize'}
@@ -1541,14 +1635,14 @@ export function MoveToWebCard({
               type="button"
               onClick={onClaim}
               disabled={claiming}
-              className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-amber-500 px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               {claiming ? 'Claiming...' : 'Claim'}
             </button>
           </span>
         ) : (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
-            <Monitor className="h-[18px] w-[18px]" strokeWidth={2.5} />
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-sky-500/10 text-sky-500">
+            <Monitor className="h-5 w-5" strokeWidth={2.5} />
           </div>
         )}
       </div>
@@ -1593,56 +1687,6 @@ export function MoveToWebCard({
         paused={paused}
       />
     </div>
-  );
-}
-
-function DailyChecklistQuestRows({
-  quest,
-  firstQuest = false,
-  rewardCatalog,
-  isPremium,
-  claimingObjectiveId,
-  onOpenRewards,
-  onClaimObjective,
-}: {
-  quest: QuestCardData & { placement: 'daily' };
-  firstQuest?: boolean;
-  rewardCatalog: Record<string, QuestRewardCatalogItem>;
-  isPremium: boolean;
-  claimingObjectiveId?: string | null;
-  onOpenRewards: (rewards: QuestReward[]) => void;
-  onClaimObjective?: (questId: string, objectiveId: string) => void;
-}) {
-  const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
-  const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
-    quest.id,
-    claimedObjectiveIds,
-  );
-  const visibleLogic = quest.logic.filter(
-    (block) => !hiddenClaimedObjectiveIds.has(block.id),
-  );
-  if (visibleLogic.length === 0) return null;
-
-  return (
-    <>
-      {visibleLogic.map((block, i) => (
-        <QuestObjectiveRow
-          key={block.id}
-          block={block}
-          divider={!(firstQuest && i === 0)}
-          claimed={claimedObjectiveIds.includes(block.id)}
-          claiming={claimingObjectiveId === block.id}
-          isPremium={isPremium}
-          rewardCatalog={rewardCatalog}
-          onOpenRewards={onOpenRewards}
-          onClaim={
-            onClaimObjective
-              ? () => onClaimObjective(quest.id, block.id)
-              : undefined
-          }
-        />
-      ))}
-    </>
   );
 }
 
@@ -1738,13 +1782,90 @@ export function JourneyCard({
     }
   });
 
-  const reachedAt = items.map((item) =>
-    item.kind === 'step'
-      ? item.done || steps.indexOf(item) === currentIndex
-      : items
-          .slice(0, items.indexOf(item))
-          .every((it) => it.kind === 'gate' || it.done),
-  );
+  const stops: QuestPathStop[] = items.map((item) => {
+    if (item.kind === 'gate') {
+      return {
+        key: item.key,
+        state: 'locked',
+        content: (
+          <div className="flex min-h-[60px] items-center gap-3 rounded-[18px] border-2 border-dashed border-amber-400/60 bg-amber-50/70 py-2.5 pl-3 pr-3 dark:bg-amber-500/10">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-card shadow-[0_1px_2px_rgba(15,23,42,0.08)]">
+              {item.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-bold leading-tight text-foreground">
+                {item.title}
+              </span>
+              <span className="mt-1 block text-[12.5px] font-semibold leading-snug text-muted-foreground">
+                {item.detail}
+              </span>
+            </span>
+            {item.stepsAway > 0 && (
+              <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-[11px] font-black leading-none text-white shadow-[0_2px_0_0_#b45309]">
+                {item.stepsAway === 1 ? '1 step' : `${item.stepsAway} steps`}
+              </span>
+            )}
+          </div>
+        ),
+      };
+    }
+    const stepIndex = steps.indexOf(item);
+    const current = stepIndex === currentIndex;
+    const complete = item.block.progress >= Math.max(1, item.block.target);
+    const flies = rewardHint(item.block.rewards);
+    return {
+      key: item.key,
+      state: item.done ? 'done' : current && complete ? 'ready' : 'open',
+      current,
+      content: current ? (
+        <QuestObjectiveRow
+          block={item.block}
+          card
+          claimed={item.claimed}
+          claiming={claimingObjectiveId === item.block.id}
+          isPremium={isPremium}
+          rewardCatalog={rewardCatalog}
+          onOpenRewards={(rewards) =>
+            setRewardPopup({ eyebrow: 'Step', title: 'Rewards', rewards })
+          }
+          onClaim={
+            onClaimObjective
+              ? () => onClaimObjective(item.questId, item.block.id)
+              : undefined
+          }
+        />
+      ) : (
+        <div
+          className={cn(
+            'flex min-h-12 items-center gap-2 py-2.5 pl-3.5 pr-3',
+            item.done ? QUEST_ROW_CARD : 'rounded-[18px] bg-muted/60',
+          )}
+        >
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate text-[14px] font-bold',
+              item.done
+                ? 'text-muted-foreground line-through decoration-muted-foreground/40'
+                : 'text-foreground/55',
+            )}
+          >
+            {formatQuestObjective(item.block)}
+          </span>
+          {flies !== null && (
+            <span
+              className={cn(
+                'inline-flex shrink-0 items-center gap-0.5 text-[12px] font-black tabular-nums',
+                item.done ? 'text-muted-foreground/60' : 'text-amber-600 dark:text-amber-400',
+              )}
+            >
+              +{flies}
+              <Fly size={18} y={-2} paused interactive={false} />
+            </span>
+          )}
+        </div>
+      ),
+    };
+  });
 
   return (
     <div>
@@ -1752,111 +1873,7 @@ export function JourneyCard({
         title="Your journey"
         count={`${doneInPath} of ${steps.length}`}
       />
-      <div className={QUEST_CARD_CLASS}>
-        <ol className="py-1.5">
-          {items.map((item, index) => {
-            const first = index === 0;
-            const last = index === items.length - 1;
-            const lineDone = reachedAt[index];
-            const nextDone = reachedAt[index + 1] ?? false;
-            if (item.kind === 'gate') {
-              return (
-                <li key={item.key} className="relative flex gap-3 pl-3.5 pr-3">
-                  <JourneyRail first={first} last={last} done={lineDone} nextDone={nextDone}>
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-amber-100 text-amber-600 ring-2 ring-card dark:bg-amber-500/15">
-                      <Lock className="h-3.5 w-3.5" strokeWidth={3} />
-                    </span>
-                  </JourneyRail>
-                  <div className="my-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-dashed border-amber-400/60 bg-amber-50/70 px-3 py-2.5 dark:bg-amber-500/10">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-card shadow-[0_1px_2px_rgba(15,23,42,0.08)]">
-                      {item.icon}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14px] font-black leading-tight text-foreground">
-                        {item.title}
-                      </span>
-                      <span className="mt-0.5 block text-[12px] font-semibold leading-snug text-muted-foreground">
-                        {item.detail}
-                      </span>
-                    </span>
-                    {item.stepsAway > 0 && (
-                      <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-[11px] font-black leading-none text-white shadow-[0_2px_0_0_#b45309]">
-                        {item.stepsAway === 1 ? '1 step' : `${item.stepsAway} steps`}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              );
-            }
-            const stepIndex = steps.indexOf(item);
-            const current = stepIndex === currentIndex;
-            const flies = rewardHint(item.block.rewards);
-            return (
-              <li key={item.key} className="relative flex gap-3 pl-3.5 pr-3">
-                <JourneyRail first={first} last={last} done={lineDone} nextDone={nextDone}>
-                  {item.done ? (
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#4f9149] text-white ring-2 ring-card">
-                      <Check className="h-4 w-4" strokeWidth={3.5} />
-                    </span>
-                  ) : current ? (
-                    <span className="relative grid h-8 w-8 place-items-center rounded-full bg-card text-[13px] font-black text-primary ring-2 ring-primary">
-                      <span className="journey-pulse absolute inset-0 rounded-full ring-2 ring-primary/50" />
-                      {stepIndex + 1}
-                    </span>
-                  ) : (
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-muted text-[13px] font-black text-muted-foreground ring-2 ring-card">
-                      {stepIndex + 1}
-                    </span>
-                  )}
-                </JourneyRail>
-                {current ? (
-                  <QuestObjectiveRow
-                    block={item.block}
-                    divider={false}
-                    claimed={item.claimed}
-                    claiming={claimingObjectiveId === item.block.id}
-                    isPremium={isPremium}
-                    rewardCatalog={rewardCatalog}
-                    onOpenRewards={(rewards) =>
-                      setRewardPopup({ eyebrow: 'Step', title: 'Rewards', rewards })
-                    }
-                    onClaim={
-                      onClaimObjective
-                        ? () => onClaimObjective(item.questId, item.block.id)
-                        : undefined
-                    }
-                    className="my-1 flex-1 rounded-2xl bg-primary/[0.06] !px-2.5 !py-2.5"
-                  />
-                ) : (
-                  <div className="flex min-h-12 min-w-0 flex-1 items-center gap-2 py-2">
-                    <span
-                      className={cn(
-                        'min-w-0 flex-1 truncate text-[14px] font-bold',
-                        item.done
-                          ? 'text-muted-foreground line-through decoration-muted-foreground/40'
-                          : 'text-foreground/55',
-                      )}
-                    >
-                      {formatQuestObjective(item.block)}
-                    </span>
-                    {flies !== null && (
-                      <span
-                        className={cn(
-                          'inline-flex shrink-0 items-center gap-0.5 text-[12px] font-black tabular-nums',
-                          item.done ? 'text-muted-foreground/60' : 'text-amber-600 dark:text-amber-400',
-                        )}
-                      >
-                        +{flies}
-                        <Fly size={18} y={-2} paused interactive={false} />
-                      </span>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+      <QuestPath stops={stops} />
       <RewardDetailsPopup
         open={!!rewardPopup}
         eyebrow={rewardPopup?.eyebrow ?? ''}
@@ -1867,38 +1884,6 @@ export function JourneyCard({
         onClose={() => setRewardPopup(null)}
       />
     </div>
-  );
-}
-
-function JourneyRail({
-  first,
-  last,
-  done,
-  nextDone,
-  children,
-}: {
-  first: boolean;
-  last: boolean;
-  done: boolean;
-  nextDone: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="relative flex w-8 shrink-0 flex-col items-center">
-      <span
-        className={cn(
-          'w-[3px] flex-1',
-          first ? 'bg-transparent' : done ? 'bg-[#4f9149]' : 'bg-border',
-        )}
-      />
-      <span className="relative z-10">{children}</span>
-      <span
-        className={cn(
-          'w-[3px] flex-1',
-          last ? 'bg-transparent' : nextDone ? 'bg-[#4f9149]' : 'bg-border',
-        )}
-      />
-    </span>
   );
 }
 
@@ -1932,12 +1917,12 @@ export function SideQuestsCard({
         title={quests.length === 1 ? quests[0].title : 'Side quests'}
         count={`${rows.length} left`}
       />
-      <div className={QUEST_CARD_CLASS}>
-        {rows.map(({ quest, block }, i) => (
+      <div className="flex flex-col gap-2">
+        {rows.map(({ quest, block }) => (
           <QuestObjectiveRow
             key={`${quest.id}:${block.id}`}
             block={block}
-            divider={i > 0}
+            card
             claiming={claimingObjectiveId === block.id}
             isPremium={isPremium}
             rewardCatalog={rewardCatalog}
@@ -1973,6 +1958,7 @@ export function QuestObjectiveRow({
   rewardCatalog,
   onOpenRewards,
   onClaim,
+  card = false,
   divider = true,
   dimmed = false,
   className,
@@ -1984,12 +1970,12 @@ export function QuestObjectiveRow({
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   onOpenRewards?: (rewards: QuestReward[]) => void;
   onClaim?: () => void;
+  card?: boolean;
   divider?: boolean;
   dimmed?: boolean;
   className?: string;
 }) {
   const startHintGuide = useUIStore((state) => state.startHintGuide);
-  const hintText = useObjectiveHint(block);
   const safeTarget = Math.max(1, block.target);
   const complete = block.progress >= safeTarget;
   const hasRewards = (block.rewards?.length ?? 0) > 0;
@@ -2001,8 +1987,15 @@ export function QuestObjectiveRow({
     <div
       data-dock-row
       className={cn(
-        'flex items-center gap-3 py-3 pl-3.5 pr-3 transition-opacity',
-        divider && 'border-t border-border/50',
+        'flex items-center gap-3 transition-[opacity,background-color] duration-300',
+        card
+          ? cn(
+              QUEST_ROW_CARD,
+              'pl-3 pr-3',
+              done ? 'py-2' : 'py-3',
+              claimable && 'bg-amber-50 dark:bg-amber-500/10',
+            )
+          : cn('py-3 pl-3.5 pr-3', divider && 'border-t border-border/50'),
         dimmed && 'opacity-55',
         className,
       )}
@@ -2011,35 +2004,42 @@ export function QuestObjectiveRow({
         type="button"
         onClick={() => rewards.length > 0 && onOpenRewards?.(rewards)}
         aria-label="See rewards"
-        className="min-h-11 min-w-11 shrink-0 rounded-xl"
+        className={cn(
+          'min-h-11 min-w-11 shrink-0 rounded-xl transition-opacity',
+          done && card && 'opacity-45 grayscale-[0.4]',
+        )}
       >
         <QuestRewardTileBadge
           rewards={rewards}
           catalog={rewardCatalog as never}
           isPremium={isPremium}
-          small
+          small={!card}
         />
       </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div className={cn('flex min-w-0 flex-1 flex-col', card ? 'gap-2' : 'gap-1.5')}>
         <span
           className={cn(
-            'flex min-w-0 items-center gap-1.5 text-[14px] font-bold leading-tight',
+            'flex min-w-0 items-center gap-1.5 font-bold leading-tight',
+            card ? 'text-[15px]' : 'text-[14px]',
             done
               ? 'text-muted-foreground line-through decoration-muted-foreground/40'
               : 'text-foreground',
           )}
         >
-          {done && (
+          {done && !card && (
             <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#4f9149] text-white">
               <Check className="h-2.5 w-2.5" strokeWidth={4} />
             </span>
           )}
-          <span className="min-w-0 truncate">{formatQuestObjective(block)}</span>
+          <span className={card ? 'line-clamp-2' : 'min-w-0 truncate'}>
+            {formatQuestObjective(block)}
+          </span>
         </span>
         {!done && (
           <QuestTrack
             progress={block.progress}
             target={block.target}
+            size={card ? 'lg' : 'md'}
             action={
               claimable && onClaim
                 ? {
@@ -2053,16 +2053,11 @@ export function QuestObjectiveRow({
         )}
       </div>
       {!done && !claimable && !dimmed && (
-        <span className="-mr-1.5 shrink-0 self-center">
-          <HintButton
-            iconOnly
-            placement="bottom"
-            text={hintText}
-            onShowMe={() =>
-              startHintGuide(guideIdForBlock(block), guideContextForBlock(block))
-            }
-          />
-        </span>
+        <QuestGoButton
+          onPress={() =>
+            startHintGuide(guideIdForBlock(block), guideContextForBlock(block))
+          }
+        />
       )}
     </div>
   );

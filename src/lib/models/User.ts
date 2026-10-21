@@ -81,6 +81,7 @@ const UserSchema = new Schema<UserDoc>(
     },
     premiumUntil: { type: Date },
     plusSubscription: { type: Schema.Types.Mixed, default: undefined },
+    plusEarned: { type: Schema.Types.Mixed, default: undefined },
     adDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
     adBudget: { type: Schema.Types.Mixed, default: undefined },
     timezoneGuard: { type: Schema.Types.Mixed, default: undefined },

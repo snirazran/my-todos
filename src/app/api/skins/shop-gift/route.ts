@@ -9,6 +9,7 @@ import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { economyDayKey, resolveEconomyTimezone } from '@/lib/economy/guards';
 import { logFlyGrant } from '@/lib/economy/ledger';
+import { recordPlusEarned } from '@/lib/plus/earned';
 import { rollShopGift } from '@/lib/economy/shopGift';
 import { shopGiftHeadroom } from '@/lib/economy/shopGiftServer';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
@@ -98,6 +99,12 @@ export async function POST(req: NextRequest) {
     }
 
     const balance = updated.wardrobe?.flies ?? balanceBefore + amount;
+    if (roll.plus) {
+      const withoutPlus = Math.floor(
+        roll.base * (roll.lucky ? config.shopGift.luckyMultiplier : 1),
+      );
+      await recordPlusEarned(userId, { flies: amount - withoutPlus });
+    }
 
     await logFlyGrant({
       userId,

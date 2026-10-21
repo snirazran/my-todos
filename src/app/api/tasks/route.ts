@@ -52,6 +52,7 @@ import {
   taskIncomeCap,
 } from '@/lib/economy/config';
 import { settleFlyGrant } from '@/lib/economy/ledger';
+import { recordPlusEarned } from '@/lib/plus/earned';
 import {
   isPayableOccurrenceDate,
   resolveEconomyTimezone,
@@ -622,6 +623,14 @@ async function awardFlyForTask(
       : null;
 
   const grant = settlement?.delta ?? 0;
+  if (premium && countTowardDaily && grant > 0) {
+    await recordPlusEarned(userId, {
+      flies: Math.min(
+        grant,
+        daily.earned + grant - config.taskIncome.dailyCapFree,
+      ),
+    });
+  }
   const blockedReason: FlyStatus['blockedReason'] = !payable
     ? 'backdated'
     : completionsExhausted

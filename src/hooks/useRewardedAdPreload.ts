@@ -9,6 +9,6 @@ import { preloadRewardedAd, rewardedAdsAvailable } from '@/lib/ads';
 export function useRewardedAdPreload(placement: string, enabled = true) {
   useEffect(() => {
     if (!enabled || !rewardedAdsAvailable()) return;
-    void preloadRewardedAd(placement);
+    void preloadRewardedAd(placement, { replace: false });
   }, [enabled, placement]);
 }

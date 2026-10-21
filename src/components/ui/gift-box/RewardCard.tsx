@@ -491,7 +491,9 @@ export const RewardCard = ({
     error: doubleError,
     plusModal,
     openPlus,
-  } = useRewardGate(doublePlacement);
+  } = useRewardGate(doublePlacement, {
+    preload: !!showDoubleUpsell && !!onWatchAd,
+  });
   const canWatchAd = mode === 'ad' && !!onWatchAd;
 
   const handleDoubleClick = () => {

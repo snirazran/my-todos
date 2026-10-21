@@ -10,6 +10,7 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { consumeAdVerification } from '@/lib/rewards/admobSsv';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { fliesGrantedOnDay, settleFlyGrant } from '@/lib/economy/ledger';
+import { plusFlyBonus, recordPlusEarned } from '@/lib/plus/earned';
 import { economyWeekKey, resolveEconomyTimezone } from '@/lib/economy/guards';
 import {
   pondDailyCap,
@@ -187,6 +188,9 @@ export async function POST(req: NextRequest) {
     if (settlement.delta <= 0) {
       return NextResponse.json({ granted: 0, capped: true, gate });
     }
+    await recordPlusEarned(userId, {
+      flies: plusFlyBonus(settlement.delta, plusMultiplier),
+    });
 
     // The weekly social bonus rewards a real friend list over one alt account:
     // several different friends, on several different days.

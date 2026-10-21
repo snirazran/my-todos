@@ -8,6 +8,7 @@ import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWardrobeBadges } from '@/hooks/useWardrobeBadges';
+import { useFriendPondBadge } from '@/hooks/useFriendPondBadge';
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -121,12 +122,7 @@ export default function MobileNav() {
     (friendRequestsData?.incoming?.length ?? 0) +
     (buddyInvitesData?.incoming?.length ?? 0);
 
-  const { data: friendsData } = useSWR<{ claimable?: number }>(
-    user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,
-    bootstrapFetcher,
-    { revalidateOnFocus: false },
-  );
-  const friendClaimable = friendsData?.claimable ?? 0;
+  const friendClaimable = useFriendPondBadge();
 
   if (
     pathname === '/welcome' ||

@@ -4,6 +4,7 @@ import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
 import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
+import { isRareOutfit, recordPlusEarned } from '@/lib/plus/earned';
 import { isPremiumActive } from '@/lib/skins/dailyDeal';
 import { ensureTradeModifiersConfig } from '@/lib/models/TradeModifiersConfig';
 import {
@@ -339,6 +340,11 @@ export async function POST(req: NextRequest) {
     user.markModified('wardrobe.inventory');
     user.markModified('wardrobe.backgrounds');
     await user.save();
+    if (fuelQuote.plusWaived > 0 || (aimed && aimQuote.discountPercent > 0)) {
+      await recordPlusEarned(userId, {
+        rareItems: rewards.filter((prize) => isRareOutfit(prize)).length,
+      });
+    }
 
     for (const prize of rewards) {
       await dropFromWishlist(userId, user.wardrobe, prize.id, prize.kind);

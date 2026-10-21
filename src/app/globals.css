@@ -2515,29 +2515,6 @@ body.dragging {
   }
 }
 
-.journey-pulse {
-  animation: journey-pulse 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-}
-
-@keyframes journey-pulse {
-  0% {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  70%,
-  100% {
-    opacity: 0;
-    transform: scale(1.45);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .journey-pulse {
-    animation: none;
-    opacity: 0;
-  }
-}
-
 @keyframes streak-frog-bob {
   0%,
   100% {

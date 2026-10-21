@@ -2,6 +2,7 @@
 
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PlusWelcomeHost } from '@/components/ui/PlusWelcome';
+import { PlusEndingHost } from '@/components/ui/PlusEndingSheet';
 import { useUIStore } from '@/lib/uiStore';
 
 /**
@@ -25,6 +26,7 @@ export function PremiumModalHost() {
         onClose={() => setOpen(false)}
       />
       <PlusWelcomeHost />
+      <PlusEndingHost />
     </>
   );
 }

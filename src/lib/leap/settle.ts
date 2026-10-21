@@ -66,6 +66,7 @@ async function payReach(args: {
           isPremium: false,
           flyMultiplier: 1,
           meta: { league: league.label, plus: true },
+          plusOnly: true,
         }),
       );
       state.plusPaidThrough = index;
@@ -106,6 +107,7 @@ export async function payPlusBacklog(args: {
         isPremium: false,
         flyMultiplier: 1,
         meta: { league: league.label, plus: true, backlog: true },
+        plusOnly: true,
       }),
     );
   }

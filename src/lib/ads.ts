@@ -311,8 +311,12 @@ function resetPreload() {
 
 /** Loads a rewarded ad ahead of the tap that spends it. Safe to call often —
  *  concurrent callers share one load and an already-loaded ad resolves at once.
- *  Only one ad can be pending, so a different placement's unit replaces it. */
-export async function preloadRewardedAd(placement: string): Promise<boolean> {
+ *  Only one ad can be pending; with `replace: false` a fresh ad for another
+ *  placement is kept instead of being replaced. */
+export async function preloadRewardedAd(
+  placement: string,
+  { replace = true }: { replace?: boolean } = {},
+): Promise<boolean> {
   if (!rewardedAdsAvailable()) return false;
 
   const unitId = rewardedAdUnitId(placement);
@@ -328,6 +332,13 @@ export async function preloadRewardedAd(placement: string): Promise<boolean> {
     return true;
   }
   if (preloadPromise && preloadingUnit === adKey) return preloadPromise;
+  if (
+    !replace &&
+    preloadedUnit &&
+    Date.now() - preloadedAt < PRELOAD_MAX_AGE_MS
+  ) {
+    return false;
+  }
 
   preloadingUnit = adKey;
   const loadId = ++preloadSeq;

@@ -13,6 +13,7 @@ import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
+import { plusFlyBonus, recordPlusEarned } from '@/lib/plus/earned';
 import {
   loadQuestCounters,
   parseTaskStreakDays,
@@ -1952,6 +1953,9 @@ export async function claimQuestReward(args: {
 
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);
+  await recordPlusEarned(user._id, {
+    flies: plusFlyBonus(summary.fliesGranted, multiplier),
+  });
   return summary;
 }
 
@@ -2031,5 +2035,8 @@ export async function claimObjectiveReward(args: {
 
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);
+  await recordPlusEarned(user._id, {
+    flies: plusFlyBonus(summary.fliesGranted, multiplier),
+  });
   return summary;
 }

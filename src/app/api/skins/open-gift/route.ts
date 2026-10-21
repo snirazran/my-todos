@@ -14,6 +14,7 @@ import { ensureGiftRulesConfig } from '@/lib/models/GiftRulesConfig';
 import { giftLuckUpdate, readUserGiftLuck } from '@/lib/skins/giftLuck';
 import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
+import { isRareOutfit } from '@/lib/plus/earned';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -158,6 +159,9 @@ export async function POST(req: NextRequest) {
       }
     }
     set['wardrobe.unseenItems'] = nextUnseen;
+    if (premium && revealed[1] && isRareOutfit(revealed[1].roll.prize)) {
+      inc['plusEarned.rareItems'] = 1;
+    }
 
     let doubleClaimId: string | undefined;
     if (!premium) {

@@ -58,6 +58,9 @@ export const ANALYTICS_EVENTS = [
   'subscription_billing_issue',
   'subscription_refunded',
   'subscription_product_changed',
+  'subscription_uncancelled',
+  'plus_ending_viewed',
+  'plus_ending_tapped',
   'planner_tour_completed',
   'try_funnel_viewed',
   'try_task_added',
@@ -155,6 +158,21 @@ export type AnalyticsSource = 'client' | 'server' | 'revenuecat';
 
 export const ANALYTICS_EVENT_SET = new Set<string>(ANALYTICS_EVENTS);
 
+export const PASSIVE_ANALYTICS_EVENTS: AnalyticsEventName[] = [
+  'notification_sent',
+  'wishlist_deal_notified',
+  'calendar_sync_failed',
+  'subscription_renewed',
+  'subscription_cancelled',
+  'subscription_expired',
+  'subscription_billing_issue',
+  'subscription_refunded',
+  'subscription_uncancelled',
+  'buddy_duo_week',
+];
+
+export const PASSIVE_ANALYTICS_EVENT_SET = new Set<string>(PASSIVE_ANALYTICS_EVENTS);
+
 const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   app_opened: 'lifecycle',
   page_viewed: 'lifecycle',
@@ -215,6 +233,9 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   subscription_billing_issue: 'monetization',
   subscription_refunded: 'monetization',
   subscription_product_changed: 'monetization',
+  subscription_uncancelled: 'monetization',
+  plus_ending_viewed: 'monetization',
+  plus_ending_tapped: 'monetization',
   planner_tour_completed: 'activation',
   try_funnel_viewed: 'acquisition',
   try_task_added: 'activation',

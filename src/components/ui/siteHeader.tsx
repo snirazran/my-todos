@@ -20,6 +20,7 @@ import { signOutNativeGoogle } from '@/lib/googleAuth';
 import { signOutNativeApple } from '@/lib/appleAuth';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useInventory } from '@/hooks/useInventory';
+import { useFriendPondBadge } from '@/hooks/useFriendPondBadge';
 import IntegrationsPanel, {
   useCalendarConnections,
 } from '@/components/ui/CalendarSyncSection';
@@ -88,12 +89,7 @@ export default function SiteHeader() {
   );
   const questClaimableCount = questsData?.claimableCount ?? 0;
 
-  const { data: friendsData } = useSWR<{ claimable?: number }>(
-    user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,
-    bootstrapFetcher,
-    { revalidateOnFocus: false },
-  );
-  const friendClaimable = friendsData?.claimable ?? 0;
+  const friendClaimable = useFriendPondBadge();
   const { data: buddyInvitesData } = useSWR<{ incoming?: unknown[] }>(
     user ? '/api/buddy/invite' : null,
     bootstrapFetcher,

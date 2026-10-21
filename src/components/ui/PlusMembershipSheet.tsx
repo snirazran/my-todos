@@ -112,7 +112,7 @@ export function PlusMembershipSheet({
     >
       {({ entered, bindScroll }) => (
         <div className="flex max-h-[92dvh] flex-col sm:max-h-[calc(100dvh-3rem)]">
-          <Hero
+          <PlusSheetHero
             headline={HEADLINES[phase]}
             pill={pill}
             onClose={onClose}
@@ -152,7 +152,7 @@ export function PlusMembershipSheet({
   );
 }
 
-function Hero({
+export function PlusSheetHero({
   headline,
   pill,
   onClose,

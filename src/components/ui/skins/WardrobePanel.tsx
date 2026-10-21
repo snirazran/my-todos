@@ -81,7 +81,6 @@ import {
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
-import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import {
   CollectionBook,
   DealTileRow,
@@ -393,8 +392,6 @@ function WardrobeManagerContent({
   };
 
   const [rerolling, setRerolling] = useState(false);
-
-  useRewardedAdPreload('shop_reroll', !data?.isPremium);
 
   const rerollDeals = async (asPlus = false) => {
     if (rerolling) return;

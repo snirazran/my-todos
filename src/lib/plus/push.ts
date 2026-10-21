@@ -14,7 +14,8 @@ export async function sendPlusPush(
   opts: {
     title: string;
     body: string;
-    type: 'plus_trial_reminder';
+    type: 'plus_trial_reminder' | 'plus_trial_ending';
+    path?: string;
   },
 ) {
   try {
@@ -32,7 +33,7 @@ export async function sendPlusPush(
           await messaging.send({
             token,
             notification: { title: opts.title, body: opts.body },
-            data: { type: opts.type, path: '/' },
+            data: { type: opts.type, path: opts.path ?? '/' },
             android: {
               priority: 'high' as const,
               notification: {

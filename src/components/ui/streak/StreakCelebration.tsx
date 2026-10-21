@@ -101,7 +101,9 @@ export function StreakCelebration({
     busy: doubling,
     error: doubleError,
     plusModal,
-  } = useRewardGate('streak_commitment_double');
+  } = useRewardGate('streak_commitment_double', {
+    preload: !!claimId && !doubled && baseFlies > 0,
+  });
 
   useEffect(() => {
     setFlies(baseFlies);

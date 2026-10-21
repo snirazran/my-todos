@@ -10,6 +10,7 @@ import FriendshipModel from '@/lib/models/Friendship';
 import UserModel from '@/lib/models/User';
 import { addUtcDays, resolveRange, ymd } from '@/lib/analytics/report/context';
 import { toCsv } from '@/lib/analytics/export';
+import { PASSIVE_ANALYTICS_EVENTS } from '@/lib/analytics/events';
 import { channelKeyFor, channelLabel, pathFor } from '@/lib/analytics/report/acquisition';
 import type { UserAcquisition } from '@/lib/attribution/classify';
 
@@ -172,6 +173,7 @@ export async function GET(req: NextRequest) {
   const eventMatch: PipelineStage.Match['$match'] = {
     occurredAt: window,
     userId: { $not: /^anonymous:/ },
+    name: { $nin: PASSIVE_ANALYTICS_EVENTS },
   };
   if (platform !== 'any') eventMatch.platform = platform;
 
