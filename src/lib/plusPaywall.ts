@@ -43,11 +43,6 @@ const SUPPORT: PlusBenefit = {
   title: 'Support a small indie team',
   body: 'Help us keep making Frogress better.',
 };
-const NO_ADS: PlusBenefit = {
-  icon: 'x2',
-  title: 'Every bonus, no ads',
-  body: 'Quest rewards and gifts double on their own.',
-};
 const REWARDS: PlusBenefit = {
   icon: 'x2',
   title: '2× flies from daily quests',
@@ -65,6 +60,8 @@ const STREAK: PlusBenefit = {
 };
 
 export function getPlusContext(placement: string, frogName?: string): PaywallContext {
+  const base = placement.replace(/^(skip_ads|after_ad)_/, '');
+  if (base !== placement) return getPlusContext(base, frogName);
   const name = frogName?.trim() || 'your frog';
   const context: PaywallContext = {
     headline: 'Commit to your goals.',
@@ -78,13 +75,6 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     accent: 'Get two prizes every time.',
     sub: 'Two prizes in every gift, double flies and a weekly coach.',
     benefits: [GIFTS, COACH, SUPPORT],
-  };
-  if (placement.startsWith('skip_ads_') || placement.startsWith('after_ad_')) return {
-    ...context,
-    headline: 'Skip the ads.',
-    accent: 'Keep every bonus.',
-    sub: 'Plus doubles quest rewards and gifts for you. No ads to watch.',
-    benefits: [NO_ADS, COACH, SUPPORT],
   };
   if (placement === 'wardrobe_looks') return {
     ...context,
@@ -152,9 +142,10 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   };
   if (placement === 'fly_shop_free_flies' || placement === 'premium_daily_deal' || placement.endsWith('_double')) return {
     ...context,
-    headline: 'Your next look is calling.',
-    accent: 'Make more of each quest.',
-    sub: 'Earn double the flies from daily quests toward outfits you love.',
+    headline: 'Double every reward.',
+    accent: 'Instantly, every time.',
+    sub: 'Plus doubles your quest rewards and gifts for you.',
+    benefits: [DOUBLE, COACH, SUPPORT],
   };
   return context;
 }
