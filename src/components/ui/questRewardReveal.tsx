@@ -5,9 +5,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import { FlyGlyph, PlusOfferButton, RewardCard, SkipAdsLink } from './gift-box/RewardCard';
-import { PlusUpgradeModal } from './PlusUpgradeModal';
-import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
+import { FlyGlyph, PlusOfferButton, RewardCard } from './gift-box/RewardCard';
+import { afterAdPlacement } from '@/lib/plusPaywall';
 import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
@@ -645,7 +644,6 @@ function FlyDoubleOffer() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [held, setHeld] = useState(false);
-  const [plusOffer, setPlusOffer] = useState<NonNullable<typeof offer> | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const remainingRef = useRef(OFFER_MS);
 
@@ -677,14 +675,14 @@ function FlyDoubleOffer() {
   }, [offer, revealBusy, visible]);
 
   useEffect(() => {
-    if (!visible || busy || held || plusOffer) return;
+    if (!visible || busy || held) return;
     const startedAt = Date.now();
     const timer = window.setTimeout(() => setVisible(false), remainingRef.current);
     return () => {
       window.clearTimeout(timer);
       remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
     };
-  }, [visible, busy, held, plusOffer]);
+  }, [visible, busy, held]);
 
   if (typeof document === 'undefined') return null;
 
@@ -719,7 +717,6 @@ function FlyDoubleOffer() {
   };
 
   return createPortal(
-    <>
     <AnimatePresence
       onExitComplete={() => {
         if (!revealStore.getState().flyOffer) return;
@@ -742,38 +739,30 @@ function FlyDoubleOffer() {
           onBlurCapture={() => setHeld(false)}
           className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[1310] mx-auto w-[min(calc(100vw-24px),360px)] md:bottom-[calc(env(safe-area-inset-bottom)+24px)]"
         >
-          <div className="relative">
-            <PlusOfferButton
-              mode="ad"
-              intent="double"
-              visual={<FlyGlyph />}
-              badge="×2"
-              title="Double your reward"
-              anchor={{ from: offer.amount, to: offer.amount * 2, unit: 'flies', ready: true }}
-              busy={busy}
-              busyLabel="Loading ad..."
-              onClick={() => void double()}
-            />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-x-5 -bottom-1.5 h-[3px] overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
-            >
-              <span
-                key={offer.id}
-                className="block h-full origin-left rounded-full bg-amber-400"
-                style={{
-                  animation: `toast-countdown ${OFFER_MS}ms linear forwards`,
-                  animationPlayState: busy || held || plusOffer ? 'paused' : 'running',
-                }}
-              />
-            </span>
-          </div>
-          <SkipAdsLink
-            label="Double it with Plus"
-            disabled={busy}
-            onClick={() => setPlusOffer(offer)}
-            className="mt-2.5 w-fit bg-card/95 text-foreground shadow-md ring-1 ring-border/60 backdrop-blur hover:bg-card"
+          <PlusOfferButton
+            mode="ad"
+            intent="double"
+            visual={<FlyGlyph />}
+            badge="×2"
+            title="Double your reward"
+            anchor={{ from: offer.amount, to: offer.amount * 2, unit: 'flies', ready: true }}
+            busy={busy}
+            busyLabel="Loading ad..."
+            onClick={() => void double()}
           />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-5 -bottom-1.5 h-[3px] overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
+          >
+            <span
+              key={offer.id}
+              className="block h-full origin-left rounded-full bg-amber-400"
+              style={{
+                animation: `toast-countdown ${OFFER_MS}ms linear forwards`,
+                animationPlayState: busy || held ? 'paused' : 'running',
+              }}
+            />
+          </span>
           <button
             type="button"
             onClick={dismiss}
@@ -785,19 +774,7 @@ function FlyDoubleOffer() {
           </button>
         </motion.div>
       )}
-    </AnimatePresence>
-    <PlusUpgradeModal
-      open={!!plusOffer}
-      placement={skipAdsPlacement(plusOffer?.placement ?? 'double_reward')}
-      onStartTrial={async () => {
-        if (!plusOffer) return;
-        const { bonus, balanceAfter } = await plusOffer.run();
-        landFlies(bonus, balanceAfter, panelRef.current);
-        setVisible(false);
-      }}
-      onClose={() => setPlusOffer(null)}
-    />
-    </>,
+    </AnimatePresence>,
     document.body,
   );
 }

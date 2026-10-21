@@ -195,7 +195,7 @@ export function SkipAdsLink({
       disabled={disabled}
       aria-label={`${label}. Try it free.`}
       className={cn(
-        'group mx-auto mt-1 flex min-h-11 items-center justify-center gap-2 rounded-2xl px-3 py-1.5 text-[15px] font-black transition-[transform,background-color] duration-150 active:scale-95 disabled:opacity-50',
+        'group mx-auto -mt-2 mb-3 flex min-h-10 items-center justify-center gap-2 rounded-2xl px-3 py-1 text-[15px] font-black transition-[transform,background-color] duration-150 active:scale-95 disabled:opacity-50',
         tone === 'light' ? 'text-white hover:bg-white/15' : 'text-amber-200 hover:bg-white/10',
         className,
       )}
