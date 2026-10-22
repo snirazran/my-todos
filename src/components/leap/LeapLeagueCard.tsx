@@ -12,6 +12,7 @@ import {
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { openShieldSheet } from '@/hooks/useShields';
 import { useUIStore } from '@/lib/uiStore';
+import { cn } from '@/lib/utils';
 import { tileRewards } from '@/lib/leap/format';
 import type { LeapView } from '@/lib/leap/types';
 import { LeapRail, type LeapStop } from './LeapRail';
@@ -185,7 +186,12 @@ export function LeapLeagueCard() {
         </div>
 
         <div className="flex items-center gap-3 border-t border-border/50 py-3 pl-3.5 pr-3">
-          <span className="min-h-11 min-w-11 shrink-0 rounded-xl">
+          <span
+            className={cn(
+              'min-h-11 min-w-11 shrink-0 rounded-xl',
+              landed && 'opacity-45 grayscale-[0.4]',
+            )}
+          >
             {competing ? (
               <QuestRewardTileBadge
                 rewards={tileRewards(leapWeekRewards(view))}
@@ -208,7 +214,12 @@ export function LeapLeagueCard() {
               )}
               <span className="min-w-0">{leapStatus(view)}</span>
             </span>
-            {competing && <LeapTrack view={view} />}
+            {competing && !landed && <LeapTrack view={view} />}
+            {competing && landed && (
+              <span className="text-[12.5px] font-semibold leading-snug text-muted-foreground">
+                Extra habits still earn flies
+              </span>
+            )}
             {!repeating && (
               <button
                 type="button"

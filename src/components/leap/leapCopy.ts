@@ -96,8 +96,14 @@ function startsNextWeek(view: LeapView) {
 
 export function leapRule(view: LeapView): string {
   if (!leapHasHabits(view) || !leapCompeting(view)) return 'Your weekly habit league';
+  const next = nextLeagueName(view);
+  if (view.week.leap.reached) {
+    return next
+      ? `You move up to the ${leagueTitle(next)} when the week ends`
+      : 'You won the top prize this week';
+  }
   const target = habitsWord(leapTarget(view));
-  return nextLeagueName(view)
+  return next
     ? `Finish ${target} to advance to the next league`
     : `Finish ${target} to win the top prize`;
 }
@@ -112,7 +118,7 @@ export function leapStatus(view: LeapView): string {
   }
   const next = nextLeagueName(view);
   if (week.leap.reached) {
-    return next ? "You're in the promotion zone!" : 'Top prize won this week';
+    return next ? 'Promotion locked in!' : 'Top prize won this week';
   }
   if (!leapCompeting(view)) {
     if (startsNextWeek(view)) return `Your league week starts ${weekdayOf(week.weekKey)}`;

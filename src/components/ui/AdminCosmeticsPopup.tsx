@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import Frog from '@/components/ui/frog';
 import { cn } from '@/lib/utils';
 import { availabilityStateAt } from '@/lib/skins/availability';
+import { EconomyUpdatePanel } from '@/components/admin/EconomyUpdatePanel';
 
 type CosmeticSlot = 'skin' | 'hat' | 'body' | 'hand_item';
 
@@ -327,6 +328,8 @@ export function AdminCosmeticsPopup({
                 {result.message}
               </motion.div>
             )}
+
+            <EconomyUpdatePanel onApplied={loadDbItems} />
 
             <div className="mb-4 rounded-2xl border border-border/60 bg-muted/25 p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
