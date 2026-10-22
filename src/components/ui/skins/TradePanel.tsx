@@ -1636,6 +1636,7 @@ export function TradePanel({
                 claiming={false}
                 onClaim={handleClaimReward}
                 paused={paused}
+                offerEquip
               />
               {rerollClaimId && (
                 <motion.div

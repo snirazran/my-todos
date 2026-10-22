@@ -6,15 +6,29 @@ import {
   useReducedMotion,
   Variants,
 } from 'framer-motion';
-import { ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
+import { mutate as mutateGlobal } from 'swr';
+import { Check, ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
 import { afterAdPlacement } from '@/lib/plusPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { useRewardGate } from '@/hooks/useRewardGate';
+import {
+  beginEquipMutation,
+  endEquipMutation,
+  INVENTORY_KEY,
+  INVENTORY_SUMMARY_KEY,
+  mutateInventoryCaches,
+  useInventory,
+} from '@/hooks/useInventory';
+import {
+  BACKGROUNDS_KEY,
+  mutateBackgrounds,
+  useBackgrounds,
+} from '@/hooks/useBackgrounds';
 import { ItemDef, type Rarity } from '@/lib/skins/catalog';
-import { hapticTick } from '@/lib/haptics';
+import { hapticSelect, hapticTick } from '@/lib/haptics';
 import {
   canFlyToInventory,
   flyFliesToCounter,
@@ -51,6 +65,7 @@ type RewardCardProps = {
   upsell?: React.ReactNode;
   paused?: boolean;
   flyCollectAmount?: number;
+  offerEquip?: boolean;
 };
 
 const GLOW_COLORS = {
@@ -77,6 +92,104 @@ const GIFT_SPARKLES = [
   { className: '-right-1 top-1 h-3 w-3', delay: '0.9s' },
   { className: 'right-10 -bottom-1 h-3.5 w-3.5', delay: '1.7s' },
 ];
+
+async function equipReward(prize: Prize) {
+  beginEquipMutation();
+  try {
+    const res =
+      prize.kind === 'background'
+        ? await fetch('/api/backgrounds/equip', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: prize.id }),
+          })
+        : await fetch('/api/skins/inventory', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot: prize.slot, itemId: prize.id }),
+          });
+    if (!res.ok) throw new Error('Failed to equip');
+    if (prize.kind === 'background') {
+      mutateGlobal(
+        BACKGROUNDS_KEY,
+        (curr: any) => (curr ? { ...curr, equipped: prize.id } : curr),
+        { revalidate: false },
+      );
+      return;
+    }
+    const patch = (curr: any) =>
+      curr?.wardrobe
+        ? {
+            ...curr,
+            wardrobe: {
+              ...curr.wardrobe,
+              equipped: { ...curr.wardrobe.equipped, [prize.slot]: prize.id },
+            },
+          }
+        : curr;
+    mutateGlobal(INVENTORY_KEY, patch, { revalidate: false });
+    mutateGlobal(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
+  } catch {
+    mutateInventoryCaches();
+    mutateBackgrounds();
+  } finally {
+    endEquipMutation();
+  }
+}
+
+function EquipCheckbox({
+  checked,
+  disabled,
+  rarity,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  rarity: Rarity;
+  onChange: (checked: boolean) => void;
+}) {
+  const palette = GIFT_BUTTON_PALETTE[rarity] ?? GIFT_BUTTON_PALETTE.common;
+  return (
+    <label
+      className={cn(
+        'relative mx-auto -mb-1 flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-2xl px-3 text-[15px] font-black text-white/85 transition-colors hover:bg-white/10 hover:text-white',
+        disabled && 'pointer-events-none opacity-60',
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => {
+          hapticSelect();
+          onChange(event.target.checked);
+        }}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden
+        className={cn(
+          'grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-[background-color,border-color] duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-white peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-slate-950',
+          !checked && 'border-white/45 bg-white/5',
+        )}
+        style={
+          checked
+            ? { backgroundColor: palette.bottom, borderColor: palette.top }
+            : undefined
+        }
+      >
+        <Check
+          className={cn(
+            'h-4 w-4 text-white transition-transform duration-150',
+            checked ? 'scale-100' : 'scale-0',
+          )}
+          strokeWidth={3.5}
+        />
+      </span>
+      Also equip
+    </label>
+  );
+}
 
 function GiftOpenButton({
   rarity,
@@ -436,16 +549,26 @@ export const RewardCard = ({
   upsell,
   paused = false,
   flyCollectAmount,
+  offerEquip = false,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
   const [launched, setLaunched] = useState(false);
+  const [equipOnClaim, setEquipOnClaim] = useState(false);
   const artRef = useRef<HTMLDivElement | null>(null);
   const stampRef = useRef<HTMLCanvasElement | null>(null);
   const releaseHoldRef = useRef<(() => void) | null>(null);
   const collectsFlies = !!flyCollectAmount && flyCollectAmount > 0;
   const itemFlight =
     !customPreview && !(flyCollectAmount && flyCollectAmount > 0) && prize.slot !== 'container';
+  const isBackgroundPrize = prize.kind === 'background';
+  const equippable = offerEquip && itemFlight;
+  const { data: inventoryData } = useInventory(equippable && !isBackgroundPrize, true);
+  const { data: backgroundsData } = useBackgrounds(equippable && isBackgroundPrize);
+  const alreadyWearing = isBackgroundPrize
+    ? backgroundsData?.equipped === prize.id
+    : inventoryData?.wardrobe?.equipped?.[prize.slot] === prize.id;
+  const showEquip = equippable && (!alreadyWearing || equipOnClaim);
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
   const isSpare = !quantity && !!spareCount && spareCount > 1;
@@ -515,6 +638,7 @@ export const RewardCard = ({
 
   const handleClaimClick = () => {
     setLocalClaiming(true);
+    if (showEquip && equipOnClaim) void equipReward(prize);
     launchCollect();
     setTimeout(() => {
       onClaim();
@@ -779,6 +903,14 @@ export const RewardCard = ({
           />
         )}
         {upsell}
+        {showEquip && (
+          <EquipCheckbox
+            checked={equipOnClaim}
+            disabled={isProcessing || !showContent}
+            rarity={prize.rarity}
+            onChange={setEquipOnClaim}
+          />
+        )}
         {prize.slot === 'container' && !hasUpsell ? (
           <GiftOpenButton
             rarity={prize.rarity}

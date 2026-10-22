@@ -66,6 +66,7 @@ export function GiftClaimRewardOverlay({
             claiming={false}
             onClaim={onClose}
             slotLabel={gift.slot.replace('_', ' ')}
+            offerEquip
           />
         </div>
       </motion.div>

@@ -935,6 +935,7 @@ function QuestRewardRevealOverlay({
               }
               onWatchAd={() => onWatchAd(entry)}
               doublePlacement="quest_reward_double"
+              offerEquip
               rewardAmount={entry.fliesGranted || undefined}
               paused={paused}
               customPreview={

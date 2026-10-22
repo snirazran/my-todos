@@ -877,7 +877,7 @@ export function QuestPath({ stops }: { stops: QuestPathStop[] }) {
                     ? 'opacity-0'
                     : topReached
                       ? 'w-[3px] bg-[#4f9149]'
-                      : 'border-l-[2.5px] border-dashed border-muted-foreground/30',
+                      : 'w-[2.5px] bg-[linear-gradient(currentColor_6px,transparent_6px)] bg-[length:100%_11px] bg-top text-muted-foreground/30',
                 )}
               />
               <span className="relative z-10 py-1">
@@ -890,7 +890,7 @@ export function QuestPath({ stops }: { stops: QuestPathStop[] }) {
                     ? 'opacity-0'
                     : bottomReached
                       ? 'w-[3px] bg-[#4f9149]'
-                      : 'border-l-[2.5px] border-dashed border-muted-foreground/30',
+                      : 'w-[2.5px] bg-[linear-gradient(currentColor_6px,transparent_6px)] bg-[length:100%_11px] bg-bottom text-muted-foreground/30',
                 )}
               />
             </span>
