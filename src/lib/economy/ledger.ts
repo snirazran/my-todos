@@ -172,9 +172,29 @@ export async function fliesGrantedInRange(
   return row?.total ?? 0;
 }
 
+const BREAKER_EXEMPT_MATCH = {
+  $nor: [
+    { source: { $in: ['purchase', 'admin'] } },
+    { 'meta.welcome': true },
+    { source: 'shop_gift', 'meta.first': true },
+  ],
+};
+
+export async function fliesCountedTowardBreaker(
+  userId: string,
+  dayKey: string,
+): Promise<number> {
+  await connectMongo();
+  const [row] = await FlyLedgerModel.aggregate<{ total: number }>([
+    { $match: { userId, dayKey, amount: { $gt: 0 }, ...BREAKER_EXEMPT_MATCH } },
+    { $group: { _id: null, total: { $sum: '$amount' } } },
+  ]);
+  return row?.total ?? 0;
+}
+
 async function breakerHeadroom(userId: string, dayKey: string) {
   const config = await loadFlyEconomyConfig();
-  const spentToday = await fliesGrantedOnDay(userId, dayKey);
+  const spentToday = await fliesCountedTowardBreaker(userId, dayKey);
   return Math.max(0, config.circuitBreaker.dailyCap - spentToday);
 }
 
@@ -331,7 +351,7 @@ export async function logFlyGrant(args: {
 
     if (amount > 0) {
       const config = await loadFlyEconomyConfig();
-      const total = await fliesGrantedOnDay(args.userId, args.dayKey);
+      const total = await fliesCountedTowardBreaker(args.userId, args.dayKey);
       if (total > config.circuitBreaker.dailyCap) {
         console.warn('[fly-economy] circuit breaker exceeded', {
           userId: args.userId,

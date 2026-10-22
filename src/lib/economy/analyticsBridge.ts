@@ -19,6 +19,7 @@ const ALREADY_LEDGERED = new Set([
   'deep_focus',
   'shop_gift',
   'leap',
+  'friend_cheer',
 ]);
 
 /**
@@ -31,7 +32,9 @@ const SOURCE_MAP: Record<string, FlySource> = {
   quest_objective: 'quest',
   quest_reward: 'quest',
   quest_streak: 'quest',
+  quest_sweep_roll: 'quest',
   move_to_web: 'quest',
+  season: 'season',
   season_reward: 'season',
   daily_reward: 'daily_reward',
   login_streak: 'login_streak',
@@ -40,8 +43,10 @@ const SOURCE_MAP: Record<string, FlySource> = {
   pact_retro: 'pact',
   fly_game: 'fly_game',
   cross_gift: 'cross_gift',
+  cross_platform_gift: 'cross_gift',
   campaign: 'campaign',
   purchase: 'purchase',
+  revenuecat: 'purchase',
   rewarded_ad_double: 'rewarded_ad',
   hunger_recover: 'other',
 };
@@ -67,14 +72,19 @@ export async function bridgeFlyEarnedToLedger(input: {
   const amount = Number(input.properties?.fly_amount);
   if (!Number.isFinite(amount) || amount === 0) return;
 
+  const welcome =
+    rawSource === 'quest_objective' &&
+    input.properties?.quest_placement === 'onboarding';
   const dayKey = getZonedToday(await storedEconomyTimezone(input.userId));
   await logFlyGrant({
     userId: input.userId,
     source,
-    occurrenceKey: `rollup:${rawSource}:${dayKey}`,
+    occurrenceKey: welcome
+      ? `rollup:onboarding:${dayKey}`
+      : `rollup:${rawSource}:${dayKey}`,
     dayKey,
     amount,
-    meta: { rollup: true, reported: rawSource },
+    meta: { rollup: true, reported: rawSource, ...(welcome ? { welcome: true } : {}) },
   });
 }
 

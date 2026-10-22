@@ -2,7 +2,7 @@ import { shopDay } from '@/lib/skins/dailyDeal';
 import type { ShopSalesConfig } from '@/lib/skins/shopSales';
 import type { FlyEconomyConfig } from './defaults';
 import { economyDayKey, economyTimezoneFor, type EconomyTimezoneUser } from './guards';
-import { fliesGrantedOnDay } from './ledger';
+import { fliesCountedTowardBreaker } from './ledger';
 import { shopGiftStatus, type ShopGiftStatus } from './shopGift';
 
 export async function shopGiftHeadroom(
@@ -10,7 +10,7 @@ export async function shopGiftHeadroom(
   timezone: string,
   economy: FlyEconomyConfig,
 ): Promise<number> {
-  const granted = await fliesGrantedOnDay(userId, economyDayKey(timezone));
+  const granted = await fliesCountedTowardBreaker(userId, economyDayKey(timezone));
   return Math.max(0, economy.circuitBreaker.dailyCap - granted);
 }
 
@@ -42,7 +42,7 @@ export async function loadShopGiftStatus({
   const open =
     economy.shopGift.enabled &&
     claimedDayKey !== shop.dayKey &&
-    (await shopGiftHeadroom(userId, zone, economy)) > 0;
+    (!claimedDayKey || (await shopGiftHeadroom(userId, zone, economy)) > 0);
   return shopGiftStatus(claimedDayKey, shop, open, {
     balance,
     premium,

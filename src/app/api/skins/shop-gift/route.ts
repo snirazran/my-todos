@@ -66,8 +66,9 @@ export async function POST(req: NextRequest) {
     const roll = rollShopGift(balanceBefore, premium, config.shopGift, first);
 
     const ledgerDay = economyDayKey(tz);
-    const headroom = await shopGiftHeadroom(userId, tz, config);
-    const amount = Math.min(roll.amount, headroom);
+    const amount = first
+      ? roll.amount
+      : Math.min(roll.amount, await shopGiftHeadroom(userId, tz, config));
     if (amount <= 0) {
       return json({ granted: false, reason: 'breaker', endsAt: shop.endsAt });
     }

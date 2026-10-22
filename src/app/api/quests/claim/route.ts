@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
         properties: {
           source: 'quest_objective',
           fly_amount: rewardSummary.fliesGranted,
+          quest_placement: quest?.placement,
           is_premium: !!analyticsUser?.premiumUntil && new Date(analyticsUser.premiumUntil) > new Date(),
         },
       });

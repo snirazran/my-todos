@@ -139,7 +139,7 @@ export function FrogBellyDeck({
   const subtitle =
     feedActive && feed && feed.to >= 97 ? 'Belly full!' : hint;
   const caption =
-    feedActive && feed ? (feed.to >= 97 ? 'Belly full!' : title) : hint;
+    feedActive && feed ? (feed.to >= 97 ? 'Belly full!' : title) : 'Hunger';
 
   const content = (
     <div
