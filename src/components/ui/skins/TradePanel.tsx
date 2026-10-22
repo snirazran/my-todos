@@ -1671,6 +1671,7 @@ export function TradePanel({
                   {!isPremium && rewardedAdsAvailable() && (
                     <SkipAdsLink
                       label="Reroll with Plus"
+                      placement="trade_reroll"
                       disabled={rerollBusy}
                       onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
                     />

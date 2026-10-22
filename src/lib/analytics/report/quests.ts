@@ -64,7 +64,7 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
   const comebacks = context.metric('leap_comeback');
   const lilies = context.metric('leap_lily_reached');
   const retro = context.metric('leap_retro_claimed');
-  const dailyReward = context.metric('daily_reward_claimed');
+  const sweepRolls = context.metric('sweep_roll_claimed');
   const seasonReward = context.metric('season_reward_claimed');
 
   const objectivePerformance: StatTable = {
@@ -185,13 +185,13 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
         question: 'Does quest engagement track the release of new content, or drift on its own?',
         lines: [
           { key: 'objectives', label: 'Objectives claimed', format: 'integer' },
-          { key: 'daily_reward', label: 'Daily rewards', format: 'integer' },
+          { key: 'sweep', label: 'Clean Sweep rolls', format: 'integer' },
           { key: 'leap', label: 'Leaps landed', format: 'integer' },
         ],
         points: context.dates.map((date, index) => ({
           date,
           objectives: context.seriesFor('quest_objective_claimed')[index] ?? 0,
-          daily_reward: context.seriesFor('daily_reward_claimed')[index] ?? 0,
+          sweep: context.seriesFor('sweep_roll_claimed')[index] ?? 0,
           leap: context.seriesFor('leap_landed')[index] ?? 0,
         })),
       },
@@ -237,7 +237,7 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
         ],
         rows: [
           { surface: 'Quest objectives', total: objectives },
-          { surface: 'Login calendar', total: dailyReward },
+          { surface: 'Clean Sweep roll', total: sweepRolls },
           { surface: 'Season track', total: seasonReward },
           { surface: 'Leaps', total: landed },
         ].map((row) => ({

@@ -15,6 +15,7 @@ import {
   type SyncDirection,
 } from '@/hooks/useCalendarSync';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const SUCCESS_HOLD_MS = 2200;
 const GLOW_STRONG = 'rgba(79,145,73,0.28)';
@@ -91,6 +92,7 @@ export default function CalendarConnectSheet({
   eyebrow,
   title = 'Sync your calendar',
   blurb = 'Your events become tasks. Your tasks become events.',
+  source,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -100,6 +102,7 @@ export default function CalendarConnectSheet({
   eyebrow?: string;
   title?: string;
   blurb?: string;
+  source: string;
 }) {
   const { connections, available, mutate } = useCalendarConnections();
   const [appleOpen, setAppleOpen] = useState(false);
@@ -138,6 +141,10 @@ export default function CalendarConnectSheet({
     const timer = window.setTimeout(() => onOpenChange(false), SUCCESS_HOLD_MS);
     return () => window.clearTimeout(timer);
   }, [connected, onOpenChange]);
+
+  useEffect(() => {
+    if (open) trackAnalyticsEvent('calendar_connect_viewed', { source });
+  }, [open, source]);
 
   useEffect(() => {
     if (open) return;

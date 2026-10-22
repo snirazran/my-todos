@@ -6,6 +6,7 @@ import UserModel from '@/lib/models/User';
 import type { StatSection, StatTable } from '@/lib/analytics/catalog';
 import {
   addUtcDays,
+  groupByProperties,
   kpi,
   rate,
   ratio,
@@ -15,6 +16,14 @@ import {
 } from './context';
 
 const RETENTION_OFFSETS = [1, 3, 7, 14, 30];
+const FIRST_RUN_STEPS = [
+  { step: 'hungry', label: 'Asked to feed the frog' },
+  { step: 'yum', label: 'Fed the frog' },
+  { step: 'streak', label: 'Saw the Day-1 streak' },
+  { step: 'quest', label: 'Shown the quest reward' },
+  { step: 'claiming', label: 'Claimed the reward' },
+  { step: 'finale', label: 'App unlocked' },
+];
 const COHORT_LIMIT = 50_000;
 
 type CohortUser = { _id: unknown; createdAt: Date };
@@ -35,7 +44,7 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     .lean<CohortUser[]>();
   const cohortIds = cohortUsers.map((user) => String(user._id));
 
-  const [activeDayRows, milestoneRows, platformRows, pageRows] =
+  const [activeDayRows, milestoneRows, platformRows, pageRows, onboardingStepRows, firstRunRows, guestRows] =
     await Promise.all([
       cohortIds.length
         ? AnalyticsEventModel.aggregate<{ _id: string; days: string[] }>([
@@ -96,6 +105,32 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
         { $sort: { count: -1 } },
         { $limit: 15 },
       ]),
+      AnalyticsEventModel.aggregate<{ _id: { step: string; index: number }; people: string[] }>([
+        { $match: { occurredAt: context.window, name: 'onboarding_step_viewed' } },
+        {
+          $group: {
+            _id: {
+              step: { $ifNull: ['$properties.step', 'unknown'] },
+              index: { $ifNull: ['$properties.step_index', -1] },
+            },
+            people: { $addToSet: { $ifNull: ['$anonymousId', '$userId'] } },
+          },
+        },
+      ]),
+      AnalyticsEventModel.aggregate<{ _id: string; users: string[] }>([
+        { $match: { occurredAt: context.window, name: 'first_run_step' } },
+        { $group: { _id: { $ifNull: ['$properties.step', 'unknown'] }, users: { $addToSet: '$userId' } } },
+      ]),
+      groupByProperties(
+        {
+          occurredAt: context.window,
+          $or: [
+            { name: 'account_created', 'properties.method': 'guest' },
+            { name: 'guest_account_linked' },
+          ],
+        },
+        { event: '$name', provider: 'provider' },
+      ),
     ]);
 
   const activeDays = new Map(activeDayRows.map((row) => [row._id, new Set(row.days)]));
@@ -188,6 +223,73 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     note: 'Counts only accounts created inside the selected range, so it reads as a true cohort.',
   };
 
+  const onboardingSteps = onboardingStepRows
+    .map((row) => ({ step: row._id.step, index: row._id.index, people: row.people.length }))
+    .sort((a, b) => a.index - b.index);
+  const onboardingTable: StatTable = {
+    key: 'growth.onboarding_steps',
+    title: 'Onboarding steps',
+    question: 'Which onboarding screen do people quit on, before an account even exists?',
+    columns: [
+      { key: 'step', label: 'Step' },
+      { key: 'people', label: 'People', format: 'integer' },
+      { key: 'of_first', label: '% of first step', format: 'percent' },
+      { key: 'step_conversion', label: 'Step-to-step', format: 'percent' },
+    ],
+    rows: onboardingSteps.map((row, index) => ({
+      step: row.step,
+      people: row.people,
+      of_first: rate(row.people, onboardingSteps[0]?.people ?? 0),
+      step_conversion: index === 0 ? 100 : rate(row.people, onboardingSteps[index - 1].people),
+    })),
+    note: 'People are counted by device, since the account is only created on the last step. Counting started October 2026.',
+  };
+
+  const firstRunUsers = new Map(firstRunRows.map((row) => [row._id, row.users.length]));
+  const firstRunStart = firstRunUsers.get(FIRST_RUN_STEPS[0].step) ?? 0;
+  const firstRunTable: StatTable = {
+    key: 'growth.first_run_guide',
+    title: 'Guided first run',
+    question: 'Does the guided first session (feed → streak → claim) get people to the unlocked app?',
+    columns: [
+      { key: 'step', label: 'Step' },
+      { key: 'users', label: 'Users', format: 'integer' },
+      { key: 'of_start', label: '% of start', format: 'percent' },
+    ],
+    rows: FIRST_RUN_STEPS.map(({ step, label }) => ({
+      step: label,
+      users: firstRunUsers.get(step) ?? 0,
+      of_start: rate(firstRunUsers.get(step) ?? 0, firstRunStart),
+    })),
+    note: 'The streak step only shows when the Day-1 streak popup opens, so it can sit below the steps after it. Counting started October 2026.',
+  };
+
+  const guestsCreated = guestRows.find((row) => row._id.event === 'account_created')?.users ?? 0;
+  const linkRows = guestRows.filter((row) => row._id.event === 'guest_account_linked');
+  const linkedTotal = linkRows.reduce((sum, row) => sum + row.users, 0);
+  const guestTable: StatTable = {
+    key: 'growth.guest_accounts',
+    title: 'Guest accounts saved',
+    question: 'Do guests save their frog to a real account, and with which sign-in?',
+    columns: [
+      { key: 'row', label: '' },
+      { key: 'users', label: 'Users', format: 'integer' },
+      { key: 'of_guests', label: '% of new guests', format: 'percent' },
+    ],
+    rows: [
+      { row: 'New guest accounts', users: guestsCreated, of_guests: guestsCreated ? 100 : 0 },
+      { row: 'Saved to an account', users: linkedTotal, of_guests: rate(linkedTotal, guestsCreated) },
+      ...linkRows
+        .sort((a, b) => b.users - a.users)
+        .map((row) => ({
+          row: `  with ${String(row._id.provider)}`,
+          users: row.users,
+          of_guests: rate(row.users, guestsCreated),
+        })),
+    ],
+    note: 'Saves inside the range can come from guests created before it, so the share can run above what a strict cohort would show. Counting started October 2026.',
+  };
+
   const activationRate = rate(reached('task_completed'), cohortUsers.length);
 
   return {
@@ -243,7 +345,10 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
       },
     ],
     tables: [
+      onboardingTable,
       activationTable,
+      firstRunTable,
+      guestTable,
       retentionTable,
       {
         key: 'growth.platforms',

@@ -1,5 +1,5 @@
 import type { StatSection } from '@/lib/analytics/catalog';
-import { kpi, rate, ratio, type ReportContext } from './context';
+import { groupByProperties, kpi, rate, ratio, type ReportContext } from './context';
 import { averagesTable, mixTable, propertyMix } from './dimensions';
 
 const TASK_KEYS = [
@@ -17,6 +17,13 @@ const TASK_KEYS = [
   'count',
 ];
 
+const CALENDAR_STAGES: Record<string, string> = {
+  calendar_connect_viewed: 'Opened the connect sheet',
+  calendar_connected: 'Connected',
+  calendar_disconnected: 'Disconnected',
+  calendar_sync_failed: 'Sync failed',
+};
+
 const TIMER_KEYS = [
   'phase',
   'auto_start_breaks',
@@ -27,11 +34,15 @@ const TIMER_KEYS = [
 ];
 
 export async function buildTasks(context: ReportContext): Promise<StatSection> {
-  const [createdMix, completedMix, timerStartMix, timerDoneMix] = await Promise.all([
+  const [createdMix, completedMix, timerStartMix, timerDoneMix, calendarRows] = await Promise.all([
     propertyMix({ occurredAt: context.window, name: 'task_created' }, TASK_KEYS),
     propertyMix({ occurredAt: context.window, name: 'task_completed' }, TASK_KEYS),
     propertyMix({ occurredAt: context.window, name: 'timer_started' }, TIMER_KEYS),
     propertyMix({ occurredAt: context.window, name: 'timer_completed' }, TIMER_KEYS),
+    groupByProperties(
+      { occurredAt: context.window, name: { $in: Object.keys(CALENDAR_STAGES) } },
+      { stage: '$name', source: 'source', provider: 'provider', direction: 'direction' },
+    ),
   ]);
 
   const created = context.metric('task_created');
@@ -152,6 +163,32 @@ export async function buildTasks(context: ReportContext): Promise<StatSection> {
         question: 'How long is a session that actually runs to the end?',
         rows: timerDoneMix,
       }),
+      {
+        key: 'tasks.calendar_sync',
+        title: 'Calendar sync',
+        question: 'Do people who open the calendar sheet connect, and do connections last?',
+        columns: [
+          { key: 'stage', label: 'Stage' },
+          { key: 'source', label: 'Opened from' },
+          { key: 'provider', label: 'Provider' },
+          { key: 'direction', label: 'Direction' },
+          { key: 'events', label: 'Events', format: 'integer' },
+          { key: 'users', label: 'Users', format: 'integer' },
+        ],
+        rows: calendarRows
+          .map((row) => ({
+            stage: CALENDAR_STAGES[String(row._id.stage)] ?? String(row._id.stage),
+            order: Object.keys(CALENDAR_STAGES).indexOf(String(row._id.stage)),
+            source: String(row._id.source),
+            provider: String(row._id.provider),
+            direction: String(row._id.direction),
+            events: row.count,
+            users: row.users,
+          }))
+          .sort((a, b) => a.order - b.order || b.events - a.events)
+          .map(({ order: _order, ...row }) => row),
+        note: 'Sheet opens are tracked from October 2026; "unknown" means that stage does not carry the field.',
+      },
     ],
   };
 }

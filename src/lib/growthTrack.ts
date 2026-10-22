@@ -15,6 +15,11 @@ const FIRST_PARTY_GROWTH_EVENTS: Record<string, AnalyticsEventName> = {
   funnel_try_on: 'try_cosmetic_previewed',
   funnel_continue_web: 'try_continued',
   funnel_store_click: 'try_store_clicked',
+  xplat_banner_shown: 'xplat_banner_shown',
+  xplat_banner_dismissed: 'xplat_banner_dismissed',
+  xplat_banner_cta: 'xplat_banner_tapped',
+  xplat_gift_shown: 'xplat_gift_shown',
+  xplat_gift_claimed: 'xplat_gift_claimed',
 };
 
 export function trackGrowthEvent(
@@ -28,6 +33,7 @@ export function trackGrowthEvent(
       trackAnalyticsEvent(firstPartyName, {
         ...params,
         is_new_user: params?.isNewUser,
+        gift_platform: params?.platform,
       });
     }
     (window as any).fbq?.('trackCustom', name, params);

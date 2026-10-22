@@ -30,6 +30,7 @@ import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
 import { findTaskStreaksAtRisk } from './taskStreaks';
 import { getRewardPool } from '@/lib/skins/gifts';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import type {
   SkinRarity,
   CheckInResult,
@@ -589,6 +590,17 @@ async function applyStreakRewardGrants(args: {
   recordDoubleableClaim(user, summary);
   await recordPlusEarned(user._id, {
     flies: plusFlyBonus(summary.fliesGranted, multiplier),
+  });
+  await recordAnalyticsEvent({
+    userId: String(user._id),
+    name: 'streak_goal_reached',
+    externalId: `streak_goal_reached:${user._id}:${goalCompleted.days}:${todayKey}`,
+    properties: {
+      days: goalCompleted.days,
+      reward_amount: summary.fliesGranted,
+      reward_count: summary.grantedItemIds.length,
+      is_premium: isPremium,
+    },
   });
 
   return {

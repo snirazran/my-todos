@@ -1,5 +1,6 @@
 import { StatsEventModel as AnalyticsEventModel } from '@/lib/analytics/statsExclusion';
 import type { StatSection, StatTable } from '@/lib/analytics/catalog';
+import { skipAdsPlacement } from '@/lib/plusPaywall';
 import { groupByProperties, kpi, rate, round, type ReportContext } from './context';
 
 const FINANCE_EVENTS = [
@@ -575,6 +576,36 @@ export async function buildMoney(context: ReportContext): Promise<StatSection> {
     })).sort((a, b) => b.requested - a.requested),
   };
 
+  const skipAdsTable: StatTable = {
+    key: 'money.skip_ads',
+    title: 'Plus link under ad offers',
+    question: 'When an ad offer shows the "with Plus" link, how often do people take Plus instead?',
+    columns: [
+      { key: 'placement', label: 'Placement' },
+      { key: 'offered', label: 'Offered', format: 'integer', hint: 'Times the ad offer showed with the Plus link under it.' },
+      { key: 'people', label: 'People', format: 'integer' },
+      { key: 'tapped', label: 'Tapped Plus link', format: 'integer' },
+      { key: 'tap_rate', label: 'Offered → tap', format: 'percent' },
+      { key: 'trials', label: 'Trials started', format: 'integer' },
+    ],
+    rows: adRows
+      .filter((row) => row._id.name === 'skip_ads_offered')
+      .map((row) => {
+        const trigger = skipAdsPlacement(row._id.placement);
+        const tapped = paywallSessions.filter((session) => session.placement === trigger).length;
+        return {
+          placement: row._id.placement,
+          offered: row.count,
+          people: row.users,
+          tapped,
+          tap_rate: rate(tapped, row.count),
+          trials: trials.filter((trial) => trial.placement === trigger).length,
+        };
+      })
+      .sort((a, b) => b.offered - a.offered),
+    note: 'Offered counts every screen that shows the link, from October 2026. Ad taps are left out because the fly-reward Double toast shares the double-reward placements. Trials count store purchases made from the link.',
+  };
+
   const adRequested = Array.from(adPlacements.values()).reduce(
     (sum, values) => sum + (values.ad_requested ?? 0),
     0,
@@ -710,6 +741,7 @@ export async function buildMoney(context: ReportContext): Promise<StatSection> {
         note: `Fly shop opened ${context.events('fly_shop_viewed')} times by ${context.users('fly_shop_viewed')} users.`,
       },
       adTable,
+      skipAdsTable,
     ],
   };
 }

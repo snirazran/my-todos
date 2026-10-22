@@ -27,6 +27,26 @@ import { addUtcDays, kpi, round, startOfUtcDay, ymd, type ReportContext } from '
 
 const COHORT_LIMIT = 50_000;
 const PEOPLE_LIMIT = 1000;
+const TRY_FUNNEL_STEPS: [string, string][] = [
+  ['try_funnel_viewed', 'Opened /try'],
+  ['try_task_added', 'Added a task'],
+  ['try_task_completed', 'Completed it'],
+  ['try_gift_opened', 'Opened the gift'],
+  ['try_cosmetic_previewed', 'Tried the outfit on'],
+  ['try_signin_started', 'Started sign-in'],
+  ['try_signin_skipped', 'Skipped sign-in'],
+  ['try_signup_completed', 'Signed up'],
+  ['try_gift_claimed', 'Claimed the gift'],
+  ['try_continued', 'Continued on web'],
+  ['try_store_clicked', 'Tapped the app store'],
+];
+const PHONE_PITCH_STEPS: [string, string][] = [
+  ['xplat_banner_shown', 'Desktop banner shown'],
+  ['xplat_banner_tapped', 'Opened the QR code'],
+  ['xplat_banner_dismissed', 'Dismissed the banner'],
+  ['xplat_gift_shown', 'Gift shown on the other device'],
+  ['xplat_gift_claimed', 'Gift claimed'],
+];
 const NOT_SET = '(not set)';
 
 const PSEUDO_CHANNELS: Record<string, string> = {
@@ -599,6 +619,36 @@ export async function buildAcquisition(
     };
   };
 
+  const funnelRows = await AnalyticsEventModel.aggregate<{ _id: string; people: string[] }>([
+    {
+      $match: {
+        occurredAt: context.window,
+        name: { $in: [...TRY_FUNNEL_STEPS, ...PHONE_PITCH_STEPS].map(([name]) => name) },
+      },
+    },
+    { $group: { _id: '$name', people: { $addToSet: { $ifNull: ['$anonymousId', '$userId'] } } } },
+  ]);
+  const funnelPeople = new Map(funnelRows.map((row) => [row._id, row.people.length]));
+  const stepTable = (key: string, title: string, question: string, steps: [string, string][], note: string): StatTable => {
+    const first = funnelPeople.get(steps[0][0]) ?? 0;
+    return {
+      key,
+      title,
+      question,
+      columns: [
+        { key: 'step', label: 'Step' },
+        { key: 'people', label: 'People', format: 'integer' },
+        { key: 'of_first', label: '% of first step', format: 'percent' },
+      ],
+      rows: steps.map(([name, label]) => ({
+        step: label,
+        people: funnelPeople.get(name) ?? 0,
+        of_first: pct(funnelPeople.get(name) ?? 0, first),
+      })),
+      note,
+    };
+  };
+
   const channelOrder = Array.from(dailyByChannel.entries())
     .map(([channel, days]) => ({ channel, total: Array.from(days.values()).reduce((sum, value) => sum + value, 0) }))
     .sort((a, b) => b.total - a.total);
@@ -686,6 +736,20 @@ export async function buildAcquisition(
         rows: referrerRows.map((row) => ({ host: row._id, visitors: row.users.length, opens: row.count })),
         note: 'Counts app opens, signed-in or not. "none" is direct traffic, bookmarks, and the native app.',
       },
+      stepTable(
+        'acquisition.try_funnel',
+        'Web /try funnel',
+        'Where do ad visitors on /try drop before they sign up or reach the store?',
+        TRY_FUNNEL_STEPS,
+        'People are counted by device, so a visitor who signs up is still one person. Skipped sign-in and Signed up are alternatives, not steps in a row.',
+      ),
+      stepTable(
+        'acquisition.phone_pitch',
+        'Web → phone pitch',
+        'Does the desktop banner and waiting gift move web users onto the phone app?',
+        PHONE_PITCH_STEPS,
+        'Counted first-party from October 2026; before that these only went to the ad pixels. The gift is shown on the device the person moved to.',
+      ),
       {
         key: 'acquisition.people',
         title: 'New accounts, one row each',

@@ -355,6 +355,7 @@ export function StreakRescueSheet({
                       {canWatchAd && mode === 'ad' && (
                         <SkipAdsLink
                           label="Save streaks with Plus"
+                          placement="streak_rescue"
                           disabled={busy}
                           onClick={() => {
                             if (saved) return;

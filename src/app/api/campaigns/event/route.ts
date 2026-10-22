@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     void recordAnalyticsEvent({
       name: ANALYTICS_NAME[event],
       userId: decoded.uid,
-      properties: { campaignId, elementId: body.elementId ?? null },
+      properties: { campaign_id: campaignId, element_id: body.elementId ?? null },
     });
 
     return NextResponse.json({ ok: true });

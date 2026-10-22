@@ -223,7 +223,7 @@ export default function StarterPlanStep({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     trackAnalyticsEvent('starter_plan_day_start', {
-      dayStart: starterMinutesToTime(sliderMinutes),
+      day_start: starterMinutesToTime(sliderMinutes),
     });
   };
 

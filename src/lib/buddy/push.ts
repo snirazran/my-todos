@@ -1,5 +1,6 @@
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import UserModel from '@/lib/models/User';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 function isInvalidTokenError(err: unknown) {
   const code = (err as { code?: string } | null)?.code;
@@ -33,6 +34,7 @@ export async function sendBuddyPush(
 
     const messaging = getAdminMessaging();
     const invalid: string[] = [];
+    let delivered = 0;
     await Promise.all(
       tokens.map(async (token) => {
         try {
@@ -57,6 +59,7 @@ export async function sendBuddyPush(
               },
             },
           });
+          delivered += 1;
         } catch (err) {
           if (isInvalidTokenError(err)) invalid.push(token);
         }
@@ -68,6 +71,13 @@ export async function sendBuddyPush(
         { _id: userId },
         { $pull: { 'notificationPrefs.fcmTokens': { $in: invalid } } },
       );
+    }
+    if (delivered > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'notification_sent',
+        properties: { notification_type: opts.type },
+      });
     }
   } catch (err) {
     console.error(

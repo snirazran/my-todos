@@ -43,39 +43,70 @@ export async function recordStreakExtended(args: {
   ]);
 }
 
+export async function recordShieldUsed(args: {
+  userId: string;
+  days: string[];
+  shieldCount: number;
+  streakLength: number;
+  isPremium: boolean;
+}) {
+  await recordAnalyticsEvent({
+    userId: args.userId,
+    name: 'streak_shield_used',
+    externalId: `streak_shield_used:${args.userId}:${args.days.join(',')}`,
+    properties: {
+      days_missed: args.days.length,
+      shield_count: args.shieldCount,
+      streak_length: args.streakLength,
+      is_premium: args.isPremium,
+    },
+  });
+}
+
+export async function recordStreakBroken(args: {
+  userId: string;
+  count: number;
+  lastDayKey: string;
+  longestStreak: number;
+  isPremium: boolean;
+}) {
+  await recordAnalyticsEvent({
+    userId: args.userId,
+    name: 'streak_broken',
+    externalId: `streak_broken:${args.userId}:${args.lastDayKey}`,
+    properties: {
+      streak_length: args.count,
+      streak_tier: streakTier(args.count),
+      longest_streak: args.longestStreak,
+      is_premium: args.isPremium,
+    },
+  });
+}
+
 export async function recordStreakEvaluated(args: {
   userId: string;
   result: CheckInResult;
   isPremium: boolean;
 }) {
   const { userId, result, isPremium } = args;
-  const dayKey = result.view?.lastDayKey ?? '';
 
   if (result.shieldConsumedDays.length && !result.extended) {
-    await recordAnalyticsEvent({
+    await recordShieldUsed({
       userId,
-      name: 'streak_shield_used',
-      externalId: `streak_shield_used:${userId}:${result.shieldConsumedDays.join(',')}`,
-      properties: {
-        days_missed: result.shieldConsumedDays.length,
-        shield_count: result.view?.shields ?? 0,
-        streak_length: result.view?.count ?? 0,
-        is_premium: isPremium,
-      },
+      days: result.shieldConsumedDays,
+      shieldCount: result.view?.shields ?? 0,
+      streakLength: result.view?.count ?? 0,
+      isPremium,
     });
   }
 
   if (result.brokeFrom > 0) {
-    await recordAnalyticsEvent({
+    await recordStreakBroken({
       userId,
-      name: 'streak_broken',
-      externalId: `streak_broken:${userId}:${dayKey}`,
-      properties: {
-        streak_length: result.brokeFrom,
-        streak_tier: streakTier(result.brokeFrom),
-        longest_streak: result.view?.longestStreak ?? 0,
-        is_premium: isPremium,
-      },
+      count: result.brokeFrom,
+      lastDayKey: result.view?.lastDayKey ?? '',
+      longestStreak: result.view?.longestStreak ?? 0,
+      isPremium,
     });
   }
 }

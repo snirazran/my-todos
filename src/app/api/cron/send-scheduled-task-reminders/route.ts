@@ -5,6 +5,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { getZonedToday } from '@/lib/utils';
 import {
   dayCandidateFilter,
@@ -131,6 +132,14 @@ async function sendTaskReminder({
       { _id: userId },
       { $pull: { 'notificationPrefs.fcmTokens': { $in: invalidTokens } } },
     );
+  }
+
+  if (sent > 0) {
+    await recordAnalyticsEvent({
+      userId,
+      name: 'notification_sent',
+      properties: { notification_type: 'scheduled_task_reminder' },
+    });
   }
 
   return sent;

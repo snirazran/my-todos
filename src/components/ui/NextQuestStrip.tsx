@@ -250,7 +250,9 @@ export function NextQuestStrip({
   const leapWins =
     !!liveLeap &&
     (holdingLeapAdvance ||
-      (!claimable && !onboardingPending && (leapReachableToday || !nextUp)));
+      (!claimable &&
+        !onboardingPending &&
+        (leapReachableToday || (!nextUp && !liveLeap.week.leap.reached))));
 
   const resolvedCatalog = catalog ?? {};
   const targetQuestId =
@@ -545,7 +547,7 @@ export function NextQuestStrip({
           'urgency = perishability x max(clock, fits-today); score x readiness',
           'perishability: daily = 1 (gone at reset)',
           'reward = flies the NEXT action banks',
-          'leap row: wins after a hop, when a mark is reachable today, or when nothing else is up',
+          'leap row: wins after a hop, when a mark is reachable today, or when nothing else is up and the leap mark is still open',
         ]}
       />
     </div>

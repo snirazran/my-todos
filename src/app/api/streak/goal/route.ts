@@ -9,6 +9,7 @@ import {
   readLoginStreakState,
 } from '@/lib/streak/loginStreak';
 import { isPremiumUser } from '@/lib/quests/engine';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { previousDayKey } from '@/lib/quests/streak';
 import {
   loadShieldConfig,
@@ -85,6 +86,16 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
+
+    await recordAnalyticsEvent({
+      userId,
+      name: 'streak_goal_set',
+      properties: {
+        days,
+        streak_length: liveCount,
+        is_premium: isPremiumUser(user as any),
+      },
+    });
 
     const shieldState = readShieldState(user);
     return NextResponse.json({

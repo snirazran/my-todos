@@ -3,6 +3,7 @@ import type { NotificationPrefs } from '@/lib/types/UserDoc';
 import { previousDayKey } from '@/lib/quests/streak';
 import {
   applyShieldCoverage,
+  computeGap,
   loadLoginStreakConfig,
   readLoginStreakState,
   RESCUE_MIN_TASK_STREAK,
@@ -16,6 +17,7 @@ import {
 import { isPremiumUser } from '@/lib/quests/engine';
 import { findTaskStreaksAtRisk } from '@/lib/streak/taskStreaks';
 import { sendStreakPush } from '@/lib/streak/push';
+import { recordShieldUsed, recordStreakBroken } from '@/lib/streak/analytics';
 import type { TaskStreakAtRisk } from '@/lib/streak/types';
 import {
   rotateIndex,
@@ -300,7 +302,24 @@ export async function runLoginStreakSweep() {
         state = coverage.state;
         shieldState = coverage.shieldState;
         results.covered += 1;
+        await recordShieldUsed({
+          userId,
+          days: coverage.consumed,
+          shieldCount: shieldState.count,
+          streakLength: state.count,
+          isPremium: isPremiumUser(user as any),
+        });
       }
+    }
+
+    if (state.count >= 2 && computeGap(state.lastDayKey, todayKey) === 1) {
+      await recordStreakBroken({
+        userId,
+        count: state.count,
+        lastDayKey: state.lastDayKey,
+        longestStreak: state.longestStreak,
+        isPremium: isPremiumUser(user as any),
+      });
     }
 
     const hasTokens = (prefs?.fcmTokens?.length ?? 0) > 0;

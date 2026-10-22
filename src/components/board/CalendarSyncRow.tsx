@@ -108,7 +108,7 @@ export default function CalendarSyncRow() {
         </button>
       )}
 
-      <CalendarConnectSheet open={sheetOpen} onOpenChange={setSheetOpen} />
+      <CalendarConnectSheet open={sheetOpen} onOpenChange={setSheetOpen} source="planner_row" />
     </>
   );
 }

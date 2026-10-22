@@ -885,8 +885,8 @@ function FrogBand({ desktop = false }: { desktop?: boolean }) {
       <div className={cn(
         'absolute left-1/2 z-20 w-max -translate-x-1/2',
         desktop
-          ? cn('max-w-[80%]', hasHat ? 'bottom-[297px]' : 'bottom-[231px]')
-          : cn('max-w-[min(78%,280px)]', hasHat ? 'bottom-[198px] short:bottom-[139px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[174px]' : 'bottom-[154px] short:bottom-[108px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[136px]'),
+          ? cn('max-w-[80%]', hasHat ? 'bottom-[243px]' : 'bottom-[177px]')
+          : cn('max-w-[min(78%,280px)]', hasHat ? 'bottom-[162px] short:bottom-[113px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[143px]' : 'bottom-[118px] short:bottom-[83px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[104px]'),
       )}>
         <AnimatePresence mode="wait" initial={false}>
           {dressed ? (

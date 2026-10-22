@@ -14,6 +14,7 @@ import { auth } from '@/lib/firebase';
 import { establishSessionCookie } from '@/lib/authCookie';
 import { takeEmailLinkIntent } from '@/lib/emailLinkSettings';
 import { clearOnboardingDraft } from '@/lib/onboardingDraft';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -96,6 +97,7 @@ export default function EmailCallbackPage() {
           }
           throw linkErr;
         }
+        trackAnalyticsEvent('guest_account_linked', { provider: 'email' });
       } else {
         await signInWithEmailLink(auth, emailForLink, href);
       }

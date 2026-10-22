@@ -1,5 +1,6 @@
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import UserModel from '@/lib/models/User';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 function isInvalidTokenError(err: unknown) {
   const code = (err as { code?: string } | null)?.code;
@@ -68,6 +69,13 @@ export async function sendWardrobePush(
         { _id: userId },
         { $pull: { 'notificationPrefs.fcmTokens': { $in: invalid } } },
       );
+    }
+    if (delivered > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'notification_sent',
+        properties: { notification_type: opts.type },
+      });
     }
     return delivered > 0;
   } catch (err) {

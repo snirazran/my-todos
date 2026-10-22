@@ -9,6 +9,7 @@ import {
 } from '@/lib/popupGate';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 export type FirstRunPhase =
   | 'off'
@@ -63,6 +64,7 @@ export function useFirstRun({
   const [phase, setPhase] = useState<FirstRunPhase>('off');
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
+  const trackedPhasesRef = useRef(new Set<FirstRunPhase>());
   const onFinishRef = useRef(onFinish);
   onFinishRef.current = onFinish;
 
@@ -123,6 +125,12 @@ export function useFirstRun({
     }
     const timer = window.setTimeout(() => setPhase('off'), FINALE_MS);
     return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'off' || trackedPhasesRef.current.has(phase)) return;
+    trackedPhasesRef.current.add(phase);
+    trackAnalyticsEvent('first_run_step', { step: phase });
   }, [phase]);
 
   useEffect(() => {

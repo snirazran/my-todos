@@ -11,6 +11,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 export class AppleAccountExistsError extends Error {
   credential: AuthCredential | null;
@@ -139,6 +140,7 @@ export async function signInWithApple({
       await signInWithPopup(auth, provider);
     }
   }
+  if (linkTo) trackAnalyticsEvent('guest_account_linked', { provider: 'apple' });
 }
 
 export async function signInWithExistingApple(

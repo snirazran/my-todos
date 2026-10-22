@@ -198,6 +198,7 @@ export function StreakCelebration({
                       {mode === 'ad' && (
                         <SkipAdsLink
                           label="Double it with Plus"
+                          placement="streak_commitment_double"
                           tone="light"
                           disabled={doubling}
                           onClick={() => skipAds(grantDouble)}

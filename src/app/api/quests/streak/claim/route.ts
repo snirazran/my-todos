@@ -13,15 +13,28 @@ export async function POST(req: NextRequest) {
 
     await connectMongo();
     const rewardSummary = await claimSweepRoll({ userId, timezone });
+    const user = await UserModel.findById(userId).select('premiumUntil').lean();
+    const isPremium = !!user?.premiumUntil && new Date(user.premiumUntil) > new Date();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'sweep_roll_claimed',
+      properties: {
+        roll_tier: rewardSummary.rolled.tier,
+        mega: rewardSummary.rolled.mega,
+        reward_amount: rewardSummary.fliesGranted,
+        reward_count: rewardSummary.grantedItemIds.length + rewardSummary.grantedBackgroundIds.length,
+        shields: rewardSummary.shieldsGranted,
+        is_premium: isPremium,
+      },
+    });
     if (rewardSummary.fliesGranted > 0) {
-      const user = await UserModel.findById(userId).select('premiumUntil').lean();
       await recordAnalyticsEvent({
         userId,
         name: 'fly_earned',
         properties: {
           source: 'quest_sweep_roll',
           fly_amount: rewardSummary.fliesGranted,
-          is_premium: !!user?.premiumUntil && new Date(user.premiumUntil) > new Date(),
+          is_premium: isPremium,
         },
       });
     }

@@ -7,7 +7,8 @@ import {
   FOCUS_FLY_DAILY_CAP,
   CATCH_LEAD_SECONDS,
 } from '@/lib/focusFlies';
-import { FLY_HUNGER_REWARD_MS, MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { calculateHunger, FLY_HUNGER_REWARD_MS, MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { recordHungerFed } from '@/lib/analytics/hunger';
 import { settleFlyGrant } from '@/lib/economy/ledger';
 
 /** A focus phase still on the clock when this flush was taken. */
@@ -119,6 +120,9 @@ async function awardFocusFlies(
       }
     : curveOf('$$seconds');
 
+  const hungerFields = 'wardrobe.hunger wardrobe.lastHungerUpdate premiumUntil';
+  const before = await UserModel.findById(userId).select(hungerFields).lean();
+
   await UserModel.updateOne({ _id: userId }, [
     {
       $set: {
@@ -197,8 +201,18 @@ async function awardFocusFlies(
   // against the day's running total afterwards: the row lands on the same
   // number however many flushes it took to get there.
   const after = await UserModel.findById(userId)
-    .select('wardrobe.focusFlyDaily')
+    .select(`wardrobe.focusFlyDaily ${hungerFields}`)
     .lean<{ wardrobe?: { focusFlyDaily?: { date?: string; earned?: number } } } | null>();
+  if (before && after) {
+    const premiumUntil = (after as { premiumUntil?: Date | null }).premiumUntil;
+    await recordHungerFed({
+      userId,
+      method: 'focus',
+      hungerBefore: calculateHunger(before as any).status.hunger,
+      hungerAfter: calculateHunger(after as any).status.hunger,
+      isPremium: !!premiumUntil && new Date(premiumUntil) > new Date(),
+    });
+  }
   const earnedToday =
     after?.wardrobe?.focusFlyDaily?.date === date
       ? after?.wardrobe?.focusFlyDaily?.earned ?? 0

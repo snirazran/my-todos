@@ -9,7 +9,7 @@ const REVIEW_OUTCOMES: Record<string, string> = {
 };
 
 export async function buildFrog(context: ReportContext): Promise<StatSection> {
-  const [streakMix, notificationRows, openRows, hungerRows, reviewRows] = await Promise.all([
+  const [streakMix, notificationRows, openRows, hungerRows, reviewRows, goalRows] = await Promise.all([
     propertyMix({ occurredAt: context.window, name: 'streak_checked_in' }, [
       'streak_tier',
       'is_premium',
@@ -33,6 +33,10 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
         name: { $in: ['app_review_requested', 'app_review_skipped', 'app_review_suppressed'] },
       },
       { event: '$name', reason: 'reason', blocker: 'blocker', moment: 'moment' },
+    ),
+    groupByProperties(
+      { occurredAt: context.window, name: { $in: ['streak_goal_set', 'streak_goal_reached'] } },
+      { event: '$name', days: 'days' },
     ),
   ]);
 
@@ -134,7 +138,7 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
       {
         key: 'frog.hunger',
         title: 'Hunger recovery',
-        question: 'When the frog goes hungry, do people pay flies or watch an ad — or neither?',
+        question: 'When the frog goes hungry, do people come back and feed it?',
         columns: [
           { key: 'method', label: 'Recovery method' },
           { key: 'events', label: 'Recoveries', format: 'integer' },
@@ -147,6 +151,27 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
           users: row.users,
           share: rate(row.count, hungerStarted.events),
         })),
+      },
+      {
+        key: 'frog.streak_goals',
+        title: 'Streak goals',
+        question: 'Which streak goal do people pledge, and do they keep it?',
+        columns: [
+          { key: 'days', label: 'Goal (days)' },
+          { key: 'set', label: 'Pledged', format: 'integer' },
+          { key: 'reached', label: 'Reached', format: 'integer' },
+          { key: 'reach_rate', label: 'Reached / pledged', format: 'percent' },
+        ],
+        rows: Array.from(new Set(goalRows.map((row) => Number(row._id.days))))
+          .sort((a, b) => a - b)
+          .map((days) => {
+            const count = (event: string) =>
+              goalRows.find((row) => Number(row._id.days) === days && row._id.event === event)?.count ?? 0;
+            const set = count('streak_goal_set');
+            const reached = count('streak_goal_reached');
+            return { days: String(days), set, reached, reach_rate: set ? rate(reached, set) : null };
+          }),
+        note: 'Both counts fall inside the selected range, so a long goal pledged near the end shows as pledged but not yet reached. Counting started October 2026.',
       },
       {
         key: 'frog.app_review',

@@ -91,7 +91,7 @@ import {
   skipOccurrence,
   unskipOccurrence,
 } from '@/lib/occurrenceMoves';
-import { recordHungerStarted } from '@/lib/analytics/hunger';
+import { recordHungerFed, recordHungerStarted } from '@/lib/analytics/hunger';
 import { refundLegacyStolenFlies } from '@/lib/hungerRefund';
 import { extendStreakForCompletion } from '@/lib/streak/loginStreak';
 import { recordStreakExtended } from '@/lib/streak/analytics';
@@ -703,6 +703,7 @@ async function awardFlyForTask(
     if (newHunger >= MAX_HUNGER_MS && hungerBefore < MAX_HUNGER_MS) {
       await bumpQuestMetric({ userId, metric: 'frog_fed_full', timezone: tz });
     }
+    await recordHungerFed({ userId, method: 'task', hungerBefore, hungerAfter: newHunger, isPremium: premium });
     setFields['wardrobe.hunger'] = newHunger;
     setFields['wardrobe.lastHungerUpdate'] = new Date();
   }

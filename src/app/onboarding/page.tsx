@@ -131,6 +131,13 @@ export default function OnboardingPage() {
 
   const currentId = stepIds[step] ?? stepIds[stepIds.length - 1];
 
+  useEffect(() => {
+    trackAnalyticsEvent('onboarding_step_viewed', {
+      step: currentId,
+      step_index: STEP_IDS.indexOf(currentId),
+    });
+  }, [currentId]);
+
   const ageIndex = stepIds.indexOf('age');
   const unitsAt = (index: number) =>
     index + (ageIndex !== -1 && index > ageIndex ? PROFILE_QUESTION_COUNT - 1 : 0);

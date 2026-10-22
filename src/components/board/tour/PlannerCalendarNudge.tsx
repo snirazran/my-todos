@@ -95,6 +95,7 @@ export default function PlannerCalendarNudge() {
     <CalendarConnectSheet
       open={open}
       onOpenChange={close}
+      source="tour_nudge"
       onConnected={() => {
         connectedRef.current = true;
       }}

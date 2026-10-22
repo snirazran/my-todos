@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
         tasks: created,
         offered: items.length,
         areas: usedCategoryIds.length,
-        dayStart,
+        day_start: dayStart,
       },
     });
 

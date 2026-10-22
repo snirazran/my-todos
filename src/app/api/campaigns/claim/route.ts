@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
     void recordAnalyticsEvent({
       name: 'campaign_reward_claimed',
       userId,
-      properties: { campaignId, elementId: elementId || null, grants: summary },
+      properties: { campaign_id: campaignId, element_id: elementId || null },
     });
 
     return json({

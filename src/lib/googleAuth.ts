@@ -10,6 +10,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 export class GoogleAccountExistsError extends Error {
   credential: AuthCredential | null;
@@ -111,6 +112,7 @@ export async function signInWithGoogle({
       await signInWithPopup(auth, provider);
     }
   }
+  if (linkTo) trackAnalyticsEvent('guest_account_linked', { provider: 'google' });
 }
 
 export async function signInWithExistingGoogle(

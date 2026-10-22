@@ -18,6 +18,18 @@ const CLIENT_EVENTS = new Set([
   'ad_completed',
   'ad_dismissed',
   'ad_failed',
+  'skip_ads_offered',
+  'plus_ending_viewed',
+  'plus_ending_tapped',
+  'onboarding_step_viewed',
+  'first_run_step',
+  'xplat_banner_shown',
+  'xplat_banner_dismissed',
+  'xplat_banner_tapped',
+  'xplat_gift_shown',
+  'xplat_gift_claimed',
+  'guest_account_linked',
+  'calendar_connect_viewed',
   'paywall_viewed',
   'paywall_prices_failed',
   'paywall_plan_selected',
@@ -127,6 +139,8 @@ export async function POST(req: NextRequest) {
     name !== 'app_opened' &&
     name !== 'page_viewed' &&
     name !== 'starter_plan_shown' &&
+    name !== 'starter_plan_day_start' &&
+    name !== 'onboarding_step_viewed' &&
     !name.startsWith('try_') &&
     !name.startsWith('fly_game_') &&
     name !== 'referral_invite_opened' &&

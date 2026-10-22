@@ -11,6 +11,7 @@ import { Check, ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { afterAdPlacement } from '@/lib/plusPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { useRewardGate } from '@/hooks/useRewardGate';
@@ -288,17 +289,29 @@ const AD_OFFER_PALETTE = {
 
 export function SkipAdsLink({
   label,
+  placement,
+  visible = true,
   onClick,
   disabled,
   tone = 'dark',
   className,
 }: {
   label: string;
+  placement: string;
+  visible?: boolean;
   onClick: () => void;
   disabled?: boolean;
   tone?: 'dark' | 'light';
   className?: string;
 }) {
+  const trackedRef = useRef(false);
+
+  useEffect(() => {
+    if (!visible || trackedRef.current) return;
+    trackedRef.current = true;
+    trackAnalyticsEvent('skip_ads_offered', { placement });
+  }, [visible, placement]);
+
   return (
     <button
       type="button"
@@ -898,6 +911,8 @@ export const RewardCard = ({
         {showDoubleUpsell && canWatchAd && onWatchAd && (
           <SkipAdsLink
             label="Double it with Plus"
+            placement={doublePlacement}
+            visible={showContent}
             disabled={watchingAd || isProcessing || !showContent}
             onClick={() => skipAds(async () => { await onWatchAd(); })}
           />
