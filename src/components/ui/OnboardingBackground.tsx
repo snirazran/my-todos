@@ -31,7 +31,7 @@ export function OnboardingBackground() {
       key={background?.id ?? 'default-bg'}
       aria-hidden
       style={backgroundFadeMaskStyle}
-      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 block h-[440px] w-full overflow-hidden animate-in fade-in duration-500 md:h-[480px]"
+      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 block h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden animate-in fade-in duration-500 md:h-[480px]"
     >
       {images.webLarge && (
         <source media="(min-width: 1920px)" srcSet={images.webLarge} />

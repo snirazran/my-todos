@@ -27,6 +27,7 @@ export default function WelcomePage() {
   const [loading, setLoading] = useState(false);
   const [adoptionSucceeded, setAdoptionSucceeded] = useState(false);
   const [flyArrived, setFlyArrived] = useState(false);
+  const [frogReady, setFrogReady] = useState(false);
   const isTablet = useMediaQuery('(min-width: 768px)');
   const isDesktop = useMediaQuery('(min-width: 1280px)');
   const tongueMouthOffset = isDesktop
@@ -60,6 +61,7 @@ export default function WelcomePage() {
   // Warm up the onboarding route and its background so the transition after
   // "Adopt your frog" doesn't pay the compile/image cost.
   useEffect(() => {
+    if (!frogReady) return;
     router.prefetch('/onboarding');
     const img = new window.Image();
     if (window.matchMedia('(min-width: 1280px)').matches) {
@@ -69,7 +71,7 @@ export default function WelcomePage() {
     } else {
       img.src = DEFAULT_BACKGROUND_IMAGES.mobile;
     }
-  }, [router]);
+  }, [router, frogReady]);
 
   const handleHatch = async () => {
     setLoading(true);
@@ -158,6 +160,8 @@ export default function WelcomePage() {
               mouthOpen={!!grab}
               mouthOffset={tongueMouthOffset}
               indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+              placeholder
+              onDressed={() => setFrogReady(true)}
             />
           </div>
           </div>
@@ -188,50 +192,24 @@ export default function WelcomePage() {
         </div>
 
         <p
-          className="auth-enter mt-6 text-center text-[11px] leading-relaxed text-muted-foreground"
+          className="auth-enter mt-5 max-w-[17rem] text-center text-xs leading-relaxed text-muted-foreground"
           style={{ '--auth-i': 4 } as any}
         >
-          By continuing, you agree to our{' '}
+          By adopting a frog, you agree to our{' '}
           <Link
             href="/terms"
-            className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            className="font-semibold text-foreground/80 underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/70"
           >
-            Terms of Service
+            Terms
           </Link>{' '}
           and{' '}
           <Link
             href="/privacy"
-            className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            className="font-semibold text-foreground/80 underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/70"
           >
             Privacy Policy
           </Link>
-        </p>
-
-        <p
-          className="auth-enter mt-3 text-center text-[11px] leading-relaxed text-muted-foreground/80"
-          style={{ '--auth-i': 5 } as any}
-        >
-          <Link
-            href="/pricing"
-            className="underline-offset-4 hover:underline"
-          >
-            Pricing
-          </Link>
-          {' · '}
-          <Link
-            href="/refund-policy"
-            className="underline-offset-4 hover:underline"
-          >
-            Refunds
-          </Link>
-          {' · '}
-          <a
-            href="mailto:help@frogress.com"
-            className="underline-offset-4 hover:underline"
-          >
-            Contact
-          </a>
-          {' · '}© {new Date().getFullYear()} Frogress
+          .
         </p>
       </div>
 

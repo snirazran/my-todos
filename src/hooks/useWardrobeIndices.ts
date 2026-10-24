@@ -16,6 +16,12 @@ const CACHE_KEY = 'frog-wardrobe-indices';
 // Leaving mood out lets those reactions be driven imperatively instead.
 type Indices = { skin: number; hat: number; body: number; hand_item: number };
 
+export function primeWardrobeIndicesCache(indices: Indices) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(indices));
+  } catch {}
+}
+
 function getCachedIndices(): Indices | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY);

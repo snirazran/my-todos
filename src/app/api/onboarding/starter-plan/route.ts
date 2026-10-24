@@ -10,9 +10,8 @@ import { createTasksForUser } from '@/app/api/tasks/route';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { buildStarterPlanForAreas } from '@/lib/quests/starterPlanServer';
 import {
-  applyStarterDayStart,
-  normalizeStarterDayStart,
   pickStarterTagColor,
+  STARTER_BASICS_CATEGORY_ID,
   type StarterPlanItem,
 } from '@/lib/quests/starterPlan';
 
@@ -108,16 +107,17 @@ export async function POST(req: NextRequest) {
     const { config, items } = await buildStarterPlanForAreas({
       selectedCategoryIds,
     });
-    const dayStart = normalizeStarterDayStart(body.dayStart);
-    const accepted = applyStarterDayStart(items, dayStart).filter((item) =>
-      acceptedIds.includes(item.id),
-    );
+    const accepted = items.filter((item) => acceptedIds.includes(item.id));
     if (accepted.length === 0) {
       return NextResponse.json({ ok: true, created: 0, categoryTagMap: [] });
     }
 
     const usedCategoryIds = Array.from(
-      new Set(accepted.map((item) => item.categoryId)),
+      new Set(
+        accepted
+          .map((item) => item.categoryId)
+          .filter((id) => id !== STARTER_BASICS_CATEGORY_ID),
+      ),
     );
 
     const tagIdByCategory = new Map<string, string>();
@@ -195,8 +195,6 @@ export async function POST(req: NextRequest) {
           text: item.text,
           repeat: 'weekly',
           days: item.days,
-          ...(item.startTime ? { startTime: item.startTime } : {}),
-          ...(item.reminder ? { reminder: item.reminder } : {}),
           ...(tagId ? { tags: [tagId] } : {}),
         },
         timezone,
@@ -217,7 +215,6 @@ export async function POST(req: NextRequest) {
         tasks: created,
         offered: items.length,
         areas: usedCategoryIds.length,
-        day_start: dayStart,
       },
     });
 

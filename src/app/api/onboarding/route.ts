@@ -7,6 +7,8 @@ import connectMongo from '@/lib/mongoose';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
 import { paywallMomentFor } from '@/lib/plusPaywall';
+import { findStarterSkin } from '@/lib/skins/starterSkins';
+import { getCachedCatalog } from '@/lib/skins/getCatalog';
 
 const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
 const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
       aboutGender?: unknown;
       usedBefore?: unknown;
       onboardingResponses?: unknown;
+      starterSkin?: unknown;
     } = {};
     try {
       body = await req.json();
@@ -94,6 +97,7 @@ export async function POST(req: Request) {
         ? body.usedBefore
         : undefined;
     const onboardingResponses = sanitizeOnboardingResponses(body.onboardingResponses);
+    const starterSkinIndex = findStarterSkin(body.starterSkin).riveIndex;
 
     await connectMongo();
 
@@ -106,6 +110,12 @@ export async function POST(req: Request) {
     if (existing.onboardingCompleted) {
       return NextResponse.json({ ok: true, alreadyOnboarded: true });
     }
+
+    const starterSkin = starterSkinIndex
+      ? (await getCachedCatalog()).find(
+          (item) => item.slot === 'skin' && item.riveIndex === starterSkinIndex,
+        )?.id
+      : undefined;
 
     await UserModel.updateOne(
       { _id: uid },
@@ -120,7 +130,9 @@ export async function POST(req: Request) {
           ...(aboutGender ? { aboutGender } : {}),
           ...(usedBefore ? { usedBefore } : {}),
           ...(onboardingResponses ? { onboardingResponses } : {}),
+          ...(starterSkin ? { 'wardrobe.equipped.skin': starterSkin } : {}),
         },
+        ...(starterSkin ? { $max: { [`wardrobe.inventory.${starterSkin}`]: 1 } } : {}),
       },
     );
     if (isStatsExcludedFrogName(frogName) && existing.excludeFromStats === undefined) {

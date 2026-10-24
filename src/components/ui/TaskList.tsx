@@ -3075,7 +3075,9 @@ export default function TaskList({
                               ? (t, o) => onStartTimer(t, o)
                               : undefined
                           }
-                          onOpenDetail={(t) => setActionSheetId(t.id)}
+                          onOpenDetail={
+                            task.isStarter ? undefined : (t) => setActionSheetId(t.id)
+                          }
                           onToggleChecklistItem={
                             isCompleted ? undefined : toggleChecklistItem
                           }

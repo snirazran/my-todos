@@ -23,7 +23,29 @@ export type FirstRunPhase =
 export const FIRST_RUN_HOLD = 'first-run';
 
 const FIRST_RUN_HOLD_MS = 30 * 60_000;
+const FIRST_RUN_FLAG_KEY = 'frogress:first-run-pending';
+
+export function markFirstRunPending() {
+  try {
+    window.localStorage.setItem(FIRST_RUN_FLAG_KEY, '1');
+  } catch {}
+}
+
+export function clearFirstRunPending() {
+  try {
+    window.localStorage.removeItem(FIRST_RUN_FLAG_KEY);
+  } catch {}
+}
+
+export function readFirstRunPending() {
+  try {
+    return window.localStorage.getItem(FIRST_RUN_FLAG_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 const STREAK_WAIT_MS = 6000;
+const YUM_MIN_MS = 1900;
 const AFTER_STREAK_MS = 450;
 const MISSING_CLAIM_MS = 8000;
 const FINALE_MS = 7000;
@@ -38,9 +60,9 @@ const GUIDED: ReadonlySet<FirstRunPhase> = new Set<FirstRunPhase>([
 ]);
 
 export const FIRST_RUN_SPEECH: Partial<Record<FirstRunPhase, string>> = {
-  hungry: 'I’m so hungry!\nTap the fly to feed me.',
-  yum: 'Yum! Thank you!',
-  streak: 'Yum! Thank you!',
+  hungry: 'I’m so hungry!\nFinish a task to feed me.',
+  yum: 'Yum! First task done!',
+  streak: 'Yum! First task done!',
   quest: 'You earned a reward!\nTap Claim to collect it.',
   claiming: 'You earned a reward!\nTap Claim to collect it.',
   finale: 'What else is on your list?\nTap + to add it.',
@@ -84,11 +106,17 @@ export function useFirstRun({
     if (phase === 'hungry' && starterDone) setPhase('yum');
   }, [phase, starterDone]);
 
+  const yumStartRef = useRef(0);
+  useEffect(() => {
+    if (phase === 'yum') yumStartRef.current = Date.now();
+  }, [phase]);
+
   useEffect(() => {
     if (phase !== 'yum') return;
     if (streakHeld) {
-      setPhase('streak');
-      return;
+      const wait = Math.max(0, YUM_MIN_MS - (Date.now() - yumStartRef.current));
+      const timer = window.setTimeout(() => setPhase('streak'), wait);
+      return () => window.clearTimeout(timer);
     }
     const timer = window.setTimeout(() => setPhase('quest'), STREAK_WAIT_MS);
     return () => window.clearTimeout(timer);
@@ -162,6 +190,7 @@ export function useFirstRun({
     phase,
     guided,
     active: phase !== 'off' || (pending && !startedRef.current),
-    speech: FIRST_RUN_SPEECH[phase] ?? null,
+    speech:
+      FIRST_RUN_SPEECH[phase] ?? (pending && !startedRef.current ? FIRST_RUN_SPEECH.hungry! : null),
   };
 }

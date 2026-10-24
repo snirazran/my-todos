@@ -56,7 +56,7 @@ import { cn } from '@/lib/utils';
 
 type View = 'offer' | 'compare';
 type Step = 'offer' | 'trial' | 'plans';
-type PlanId = 'yearly' | 'monthly';
+export type PlanId = 'yearly' | 'monthly';
 type CloseMethod = 'close_button' | 'continue_free' | 'escape' | 'outside' | 'external';
 type PaywallSession = {
   id: string;
@@ -131,19 +131,21 @@ async function deliverPlusUnlock(
 }
 
 
-export function PlusUpgradeModal({
-  open,
-  onClose,
-  onStartTrial,
-  placement = 'unknown',
-  frogName,
-}: {
+export type PlusPaywallArgs = {
   open: boolean;
   onClose: () => void;
   onStartTrial?: (plan: PlanId) => void | Promise<void>;
   placement?: string;
   frogName?: string;
-}) {
+};
+
+export function usePlusPaywall({
+  open,
+  onClose,
+  onStartTrial,
+  placement = 'unknown',
+  frogName,
+}: PlusPaywallArgs) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -425,7 +427,10 @@ export function PlusUpgradeModal({
     }
   };
 
-  if (!mounted) return null;
+  const continueWithEmail = () => {
+    trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'email' });
+    window.location.assign('/login?upgrade=1');
+  };
 
   const selected = pricing?.[plan];
   const paywallContext = getPlusContext(placement, frogName);
@@ -465,6 +470,97 @@ export function PlusUpgradeModal({
   const caption = selected
     ? selected.trialDuration ? 'No charge today · Cancel anytime' : 'Cancel anytime'
     : pricingFailed ? 'Store prices are unavailable right now' : 'Checking your store’s prices and offers…';
+
+  return {
+    mounted,
+    view,
+    step,
+    stepDirection,
+    plan,
+    purchasing,
+    purchaseError,
+    needsAccount,
+    linking,
+    linkError,
+    pricing,
+    pricingFailed,
+    isDesktop,
+    reduceMotion,
+    setPricingAttempt,
+    markClose,
+    returnFocusRef,
+    moreBelow,
+    bindScroll,
+    scrollRef,
+    paywallProps,
+    selectPlan,
+    dismissAccountPrompt,
+    linkGuestAccount,
+    continueWithEmail,
+    startPurchase,
+    restorePurchases,
+    selected,
+    paywallContext,
+    changeView,
+    steps,
+    stepIndex,
+    onPlans,
+    goStep,
+    showBack,
+    goBack,
+    pricesPending,
+    ctaLabel,
+    ctaContent,
+    caption,
+  };
+}
+
+export function PlusUpgradeModal(props: PlusPaywallArgs) {
+  const { open, onClose } = props;
+  const {
+    mounted,
+    view,
+    step,
+    stepDirection,
+    plan,
+    purchasing,
+    purchaseError,
+    needsAccount,
+    linking,
+    linkError,
+    pricing,
+    pricingFailed,
+    isDesktop,
+    reduceMotion,
+    setPricingAttempt,
+    markClose,
+    returnFocusRef,
+    moreBelow,
+    bindScroll,
+    scrollRef,
+    paywallProps,
+    selectPlan,
+    dismissAccountPrompt,
+    linkGuestAccount,
+    continueWithEmail,
+    startPurchase,
+    restorePurchases,
+    selected,
+    paywallContext,
+    changeView,
+    steps,
+    stepIndex,
+    onPlans,
+    goStep,
+    showBack,
+    goBack,
+    pricesPending,
+    ctaLabel,
+    ctaContent,
+    caption,
+  } = usePlusPaywall(props);
+
+  if (!mounted) return null;
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next && !purchasing && !linking) onClose(); }}>
@@ -593,88 +689,14 @@ export function PlusUpgradeModal({
                     </div>
                   </div>
 
-              <AnimatePresence>
-                {needsAccount && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[10011] flex items-center justify-center bg-black/60 px-6 backdrop-blur-sm"
-                    onClick={dismissAccountPrompt}
-                  >
-                    <motion.div
-                      initial={{ scale: 0.95, y: 10 }}
-                      animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0.95, y: 10 }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 380,
-                        damping: 30,
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center text-slate-900 shadow-2xl"
-                    >
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
-                        <ShieldAlert
-                          className="h-7 w-7 text-[#447d3f]"
-                          strokeWidth={2.5}
-                        />
-                      </div>
-                      <h3 className="mt-3 text-lg font-black tracking-tight">
-                        Save your frog first
-                      </h3>
-                      <p className="mt-2 text-sm font-medium text-slate-600">
-                        Plus is tied to your account. Save your frog, and
-                        you can review your plan before continuing.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void linkGuestAccount('apple')}
-                        disabled={!!linking}
-                        className="mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-slate-900 text-[15px] font-black text-white shadow-[0_4px_0_0_#020617] transition-all hover:brightness-110 active:translate-y-1 active:shadow-none disabled:opacity-60"
-                      >
-                        {linking === 'apple' ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            <AppleIcon /> Continue with Apple
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void linkGuestAccount('google')}
-                        disabled={!!linking}
-                        className="mt-2.5 flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white text-[15px] font-black text-slate-900 shadow-[0_4px_0_0_#e2e8f0] transition-all hover:bg-slate-50 active:translate-y-1 active:shadow-none disabled:opacity-60"
-                      >
-                        {linking === 'google' ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            <GoogleIcon /> Continue with Google
-                          </>
-                        )}
-                      </button>
-                      {linkError && (
-                        <p className="mt-2.5 text-xs font-bold text-red-500">
-                          {linkError}
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'email' });
-                          window.location.assign('/login?upgrade=1');
-                        }}
-                        disabled={!!linking}
-                        className="mt-2 h-10 w-full rounded-2xl text-sm font-bold text-slate-500 transition-colors hover:text-slate-700"
-                      >
-                        Use email instead
-                      </button>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <PlusAccountPrompt
+                open={needsAccount}
+                linking={linking}
+                linkError={linkError}
+                onDismiss={dismissAccountPrompt}
+                onLink={(provider) => void linkGuestAccount(provider)}
+                onEmail={continueWithEmail}
+              />
                 </motion.div>
               </Dialog.Content>
             </>
@@ -1019,7 +1041,7 @@ function PrimaryButton({ onClick, children, disabled, loading, className }: {
   );
 }
 
-function TrialTimeline({ trial, showFrog }: { trial: TrialPeriod; showFrog: boolean }) {
+export function TrialTimeline({ trial, showFrog, compact = false }: { trial: TrialPeriod; showFrog: boolean; compact?: boolean }) {
   const reduceMotion = useReducedMotion();
   const notifications = useNotificationStatus();
   const [start] = useState(() => new Date());
@@ -1034,9 +1056,9 @@ function TrialTimeline({ trial, showFrog }: { trial: TrialPeriod; showFrog: bool
       key: 'reminder',
       icon: <Bell className="h-4 w-4" strokeWidth={2.75} />,
       title: day(reminder),
-      body: notifications.isEnabled ? 'We’ll send you a reminder that your trial is ending.' : 'Turn on notifications to get a reminder before it ends.',
+      body: notifications.isEnabled ? 'We’ll send you a reminder that your trial is ending.' : compact ? 'Get a reminder before it ends.' : 'Turn on notifications to get a reminder before it ends.',
       action: !notifications.isEnabled && notifications.canEnable ? (
-        <button type="button" onClick={() => void notifications.enableOrConfigure()} className="mt-1.5 inline-flex min-h-9 items-center rounded-xl bg-primary/10 px-3 text-[13px] font-black text-primary hover:bg-primary/15 active:scale-95">
+        <button type="button" onClick={() => void notifications.enableOrConfigure()} className={cn('inline-flex shrink-0 items-center rounded-xl bg-primary/10 font-black text-primary hover:bg-primary/15 active:scale-95', compact ? '-my-1 min-h-8 px-2.5 text-[12.5px]' : 'mt-1.5 min-h-9 px-3 text-[13px]')}>
           Turn on reminders
         </button>
       ) : null,
@@ -1044,31 +1066,40 @@ function TrialTimeline({ trial, showFrog }: { trial: TrialPeriod; showFrog: bool
   }
   rows.push({ key: 'end', icon: <Crown className="h-4 w-4" strokeWidth={2.75} />, title: day(end), body: 'Your Plus plan starts. Cancel before then and pay nothing.' });
   return (
-    <section className="mx-auto flex w-full max-w-md flex-1 flex-col md:mx-0">
-      <div className="flex flex-1 flex-col justify-center py-2">
-      <h2 className="text-balance text-center text-[24px] font-black leading-[1.1] tracking-tight short:text-[21px] md:text-left md:text-[28px]">
-        How your <span className="text-primary">free trial</span> works
-      </h2>
-      <ol className="mt-6 short:mt-4">
+    <section className={cn('mx-auto flex w-full max-w-md flex-col md:mx-0', !compact && 'flex-1')}>
+      <div className={cn('flex flex-1 flex-col justify-center', !compact && 'py-2')}>
+      {compact ? null : (
+        <h2 className="text-balance text-center text-[24px] font-black leading-[1.1] tracking-tight short:text-[21px] md:text-left md:text-[28px]">
+          How your <span className="text-primary">free trial</span> works
+        </h2>
+      )}
+      <ol className={compact ? undefined : 'mt-6 short:mt-4'}>
         {rows.map((row, index) => (
           <motion.li
             key={row.key}
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + index * 0.1, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-            className="relative flex gap-4 pb-6 last:pb-0 short:pb-4"
+            className={cn('relative flex last:pb-0', compact ? 'gap-3 pb-3.5' : 'gap-4 pb-6 short:pb-4')}
           >
             {index < rows.length - 1 ? (
-              <span aria-hidden className={cn('absolute bottom-0 left-[19px] top-11 w-0.5 origin-top rounded-full motion-safe:animate-[plus-rail-draw_480ms_cubic-bezier(0.22,1,0.36,1)_both]', row.active ? 'bg-gradient-to-b from-amber-400 to-border' : 'bg-border')} style={{ animationDelay: `${260 + index * 100}ms` }} />
+              <span aria-hidden className={cn('absolute bottom-0 w-0.5 origin-top rounded-full', compact ? 'left-[15px] top-9' : 'left-[19px] top-11', ' motion-safe:animate-[plus-rail-draw_480ms_cubic-bezier(0.22,1,0.36,1)_both]', row.active ? 'bg-gradient-to-b from-amber-400 to-border' : 'bg-border')} style={{ animationDelay: `${260 + index * 100}ms` }} />
             ) : null}
-            <span className={cn('relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full', row.active ? 'bg-amber-400 text-amber-950 shadow-[0_0_0_5px_rgba(251,191,36,0.22)]' : 'bg-primary/10 text-primary')}>
+            <span className={cn('relative flex shrink-0 items-center justify-center rounded-full', compact ? 'h-8 w-8' : 'h-10 w-10', row.active ? 'bg-amber-400 text-amber-950 shadow-[0_0_0_5px_rgba(251,191,36,0.22)]' : 'bg-primary/10 text-primary')}>
               {row.active ? <span aria-hidden className="absolute inset-0 rounded-full bg-amber-400/60 motion-safe:animate-[plus-halo_2.4s_cubic-bezier(0,0,0.2,1)_infinite]" /> : null}
               <span className="relative">{row.icon}</span>
             </span>
-            <div className="min-w-0 pt-0.5 text-left">
-              <p className="text-[16px] font-black leading-tight">{row.title}</p>
-              <p className="mt-1 text-[14px] font-semibold leading-snug text-muted-foreground">{row.body}</p>
-              {row.action}
+            <div className={cn('min-w-0 pt-0.5 text-left', compact && 'flex-1')}>
+              {compact ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[15px] font-black leading-tight">{row.title}</p>
+                  {row.action}
+                </div>
+              ) : (
+                <p className="text-[16px] font-black leading-tight">{row.title}</p>
+              )}
+              <p className={cn('font-semibold leading-snug text-muted-foreground', compact ? 'mt-0.5 text-[13px]' : 'mt-1 text-[14px]')}>{row.body}</p>
+              {compact ? null : row.action}
             </div>
           </motion.li>
         ))}
@@ -1194,7 +1225,7 @@ function PlusEmblem() {
   );
 }
 
-function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRetry }: {
+export function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRetry }: {
   plan: PlanId;
   onSelect: (plan: PlanId) => void;
   pricing: Partial<Record<PlanId, PlusPriceInfo>> | null;
@@ -1268,7 +1299,7 @@ function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRetry }: {
   );
 }
 
-function PlanFooter({ plan, selected, busy, onRestore }: {
+export function PlanFooter({ plan, selected, busy, onRestore }: {
   plan: PlanId;
   selected: PlusPriceInfo | undefined;
   busy: boolean;
@@ -1388,5 +1419,103 @@ function CompareView() {
         ))}
       </div>
     </div>
+  );
+}
+
+export function PlusAccountPrompt({
+  open,
+  linking,
+  linkError,
+  onDismiss,
+  onLink,
+  onEmail,
+}: {
+  open: boolean;
+  linking: 'google' | 'apple' | null;
+  linkError: string | null;
+  onDismiss: () => void;
+  onLink: (provider: 'google' | 'apple') => void;
+  onEmail: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[10011] flex items-center justify-center bg-black/60 px-6 backdrop-blur-sm"
+          onClick={onDismiss}
+        >
+          <motion.div
+            initial={{ scale: 0.95, y: 10 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.95, y: 10 }}
+            transition={{
+              type: 'spring',
+              stiffness: 380,
+              damping: 30,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center text-slate-900 shadow-2xl"
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+              <ShieldAlert
+                className="h-7 w-7 text-[#447d3f]"
+                strokeWidth={2.5}
+              />
+            </div>
+            <h3 className="mt-3 text-lg font-black tracking-tight">
+              Save your frog first
+            </h3>
+            <p className="mt-2 text-sm font-medium text-slate-600">
+              Plus is tied to your account. Save your frog, and
+              you can review your plan before continuing.
+            </p>
+            <button
+              type="button"
+              onClick={() => onLink('apple')}
+              disabled={!!linking}
+              className="mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-slate-900 text-[15px] font-black text-white shadow-[0_4px_0_0_#020617] transition-all hover:brightness-110 active:translate-y-1 active:shadow-none disabled:opacity-60"
+            >
+              {linking === 'apple' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  <AppleIcon /> Continue with Apple
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onLink('google')}
+              disabled={!!linking}
+              className="mt-2.5 flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white text-[15px] font-black text-slate-900 shadow-[0_4px_0_0_#e2e8f0] transition-all hover:bg-slate-50 active:translate-y-1 active:shadow-none disabled:opacity-60"
+            >
+              {linking === 'google' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  <GoogleIcon /> Continue with Google
+                </>
+              )}
+            </button>
+            {linkError && (
+              <p className="mt-2.5 text-xs font-bold text-red-500">
+                {linkError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={onEmail}
+              disabled={!!linking}
+              className="mt-2 h-10 w-full rounded-2xl text-sm font-bold text-slate-500 transition-colors hover:text-slate-700"
+            >
+              Use email instead
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

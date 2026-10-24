@@ -1,19 +1,29 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { mutate } from 'swr';
+import { mutate, preload } from 'swr';
+import { format } from 'date-fns';
 import type { OnboardingStepProps } from './steps/types';
-import FrogNameStep from './steps/FrogNameStep';
+import AdoptFrogStep from './steps/AdoptFrogStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
-import ProfileQuestionsStep, { PROFILE_QUESTION_COUNT } from './steps/ProfileQuestionsStep';
+import ProfileQuestionsStep, {
+  PROFILE_QUESTION_COUNT,
+  preloadFocusAreas,
+} from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
-import StarterPlanStep from './steps/StarterPlanStep';
+import StarterPlanStep, { preloadStarterPlan } from './steps/StarterPlanStep';
 import CelebrationStep from './steps/CelebrationStep';
+import PlusStep from './steps/PlusStep';
 import { OnboardingTopBar } from './steps/OnboardingTopBar';
-import { OnboardingFrogStage } from './steps/OnboardingFrogHeader';
+import {
+  OnboardingFrogStage,
+  OnboardingProgressDock,
+  type FrogPose,
+} from './steps/OnboardingFrogHeader';
+import { cn } from '@/lib/utils';
 import type { FrogEmote } from '@/components/ui/frog';
 import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -21,9 +31,12 @@ import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 import { resetBootstrapCache } from '@/lib/bootstrapFetcher';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { primeWardrobeIndicesCache, useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { findStarterSkin } from '@/lib/skins/starterSkins';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { todayTasksKey } from '@/hooks/useTaskData';
+import { preloadBackgrounds } from '@/hooks/useBackgrounds';
+import { markFirstRunPending } from '@/hooks/useFirstRun';
 import { paywallMomentFor } from '@/lib/plusPaywall';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { useAutoPopupHold } from '@/lib/popupGate';
@@ -36,9 +49,9 @@ import {
   saveOnboardingDraft,
 } from '@/lib/onboardingDraft';
 
-const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'plan', 'notifications', 'createAccount'] as const;
+const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount', 'plan'] as const;
 
-const CELEBRATION_MS = 2600;
+const CELEBRATION_MS = 3000;
 
 const STEP_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
   humanName: 'love',
@@ -52,14 +65,25 @@ export default function OnboardingPage() {
   const hasAccount = !!authUser && !authUser.isAnonymous;
   const { indices: wardrobeIndices } = useWardrobeIndices(hasAccount);
   const [step, setStep] = useState(0);
-  const [selections, setSelections] = useState<Record<string, string[]>>(
-    loadOnboardingDraft,
-  );
+  const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
   const [subStep, setSubStep] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
+  const [celebrationReady, setCelebrationReady] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [frogPose, setFrogPose] = useState<FrogPose | null>(null);
+  const [giftOpened, setGiftOpened] = useState(false);
+  const starterSkin = findStarterSkin(selections.frogSkin?.[0]);
+  const starterSkinIndex = starterSkin.riveIndex;
+  const stageIndices = useMemo(() => {
+    if (hasAccount) {
+      return starterSkinIndex ? { ...wardrobeIndices, skin: starterSkinIndex } : wardrobeIndices;
+    }
+    return starterSkinIndex
+      ? { skin: starterSkinIndex, hat: 0, body: 0, hand_item: 0 }
+      : undefined;
+  }, [hasAccount, wardrobeIndices, starterSkinIndex]);
   const mainRef = useRef<HTMLElement | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
   useAutoPopupHold('onboarding-celebration', celebrating);
@@ -68,6 +92,11 @@ export default function OnboardingPage() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [step, subStep]);
+
+  useLayoutEffect(() => {
+    const draft = loadOnboardingDraft();
+    if (Object.keys(draft).length) setSelections((prev) => ({ ...draft, ...prev }));
+  }, []);
 
   // Keep the local copy in sync so it can be restored after the magic-link reload.
   useEffect(() => {
@@ -138,9 +167,22 @@ export default function OnboardingPage() {
     });
   }, [currentId]);
 
+  useEffect(() => {
+    if (currentId === 'humanName') preloadFocusAreas();
+  }, [currentId]);
+
+  const focusAreasKey = (selections.focusAreas ?? []).join(',');
+  useEffect(() => {
+    if (currentId === 'notifications' || currentId === 'createAccount') {
+      preloadStarterPlan(focusAreasKey);
+    }
+  }, [currentId, focusAreasKey]);
+
   const ageIndex = stepIds.indexOf('age');
   const unitsAt = (index: number) =>
-    index + (ageIndex !== -1 && index > ageIndex ? PROFILE_QUESTION_COUNT - 1 : 0);
+    index +
+    (index > 0 ? 1 : 0) +
+    (ageIndex !== -1 && index > ageIndex ? PROFILE_QUESTION_COUNT - 1 : 0);
   const totalUnits = unitsAt(stepIds.length);
   const doneUnits = currentId === 'age' ? unitsAt(step) + subStep : unitsAt(step);
 
@@ -233,7 +275,7 @@ export default function OnboardingPage() {
     try {
       const starterPlanIds = selections.starterPlan ?? [];
       let starterCategoryTagMap: Array<{ categoryId: string; tagIds: string[] }> = [];
-      if (focusAreaIds.length > 0 && starterPlanIds.length > 0) {
+      if (starterPlanIds.length > 0) {
         try {
           const planRes = await fetch('/api/onboarding/starter-plan', {
             signal: AbortSignal.timeout(15000),
@@ -242,7 +284,6 @@ export default function OnboardingPage() {
             body: JSON.stringify({
               itemIds: starterPlanIds,
               selectedCategoryIds: focusAreaIds,
-              dayStart: selections.starterPlanDayStart?.[0],
               timezone,
             }),
           });
@@ -263,6 +304,7 @@ export default function OnboardingPage() {
             aboutGender: selections.aboutGender?.[0] ?? null,
             usedBefore: selections.usedBefore?.[0] ?? null,
             onboardingResponses: selections,
+            starterSkin: starterSkin.key,
           }),
         }),
         focusAreaIds.length > 0
@@ -284,6 +326,9 @@ export default function OnboardingPage() {
       if (onboardingRes.ok) {
         clearOnboardingDraft();
         resetBootstrapCache();
+        if (starterSkinIndex && !hasAccount) {
+          primeWardrobeIndicesCache({ skin: starterSkinIndex, hat: 0, body: 0, hand_item: 0 });
+        }
         await mutate(
           '/api/user',
           (cur: Record<string, unknown> | undefined) =>
@@ -296,11 +341,22 @@ export default function OnboardingPage() {
     }
   };
 
+  const prewarmHome = () => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const loadJson = (url: string) =>
+      fetch(url, { cache: 'no-store' }).then((res) => res.json());
+    preload(todayTasksKey(format(new Date(), 'yyyy-MM-dd'), timezone), loadJson).catch(() => {});
+    preload('/api/tasks?view=board&day=-1', loadJson).catch(() => {});
+    preloadBackgrounds();
+  };
+
   const finishOnboarding = async (pendingSave: Promise<void>) => {
     setCelebrating(true);
     const celebrationStart = Date.now();
     await pendingSave;
     prewarmStreakCheckIn();
+    prewarmHome();
+    setCelebrationReady(true);
     const remaining = CELEBRATION_MS - (Date.now() - celebrationStart);
     if (remaining > 0) {
       await new Promise((resolve) => setTimeout(resolve, remaining));
@@ -311,6 +367,14 @@ export default function OnboardingPage() {
     await mutate(
       (key) => typeof key === 'string' && key.startsWith('/api/quests'),
       undefined,
+      { revalidate: false },
+    );
+    markFirstRunPending();
+    await mutate(
+      '/api/user/intros',
+      (cur: { seenIntros?: Record<string, boolean> } | undefined) => ({
+        seenIntros: { ...(cur?.seenIntros ?? {}), firstRun: false },
+      }),
       { revalidate: false },
     );
     router.push('/');
@@ -340,7 +404,7 @@ export default function OnboardingPage() {
       router.replace('/welcome');
       return;
     }
-    goToStep(step - 1, -1);
+    goToStep(stepIds[step - 1] === 'aboutIntro' && step >= 2 ? step - 2 : step - 1, -1);
   };
 
   const stepProps: OnboardingStepProps = {
@@ -357,67 +421,78 @@ export default function OnboardingPage() {
       ref={mainRef}
       className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4"
     >
-      <div className="absolute inset-x-0 top-0 h-[calc(390px+env(safe-area-inset-top))] overflow-hidden short:h-[calc(342px+env(safe-area-inset-top))] md:h-[352px]">
-        <OnboardingBackground />
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(286px+env(safe-area-inset-top))] z-[5] rounded-t-[24px] bg-background short:top-[calc(238px+env(safe-area-inset-top))] md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
-      />
+      {(currentId !== 'plan' || celebrating) && !paywallOpen && (
+        <>
+          <OnboardingBackground />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(300px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px]"
+          />
+          <OnboardingProgressDock
+            done={celebrating ? totalUnits : doneUnits}
+            total={totalUnits}
+            className={cn('z-[5]', currentId === 'name' && !celebrating && 'opacity-0')}
+          />
+        </>
+      )}
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
         <OnboardingFrogStage
-          indices={hasAccount ? wardrobeIndices : undefined}
-          emote={STEP_EMOTES[currentId] ?? null}
+          indices={stageIndices}
+          emote={celebrating ? 'love' : (STEP_EMOTES[currentId] ?? null)}
+          hidden={
+            paywallOpen ||
+            (!celebrating && ((currentId === 'name' && !frogPose) || currentId === 'plan'))
+          }
+          pose={currentId === 'name' && !celebrating ? frogPose : null}
         />
-        {!celebrating && (
-          <OnboardingTopBar
-            onBack={step === 0 && hasAccount ? undefined : handleBack}
-            done={doneUnits}
-            total={totalUnits}
-            rightSlot={
-              currentId === 'createAccount' ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={saving}
-                  className="flex h-10 shrink-0 items-center rounded-full bg-background/90 px-4 text-sm font-black text-primary shadow-md ring-1 ring-border/40 backdrop-blur transition hover:bg-background disabled:opacity-60"
-                >
-                  Skip
-                </button>
-              ) : undefined
-            }
-          />
+        {!celebrating && !paywallOpen && currentId !== 'name' && (
+          <OnboardingTopBar onBack={step === 0 && hasAccount ? undefined : handleBack} />
         )}
-        {currentId === 'name' && <FrogNameStep {...stepProps} />}
-        {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
-        {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}
-        {currentId === 'plan' && <StarterPlanStep {...stepProps} />}
-        {currentId === 'notifications' && <NotificationStep {...stepProps} />}
-        {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
-        {currentId === 'age' && (
-          <ProfileQuestionsStep
-            {...stepProps}
-            subStep={subStep}
-            onSubStepChange={handleSubStepChange}
+        {celebrating ? (
+          <CelebrationStep
+            humanName={selections.humanName?.[0]?.trim() || null}
+            frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
+            habitCount={selections.starterPlan?.length ?? 0}
+            ready={celebrationReady}
           />
+        ) : paywallOpen ? (
+          <PlusStep
+            frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
+            humanName={selections.humanName?.[0]?.trim() || null}
+            habitCount={selections.starterPlan?.length ?? 0}
+            indices={stageIndices}
+            onDone={() => {
+              setPaywallOpen(false);
+              void finishOnboarding(savePromiseRef.current ?? Promise.resolve());
+            }}
+          />
+        ) : (
+          <>
+            {currentId === 'name' && (
+              <AdoptFrogStep
+                {...stepProps}
+                canGoBack={!hasAccount}
+                giftOpened={giftOpened}
+                onGiftOpened={() => setGiftOpened(true)}
+                onFrogPose={setFrogPose}
+                progressTotal={totalUnits}
+              />
+            )}
+            {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
+            {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}
+            {currentId === 'plan' && <StarterPlanStep {...stepProps} />}
+            {currentId === 'notifications' && <NotificationStep {...stepProps} />}
+            {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
+            {currentId === 'age' && (
+              <ProfileQuestionsStep
+                {...stepProps}
+                subStep={subStep}
+                onSubStepChange={handleSubStepChange}
+              />
+            )}
+          </>
         )}
-
       </div>
-      {celebrating && (
-        <CelebrationStep
-          frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
-          humanName={selections.humanName?.[0]?.trim() || null}
-        />
-      )}
-      <PlusUpgradeModal
-        open={paywallOpen}
-        placement="onboarding"
-        frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
-        onClose={() => {
-          setPaywallOpen(false);
-          void finishOnboarding(savePromiseRef.current ?? Promise.resolve());
-        }}
-      />
     </main>
   );
 }

@@ -84,6 +84,10 @@ const DEFAULT_FROG_WIDTH = 240;
 const DEFAULT_FROG_HEIGHT = Math.round(
   (DEFAULT_FROG_WIDTH * ARTBOARD_HEIGHT) / ARTBOARD_WIDTH,
 );
+const PLACEHOLDER_SRC = '/skins/common/skin0.webp';
+const PLACEHOLDER_LEFT = 17.1;
+const PLACEHOLDER_TOP = 50.1;
+const PLACEHOLDER_WIDTH = 94.6;
 const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
 const HUNGRY_MOOD_INDEX = 1;
@@ -127,6 +131,7 @@ interface FrogProps {
    *  applied) — lets a static placeholder crossfade out instead of
    *  unmounting while the live canvas is still transparent. */
   onDressed?: () => void;
+  placeholder?: boolean;
 }
 
 const Frog = memo(
@@ -143,6 +148,7 @@ const Frog = memo(
       emote = null,
       ignoreIdlePause = false,
       onDressed,
+      placeholder = false,
     },
     ref,
   ) {
@@ -518,12 +524,41 @@ const Frog = memo(
       },
     }));
 
+    const placeholderScale =
+      placeholder && typeof width === 'number' && typeof height === 'number'
+        ? Math.min(width / ARTBOARD_WIDTH, height / ARTBOARD_HEIGHT)
+        : 0;
+
     return (
       <div
         ref={wrapperRef}
         className={className}
         style={{ width, height, position: 'relative', overflow: 'visible' }}
       >
+        {placeholderScale > 0 && (
+          <img
+            src={PLACEHOLDER_SRC}
+            alt=""
+            aria-hidden
+            draggable={false}
+            style={{
+              position: 'absolute',
+              left:
+                ((width as number) - ARTBOARD_WIDTH * placeholderScale) / 2 +
+                PLACEHOLDER_LEFT * placeholderScale,
+              top:
+                ((height as number) - ARTBOARD_HEIGHT * placeholderScale) / 2 +
+                PLACEHOLDER_TOP * placeholderScale +
+                resolvedVisualOffsetY,
+              width: PLACEHOLDER_WIDTH * placeholderScale,
+              maxWidth: 'none',
+              height: 'auto',
+              pointerEvents: 'none',
+              opacity: dressed ? 0 : 1,
+              transition: 'opacity 150ms ease-out',
+            }}
+          />
+        )}
         {riveUrl && (
           <RiveComponent
             style={{

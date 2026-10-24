@@ -10,7 +10,7 @@ import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
+import { hapticCelebrate, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useSettled } from '@/hooks/useSettled';
@@ -29,11 +29,16 @@ import {
 } from '@/components/ui/QuestCards';
 import { rewardStackTileStyle } from '@/lib/questClaims';
 import { CATALOG } from '@/lib/skins/catalog';
+import { warmFrogStamps, type FrogStampIndices } from '@/lib/frogStampEngine';
+import { riveDevicePixelRatio } from '@/lib/riveLoader';
+import { announcePledgeMade } from '@/lib/widget/prompt';
 import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
 import { maybeRequestAppRating } from '@/lib/rateApp';
-import { streakRevealMessage } from '@/lib/streak/revealMessage';
+import { pledgeFrogLine, streakRevealMessage } from '@/lib/streak/revealMessage';
+import { PondBackdrop } from '@/components/ui/PondBackdrop';
+import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import type {
   CheckInResult,
   LoginStreakReward,
@@ -47,12 +52,15 @@ const isShieldReward = (reward: LoginStreakReward) =>
   reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE';
 
 const SKIN_ROLL_RARITY_LABEL: Record<string, string> = {
-  common: 'Common+',
-  uncommon: 'Uncommon+',
-  rare: 'Rare+',
-  epic: 'Epic+',
+  common: 'New',
+  uncommon: 'New',
+  rare: 'Special',
+  epic: 'Super special',
   legendary: 'Legendary',
 };
+
+const SKIN_ROLL_SAMPLE = 6;
+const SKIN_ROLL_STAMP_CSS = 96;
 
 /** Matches REWARD_TILE_TONE, so the chip reads as the tile it is promising. */
 const SKIN_ROLL_RARITY_CHIP: Record<string, string> = {
@@ -85,16 +93,17 @@ const REWARD_TILE_FRAME =
   'relative flex h-11 w-11 items-center justify-center overflow-visible rounded-xl border-2 shadow-sm';
 
 /** A Lily Pad in the same frame a reward tile uses — it is a prize, not a note. */
-function LilyPadTile({ count }: { count: number }) {
+function LilyPadTile({ count, className }: { count: number; className?: string }) {
   return (
     <span
       className={cn(
         REWARD_TILE_FRAME,
         'border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-emerald-900/10 dark:from-emerald-900 dark:to-emerald-950',
+        className,
       )}
       title={`${count} Lily Pad${count === 1 ? '' : 's'}`}
     >
-      <Icon name="lilyPad" label="Lily Pad" className="h-7 w-7" />
+      <Icon name="lilyPad" label="Lily Pad" className="h-[62%] w-[62%]" />
       {count > 1 && (
         <span className="absolute -right-1.5 -top-1.5 z-30 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[9px] font-bold leading-[16px] tracking-wide text-white shadow-sm backdrop-blur-sm">
           ×{count}
@@ -113,27 +122,18 @@ function SkinRollTile({
   minRarity,
   rewardCatalog,
   isPremium,
+  className = 'h-11 w-11 rounded-xl',
 }: {
   minRarity: string;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  className?: string;
 }) {
   const reduceMotion = useReducedMotion();
-  const options = useMemo(() => {
-    const floor = SKIN_ROLL_RARITY_ORDER.indexOf(
-      minRarity as (typeof SKIN_ROLL_RARITY_ORDER)[number],
-    );
-    return Object.values(rewardCatalog)
-      .filter(
-        (item) =>
-          item.slot !== 'container' &&
-          item.slot !== 'background' &&
-          SKIN_ROLL_RARITY_ORDER.indexOf(
-            item.rarity as (typeof SKIN_ROLL_RARITY_ORDER)[number],
-          ) >= Math.max(0, floor),
-      )
-      .map((item) => item.id);
-  }, [rewardCatalog, minRarity]);
+  const options = useMemo(
+    () => skinRollOptions(rewardCatalog, minRarity),
+    [rewardCatalog, minRarity],
+  );
 
   const [shown, setShown] = useState(0);
   useEffect(() => {
@@ -160,10 +160,76 @@ function SkinRollTile({
       isPremium={isPremium}
       compact
       hideBadge
-      className="h-11 w-11 rounded-xl"
+      still
+      className={className}
       frogClassName="h-[142%] w-[142%] -translate-y-[20%]"
     />
   );
+}
+
+function skinRollOptions(
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+  minRarity: string,
+): string[] {
+  const floor = SKIN_ROLL_RARITY_ORDER.indexOf(
+    minRarity as (typeof SKIN_ROLL_RARITY_ORDER)[number],
+  );
+  const ids = Object.values(rewardCatalog)
+    .filter(
+      (item) =>
+        item.slot !== 'container' &&
+        item.slot !== 'background' &&
+        SKIN_ROLL_RARITY_ORDER.indexOf(
+          item.rarity as (typeof SKIN_ROLL_RARITY_ORDER)[number],
+        ) >= Math.max(0, floor),
+    )
+    .map((item) => item.id);
+  const step = Math.max(1, Math.ceil(ids.length / SKIN_ROLL_SAMPLE));
+  return ids.filter((_, index) => index % step === 0).slice(0, SKIN_ROLL_SAMPLE);
+}
+
+function skinRollStampIndices(item: QuestRewardCatalogItem): FrogStampIndices {
+  return {
+    skin: item.slot === 'skin' ? item.riveIndex : 0,
+    mood: 0,
+    hat: item.slot === 'hat' ? item.riveIndex : 0,
+    body: item.slot === 'body' ? item.riveIndex : 0,
+    hand_item: item.slot === 'hand_item' ? item.riveIndex : 0,
+  };
+}
+
+function useWarmSkinRolls(
+  tiers: { rewards: LoginStreakReward[] }[],
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+) {
+  const key = tiers.map((tier) => skinRollFloor(tier.rewards) ?? '').join('|');
+  useEffect(() => {
+    const floors = Array.from(
+      new Set(
+        tiers
+          .map((tier) => skinRollFloor(tier.rewards))
+          .filter((floor): floor is string => !!floor),
+      ),
+    );
+    if (floors.length === 0) return;
+    const indices = floors.flatMap((floor) =>
+      skinRollOptions(rewardCatalog, floor).map((id) =>
+        skinRollStampIndices(rewardCatalog[id]),
+      ),
+    );
+    let cancel: (() => void) | null = null;
+    const timer = window.setTimeout(() => {
+      cancel = warmFrogStamps(
+        indices,
+        Math.round(SKIN_ROLL_STAMP_CSS * riveDevicePixelRatio()),
+      );
+    }, 450);
+    return () => {
+      window.clearTimeout(timer);
+      cancel?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, rewardCatalog]);
 }
 
 /**
@@ -256,7 +322,7 @@ function PledgeRewardTiles({
             SKIN_ROLL_RARITY_CHIP[skinFloor] ?? SKIN_ROLL_RARITY_CHIP.rare,
           )}
         >
-          {SKIN_ROLL_RARITY_LABEL[skinFloor] ?? skinFloor} skin
+          {SKIN_ROLL_RARITY_LABEL[skinFloor] ?? 'New'} outfit
         </span>
       )}
     </span>
@@ -304,8 +370,8 @@ function WeekStrip({
         const future = dayKey > today;
         const pendingToday = isToday && !lit && !frozen;
         const date = new Date(`${dayKey}T12:00:00`);
-        const label = date.toLocaleDateString(undefined, { weekday: 'narrow' });
-        const longLabel = date.toLocaleDateString(undefined, { weekday: 'long' });
+        const label = date.toLocaleDateString('en-US', { weekday: 'narrow' });
+        const longLabel = date.toLocaleDateString('en-US', { weekday: 'long' });
         const state = frozen
           ? 'covered by a Lily Pad'
           : lit
@@ -481,7 +547,7 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
               dayKey === today ? 'text-white' : 'text-white/70',
             )}
           >
-            {new Date(`${dayKey}T12:00:00`).toLocaleDateString(undefined, {
+            {new Date(`${dayKey}T12:00:00`).toLocaleDateString('en-US', {
               weekday: 'narrow',
             })}
           </span>
@@ -512,7 +578,7 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
           const future = dayKey > today;
           const pendingToday = isToday && !lit && !frozen;
           const longLabel = new Date(`${dayKey}T12:00:00`).toLocaleDateString(
-            undefined,
+            'en-US',
             { weekday: 'long' },
           );
           const state = frozen
@@ -546,13 +612,13 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
                   frozen
                     ? 'bg-white'
                     : lit
-                      ? 'bg-white text-orange-500 shadow-[0_2px_0_0_rgba(124,45,18,0.25)]'
+                      ? 'bg-white text-amber-500 shadow-[0_2px_0_0_var(--streak-ink-shadow)]'
                       : pendingToday
                         ? 'bg-white/20 text-white ring-2 ring-white/80'
                         : future
                           ? 'bg-white/15'
-                          : 'bg-orange-950/20 text-white/50',
-                  isToday && (lit || frozen) && 'ring-[3px] ring-yellow-200',
+                          : 'bg-[color:var(--streak-dim)] text-white/50',
+                  isToday && (lit || frozen) && 'ring-[3px] ring-amber-200',
                 )}
               >
                 {frozen ? (
@@ -598,12 +664,12 @@ function PledgeProgress({
             : `${left} ${left === 1 ? 'day' : 'days'} to go`}
         </span>
       </div>
-      <div className="mt-2 h-3 overflow-hidden rounded-full bg-orange-950/25">
+      <div className="mt-2 h-3 overflow-hidden rounded-full bg-[color:var(--streak-dim)]">
         <motion.div
           initial={reduceMotion ? false : { scaleX: 0 }}
           animate={{ scaleX: ratio }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.9 }}
-          className="h-full origin-left rounded-full bg-gradient-to-r from-yellow-200 to-white"
+          className="h-full origin-left rounded-full bg-gradient-to-r from-amber-200 to-white"
         />
       </div>
     </div>
@@ -638,6 +704,7 @@ function RevealStep({
     longestStreak: view.longestStreak,
     nextTierDays: view.nextTierDays,
     dayOfWeek: new Date().getDay(),
+    shieldUsed: celebration.shieldConsumedDays.length > 0,
   });
   const activeGoal =
     view.goal && view.goal.progress < view.goal.days ? view.goal : null;
@@ -654,7 +721,8 @@ function RevealStep({
         startVelocity: 40,
         origin: { y: 0.3 },
         zIndex: 99999,
-        colors: ['#fb923c', '#fbbf24', '#fde68a', '#ffffff'],
+        colors: ['#fbbf24', '#fde68a', '#93df6e', '#4f9a45', '#ffffff'],
+        disableForReducedMotion: true,
       });
       hapticCelebrate();
     }, 1000);
@@ -665,16 +733,22 @@ function RevealStep({
   }, [view.count]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col bg-gradient-to-b from-orange-500 via-orange-400 to-orange-600">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
-        <RotatingRays colorClass="text-white" masked={false} size="118vmax" />
+    <div className="streak-stage relative flex min-h-0 flex-1 flex-col bg-[color:var(--streak-base)]">
+      <PondBackdrop className="absolute inset-0 h-full w-full" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'var(--streak-overlay)' }}
+      />
+      <div className="pointer-events-none absolute inset-0 opacity-[var(--streak-ray-opacity)]">
+        <RotatingRays
+          colorClass="text-[color:var(--streak-ray)]"
+          masked={false}
+          size="118vmax"
+        />
       </div>
       <div
         className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 70% 38% at 50% 22%, rgba(255,237,160,0.55), rgba(255,237,160,0) 70%)',
-        }}
+        style={{ background: 'var(--streak-glow)' }}
       />
 
       <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2.25rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-10">
@@ -716,7 +790,7 @@ function RevealStep({
                         rotate: 90,
                       }}
                       transition={{ duration: 0.65, ease: [0.2, 0.8, 0.3, 1] }}
-                      className="absolute rounded-[2px] bg-yellow-100"
+                      className="absolute rounded-[2px] bg-amber-200"
                       style={{ width: spark.size, height: spark.size }}
                     />
                   ))}
@@ -726,7 +800,7 @@ function RevealStep({
                 className={cn(
                   'relative h-[84px] w-[84px] transition-[color,fill] duration-500 short-screen:h-16 short-screen:w-16',
                   popped
-                    ? 'fill-yellow-200 text-yellow-50 drop-shadow-[0_0_18px_rgba(255,230,120,0.9)]'
+                    ? 'fill-amber-300 text-amber-100 drop-shadow-[0_0_18px_rgba(255,200,80,0.85)]'
                     : 'fill-white/25 text-white/50',
                 )}
               />
@@ -735,30 +809,51 @@ function RevealStep({
 
             <TickerNumber
               value={count}
-              className="font-display text-[112px] leading-[0.95] tracking-wide text-white [filter:drop-shadow(0_5px_0_rgba(124,45,18,0.3))] short-screen:text-[84px]"
+              className="font-display text-[112px] leading-[0.95] tracking-wide text-white [filter:drop-shadow(0_5px_0_var(--streak-ink-shadow))] short-screen:text-[84px]"
             />
           </div>
 
-          <p className="-mt-1 font-display text-[26px] leading-none tracking-wide text-white [filter:drop-shadow(0_2px_0_rgba(124,45,18,0.3))] short-screen:text-[22px]">
+          <p className="-mt-1 font-display text-[26px] leading-none tracking-wide text-white [filter:drop-shadow(0_2px_0_var(--streak-ink-shadow))] short-screen:text-[22px]">
             day streak
           </p>
 
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={popped ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.25 }}
-            className="mt-3 flex min-h-10 max-w-[32ch] items-center justify-center text-pretty text-center text-[15px] font-bold leading-snug text-white short-screen:mt-2 short-screen:min-h-8 short-screen:text-sm"
+          <motion.div
+            initial={{ y: 40, opacity: 0, scale: 0.85 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+            className="pointer-events-none relative z-20"
+            style={{
+              width: frogWidth,
+              height: frogHeight,
+              marginTop: -(Math.round(frogHeight * 0.68) - 102),
+              marginBottom: shortScreen ? -27 : -11,
+            }}
           >
-            {celebration.shieldConsumedDays.length > 0
-              ? 'A Lily Pad caught your missed day. Welcome back!'
-              : revealMessage}
-          </motion.p>
+            {frogReady && (
+              <Frog
+                ref={frogRef}
+                width={frogWidth}
+                height={frogHeight}
+                indices={indices}
+                emote="love"
+              />
+            )}
+            {popped && (
+              <FrogSpeechBubble
+                rate={0}
+                done={0}
+                total={0}
+                fixedMessage={revealMessage}
+                className={shortScreen ? '!top-[142px]' : '!top-[188px]'}
+              />
+            )}
+          </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={popped ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 24 }}
-            className="mt-5 w-full rounded-[24px] bg-white/20 p-4 ring-1 ring-inset ring-white/30 short-screen:mt-3 short-screen:p-3"
+            className="relative z-10 w-full rounded-[24px] bg-[color:var(--streak-glass)] p-4 ring-1 ring-inset ring-white/30 backdrop-blur-md short-screen:mt-4 short-screen:p-3"
           >
             <StreakChain view={view} play={popped} />
             {activeGoal && (
@@ -776,30 +871,8 @@ function RevealStep({
         </div>
       </div>
 
-      <div className="relative shrink-0 px-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[126px] short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] short-screen:pt-[98px] md:px-8 md:pb-7">
+      <div className="relative shrink-0 px-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] short-screen:pt-3 md:px-8 md:pb-7">
         <div className="relative mx-auto w-full max-w-[320px]">
-          <motion.div
-            initial={{ y: 40, opacity: 0, scale: 0.85 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-            className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-11px)] z-20 flex justify-center short-screen:bottom-[calc(100%-10px)]"
-          >
-            <div
-              className="relative"
-              style={{ width: frogWidth, height: frogHeight }}
-            >
-              {frogReady && (
-                <Frog
-                  ref={frogRef}
-                  width={frogWidth}
-                  height={frogHeight}
-                  indices={indices}
-                  emote="love"
-                />
-              )}
-            </div>
-          </motion.div>
-
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={popped ? { opacity: 1, y: 0 } : {}}
@@ -809,7 +882,7 @@ function RevealStep({
             <button
               type="button"
               onClick={onContinue}
-              className="w-full rounded-2xl bg-white py-4 text-[17px] font-black tracking-tight text-orange-600 shadow-[0_5px_0_0_#9a3412,0_12px_24px_-8px_rgba(124,45,18,0.55)] ring-1 ring-orange-900/10 transition-[transform,box-shadow] hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-orange-500 active:translate-y-1 active:shadow-none short-screen:py-3.5"
+              className="w-full rounded-2xl bg-white py-4 text-[17px] font-black tracking-tight text-[#447d3f] shadow-[0_5px_0_0_#2c511a,0_12px_24px_-8px_rgba(10,40,16,0.55)] ring-1 ring-[#2c511a]/15 transition-[transform,box-shadow] hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#447d3f] active:translate-y-1 active:shadow-none short-screen:py-3.5"
             >
               Continue
             </button>
@@ -821,9 +894,9 @@ function RevealStep({
 }
 
 const PLEDGE_NAMES: Record<number, string> = {
-  7: 'Warm-up',
-  14: 'Steady',
-  30: 'Serious',
+  7: 'Tadpole',
+  14: 'Froglet',
+  30: 'Bullfrog',
   50: 'Legend',
 };
 
@@ -833,59 +906,15 @@ function pledgeName(days: number) {
 
 type PrizeRow = { key: string; tile: React.ReactNode; title: string; note?: string };
 
+const PRIZE_TILE_CLASS = 'h-[52px] w-[52px] rounded-[14px]';
+
 function pledgePrizeRows(
   rewards: LoginStreakReward[],
-  days: number,
   rewardCatalog: Record<string, QuestRewardCatalogItem>,
   isPremium: boolean,
   paused: boolean,
 ): PrizeRow[] {
   const rows: PrizeRow[] = [];
-  rewards.forEach((reward, index) => {
-    if (isShieldReward(reward)) return;
-    if ((reward as { type?: string }).type === 'SKIN_ROLL') return;
-    const questReward = reward as QuestReward;
-    const copies =
-      questReward.type !== 'FLIES' && (questReward.amount ?? 1) > 1
-        ? `${questReward.amount}× `
-        : '';
-    const flies =
-      questReward.type === 'FLIES' ? Math.max(0, questReward.amount ?? 0) : 0;
-    rows.push({
-      key: `${index}-${questReward.type}-${questReward.itemId ?? ''}`,
-      tile: (
-        <RewardTile
-          reward={questReward}
-          rewardCatalog={rewardCatalog}
-          isPremium={isPremium}
-          compact
-          hideBadge
-          className="h-11 w-11 rounded-xl"
-          flySize={30}
-          hydrateDelayMs={index * 80}
-          paused={paused}
-        />
-      ),
-      title: `${copies}${rewardLabel(questReward, rewardCatalog, isPremium)}`,
-      note:
-        flies > 0 && days > 0
-          ? `About ${Math.round((flies / days) * 10) / 10} a day`
-          : undefined,
-    });
-  });
-  const shields = rewards.reduce(
-    (sum, reward) =>
-      isShieldReward(reward) ? sum + ((reward as any).amount ?? 1) : sum,
-    0,
-  );
-  if (shields > 0) {
-    rows.push({
-      key: 'shield',
-      tile: <LilyPadTile count={shields} />,
-      title: shields > 1 ? `${shields} Lily Pads` : 'Lily Pad',
-      note: shields > 1 ? 'Each one saves a missed day' : 'Saves a missed day',
-    });
-  }
   const skinFloor = skinRollFloor(rewards);
   if (skinFloor) {
     rows.push({
@@ -895,13 +924,68 @@ function pledgePrizeRows(
           minRarity={skinFloor}
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
+          className={PRIZE_TILE_CLASS}
         />
       ),
-      title: `${SKIN_ROLL_RARITY_LABEL[skinFloor] ?? skinFloor} skin`,
-      note: 'Guaranteed, and one you don’t own yet',
+      title: `${SKIN_ROLL_RARITY_LABEL[skinFloor] ?? 'New'} outfit`,
+      note: 'A new look you don’t own yet',
     });
   }
-  return rows;
+  const flyRows: PrizeRow[] = [];
+  rewards.forEach((reward, index) => {
+    if (isShieldReward(reward)) return;
+    if ((reward as { type?: string }).type === 'SKIN_ROLL') return;
+    const questReward = reward as QuestReward;
+    const isFlies = questReward.type === 'FLIES';
+    const copies =
+      !isFlies && (questReward.amount ?? 1) > 1 ? `${questReward.amount}× ` : '';
+    const row: PrizeRow = {
+      key: `${questReward.type}-${questReward.itemId ?? ''}`,
+      tile: (
+        <RewardTile
+          reward={questReward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          compact
+          hideBadge
+          className={PRIZE_TILE_CLASS}
+          flySize={36}
+          hydrateDelayMs={index * 60}
+          paused={paused}
+        />
+      ),
+      title: `${copies}${rewardLabel(questReward, rewardCatalog, isPremium)}`,
+      note: isFlies
+        ? 'Spend them on outfits'
+        : questReward.type === 'BOX'
+          ? copies
+            ? 'Each hides a surprise outfit or background'
+            : 'Hides a surprise outfit or background'
+          : undefined,
+    };
+    if (isFlies) flyRows.push(row);
+    else rows.push(row);
+  });
+  const shields = rewards.reduce(
+    (sum, reward) =>
+      isShieldReward(reward) ? sum + ((reward as any).amount ?? 1) : sum,
+    0,
+  );
+  if (shields > 0) {
+    rows.push({
+      key: 'shield',
+      tile: <LilyPadTile count={shields} className={PRIZE_TILE_CLASS} />,
+      title: shields > 1 ? `${shields} Lily Pads` : 'Lily Pad',
+      note: shields > 1 ? 'Each one saves a missed day' : 'Saves a missed day',
+    });
+  }
+  rows.push(...flyRows);
+  const seen = new Map<string, number>();
+  return rows.map((row) => {
+    const count = seen.get(row.key) ?? 0;
+    seen.set(row.key, count + 1);
+    return count === 0 ? row : { ...row, key: `${row.key}-${count}` };
+  });
 }
 
 function pledgePrizeSummary(
@@ -909,14 +993,14 @@ function pledgePrizeSummary(
   rewardCatalog: Record<string, QuestRewardCatalogItem>,
   isPremium: boolean,
 ) {
-  return pledgePrizeRows(rewards, 0, rewardCatalog, isPremium, true)
+  return pledgePrizeRows(rewards, rewardCatalog, isPremium, true)
     .map((row) => row.title)
     .join(', ');
 }
 
 function formatPledgeEnd(days: number) {
   const end = new Date(`${addDaysToKey(localDayKey(), days)}T12:00:00`);
-  return end.toLocaleDateString(undefined, {
+  return end.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -925,12 +1009,14 @@ function formatPledgeEnd(days: number) {
 
 function CommitStep({
   view,
+  indices,
   rewardCatalog,
   isPremium,
   onPicked,
   onSkip,
 }: {
   view: LoginStreakView;
+  indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   onPicked: (view: LoginStreakView) => void;
@@ -952,14 +1038,36 @@ function CommitStep({
     stepUpTier.repeatIndex === 0
       ? stepUpTier.days
       : null;
+  useWarmSkinRolls(view.goalTiers, rewardCatalog);
+  const frogRef = useRef<FrogHandle>(null);
+  const [frogReady, setFrogReady] = useState(false);
+  const shortScreen = useMediaQuery('(max-height: 800px)');
+  const frogHeight = shortScreen ? 190 : 210;
+  const frogWidth = Math.round((frogHeight * 128) / 144);
   useEffect(() => {
-    if (selectedDays !== null) return;
-    const suggested = view?.nextTierDays ?? view?.goalTiers?.[0]?.days ?? null;
-    if (suggested !== null) setSelectedDays(suggested);
-  }, [view?.nextTierDays, view?.goalTiers, selectedDays]);
+    const timer = window.setTimeout(() => setFrogReady(true), 320);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const choose = (days: number) => {
+    setSelectedDays(days);
+    setError(null);
+    hapticSelect();
+    frogRef.current?.fireEmote('love');
+  };
   const [error, setError] = useState<string | null>(null);
   const selectedTier =
     view.goalTiers.find((tier) => tier.days === selectedDays) ?? null;
+  const topTier = view.goalTiers.reduce<LoginStreakView['goalTiers'][number] | null>(
+    (best, tier) => (!best || tier.days > best.days ? tier : best),
+    null,
+  );
+  const bestStartDays =
+    steppingUpTo === null &&
+    view.goalTiers.some(
+      (tier) => tier.days === lowestTierDays && tier.repeatIndex === 0 && tier.payoutPercent >= 100,
+    )
+      ? lowestTierDays
+      : null;
 
   const pickGoal = async (days: number) => {
     if (busyDays !== null) return;
@@ -980,6 +1088,7 @@ function CommitStep({
         if (payload.view) {
           patchStreakView(payload.view);
           hapticImpact();
+          announcePledgeMade();
           onPicked(payload.view);
           return;
         }
@@ -993,156 +1102,194 @@ function CommitStep({
   };
 
   const rows = selectedTier
-    ? pledgePrizeRows(
-        selectedTier.rewards,
-        selectedTier.days,
-        rewardCatalog,
-        isPremium,
-        false,
-      )
+    ? pledgePrizeRows(selectedTier.rewards, rewardCatalog, isPremium, false)
     : [];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
       <div
-        className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-10"
+        className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ contain: 'paint' }}
       >
-        <div className="mx-auto flex w-full max-w-sm flex-col items-center">
-          <h2
-            id="streak-goal-heading"
-            className="text-center text-[clamp(1.5rem,7vw,1.875rem)] font-black tracking-tight text-foreground"
-          >
-            Make a pledge
-          </h2>
-          <p
-            id="streak-goal-hint"
-            className="mt-1.5 max-w-[30ch] text-pretty text-center text-sm font-semibold leading-snug text-muted-foreground"
-          >
-            Get one thing done every day. Keep it up and the prize is yours.
-          </p>
-
-          <div className="mt-5 flex items-center gap-1 text-orange-500 short-screen:mt-3">
-            <Flame className="h-12 w-12 fill-orange-400 short-screen:h-10 short-screen:w-10" />
-            <TickerNumber
-              value={selectedDays ?? 0}
-              className="font-display text-[72px] leading-none tracking-wide text-orange-500 short-screen:text-[60px]"
-            />
-          </div>
-          <p className="font-display text-xl leading-none tracking-wide text-orange-500/90">
-            days in a row
-          </p>
-          {selectedDays !== null && (
-            <span className="mt-2.5 rounded-full bg-orange-500/10 px-3 py-1 text-[13px] font-bold text-orange-700 dark:text-orange-300">
-              Ends {formatPledgeEnd(selectedDays)}
-            </span>
-          )}
-
-          <fieldset
-            className="mt-5 w-full short-screen:mt-4"
-            aria-labelledby="streak-goal-heading"
-            aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
-            disabled={busyDays !== null}
-          >
-            <legend className="sr-only">Pledge length</legend>
-            <div className="grid grid-cols-4 gap-2">
-              {view.goalTiers.map((tier) => {
-                const selected = selectedDays === tier.days;
-                return (
-                  <label key={tier.days} className="relative block cursor-pointer">
-                    <input
-                      type="radio"
-                      name="streak-goal"
-                      value={tier.days}
-                      checked={selected}
-                      onChange={() => {
-                        setSelectedDays(tier.days);
-                        setError(null);
-                      }}
-                      className="peer sr-only"
-                    />
-                    {tier.days === steppingUpTo && (
-                      <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#447d3f] px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
-                        Next up
-                      </span>
-                    )}
-                    <span
-                      className={cn(
-                        'flex h-[72px] flex-col items-center justify-center rounded-2xl border-2 transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
-                        selected
-                          ? 'border-orange-500 bg-orange-500 text-white shadow-[0_4px_0_0_#c2410c]'
-                          : 'border-border/70 bg-card text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.08)] hover:border-orange-300',
-                      )}
-                    >
-                      <span className="font-display text-[26px] leading-none tracking-wide">
-                        {tier.days}
-                      </span>
-                      <span
-                        className={cn(
-                          'mt-1 text-[11px] font-black leading-none',
-                          selected ? 'text-white/90' : 'text-muted-foreground',
-                        )}
-                      >
-                        {tier.payoutPercent < 100
-                          ? `${tier.payoutPercent}% prize`
-                          : pledgeName(tier.days)}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <div className="mt-4 w-full rounded-[24px] border border-border/60 bg-card p-4 shadow-sm short-screen:mt-3 short-screen:p-3">
-            <p className="text-[13px] font-black text-muted-foreground">
-              {selectedDays !== null ? `Prize for ${selectedDays} days` : 'Prize'}
+        <div className="min-h-full bg-[radial-gradient(140%_42%_at_50%_0%,hsl(var(--primary)/0.13),transparent_72%)] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
+          <div className="mx-auto flex w-full max-w-sm flex-col items-center">
+            <h2
+              id="streak-goal-heading"
+              className="text-center text-[clamp(1.5rem,7vw,1.75rem)] font-black tracking-tight text-foreground"
+            >
+              Make a pledge
+            </h2>
+            <p
+              id="streak-goal-hint"
+              className="mt-1 max-w-[30ch] text-pretty text-center text-sm font-semibold leading-snug text-muted-foreground"
+            >
+              Get one thing done every day. Keep it up and the prize is yours.
             </p>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.ul
-                key={selectedDays ?? 'none'}
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
-                transition={{ duration: 0.18 }}
-                className="mt-3 flex flex-col gap-3"
+
+            <div className="relative mt-[80px] w-full short-screen:mt-[74px]">
+              <div
+                className="pointer-events-none absolute bottom-[calc(100%-11px)] left-[-22px] z-20"
+                style={{ width: frogWidth, height: frogHeight }}
               >
-                {settled
-                  ? rows.map((row) => (
-                      <li key={row.key} className="flex items-center gap-3">
-                        <span className="grid h-11 w-11 shrink-0 place-items-center">
-                          {row.tile}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-[15px] font-black leading-tight text-foreground">
-                            {row.title}
-                          </span>
-                          {row.note && (
-                            <span className="mt-0.5 block text-[12px] font-semibold leading-tight text-muted-foreground">
-                              {row.note}
+                {frogReady && (
+                  <Frog
+                    ref={frogRef}
+                    width={frogWidth}
+                    height={frogHeight}
+                    indices={indices}
+                  />
+                )}
+              </div>
+              <FrogSpeechBubble
+                key={selectedDays ?? 'ask'}
+                side
+                rate={0}
+                done={0}
+                total={0}
+                fixedMessage={pledgeFrogLine(selectedDays)}
+                messageClassName="!text-[14px]"
+                className={cn(
+                  '[--bubble-max:calc(100vw-11.5rem)] md:[--bubble-max:14rem]',
+                  shortScreen ? '!left-[128px] !top-[-30px]' : '!left-[144px] !top-[-30px]',
+                )}
+              />
+
+              <div className="pond-panel relative z-10 w-full rounded-[24px] border border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3.5 pt-5 shadow-[0_3px_0_0_var(--pond-line)] short-screen:pb-3">
+                <fieldset
+                  className="w-full"
+                  aria-labelledby="streak-goal-heading"
+                  aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
+                  disabled={busyDays !== null}
+                >
+                  <legend className="sr-only">Pledge length</legend>
+                  <div className="grid grid-cols-4 gap-2">
+                    {view.goalTiers.map((tier) => {
+                      const selected = selectedDays === tier.days;
+                      return (
+                        <label key={tier.days} className="relative block cursor-pointer">
+                          <input
+                            type="radio"
+                            name="streak-goal"
+                            value={tier.days}
+                            checked={selected}
+                            onChange={() => choose(tier.days)}
+                            className="peer sr-only"
+                          />
+                          {(tier.days === steppingUpTo || tier.days === bestStartDays) && (
+                            <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950 shadow-sm">
+                              {tier.days === steppingUpTo ? 'Next up' : 'Best start'}
                             </span>
                           )}
-                        </span>
-                      </li>
-                    ))
-                  : rows.map((row) => (
-                      <li key={row.key} className="h-11" aria-hidden />
-                    ))}
-              </motion.ul>
-            </AnimatePresence>
-            {selectedTier && selectedTier.payoutPercent < 100 && (
-              <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
-                You&apos;ve kept this pledge before, so its flies pay{' '}
-                {selectedTier.payoutPercent}%. A longer one pays in full.
-              </p>
-            )}
-          </div>
+                          <span
+                            className={cn(
+                              'flex h-[80px] flex-col items-center justify-center rounded-2xl border-2 short-screen:h-[72px] transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
+                              selected
+                                ? 'border-[#447d3f] bg-[#447d3f] text-white shadow-[0_4px_0_0_#2c511a]'
+                                : 'border-[color:var(--pond-chip-line)] bg-[color:var(--pond-chip)] text-[color:var(--pond-ink)] shadow-[0_3px_0_0_var(--pond-chip-line)] hover:bg-[color:var(--pond-chip-hover)]',
+                            )}
+                          >
+                            <span className="font-display text-[28px] leading-none tracking-wide short-screen:text-[26px]">
+                              {tier.days}
+                            </span>
+                            <span
+                              className={cn(
+                                'mt-1.5 text-[11px] font-black leading-none',
+                                selected ? 'text-white/90' : 'text-[color:var(--pond-ink-muted)]',
+                              )}
+                            >
+                              {tier.payoutPercent < 100
+                                ? `days · ${tier.payoutPercent}%`
+                                : 'days'}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              </div>
+            </div>
 
-          <p className="mt-3 flex items-start gap-2 px-1 text-[12px] font-semibold leading-snug text-muted-foreground">
-            <Icon name="lilyPad" className="mt-px h-4 w-4 shrink-0" />
-            Miss a day and a Lily Pad can cover it. Breaking a pledge only
-            costs the prize.
-          </p>
+            <section className="mt-5 w-full short-screen:mt-4" aria-live="polite">
+              <div className="mb-2 flex h-6 items-center justify-between gap-2 px-1.5">
+                <h3 className="flex items-center gap-1.5 text-[13px] font-black text-amber-800 dark:text-amber-300">
+                  <Trophy aria-hidden className="h-4 w-4 text-amber-500" />
+                  {selectedDays !== null ? `${pledgeName(selectedDays)} prize` : 'Prizes'}
+                </h3>
+                {selectedDays !== null && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-300">
+                    Ends {formatPledgeEnd(selectedDays)}
+                  </span>
+                )}
+              </div>
+              <div className="rounded-[24px] border border-amber-200 bg-[linear-gradient(to_bottom,#fffbeb,#ffffff)] px-3.5 py-1.5 shadow-[0_3px_0_0_rgba(217,119,6,0.14)] dark:border-amber-400/25 dark:bg-[linear-gradient(to_bottom,rgba(251,191,36,0.11),rgba(251,191,36,0.03))] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
+                {selectedDays !== null ? (
+                  <>
+                    <ul className="relative flex flex-col divide-y divide-amber-200/70 dark:divide-amber-400/15">
+                      <AnimatePresence initial={false} mode="popLayout">
+                        {settled
+                          ? rows.map((row) => (
+                              <motion.li
+                                key={row.key}
+                                layout={reduceMotion ? false : 'position'}
+                                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
+                                transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                                className="flex items-center gap-3.5 py-3 short-screen:py-2.5"
+                              >
+                                <span className="grid h-[52px] w-[52px] shrink-0 place-items-center">
+                                  {row.tile}
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block text-[15px] font-black leading-tight text-foreground">
+                                    {row.title}
+                                  </span>
+                                  {row.note && (
+                                    <span className="mt-1 block text-[12.5px] font-semibold leading-snug text-muted-foreground">
+                                      {row.note}
+                                    </span>
+                                  )}
+                                </span>
+                              </motion.li>
+                            ))
+                          : rows.map((row) => (
+                              <li key={row.key} className="h-[76px] short-screen:h-[72px]" aria-hidden />
+                            ))}
+                      </AnimatePresence>
+                    </ul>
+                    {selectedTier && selectedTier.payoutPercent < 100 && (
+                      <p className="mb-2 rounded-xl bg-muted px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
+                        You&apos;ve kept this pledge before, so its flies pay{' '}
+                        {selectedTier.payoutPercent}%. A longer one pays in full.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex min-h-[148px] flex-col items-center justify-center gap-3 py-3 text-center short-screen:min-h-[140px]">
+                    {topTier && (
+                      <PledgeRewardTiles
+                        rewards={topTier.rewards}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={isPremium}
+                        hydrateDelayMs={450}
+                        paused
+                        still
+                      />
+                    )}
+                    <span>
+                      <span className="block text-[15px] font-black leading-tight text-foreground">
+                        Longer pledges win bigger prizes
+                      </span>
+                      <span className="mt-1 block text-[12.5px] font-semibold text-muted-foreground">
+                        Pick a length to see yours
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
       </div>
 
@@ -1159,23 +1306,19 @@ function CommitStep({
           )}
           <button
             type="button"
-            disabled={busyDays !== null}
+            disabled={busyDays !== null || selectedDays === null}
             onClick={() => {
-              if (selectedDays === null) {
-                setError('Pick how many days to pledge.');
-                return;
-              }
-              void pickGoal(selectedDays);
+              if (selectedDays !== null) void pickGoal(selectedDays);
             }}
             aria-live="polite"
-            className="flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-base font-black text-white shadow-[0_4px_0_0_#c2410c] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-60"
+            className="flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-4 text-base font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-[transform,box-shadow,filter] hover:brightness-110 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-[0_4px_0_0_rgba(0,0,0,0.08)] disabled:ring-0 disabled:hover:brightness-100"
           >
-            <Flame className="h-5 w-5 fill-current" />
+            {selectedDays !== null && <Flame className="h-5 w-5 fill-amber-300 text-amber-200" />}
             {busyDays !== null
               ? 'Starting…'
               : selectedDays !== null
                 ? `Pledge ${selectedDays} days`
-                : 'Pledge'}
+                : 'Pick a pledge'}
           </button>
           <button
             type="button"
@@ -1183,7 +1326,7 @@ function CommitStep({
             disabled={busyDays !== null}
             className="mt-1 min-h-11 px-4 text-sm font-bold text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
           >
-            Choose later
+            Not now
           </button>
         </div>
       </div>
@@ -1588,6 +1731,7 @@ export function StreakSheet({
                 {step === 'commit' && (
                   <CommitStep
                     view={view}
+                    indices={indices}
                     rewardCatalog={rewardCatalog}
                     isPremium={isPremium}
                     onPicked={finishCommit}

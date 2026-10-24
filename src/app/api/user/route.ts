@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
         userId: uid,
         type: 'regular',
         id: uuid(),
-        text: 'Grab your first fly',
+        text: 'Tap the fly to finish this task',
         order: 0,
         date: getZonedToday(tz),
         completed: false,

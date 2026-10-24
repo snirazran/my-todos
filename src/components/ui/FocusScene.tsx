@@ -374,7 +374,7 @@ export function FocusScene({
             done={0}
             total={0}
             fixedMessage={speech}
-            className="!top-2"
+            className="!top-[78px]"
           />
         )}
         <Frog

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
-import useSWR from 'swr';
+import useSWR, { preload } from 'swr';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import type { MacroCategoryDefinition } from '@/lib/quests/types';
@@ -50,9 +50,9 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
     title: "What's your gender?",
     sectionLabel: 'About You',
     options: [
-      { id: 'male', label: 'Male' },
-      { id: 'female', label: 'Female' },
-      { id: 'non-binary', label: 'Non-binary' },
+      { id: 'male', label: 'Male', icon: '💙' },
+      { id: 'female', label: 'Female', icon: '💗' },
+      { id: 'non-binary', label: 'Non-binary', icon: '💛' },
     ],
     plainOption: { id: 'prefer-not', label: 'Prefer not to answer' },
   },
@@ -80,6 +80,21 @@ export const PROFILE_QUESTION_COUNT = ABOUT_QUESTIONS.length + 1;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+const FOCUS_AREAS_URL = '/api/onboarding/categories';
+
+export function preloadFocusAreas() {
+  preload(FOCUS_AREAS_URL, fetcher)
+    .then((data: { macroCategories?: MacroCategoryDefinition[] } | null) => {
+      data?.macroCategories?.forEach((category) => {
+        if (!category.coverImageUrl) return;
+        const image = new Image();
+        image.decoding = 'async';
+        image.src = category.coverImageUrl;
+      });
+    })
+    .catch(() => {});
+}
+
 type Props = OnboardingStepProps & {
   subStep: number;
   onSubStepChange: (index: number) => void;
@@ -97,7 +112,7 @@ export default function ProfileQuestionsStep({
   const questionIndex = subStep;
 
   const { data: questsData } = useSWR<{ macroCategories?: MacroCategoryDefinition[] }>(
-    '/api/onboarding/categories',
+    FOCUS_AREAS_URL,
     fetcher,
   );
 
@@ -173,12 +188,11 @@ export default function ProfileQuestionsStep({
   return (
     <div className="flex-1 flex flex-col">
       <OnboardingFrogHeader
-        eyebrow={currentQuestion.sectionLabel}
         title={currentQuestion.title}
         subtitle={currentQuestion.subtitle}
       />
 
-      <div className="relative z-20 flex flex-col pt-[calc(418px+env(safe-area-inset-top))] short:pt-[calc(370px+env(safe-area-inset-top))] md:pt-[404px]">
+      <div className="relative z-20 flex flex-col pt-[calc(442px+env(safe-area-inset-top))] short:pt-[calc(390px+env(safe-area-inset-top))] md:pt-[436px]">
       <motion.div
         key={currentQuestion.id}
         custom={direction}
@@ -198,7 +212,16 @@ export default function ProfileQuestionsStep({
           )}
         >
           {isFocusAreas ? (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div
+              className={cn(
+                'grid gap-2.5 md:gap-3',
+                focusAreaCategories.length <= 1
+                  ? 'grid-cols-1'
+                  : focusAreaCategories.length === 2
+                    ? 'grid-cols-2'
+                    : 'grid-cols-3',
+              )}
+            >
               {focusAreaCategories.map((category, index) => {
                 const isSelected = selectedValues.includes(category.id);
                 return (
@@ -217,10 +240,10 @@ export default function ProfileQuestionsStep({
                     }}
                     whileTap={{ scale: 0.98 }}
                     className={cn(
-                      'relative block h-[104px] overflow-hidden rounded-3xl border-2 bg-background text-left shadow-sm transition-colors duration-200',
-                      // Short banner on phones so the list stays scannable; a
-                      // wider tile once the grid gains columns.
-                      'md:h-auto md:aspect-[16/9]',
+                      'relative block overflow-hidden rounded-3xl border-2 bg-background text-left shadow-sm transition-colors duration-200',
+                      focusAreaCategories.length >= 3
+                        ? 'aspect-[3/4] md:aspect-[16/9]'
+                        : 'aspect-[16/9]',
                       '[-webkit-tap-highlight-color:transparent]',
                       isSelected
                         ? 'border-primary ring-4 ring-primary/25'
@@ -254,24 +277,19 @@ export default function ProfileQuestionsStep({
                       className="pointer-events-none absolute inset-0"
                       style={{
                         background:
-                          'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.34) 26%, rgba(0,0,0,0.10) 48%, rgba(0,0,0,0) 68%)',
+                          'linear-gradient(to top, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.26) 20%, rgba(0,0,0,0) 40%)',
                       }}
                     />
 
-                    <span className="absolute inset-x-0 bottom-0 z-10 p-3.5 md:p-4">
-                      <span className="block text-base font-black leading-tight tracking-tight text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.7)] md:text-lg">
+                    <span className="absolute inset-x-0 bottom-0 z-10 p-2.5 md:p-4">
+                      <span className="block text-sm font-black leading-tight tracking-tight text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.7)] md:text-lg">
                         {category.name}
                       </span>
-                      {category.onboardingSentence?.trim() ? (
-                        <span className="mt-0.5 block text-sm font-medium leading-snug text-white/90 [text-shadow:0_1px_5px_rgba(0,0,0,0.7)] line-clamp-2">
-                          {category.onboardingSentence}
-                        </span>
-                      ) : null}
                     </span>
 
                     <span
                       className={cn(
-                        'absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-full border-2 transition-all duration-200 md:h-8 md:w-8',
+                        'absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full border-2 transition-all duration-200 md:right-3 md:top-3 md:h-8 md:w-8',
                         isSelected
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-white/90 bg-white/15 text-transparent shadow-[0_1px_6px_rgba(0,0,0,0.35)] backdrop-blur-sm',

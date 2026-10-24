@@ -74,6 +74,24 @@ export function drawCachedFrogStamp(target: HTMLCanvasElement, indices: FrogStam
   return true;
 }
 
+export function frogStampCovers(indices: FrogStampIndices, width: number, height: number): boolean {
+  const source = frameCache.get(frameKey(indices));
+  return !!source && source.width >= Math.min(width, MAX_MASTER_DIM) && source.height >= Math.min(height, MAX_MASTER_DIM);
+}
+
+export function warmFrogStamps(list: FrogStampIndices[], size: number): () => void {
+  if (typeof document === 'undefined') return () => {};
+  const cancels = list
+    .filter((indices) => !frogStampCovers(indices, size, size))
+    .map((indices) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      return requestFrogStamp(canvas, indices);
+    });
+  return () => cancels.forEach((cancel) => cancel());
+}
+
 function cacheFrame(job: Job) {
   if (job.cancelled || !masterCanvas) return;
   const key = frameKey(job.indices);

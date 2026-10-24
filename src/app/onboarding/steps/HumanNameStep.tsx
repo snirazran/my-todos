@@ -39,7 +39,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
         className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
       >
         <form
-          className="relative -mt-28 w-full md:max-w-md"
+          className="relative -mt-[88px] w-full md:max-w-md"
           onSubmit={(event) => {
             event.preventDefault();
             if (canContinue && !saving) onNext();

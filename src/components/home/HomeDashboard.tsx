@@ -12,7 +12,6 @@ import {
   EllipsisVertical,
   Plus,
   Sparkles,
-  ChevronRight,
 } from 'lucide-react';
 import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
@@ -34,6 +33,7 @@ import {
   type FrogHandle,
 } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
+import { TapFinger } from '@/components/ui/TapFinger';
 import TaskList from '@/components/ui/TaskList';
 import { GuestAccountBanner } from '@/components/ui/GuestAccountBanner';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
@@ -85,7 +85,11 @@ import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
-import { useFirstRun } from '@/hooks/useFirstRun';
+import {
+  clearFirstRunPending,
+  readFirstRunPending,
+  useFirstRun,
+} from '@/hooks/useFirstRun';
 import { useQuestRevealQueueLength } from '@/components/ui/questRewardReveal';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
@@ -119,8 +123,8 @@ const demoTasks: Task[] = [
 
 const HOME_FILTER_BASE = { showCompleted: false };
 
-const FINALE_STRIP_SWAP_MS = 1100;
-const FINALE_TASKS_FALLBACK_MS = 3500;
+const FINALE_STRIP_SWAP_MS = 450;
+const FINALE_TASKS_FALLBACK_MS = 1500;
 
 export default function HomeDashboard() {
   const { user, loading } = useAuth();
@@ -570,18 +574,43 @@ export default function HomeDashboard() {
 
   const starterTask = user ? tasks.find((t) => t.isStarter) : undefined;
   const revealQueueLength = useQuestRevealQueueLength();
+  const [firstRunFlagged] = useState(readFirstRunPending);
+  useEffect(() => {
+    if (seenIntros && seenIntros.firstRun !== false) clearFirstRunPending();
+  }, [seenIntros]);
   const firstRun = useFirstRun({
-    pending: !!user && seenIntros?.firstRun === false,
+    pending:
+      !!user && (seenIntros ? seenIntros.firstRun === false : firstRunFlagged),
     ready: !!user && !isLoading && (questsData !== undefined || !!questsError),
     starterDone: !starterTask || !!starterTask.completed,
     hasClaim: !!questsData?.claimables?.some((c) => c.placement === 'onboarding'),
     revealCount: revealQueueLength,
-    onFinish: () => markIntroSeen('firstRun'),
+    onFinish: () => {
+      clearFirstRunPending();
+      markIntroSeen('firstRun');
+    },
   });
   const guided = firstRun.guided;
   const earnedChipsVisible =
     !guided || firstRun.phase === 'quest' || firstRun.phase === 'claiming';
-  const flyCounterVisible = !guided || firstRun.phase === 'claiming';
+  const flyCounterVisible =
+    !guided || (firstRun.phase !== 'hungry' && firstRun.phase !== 'off');
+  const [firstRunFlyStart, setFirstRunFlyStart] = useState<number | null>(null);
+  useEffect(() => {
+    if (firstRun.phase === 'hungry' && firstRunFlyStart === null && !isLoading) {
+      setFirstRunFlyStart(flyBalance);
+    }
+  }, [firstRun.phase, firstRunFlyStart, flyBalance, isLoading]);
+  const [firstRunFlyShown, setFirstRunFlyShown] = useState(false);
+  useEffect(() => {
+    if (firstRun.phase !== 'yum') return;
+    const timer = window.setTimeout(() => setFirstRunFlyShown(true), 650);
+    return () => window.clearTimeout(timer);
+  }, [firstRun.phase]);
+  const shownFlyBalance =
+    firstRun.phase === 'yum' && !firstRunFlyShown && firstRunFlyStart !== null
+      ? Math.min(firstRunFlyStart, flyBalance)
+      : flyBalance;
   const questIntroHeld =
     guided && firstRun.phase !== 'quest' && firstRun.phase !== 'claiming';
   const onboardingClaimPending = !!questsData?.claimables?.some(
@@ -609,21 +638,10 @@ export default function HomeDashboard() {
   const taskListHidden =
     (guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off') ||
     (firstRun.phase === 'finale' && !finaleTasksReady);
-  const [finaleRevealCount, setFinaleRevealCount] = useState(0);
-  useEffect(() => {
-    if (firstRun.phase !== 'finale' || !finaleTasksReady) return;
-    const timer = window.setInterval(
-      () => setFinaleRevealCount((count) => count + 1),
-      180,
-    );
-    return () => window.clearInterval(timer);
-  }, [firstRun.phase, finaleTasksReady]);
-  const listTasks = useMemo(() => {
-    if (guided) return data.filter((t) => t.isStarter);
-    if (firstRun.phase !== 'finale') return data;
-    let shown = 0;
-    return data.filter((t) => t.isStarter || shown++ < finaleRevealCount);
-  }, [data, guided, firstRun.phase, finaleRevealCount]);
+  const listTasks = useMemo(
+    () => (guided ? data.filter((t) => t.isStarter) : data),
+    [data, guided],
+  );
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -848,10 +866,11 @@ export default function HomeDashboard() {
               transition={{ type: 'spring', stiffness: 420, damping: 18 }}
             >
               <FlyCounter
-                balance={flyBalance}
+                balance={shownFlyBalance}
                 variant="mobile"
                 onClick={() => openFlyShop()}
                 showGoal={!!user}
+                alwaysCelebrate={firstRun.phase === 'yum'}
               />
             </motion.span>
           )}
@@ -998,10 +1017,10 @@ export default function HomeDashboard() {
                 {!taskListHidden && (
                 <motion.div
                   key="home-task-list"
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8, transition: { duration: 0.25 } }}
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                 >
                 <TaskList
                   tasks={listTasks}
@@ -1032,16 +1051,13 @@ export default function HomeDashboard() {
                           <>
                             <span
                               aria-hidden
-                              className="pointer-events-none absolute -inset-0.5 rounded-full ring-[3px] ring-amber-400/90 animate-[demo-glow-breathe_2.4s_ease-in-out_infinite]"
+                              className="pointer-events-none absolute -inset-0.5 rounded-full ring-[2.5px] ring-primary/70"
                             />
                             <span
                               aria-hidden
-                              className="pointer-events-none absolute -inset-0.5 rounded-full ring-[3px] ring-amber-400 animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
+                              className="pointer-events-none absolute -inset-0.5 rounded-full bg-primary/15 ring-[2.5px] ring-primary/60 animate-[demo-sonar_1.6s_cubic-bezier(0,0,0.2,1)_0.8s_infinite_both] motion-reduce:hidden"
                             />
-                            <span className="pointer-events-none absolute right-full top-1/2 mr-3 flex -translate-y-1/2 items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-amber-500 dark:text-amber-400">
-                              Tap to finish
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            </span>
+                            <TapFinger className="left-[24px] top-[31px] z-20 h-[21px] w-[18px] md:left-[27px] md:top-[34px]" />
                           </>
                         )}
                         <Fly

@@ -4,28 +4,29 @@ export type StreakRevealContext = {
   nextTierDays: number | null;
   /** 0 = Sunday … 6 = Saturday, in the user's own week. */
   dayOfWeek: number;
+  shieldUsed?: boolean;
 };
 
 const MILESTONES: Record<number, string> = {
-  7: 'Seven days. A full week without missing one.',
-  14: 'Two weeks straight. This is a routine now.',
-  21: 'Three weeks. The hard part is behind you.',
-  30: 'Thirty days. A whole month of showing up.',
-  50: 'Fifty days. Half a hundred.',
-  75: 'Seventy-five days, and still going.',
-  100: 'One hundred days. Sit with that one for a second.',
-  150: 'One hundred and fifty days. Still here.',
-  200: 'Two hundred days. That is not luck.',
-  250: 'Two hundred and fifty days of turning up.',
-  300: 'Three hundred days. Almost the whole year.',
-  365: 'One year. Every single day.',
+  7: 'A whole week!\nI might cry a little.',
+  14: 'Two weeks straight!\nThis is a routine now.',
+  21: 'Three weeks!\nThe hard part is behind us.',
+  30: 'Thirty days!\nTelling the whole pond.',
+  50: 'Fifty days!\nI need to sit down.',
+  75: 'Seventy-five days.\nWho even are we?',
+  100: 'One hundred days!\nFrame this. I’ll wait.',
+  150: '150 days!\nStill going. Still proud.',
+  200: '200 days.\nThat is not luck.',
+  250: '250 days!\nI’ve run out of croaks.',
+  300: '300 days!\nAlmost a whole year.',
+  365: 'One whole year!\nEvery. Single. Day.',
 };
 
 const WEEKDAY_LINES: Record<number, string> = {
-  0: 'Something done on a Sunday. Those are the easy ones to skip.',
-  1: 'Monday, and you still showed up.',
-  5: 'Friday, going into the weekend {n} days deep.',
-  6: 'Something done on a Saturday. Those are the easy ones to skip.',
+  0: 'A Sunday win!\nThe easiest day to skip.',
+  1: 'A Monday win!\nThe hardest kind.',
+  5: 'Friday, and still going.\n{n} days deep.',
+  6: 'A Saturday win!\nThe easiest day to skip.',
 };
 
 /**
@@ -33,16 +34,18 @@ const WEEKDAY_LINES: Record<number, string> = {
  * eventually breaks, where "you're amazing" turns into a reason to quit.
  */
 const GENERIC_LINES = [
-  'You got something done today. That is how streaks are made.',
-  'Day {n}, logged.',
-  'You made time today. That is the whole trick.',
-  'Another one on the board.',
-  'Small and repeated beats big and once.',
-  'Today counted. On to the next.',
-  'You kept it alive — {n} days and going.',
-  'Turned up again. That is the hard part done.',
-  'One more day in the bank.',
-  'Nothing dramatic. Just another day kept.',
+  'Day {n}!\nI’m doing a little dance.',
+  '{n} days in a row.\nLook at us go.',
+  'You showed up again.\nI noticed. I always do.',
+  'Another day kept!\nSmall steps, big frog.',
+  'Day {n}, done.\nVery proud. Quietly.',
+  'Still going!\nMy belly thanks you.',
+  '{n} days!\nThe pond is talking.',
+  'Kept it alive!\nSame time tomorrow?',
+  'Another one banked.\nCroak of approval.',
+  'Day {n}.\nThis looks good on us.',
+  'Showed up again!\nThat’s the whole trick.',
+  'Look at that streak.\nHappy tears. Mine.',
 ];
 
 function fill(line: string, count: number) {
@@ -50,11 +53,9 @@ function fill(line: string, count: number) {
 }
 
 /**
- * The most specific true thing the streak can say today.
+ * The most specific true thing the frog can say about today's streak.
  *
- * Generic praise reads worse than none — the reveal used to rotate ten
- * interchangeable sentences by streak count, which is variety without
- * variation. This walks real state first (first day, a comeback, a milestone,
+ * Walks real state first (a Lily Pad save, first day, a comeback, a milestone,
  * a reward one day out, a personal best) and only falls back to the pool when
  * nothing specific applies, seeding it so consecutive days never repeat.
  */
@@ -62,10 +63,12 @@ export function streakRevealMessage(context: StreakRevealContext): string {
   const count = Math.max(1, Math.floor(context.count));
   const longest = Math.max(count, Math.floor(context.longestStreak || 0));
 
+  if (context.shieldUsed) return 'A Lily Pad saved us!\nStreak still alive.';
+
   if (count === 1) {
     return longest > 1
-      ? `Back to day one. Your best run was ${longest} — you already know you can.`
-      : 'Day one. The only one that is hard to start.';
+      ? `Fresh start!\nWe did ${longest} days before.`
+      : 'Day one!\nI already feel stronger.';
   }
 
   const milestone = MILESTONES[count];
@@ -73,11 +76,11 @@ export function streakRevealMessage(context: StreakRevealContext): string {
 
   const toTier =
     context.nextTierDays != null ? context.nextTierDays - count : null;
-  if (toTier === 1) return 'One more day and your next reward opens.';
-  if (toTier === 2) return 'Two days from your next reward.';
+  if (toTier === 1) return 'One more day and\na prize opens. I can smell it.';
+  if (toTier === 2) return 'Two more days\nto your next prize!';
 
   if (count >= 7 && count === longest) {
-    return `${count} days — your longest run yet.`;
+    return `${count} days!\nOur longest run yet.`;
   }
 
   const weekday = WEEKDAY_LINES[context.dayOfWeek];
@@ -89,4 +92,16 @@ export function streakRevealMessage(context: StreakRevealContext): string {
     GENERIC_LINES[(count * 7 + context.dayOfWeek) % GENERIC_LINES.length],
     count,
   );
+}
+
+const PLEDGE_LINES: Record<number, string> = {
+  7: 'Seven days.\nPerfect warm-up!',
+  14: 'Two weeks!\nBold. I like it.',
+  30: 'A whole month?\nI’m getting emotional.',
+  50: 'Fifty days?!\nThat’s a legend move.',
+};
+
+export function pledgeFrogLine(days: number | null): string {
+  if (days === null) return 'Make it official?\nPick how long we go.';
+  return PLEDGE_LINES[days] ?? `${days} days together?\nI’m so in.`;
 }

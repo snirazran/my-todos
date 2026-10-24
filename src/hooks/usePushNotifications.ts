@@ -55,8 +55,7 @@ function taskSyncDetailFromData(
 
 /**
  * Hook that handles push notification setup for native platforms (Android/iOS).
- * - Requests permission
- * - Registers the FCM token with the server
+ * - Registers the FCM token with the server once permission is granted
  * - Tracks user activity for smart notification timing
  *
  * Uses @capacitor-firebase/messaging so both iOS and Android return a real FCM
@@ -102,15 +101,7 @@ export function usePushNotifications(userId: string | null | undefined) {
 
     async function setup() {
       try {
-        // Check current permission status
-        let permStatus = await FirebaseMessaging.checkPermissions();
-
-        if (
-          permStatus.receive === 'prompt' ||
-          permStatus.receive === 'prompt-with-rationale'
-        ) {
-          permStatus = await FirebaseMessaging.requestPermissions();
-        }
+        const permStatus = await FirebaseMessaging.checkPermissions();
 
         if (permStatus.receive !== 'granted') {
           console.log('Push notification permission not granted');

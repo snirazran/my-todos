@@ -2,14 +2,17 @@ import type { MacroCategoryId } from './types';
 
 export type StarterCadence = 'daily' | 'weekdays' | 'weekend' | 'custom';
 
+export type StarterMoment = 'wake' | 'morning' | 'day' | 'evening' | 'night';
+
+export const STARTER_MOMENTS: StarterMoment[] = ['wake', 'morning', 'day', 'evening', 'night'];
+
 export type StarterTaskTemplate = {
   id: string;
   text: string;
   cadence: StarterCadence;
   days?: number[];
-  startTime?: string;
-  reminder?: string;
-  anchor?: string;
+  emoji?: string;
+  moment?: StarterMoment;
   enabled?: boolean;
 };
 
@@ -23,11 +26,11 @@ export type StarterPlanItem = {
   cadence: StarterCadence;
   days: number[];
   cadenceLabel: string;
-  timeLabel?: string;
-  startTime?: string;
-  reminder?: string;
-  anchor?: string;
+  emoji?: string;
+  moment: StarterMoment;
 };
+
+export const STARTER_BASICS_CATEGORY_ID = 'basics';
 
 export type StarterPlanConfig = {
   isActive: boolean;
@@ -46,11 +49,11 @@ export const STARTER_PLAN_DEFAULT_CONFIG: StarterPlanConfig = {
   maxTasks: 5,
   maxPerArea: 3,
   linkTags: true,
-  headline: 'Your starting plan',
-  subheadline: 'Small on purpose. Change anything later.',
-  acceptLabel: 'Start with this plan',
-  declineLabel: "I'll add my own",
-  footnote: 'You can edit, reschedule or delete any of these anytime.',
+  headline: 'Start small',
+  subheadline: "Tiny daily habits you'll actually keep.",
+  acceptLabel: 'Add {habits}',
+  declineLabel: 'Skip for now',
+  footnote: 'Change or remove any of them later.',
 };
 
 export const STARTER_PLAN_MAX_TASKS_LIMIT = 8;
@@ -135,115 +138,6 @@ export function starterCadenceLabel(
   return resolved.map((d) => WEEKDAY_SHORT[d]).join(' · ');
 }
 
-export type StarterDayStart = string;
-
-export const STARTER_DAY_START_MIN_MINUTES = 4 * 60;
-export const STARTER_DAY_START_MAX_MINUTES = 11 * 60;
-export const STARTER_DAY_START_STEP_MINUTES = 15;
-
-const DAY_START_EARLIEST_MINUTES = 4 * 60;
-const DAY_START_LATEST_MINUTES = 23 * 60 + 30;
-
-export function starterTimeToMinutes(value?: string): number | undefined {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return undefined;
-  const [hour, minute] = value.split(':').map(Number);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return undefined;
-  return hour * 60 + minute;
-}
-
-export function starterMinutesToTime(minutes: number): string {
-  const total = Math.min(24 * 60 - 1, Math.max(0, Math.round(minutes)));
-  const hh = String(Math.floor(total / 60)).padStart(2, '0');
-  const mm = String(total % 60).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
-export function clampStarterDayStartMinutes(minutes: number): number {
-  const snapped =
-    Math.round(minutes / STARTER_DAY_START_STEP_MINUTES) *
-    STARTER_DAY_START_STEP_MINUTES;
-  return Math.min(
-    STARTER_DAY_START_MAX_MINUTES,
-    Math.max(STARTER_DAY_START_MIN_MINUTES, snapped),
-  );
-}
-
-export function normalizeStarterDayStart(
-  value: unknown,
-): StarterDayStart | undefined {
-  if (typeof value !== 'string') return undefined;
-  const minutes = starterTimeToMinutes(value.trim());
-  if (minutes === undefined) return undefined;
-  return starterMinutesToTime(clampStarterDayStartMinutes(minutes));
-}
-
-export function shiftStarterTime(
-  startTime: string | undefined,
-  shiftMinutes: number,
-): string | undefined {
-  const minutes = starterTimeToMinutes(startTime);
-  if (minutes === undefined || shiftMinutes === 0) return startTime;
-  const total = Math.min(
-    DAY_START_LATEST_MINUTES,
-    Math.max(DAY_START_EARLIEST_MINUTES, minutes + shiftMinutes),
-  );
-  return starterMinutesToTime(total);
-}
-
-export function starterDayStartShift(
-  items: StarterPlanItem[],
-  dayStart: StarterDayStart | undefined,
-): number {
-  const target = starterTimeToMinutes(normalizeStarterDayStart(dayStart));
-  const base = starterTimeToMinutes(earliestStarterTime(items));
-  if (target === undefined || base === undefined) return 0;
-  return target - base;
-}
-
-export function applyStarterDayStart(
-  items: StarterPlanItem[],
-  dayStart: StarterDayStart | undefined,
-): StarterPlanItem[] {
-  const shift = starterDayStartShift(items, dayStart);
-  if (shift === 0) return items;
-  return items.map((item) => {
-    const startTime = shiftStarterTime(item.startTime, shift);
-    return { ...item, startTime, timeLabel: starterTimeLabel(startTime) };
-  });
-}
-
-export function sortStarterPlanItems(items: StarterPlanItem[]): StarterPlanItem[] {
-  return [...items].sort((a, b) => {
-    const aTime = starterTimeToMinutes(a.startTime);
-    const bTime = starterTimeToMinutes(b.startTime);
-    if (aTime === undefined && bTime === undefined) return 0;
-    if (aTime === undefined) return 1;
-    if (bTime === undefined) return -1;
-    return aTime - bTime;
-  });
-}
-
-export function earliestStarterTime(items: StarterPlanItem[]): string | undefined {
-  let earliest: string | undefined;
-  for (const item of items) {
-    if (!item.startTime) continue;
-    if (!earliest || item.startTime < earliest) earliest = item.startTime;
-  }
-  return earliest;
-}
-
-export function starterTimeLabel(startTime?: string): string | undefined {
-  if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) return undefined;
-  const [hourRaw, minute] = startTime.split(':');
-  const hour = Number(hourRaw);
-  if (!Number.isInteger(hour)) return undefined;
-  const suffix = hour < 12 ? 'AM' : 'PM';
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-  return minute === '00'
-    ? `${displayHour} ${suffix}`
-    : `${displayHour}:${minute} ${suffix}`;
-}
-
 export function normalizeStarterTasks(value: unknown): StarterTaskTemplate[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -266,22 +160,15 @@ export function normalizeStarterTasks(value: unknown): StarterTaskTemplate[] {
         ? entry.cadence
         : 'daily';
     const days = starterCadenceDays('custom', entry.days as number[] | undefined);
-    const startTime =
-      typeof entry.startTime === 'string' && /^\d{2}:\d{2}$/.test(entry.startTime)
-        ? entry.startTime
-        : undefined;
+    const emoji = typeof entry.emoji === 'string' ? entry.emoji.trim().slice(0, 8) : '';
+    const moment = STARTER_MOMENTS.find((m) => m === entry.moment);
     out.push({
       id,
       text,
       cadence,
       ...(cadence === 'custom' ? { days: days.length > 0 ? days : [1, 3, 5] } : {}),
-      ...(startTime ? { startTime } : {}),
-      ...(typeof entry.reminder === 'string' && entry.reminder
-        ? { reminder: entry.reminder.slice(0, 16) }
-        : {}),
-      ...(typeof entry.anchor === 'string' && entry.anchor.trim()
-        ? { anchor: entry.anchor.trim().slice(0, 160) }
-        : {}),
+      ...(emoji ? { emoji } : {}),
+      ...(moment ? { moment } : {}),
       enabled: entry.enabled !== false,
     });
   }
@@ -318,6 +205,16 @@ export function normalizeStarterPlanConfig(
   };
 }
 
+const MOMENT_ORDER: Record<StarterMoment, number> = {
+  wake: 0,
+  morning: 1,
+  day: 2,
+  evening: 3,
+  night: 4,
+};
+
+const textKey = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
 export function buildStarterPlan(args: {
   selectedCategoryIds: MacroCategoryId[];
   categories: Array<{
@@ -327,10 +224,46 @@ export function buildStarterPlan(args: {
     accent?: string;
     starterTasks?: StarterTaskTemplate[];
   }>;
+  basics?: StarterTaskTemplate[];
   config: StarterPlanConfig;
 }): StarterPlanItem[] {
   const { selectedCategoryIds, categories, config } = args;
   const byId = new Map(categories.map((c) => [c.id, c]));
+  const picked: StarterPlanItem[] = [];
+  const seen = new Set<string>();
+
+  const add = (
+    category: { id: string; name: string; shortLabel?: string; accent?: string },
+    template: StarterTaskTemplate,
+  ) => {
+    if (picked.length >= config.maxTasks) return false;
+    const key = textKey(template.text);
+    if (seen.has(template.id) || seen.has(key)) return false;
+    const days = starterCadenceDays(template.cadence, template.days);
+    if (days.length === 0) return false;
+    seen.add(template.id);
+    seen.add(key);
+    picked.push({
+      id: `${category.id}:${template.id}`,
+      categoryId: category.id,
+      categoryName: category.name,
+      categoryShortLabel: category.shortLabel,
+      categoryAccent: category.accent,
+      text: template.text,
+      cadence: template.cadence,
+      days,
+      cadenceLabel: starterCadenceLabel(template.cadence, template.days),
+      emoji: template.emoji,
+      moment: template.moment ?? 'day',
+    });
+    return true;
+  };
+
+  const basicsCategory = { id: STARTER_BASICS_CATEGORY_ID, name: 'Easy wins' };
+  for (const template of args.basics ?? []) {
+    if (template.enabled !== false) add(basicsCategory, template);
+  }
+
   const pools = selectedCategoryIds
     .map((id) => {
       const category = byId.get(id);
@@ -339,40 +272,36 @@ export function buildStarterPlan(args: {
         (task) => task.enabled !== false,
       );
       if (tasks.length === 0) return null;
-      return { category, tasks };
+      return { category, tasks, cursor: 0, taken: 0 };
     })
     .filter(Boolean) as Array<{
     category: { id: string; name: string; shortLabel?: string; accent?: string };
     tasks: StarterTaskTemplate[];
+    cursor: number;
+    taken: number;
   }>;
 
-  if (pools.length === 0) return [];
-
-  const picked: StarterPlanItem[] = [];
-  const deepest = Math.max(...pools.map((pool) => pool.tasks.length));
-  for (let round = 0; round < Math.min(deepest, config.maxPerArea); round++) {
+  let progressed = true;
+  while (progressed && picked.length < config.maxTasks) {
+    progressed = false;
     for (const pool of pools) {
-      if (picked.length >= config.maxTasks) return picked;
-      const template = pool.tasks[round];
-      if (!template) continue;
-      const days = starterCadenceDays(template.cadence, template.days);
-      if (days.length === 0) continue;
-      picked.push({
-        id: `${pool.category.id}:${template.id}`,
-        categoryId: pool.category.id,
-        categoryName: pool.category.name,
-        categoryShortLabel: pool.category.shortLabel,
-        categoryAccent: pool.category.accent,
-        text: template.text,
-        cadence: template.cadence,
-        days,
-        cadenceLabel: starterCadenceLabel(template.cadence, template.days),
-        timeLabel: starterTimeLabel(template.startTime),
-        startTime: template.startTime,
-        reminder: template.reminder,
-        anchor: template.anchor,
-      });
+      if (pool.taken >= config.maxPerArea) continue;
+      while (pool.cursor < pool.tasks.length) {
+        const template = pool.tasks[pool.cursor++];
+        if (add(pool.category, template)) {
+          pool.taken += 1;
+          progressed = true;
+          break;
+        }
+      }
     }
   }
-  return picked;
+
+  return picked
+    .map((item, index) => ({ item, index }))
+    .sort(
+      (a, b) =>
+        MOMENT_ORDER[a.item.moment] - MOMENT_ORDER[b.item.moment] || a.index - b.index,
+    )
+    .map(({ item }) => item);
 }

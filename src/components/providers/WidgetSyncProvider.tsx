@@ -13,10 +13,12 @@ import { TASK_SYNC_EVENT } from '@/lib/taskSyncClient';
 import { useWidgetPinStore } from '@/lib/widget/pinStore';
 import { requestQuickAdd } from '@/lib/widget/quickAdd';
 import {
+  PLEDGE_MADE_EVENT,
   TASK_COMPLETED_EVENT,
   readCompletedEver,
   shouldAskForWidget,
 } from '@/lib/widget/prompt';
+import { useSheetStore } from '@/lib/sheetStore';
 import {
   buildPayload,
   clientTimezone,
@@ -37,6 +39,7 @@ type StreakResponse = {
 };
 
 const WIDGET_ASK_WAIT_MS = 10 * 60 * 1000;
+const PLEDGE_ASK_DELAY_MS = 350;
 
 const cacheFetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -82,6 +85,8 @@ export function WidgetSyncProvider() {
   const clearPromptRequest = useWidgetPinStore((s) => s.clearPromptRequest);
   const [promptOpen, setPromptOpen] = useState(false);
   const [userInitiated, setUserInitiated] = useState(false);
+  const [pledgeAskPending, setPledgeAskPending] = useState(false);
+  const sheetOpen = useSheetStore((s) => s.count > 0);
   const wasSignedIn = useRef(false);
 
   const streak = streakData?.view?.count ?? 0;
@@ -198,6 +203,31 @@ export function WidgetSyncProvider() {
       cancelWait?.();
     };
   }, [enabled, pinState, streak]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const onPledge = () => setPledgeAskPending(true);
+    window.addEventListener(PLEDGE_MADE_EVENT, onPledge);
+    return () => window.removeEventListener(PLEDGE_MADE_EVENT, onPledge);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!pledgeAskPending || sheetOpen) return;
+    const timer = window.setTimeout(() => {
+      setPledgeAskPending(false);
+      if (
+        !shouldAskForWidget({
+          pinState,
+          completedEver: Math.max(1, readCompletedEver()),
+          streak,
+        })
+      )
+        return;
+      setUserInitiated(false);
+      setPromptOpen(true);
+    }, PLEDGE_ASK_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [pledgeAskPending, sheetOpen, pinState, streak]);
 
   if (!native) return null;
 

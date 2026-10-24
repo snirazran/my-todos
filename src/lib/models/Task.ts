@@ -65,7 +65,7 @@ export interface TaskDoc {
   reminderSentKeys?: string[];
   bondId?: string; // links this task to a shared "buddy" bond (TaskBond)
   buddyUserId?: string; // the friend this task is shared with
-  isStarter?: boolean; // seeded "Grab your first fly" onboarding task
+  isStarter?: boolean; // seeded "Tap the fly to finish this task" onboarding task
   isSeededPlan?: boolean; // seeded from the onboarding starter plan, not typed by the user
   isTutorial?: boolean; // practice card seeded by the planner tour, deleted when it ends
   sectionId?: string; // Today-list section (TaskSection) this task is grouped under

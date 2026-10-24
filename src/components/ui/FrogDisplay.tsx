@@ -203,7 +203,7 @@ export function FrogDisplay({
             done={0}
             total={0}
             fixedMessage={fixedSpeech}
-            className="!top-20"
+            className="!top-[150px]"
           />
         ) : (
           showSpeechBubble &&
@@ -218,7 +218,7 @@ export function FrogDisplay({
               isCatching={isCatching}
               clickedAt={clickedAt}
               facts={speechFacts}
-              className="!top-20"
+              className="!top-[150px]"
             />
           )
         )}

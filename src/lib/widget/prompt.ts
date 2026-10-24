@@ -9,6 +9,15 @@ const MAX_ASKS = 2;
 const SECOND_ASK_DELAY_MS = 3 * DAY_MS;
 
 export const TASK_COMPLETED_EVENT = 'frogress:task-completed';
+export const PLEDGE_MADE_EVENT = 'frogress:pledge-made';
+
+export function announcePledgeMade(): void {
+  try {
+    window.dispatchEvent(new Event(PLEDGE_MADE_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Lifetime completed-task count on this device, the value-moment signal. */
 export function readCompletedEver(): number {

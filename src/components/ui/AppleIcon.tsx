@@ -2,7 +2,7 @@ export function AppleIcon({ className = 'h-4 w-4 shrink-0' }: { className?: stri
   return (
     <svg
       className={className}
-      viewBox="0 0 24 24"
+      viewBox="4.9 2.5 14.8 18.5"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"

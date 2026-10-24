@@ -32,9 +32,11 @@ import {
 } from '@/lib/emailLinkSettings';
 import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup';
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Loader2, ArrowRight, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Frog, {
@@ -88,6 +90,13 @@ function LoginPageInner() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [usePassword, setUsePassword] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [appleFirst, setAppleFirst] = useState(false);
+  const showEmailForm = emailOpen || usePassword || email.length > 0;
+
+  useEffect(() => {
+    setAppleFirst(Capacitor.getPlatform() === 'ios');
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
@@ -429,40 +438,19 @@ function LoginPageInner() {
   return (
     <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10">
       <div className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125">
-        {/* Frogress wordmark — curved, matching the loading screen */}
-        <div className="auth-enter-brand" style={{ '--auth-i': 0 } as any}>
-          <svg
-            aria-label="Frogress"
-            role="img"
-            viewBox="0 0 220 34"
-            className="mb-2 h-12 w-[300px] overflow-visible text-foreground"
-          >
-            <path id="login-brand-arc" d="M 36 22 Q 110 6 184 22" fill="none" />
-            <text
-              fill="currentColor"
-              fontSize="20"
-              fontWeight="800"
-              textAnchor="middle"
-              style={{
-                fontFamily:
-                  '"Arial Rounded MT Bold", "Avenir Next Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              }}
-            >
-              <textPath href="#login-brand-arc" startOffset="50%">
-                Frogress
-              </textPath>
-            </text>
-          </svg>
-        </div>
-
-        {isUpgrade && (
-          <p
-            className="auth-enter -mt-1 mb-1 max-w-xs text-center text-[14px] font-semibold text-muted-foreground"
-            style={{ '--auth-i': 1 } as any}
-          >
-            Save your frog so it&apos;s never lost.
+        <div
+          className="auth-enter-brand text-center"
+          style={{ '--auth-i': 0 } as any}
+        >
+          <h1 className="text-[26px] font-black tracking-tight text-foreground">
+            {isUpgrade ? 'Save your frog' : 'Welcome back!'}
+          </h1>
+          <p className="mt-1 text-[15px] font-medium text-muted-foreground">
+            {isUpgrade
+              ? 'Sign in so it’s never lost.'
+              : 'Sign in to get back to your frog.'}
           </p>
-        )}
+        </div>
 
         {/* Frog mascot — sits on top of the email input, fly buzzing above. No container. */}
         <div
@@ -478,7 +466,7 @@ function LoginPageInner() {
               }`}
               style={
                 {
-                  top: '-6%',
+                  top: '14%',
                   '--auth-i': flyFirstArrivalRef.current ? 8 : 0,
                 } as any
               }
@@ -526,101 +514,108 @@ function LoginPageInner() {
                 exit="exit"
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
-                <button
-                  onClick={handleGoogle}
-                  disabled={loading}
-                  className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-card text-[15px] font-black text-foreground ring-1 ring-border shadow-[0_3px_0_0_hsl(var(--border))] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <GoogleIcon /> Continue with Google
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={handleApple}
-                  disabled={loading}
-                  className="mt-3 flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-black text-[15px] font-black text-white shadow-[0_3px_0_0_#3f3f46] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black dark:shadow-[0_3px_0_0_#a1a1aa]"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <AppleIcon /> Continue with Apple
-                    </>
-                  )}
-                </button>
-
-                <div className="relative my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border/60" />
-                  </div>
-                  <div className="relative flex justify-center text-[13px]">
-                    <span className="bg-background px-2 font-bold tracking-widest text-muted-foreground">
-                      Or
-                    </span>
-                  </div>
-                </div>
-
-                <form
-                  onSubmit={usePassword ? handlePasswordSignIn : handleSendEmailLink}
-                  className="space-y-3"
-                >
-                  <Input
-                    ref={emailRef}
-                    id="email"
-                    type="email"
-                    aria-label="Email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-2xl border-border bg-card px-4 text-base focus-visible:ring-primary/30"
-                    required
-                  />
-                  {usePassword && (
-                    <Input
-                      id="password"
-                      type="password"
-                      aria-label="Password"
-                      placeholder="Password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-12 rounded-2xl border-border bg-card px-4 text-base focus-visible:ring-primary/30"
-                      required
-                    />
-                  )}
+                <div className={cn('flex gap-3', appleFirst ? 'flex-col-reverse' : 'flex-col')}>
                   <button
-                    type="submit"
-                    disabled={
-                      !email.trim() || (usePassword && !password) || loading
-                    }
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,opacity] active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    onClick={handleGoogle}
+                    disabled={loading}
+                    className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-card text-[15px] font-black text-foreground ring-1 ring-border shadow-[0_3px_0_0_hsl(var(--border))] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
-                        {usePassword ? 'Sign in' : 'Continue with email'}{' '}
-                        <ArrowRight className="h-4 w-4" />
+                        <GoogleIcon /> Continue with Google
                       </>
                     )}
                   </button>
-                  {PASSWORD_LOGIN_ENABLED && (
+
+                  <button
+                    onClick={handleApple}
+                    disabled={loading}
+                    className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-black text-[15px] font-black text-white shadow-[0_3px_0_0_#3f3f46] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black dark:shadow-[0_3px_0_0_#a1a1aa]"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <AppleIcon /> Continue with Apple
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {showEmailForm ? (
+                  <motion.form
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    onSubmit={usePassword ? handlePasswordSignIn : handleSendEmailLink}
+                    className="mt-5 space-y-3 border-t border-border/60 pt-5"
+                  >
+                    <Input
+                      ref={emailRef}
+                      id="email"
+                      type="email"
+                      aria-label="Email"
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      autoFocus={emailOpen}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-12 rounded-2xl border-border bg-card px-4 text-base focus-visible:ring-primary/30"
+                      required
+                    />
+                    {usePassword && (
+                      <Input
+                        id="password"
+                        type="password"
+                        aria-label="Password"
+                        placeholder="Password"
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="h-12 rounded-2xl border-border bg-card px-4 text-base focus-visible:ring-primary/30"
+                        required
+                      />
+                    )}
                     <button
-                      type="button"
-                      onClick={() => setUsePassword((value) => !value)}
-                      className="mx-auto block text-xs font-bold tracking-wide text-primary hover:underline"
+                      type="submit"
+                      disabled={
+                        !email.trim() || (usePassword && !password) || loading
+                      }
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,opacity] active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                     >
-                      {usePassword
-                        ? 'Email me a sign-in link instead'
-                        : 'Use a password instead'}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          {usePassword ? 'Sign in' : 'Send sign-in link'}{' '}
+                          <ArrowRight className="h-4 w-4" />
+                        </>
+                      )}
                     </button>
-                  )}
-                </form>
+                    {PASSWORD_LOGIN_ENABLED && (
+                      <button
+                        type="button"
+                        onClick={() => setUsePassword((value) => !value)}
+                        className="mx-auto block text-xs font-bold tracking-wide text-primary hover:underline"
+                      >
+                        {usePassword
+                          ? 'Email me a sign-in link instead'
+                          : 'Use a password instead'}
+                      </button>
+                    )}
+                  </motion.form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEmailOpen(true)}
+                    disabled={loading}
+                    className="mt-3 flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-card text-[15px] font-black text-foreground ring-1 ring-border shadow-[0_3px_0_0_hsl(var(--border))] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Mail className="h-[18px] w-[18px]" strokeWidth={2.5} /> Continue with email
+                  </button>
+                )}
               </motion.div>
             )}
 

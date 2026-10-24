@@ -10,7 +10,6 @@ import {
 export function RiveWarmup() {
   useEffect(() => {
     warmRiveRuntime();
-    preloadRiveAsset('/frog_idle.riv');
 
     const idle =
       typeof window.requestIdleCallback === 'function'
@@ -21,11 +20,19 @@ export function RiveWarmup() {
         ? window.cancelIdleCallback
         : window.clearTimeout;
 
-    const id = idle(() => {
-      preloadRiveAsset('/idle_gift.riv');
-      preloadRiveAsset(FLY_RIVE_ASSET_URL);
+    let cancelled = false;
+    let id: number | undefined;
+    void preloadRiveAsset('/frog_idle.riv').then(() => {
+      if (cancelled) return;
+      id = idle(() => {
+        preloadRiveAsset('/idle_gift.riv');
+        preloadRiveAsset(FLY_RIVE_ASSET_URL);
+      });
     });
-    return () => cancelIdle(id);
+    return () => {
+      cancelled = true;
+      if (id !== undefined) cancelIdle(id);
+    };
   }, []);
 
   return null;

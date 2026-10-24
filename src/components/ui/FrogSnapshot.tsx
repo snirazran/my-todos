@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import {
   requestFrogStamp,
   drawCachedFrogStamp,
+  frogStampCovers,
   type FrogStampIndices,
 } from '@/lib/frogStampEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
@@ -58,7 +59,8 @@ export function FrogSnapshot({
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       cancelStamp?.();
-      drawCachedFrogStamp(canvas, indicesRef.current ?? {});
+      const drawn = drawCachedFrogStamp(canvas, indicesRef.current ?? {});
+      if (drawn && frogStampCovers(indicesRef.current ?? {}, w, h)) return;
       if (!cachedOnly) cancelStamp = requestFrogStamp(canvas, indicesRef.current ?? {});
     };
     applySize();

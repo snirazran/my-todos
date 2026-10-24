@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
+  EventType,
   useRive,
   useStateMachineInput,
   Layout,
@@ -36,6 +37,8 @@ const nextNudgeDelayMs = () =>
     ? 4500 + Math.random() * 3000
     : 1800 + Math.random() * 2200;
 
+const nextEagerNudgeDelayMs = () => 1100 + Math.random() * 700;
+
 // --- FIXED: Removed all delay logic, just simple rendering ---
 export const GiftRive = React.memo(
   ({
@@ -47,6 +50,9 @@ export const GiftRive = React.memo(
     paused = false,
     color = 0,
     ambient = 'shake',
+    eager = false,
+    onReady,
+    onOpenStart,
   }: {
     width?: number;
     height?: number;
@@ -57,9 +63,12 @@ export const GiftRive = React.memo(
     color?: number;
     /** Which one-shot the ambient scheduler fires every few seconds. */
     ambient?: 'shake' | 'jump';
+    eager?: boolean;
     /** Legacy raw-animation override — ignored. The state machine drives all
      *  motion now via the ambient boxShake/boxJump triggers. */
     animation?: string;
+    onReady?: () => void;
+    onOpenStart?: () => void;
   }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const riveUrl = useRiveAsset('/idle_gift.riv');
@@ -70,6 +79,27 @@ export const GiftRive = React.memo(
       autoBind: true,
       layout: RIVE_LAYOUT,
     });
+
+    const onReadyRef = useRef(onReady);
+    onReadyRef.current = onReady;
+    useEffect(() => {
+      if (rive) onReadyRef.current?.();
+    }, [rive]);
+
+    const [shaking, setShaking] = useState(false);
+    const onOpenStartRef = useRef(onOpenStart);
+    onOpenStartRef.current = onOpenStart;
+    useEffect(() => {
+      if (!rive) return;
+      const onStateChange = (event: { data?: unknown }) => {
+        const states = Array.isArray(event.data) ? (event.data as string[]) : [];
+        if (states.includes('box_open')) onOpenStartRef.current?.();
+        if (states.includes('box_shake')) setShaking(true);
+        else if (states.length > 0) setShaking(false);
+      };
+      rive.on(EventType.StateChange, onStateChange);
+      return () => rive.off(EventType.StateChange, onStateChange);
+    }, [rive]);
 
     useRiveVisibility(rive, containerRef, !paused, 'gift');
 
@@ -116,11 +146,11 @@ export const GiftRive = React.memo(
             else triggerBoxShake();
           }
           schedule();
-        }, nextNudgeDelayMs());
+        }, eager ? nextEagerNudgeDelayMs() : nextNudgeDelayMs());
       };
       schedule();
       return () => window.clearTimeout(t);
-    }, [rive, paused, triggerOpen, ambient, triggerBoxShake, triggerBoxJump]);
+    }, [rive, paused, triggerOpen, ambient, eager, triggerBoxShake, triggerBoxJump]);
 
     useEffect(() => {
       if (!rive) return;
@@ -232,12 +262,12 @@ export const GiftRive = React.memo(
     ]);
 
     useEffect(() => {
-      if (!triggerOpen) return;
+      if (!triggerOpen || shaking) return;
 
       startOpenBinding.trigger();
       legacyStartOpenBinding.trigger();
       startOpenInput?.fire();
-    }, [legacyStartOpenBinding, startOpenBinding, startOpenInput, triggerOpen]);
+    }, [legacyStartOpenBinding, startOpenBinding, startOpenInput, triggerOpen, shaking]);
 
     return (
       <div

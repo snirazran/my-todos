@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { MailCheck } from 'lucide-react';
+import Link from 'next/link';
+import { Capacitor } from '@capacitor/core';
+import { Check, Loader2, Mail, MailCheck } from 'lucide-react';
 import { sendSignInLinkToEmail, signOut, type AuthCredential } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
@@ -29,12 +31,15 @@ import {
 } from '@/lib/emailLinkSettings';
 import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup';
 import { clearOnboardingDraft } from '@/lib/onboardingDraft';
+import { hapticSuccess } from '@/lib/haptics';
+import { findStarterSkin } from '@/lib/skins/starterSkins';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
-import { OnboardingButton, useOnboardingKeyboardInset } from './OnboardingFooter';
+import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 type Step = 'enter' | 'email-sent';
 
@@ -45,6 +50,11 @@ type ReturningAccount = {
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
+const SAVED_HOLD_MS = 650;
+
+const LEGAL_LINK_CLASS =
+  'font-semibold text-foreground/80 underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/70';
+
 const variants = {
   enter: { opacity: 0, y: 8 },
   center: { opacity: 1, y: 0 },
@@ -53,10 +63,16 @@ const variants = {
 
 export default function CreateAccountStep({ selections, onNext, saving }: OnboardingStepProps) {
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
+  const humanName = selections.humanName?.[0]?.trim() || null;
+  const skin = findStarterSkin(selections.frogSkin?.[0]);
+  const [saved, setSaved] = useState(false);
+  const [skipAsk, setSkipAsk] = useState(false);
   const [step, setStep] = useState<Step>('enter');
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState<'google' | 'apple' | 'email' | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [appleFirst, setAppleFirst] = useState(false);
   const [conflict, setConflict] = useState<{
     credential: AuthCredential | null;
     provider: 'google' | 'apple';
@@ -70,22 +86,10 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     'new-account',
   );
   const [switching, setSwitching] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const keyboardInset = useOnboardingKeyboardInset();
 
   useEffect(() => {
-    const form = formRef.current;
-    const vv = window.visualViewport;
-    if (!keyboardInset || !form || !vv) return;
-    const scroller = form.closest('main');
-    if (!scroller) return;
-    const frame = requestAnimationFrame(() => {
-      const visibleBottom = vv.offsetTop + vv.height - 12;
-      const overlap = form.getBoundingClientRect().bottom - visibleBottom;
-      if (overlap > 0) scroller.scrollBy({ top: overlap, behavior: 'smooth' });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [keyboardInset, error]);
+    setAppleFirst(Capacitor.getPlatform() === 'ios');
+  }, []);
 
   useEffect(() => {
     void initNativeGoogleSignIn().catch(() => {
@@ -126,12 +130,18 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     setReturning({ name: data.name ?? null, frogName: data.frogName ?? null });
     setConflict(null);
     setExistingEmail(null);
-    setLoading(false);
+    setPending(null);
     setSwitching(false);
   };
 
+  const finishSaved = () => {
+    setSaved(true);
+    hapticSuccess();
+    window.setTimeout(onNext, SAVED_HOLD_MS);
+  };
+
   const handleGoogle = async () => {
-    setLoading(true);
+    setPending('google');
     setError(null);
     try {
       const current = auth.currentUser;
@@ -141,19 +151,19 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         showReturning(data);
         return;
       }
-      onNext();
+      finishSaved();
     } catch (signInError: any) {
       if (signInError instanceof GoogleAccountExistsError) {
         setConflict({ credential: signInError.credential, provider: 'google' });
       } else {
         setError(getGoogleAuthErrorMessage(signInError));
       }
-      setLoading(false);
+      setPending(null);
     }
   };
 
   const handleApple = async () => {
-    setLoading(true);
+    setPending('apple');
     setError(null);
     try {
       const current = auth.currentUser;
@@ -163,14 +173,14 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         showReturning(data);
         return;
       }
-      onNext();
+      finishSaved();
     } catch (signInError: any) {
       if (signInError instanceof AppleAccountExistsError) {
         setConflict({ credential: signInError.credential, provider: 'apple' });
       } else {
         setError(getAppleAuthErrorMessage(signInError));
       }
-      setLoading(false);
+      setPending(null);
     }
   };
 
@@ -191,7 +201,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       }
       setConflict(null);
       setSwitching(false);
-      onNext();
+      finishSaved();
     } catch (switchError: any) {
       setConflict(null);
       setError(
@@ -221,7 +231,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     const trimmed = email.trim();
     if (!trimmed) return;
 
-    setLoading(true);
+    setPending('email');
     setError(null);
     try {
       // Firebase removed client-side sign-in-method lookup (email enumeration
@@ -233,14 +243,14 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
           email: trimmed,
           method: describeSignInMethod(lookup.providers),
         });
-        setLoading(false);
+        setPending(null);
         return;
       }
       await sendEmailLink(trimmed, 'new-account');
     } catch (sendError: unknown) {
       setError(sendError instanceof Error ? sendError.message : 'Could not send email link');
     } finally {
-      setLoading(false);
+      setPending(null);
     }
   };
 
@@ -275,129 +285,195 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
 
   const returningFrogName = returning?.frogName?.trim() || 'your frog';
 
+  const busy = pending !== null || saving || saved;
+
+  const google = (primary: boolean) => (
+    <ProviderButton
+      key="google"
+      primary={primary}
+      onClick={handleGoogle}
+      disabled={busy}
+      loading={pending === 'google'}
+    >
+      <GoogleIcon className="h-[18px] w-[18px] shrink-0" /> Continue with Google
+    </ProviderButton>
+  );
+  const apple = (primary: boolean) => (
+    <ProviderButton
+      key="apple"
+      primary={primary}
+      onClick={handleApple}
+      disabled={busy}
+      loading={pending === 'apple'}
+    >
+      <AppleIcon className="h-[18px] w-[18px] shrink-0" /> Continue with Apple
+    </ProviderButton>
+  );
+  const providerButtons = appleFirst ? [apple(true), google(false)] : [google(true), apple(false)];
+
+  const swap = {
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -6 },
+    transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const },
+  };
+
   return (
     <div className="relative flex w-full flex-1 flex-col">
       <OnboardingFrogHeader
-        title={`Don't lose ${frogName}!`}
-        subtitle="Create a free account so your frog and progress are safe on any device."
+        title={step === 'enter' ? `Don't lose ${frogName}!` : 'Check your inbox'}
+        subtitle={
+          step === 'enter'
+            ? 'Save your progress with a free account.'
+            : sentIntent === 'existing-account'
+              ? 'Tap the link to sign back into your account.'
+              : 'Tap the link to finish. You can keep going meanwhile.'
+        }
       />
 
-      <div className={`relative z-20 flex w-full flex-col items-center px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] md:pb-10 ${ONBOARDING_BODY_CLASS}`}>
-        <div className="w-full max-w-sm">
-          <AnimatePresence mode="wait">
-            {step === 'enter' ? (
-              <motion.div
-                key="email"
-                variants={variants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.18 }}
-              >
-                <div className="flex flex-col gap-3">
-                  <OnboardingButton
-                    variant="secondary"
-                    onClick={handleGoogle}
-                    loading={loading}
-                    className="h-[52px] text-foreground md:w-full"
-                  >
-                    <GoogleIcon /> Continue with Google
-                  </OnboardingButton>
-                  <OnboardingButton
-                    variant="secondary"
-                    onClick={handleApple}
-                    loading={loading}
-                    className="h-[52px] text-foreground md:w-full"
-                  >
-                    <AppleIcon /> Continue with Apple
-                  </OnboardingButton>
-                </div>
-
-                <div className="relative my-5">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border/60" />
-                  </div>
-                  <div className="relative flex justify-center text-[13px]">
-                    <span className="bg-background px-3 font-bold text-muted-foreground">
-                      or use email
-                    </span>
-                  </div>
-                </div>
-
-                <form ref={formRef} onSubmit={handleSendEmailLink} className="space-y-3">
-                  <Input
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    enterKeyHint="send"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    placeholder="you@example.com"
-                    aria-label="Email address"
-                    name="email"
-                    value={email}
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      if (error) setError(null);
-                    }}
-                    className="h-[52px] rounded-2xl border-2 border-border/60 bg-card text-center text-base font-bold shadow-[0_3px_0_0_rgba(0,0,0,0.06)] placeholder:font-semibold placeholder:text-muted-foreground/50 focus-visible:border-primary/60 focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:ring-offset-0 md:text-base"
-                    required
-                  />
-                  {error ? <ErrorMsg>{error}</ErrorMsg> : null}
-                  <OnboardingButton
-                    type="submit"
-                    disabled={!email.trim()}
-                    loading={loading}
-                    className="md:w-full"
-                  >
-                    Send sign-in link
-                  </OnboardingButton>
-                </form>
-                {keyboardInset > 0 ? (
-                  <div aria-hidden style={{ height: keyboardInset }} />
-                ) : null}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="email-sent"
-                variants={variants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.18 }}
-                className="flex flex-col items-center text-center"
-              >
-                <div className="flex w-full flex-col items-center rounded-3xl border border-border/60 bg-card px-5 py-5 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
-                    <MailCheck className="h-6 w-6" strokeWidth={2.25} />
-                  </span>
-                  <p className="mt-3 text-base font-black text-foreground">Check your inbox</p>
-                  <p className="mt-1 break-all text-sm font-bold text-primary">{email}</p>
-                  <p className="mt-2 text-[13px] font-medium leading-snug text-muted-foreground">
-                    {sentIntent === 'existing-account'
-                      ? 'Tap the link to sign back into your account. Your frog and progress will be exactly as you left them.'
-                      : 'Tap the link to finish signing in. You can hop in meanwhile.'}
-                  </p>
-                </div>
-                {sentIntent === 'new-account' ? (
-                  <OnboardingButton onClick={onNext} loading={saving} className="mt-5 md:w-full">
-                    Hop in
-                  </OnboardingButton>
-                ) : null}
-                <OnboardingButton
-                  variant="ghost"
-                  onClick={() => setStep('enter')}
-                  disabled={saving}
-                  className="mt-1 md:w-full"
-                >
-                  Use a different email
-                </OnboardingButton>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className={cn('relative z-20 flex w-full flex-1 flex-col items-center', ONBOARDING_BODY_CLASS)}>
+        {step === 'enter' ? (
+          <SaveCard
+            frogName={frogName}
+            humanName={humanName}
+            skin={skin}
+            saved={saved}
+          />
+        ) : null}
+        {step === 'email-sent' ? (
+          <motion.div
+            {...swap}
+            className="mt-5 flex w-full max-w-sm items-center gap-3.5 rounded-[20px] border-2 border-border/60 bg-card px-4 py-3.5 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+              <MailCheck className="h-[22px] w-[22px]" strokeWidth={2.25} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-muted-foreground">
+                Link sent to
+              </span>
+              <span className="block truncate text-[15px] font-bold text-foreground">
+                {email.trim()}
+              </span>
+            </span>
+          </motion.div>
+        ) : null}
       </div>
+
+
+      <OnboardingFooter>
+        <AnimatePresence mode="wait" initial={false}>
+          {step === 'enter' && !emailOpen ? (
+            <motion.div key="providers" {...swap} className="flex w-full flex-col gap-2 md:w-80">
+              {providerButtons}
+              <ProviderButton
+                onClick={() => {
+                  setError(null);
+                  setEmailOpen(true);
+                }}
+                disabled={busy}
+              >
+                <Mail className="h-[18px] w-[18px]" strokeWidth={2.5} /> Continue with email
+              </ProviderButton>
+            </motion.div>
+          ) : step === 'enter' ? (
+            <motion.form
+              key="email"
+              {...swap}
+              onSubmit={handleSendEmailLink}
+              className="flex w-full flex-col gap-2.5 md:w-80"
+            >
+              <Input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                enterKeyHint="send"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+                placeholder="you@example.com"
+                aria-label="Email address"
+                name="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  if (error) setError(null);
+                }}
+                className="h-[52px] rounded-2xl border-2 border-border/60 bg-card px-4 text-base font-bold shadow-[0_3px_0_0_rgba(0,0,0,0.06)] placeholder:font-semibold placeholder:text-muted-foreground/50 focus-visible:border-primary/60 focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:ring-offset-0 md:text-base"
+                required
+              />
+              <OnboardingButton
+                type="submit"
+                disabled={!email.trim() || busy}
+                loading={pending === 'email'}
+              >
+                Send sign-in link
+              </OnboardingButton>
+            </motion.form>
+          ) : sentIntent === 'new-account' ? (
+            <motion.div key="sent" {...swap} className="flex w-full justify-center">
+              <OnboardingButton onClick={onNext} loading={saving}>
+                Continue
+              </OnboardingButton>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        {error ? <ErrorMsg>{error}</ErrorMsg> : null}
+
+        {step === 'enter' ? (
+          <p className="mt-0.5 max-w-[23rem] text-balance text-center text-[11px] leading-snug text-muted-foreground">
+            By continuing, you agree to our{' '}
+            <Link href="/terms" className={LEGAL_LINK_CLASS}>
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className={LEGAL_LINK_CLASS}>
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        ) : null}
+
+        {step === 'enter' ? (
+          <OnboardingButton
+            variant="ghost"
+            onClick={() => {
+              if (emailOpen) {
+                setEmailOpen(false);
+                setError(null);
+              } else {
+                setSkipAsk(true);
+              }
+            }}
+            disabled={busy}
+          >
+            {emailOpen ? 'Back' : 'Skip for now'}
+          </OnboardingButton>
+        ) : (
+          <OnboardingButton variant="ghost" onClick={() => setStep('enter')} disabled={saving}>
+            Use a different email
+          </OnboardingButton>
+        )}
+      </OnboardingFooter>
+
+      <AccountConflictDialog
+        open={skipAsk}
+        title={`Skip saving ${frogName}?`}
+        message={`Without an account, ${frogName} only lives on this device. Delete the app or switch phones and ${frogName} is gone.`}
+        confirmLabel={`Save ${frogName}`}
+        cancelLabel="Skip anyway"
+        dismissOnBackdrop={false}
+        onConfirm={() => {
+          setSkipAsk(false);
+          void (appleFirst ? handleApple() : handleGoogle());
+        }}
+        onCancel={() => {
+          setSkipAsk(false);
+          onNext();
+        }}
+      />
 
       <AccountConflictDialog
         open={!!existingEmail}
@@ -443,9 +519,105 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   );
 }
 
+function SaveCard({
+  frogName,
+  humanName,
+  skin,
+  saved,
+}: {
+  frogName: string;
+  humanName: string | null;
+  skin: ReturnType<typeof findStarterSkin>;
+  saved: boolean;
+}) {
+  const owner = humanName ? `${humanName}’s` : 'Your';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+      className="relative -top-3 my-auto w-full overflow-hidden rounded-[22px] border-2 border-border/60 bg-card shadow-[0_3px_0_0_rgba(0,0,0,0.05)] short:hidden md:w-80"
+    >
+      <div className="flex items-center gap-3 px-3.5 py-3">
+        <span
+          aria-hidden
+          className="flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-hidden rounded-2xl"
+          style={{ backgroundColor: `${skin.color}38` }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={skin.image} alt="" className="w-[86%] translate-y-[8%]" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[16px] font-black leading-tight text-foreground">
+            {frogName}
+          </span>
+          <span className="mt-0.5 block truncate text-[13px] font-semibold text-muted-foreground">
+            {owner} {skin.label.toLowerCase()} frog
+          </span>
+        </span>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={saved ? 'saved' : 'unsaved'}
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 26 }}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-black',
+              saved
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300',
+            )}
+          >
+            {saved ? (
+              <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+            ) : (
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inset-0 rounded-full bg-amber-500 motion-safe:animate-ping" />
+                <span className="relative h-2 w-2 rounded-full bg-amber-500" />
+              </span>
+            )}
+            {saved ? 'Saved' : 'Not saved'}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+function ProviderButton({
+  children,
+  onClick,
+  disabled,
+  loading,
+  primary = false,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex h-[50px] w-full items-center justify-center gap-2.5 rounded-2xl text-[15px] font-black transition-[transform,box-shadow,opacity] [-webkit-tap-highlight-color:transparent] active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60',
+        primary
+          ? 'bg-foreground text-background shadow-[0_3px_0_0_rgba(0,0,0,0.35)] dark:shadow-[0_3px_0_0_rgba(255,255,255,0.25)]'
+          : 'bg-card text-foreground shadow-[0_3px_0_0_hsl(var(--border))] ring-1 ring-border',
+      )}
+    >
+      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : children}
+    </button>
+  );
+}
+
 function ErrorMsg({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-[13px] font-black text-destructive">
+    <p className="w-full rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-[13px] font-black text-destructive">
       {children}
     </p>
   );

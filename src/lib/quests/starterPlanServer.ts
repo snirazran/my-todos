@@ -10,7 +10,7 @@ import {
   type StarterPlanItem,
   type StarterTaskTemplate,
 } from './starterPlan';
-import { defaultStarterTasksFor } from './starterPlanDefaults';
+import { defaultStarterTasksFor, STARTER_BASICS } from './starterPlanDefaults';
 
 export async function loadStarterPlanConfig(): Promise<StarterPlanConfig> {
   const doc = await StarterPlanConfigModel.findOne({
@@ -35,19 +35,22 @@ export async function buildStarterPlanForAreas(args: {
 }): Promise<{ config: StarterPlanConfig; items: StarterPlanItem[] }> {
   const config = args.config ?? (await loadStarterPlanConfig());
   const ids = Array.from(new Set(args.selectedCategoryIds)).slice(0, 20);
-  if (ids.length === 0 || !config.isActive) return { config, items: [] };
+  if (!config.isActive) return { config, items: [] };
 
-  const docs = await QuestCategoryModel.find({ categoryId: { $in: ids } })
-    .select('categoryId name shortLabel accent starterTasks')
-    .lean<
-      Array<{
-        categoryId: string;
-        name: string;
-        shortLabel?: string;
-        accent?: string;
-        starterTasks?: StarterTaskTemplate[];
-      }>
-    >();
+  const docs =
+    ids.length === 0
+      ? []
+      : await QuestCategoryModel.find({ categoryId: { $in: ids } })
+          .select('categoryId name shortLabel accent starterTasks')
+          .lean<
+            Array<{
+              categoryId: string;
+              name: string;
+              shortLabel?: string;
+              accent?: string;
+              starterTasks?: StarterTaskTemplate[];
+            }>
+          >();
 
   const categories = docs.map((doc) => ({
     id: doc.categoryId,
@@ -62,6 +65,7 @@ export async function buildStarterPlanForAreas(args: {
     items: buildStarterPlan({
       selectedCategoryIds: ids,
       categories,
+      basics: STARTER_BASICS,
       config,
     }),
   };

@@ -129,7 +129,7 @@ export function MarketingFrogHero() {
             done={doneCount}
             total={tasks.length}
             fixedMessage={speech}
-            className="!top-16"
+            className="!top-[138px]"
           />
           <Image
             src="/skins/common/skin0.webp"

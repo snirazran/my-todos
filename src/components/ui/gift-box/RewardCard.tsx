@@ -142,18 +142,20 @@ function EquipCheckbox({
   checked,
   disabled,
   rarity,
+  label,
   onChange,
 }: {
   checked: boolean;
   disabled?: boolean;
   rarity: Rarity;
+  label: string;
   onChange: (checked: boolean) => void;
 }) {
   const palette = GIFT_BUTTON_PALETTE[rarity] ?? GIFT_BUTTON_PALETTE.common;
   return (
     <label
       className={cn(
-        'relative mx-auto -mb-1 flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-2xl px-3 text-[15px] font-black text-white/85 transition-colors hover:bg-white/10 hover:text-white',
+        'relative mx-auto -mt-1 flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-2xl px-3 text-[15px] font-black text-white/85 transition-colors hover:bg-white/10 hover:text-white',
         disabled && 'pointer-events-none opacity-60',
       )}
     >
@@ -187,7 +189,7 @@ function EquipCheckbox({
           strokeWidth={3.5}
         />
       </span>
-      Also equip
+      {label}
     </label>
   );
 }
@@ -918,14 +920,6 @@ export const RewardCard = ({
           />
         )}
         {upsell}
-        {showEquip && (
-          <EquipCheckbox
-            checked={equipOnClaim}
-            disabled={isProcessing || !showContent}
-            rarity={prize.rarity}
-            onChange={setEquipOnClaim}
-          />
-        )}
         {prize.slot === 'container' && !hasUpsell ? (
           <GiftOpenButton
             rarity={prize.rarity}
@@ -946,7 +940,7 @@ export const RewardCard = ({
             className={cn(
               'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl font-black transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
               hasUpsell
-                ? 'border border-white/15 bg-white/10 py-3 text-base text-white shadow-lg hover:bg-white/15'
+                ? 'bg-white py-3.5 text-base text-slate-900 shadow-[0_4px_0_0_rgba(255,255,255,0.22),0_10px_24px_-10px_rgba(255,255,255,0.45)]'
                 : cn('py-4 text-lg shadow-xl', config.button),
             )}
           >
@@ -975,6 +969,15 @@ export const RewardCard = ({
               </>
             )}
           </button>
+        )}
+        {showEquip && (
+          <EquipCheckbox
+            checked={equipOnClaim}
+            disabled={isProcessing || !showContent}
+            rarity={prize.rarity}
+            label={isBackgroundPrize ? 'Use it now' : 'Wear it now'}
+            onChange={setEquipOnClaim}
+          />
         )}
         {prize.slot === 'container' && onOpenLater && (
           <button

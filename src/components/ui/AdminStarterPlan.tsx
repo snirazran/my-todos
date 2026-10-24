@@ -10,7 +10,9 @@ import {
   STARTER_PLAN_MAX_PER_AREA_LIMIT,
   STARTER_PLAN_MAX_TASKS_LIMIT,
   starterCadenceLabel,
+  STARTER_MOMENTS,
   type StarterCadence,
+  type StarterMoment,
   type StarterPlanConfig,
   type StarterTaskTemplate,
 } from '@/lib/quests/starterPlan';
@@ -20,6 +22,14 @@ const inputClass =
   'h-9 rounded-lg border border-border/60 bg-background px-2.5 text-sm font-medium text-foreground outline-none focus:border-primary';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+const MOMENT_LABELS: Record<StarterMoment, string> = {
+  wake: 'On waking',
+  morning: 'Morning',
+  day: 'Daytime',
+  evening: 'Evening',
+  night: 'Bedtime',
+};
 
 const CADENCES: Array<{ id: StarterCadence; label: string }> = [
   { id: 'daily', label: 'Every day' },
@@ -174,26 +184,24 @@ export function StarterTasksEditor({
               )}
 
               <input
-                type="time"
-                value={task.startTime ?? ''}
-                onChange={(e) =>
-                  update(task.id, { startTime: e.target.value || undefined })
-                }
-                className={cn(inputClass, 'w-[110px]')}
+                value={task.emoji ?? ''}
+                onChange={(e) => update(task.id, { emoji: e.target.value || undefined })}
+                placeholder="Emoji"
+                maxLength={8}
+                className={cn(inputClass, 'w-[72px] text-center')}
               />
 
-              <label className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={task.reminder === 'at_time'}
-                  onChange={(e) =>
-                    update(task.id, {
-                      reminder: e.target.checked ? 'at_time' : undefined,
-                    })
-                  }
-                />
-                Remind
-              </label>
+              <select
+                value={task.moment ?? 'day'}
+                onChange={(e) => update(task.id, { moment: e.target.value as StarterMoment })}
+                className={cn(inputClass, 'w-[120px]')}
+              >
+                {STARTER_MOMENTS.map((moment) => (
+                  <option key={moment} value={moment}>
+                    {MOMENT_LABELS[moment]}
+                  </option>
+                ))}
+              </select>
 
               <label className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
                 <input
@@ -205,15 +213,8 @@ export function StarterTasksEditor({
               </label>
             </div>
 
-            <input
-              value={task.anchor ?? ''}
-              onChange={(e) => update(task.id, { anchor: e.target.value })}
-              placeholder="When / where — e.g. Right after you brush your teeth"
-              className={cn(inputClass, 'mt-2 w-full')}
-            />
             <p className="mt-1 text-[10px] font-medium text-muted-foreground">
-              {starterCadenceLabel(task.cadence, task.days)}
-              {task.startTime ? ` · ${task.startTime}` : ''}
+              {starterCadenceLabel(task.cadence, task.days)} · {MOMENT_LABELS[task.moment ?? 'day']}
             </p>
           </div>
         ))}

@@ -1,4 +1,4 @@
-import useSWR, { mutate as mutateGlobal } from 'swr';
+import useSWR, { mutate as mutateGlobal, preload } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import {
   DEFAULT_BACKGROUND_ID,
@@ -48,6 +48,10 @@ export type CachedBackground = {
 };
 
 const fetcher = bootstrapFetcher;
+
+export function preloadBackgrounds() {
+  preload(BACKGROUNDS_KEY, fetcher).catch(() => {});
+}
 
 export function mutateBackgrounds(data?: BackgroundsApiData) {
   if (data) {

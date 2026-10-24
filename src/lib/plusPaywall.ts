@@ -69,6 +69,10 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     sub: `A weekly coach, double rewards and more outfits for ${name}.`,
     benefits: [COACH, DOUBLE, SUPPORT],
   };
+  if (placement === 'onboarding') return {
+    ...context,
+    benefits: [COACH, { icon: 'x2', title: 'Double prizes', body: 'For every quest, habit and gift.' }, SUPPORT],
+  };
   if (placement === 'first_gift') return {
     ...context,
     headline: 'Loved that gift?',

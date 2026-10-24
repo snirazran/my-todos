@@ -1,31 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Moon, Sun } from 'lucide-react';
-import useSWR from 'swr';
+import { Check } from 'lucide-react';
+import useSWR, { preload } from 'swr';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import {
-  applyStarterDayStart,
-  clampStarterDayStartMinutes,
-  earliestStarterTime,
-  normalizeStarterDayStart,
-  pickStarterTagColor,
-  starterMinutesToTime,
-  sortStarterPlanItems,
-  starterTimeLabel,
-  starterTimeToMinutes,
-  STARTER_DAY_START_MAX_MINUTES,
-  STARTER_DAY_START_MIN_MINUTES,
-  STARTER_DAY_START_STEP_MINUTES,
-  type StarterDayStart,
-  type StarterPlanItem,
-} from '@/lib/quests/starterPlan';
-import { TimeTag } from '@/components/ui/TimeTag';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import type { StarterPlanItem } from '@/lib/quests/starterPlan';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
-import { hapticGrab, hapticSelect, hapticTick } from '@/lib/haptics';
+import { hapticSelect } from '@/lib/haptics';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 type PlanResponse = {
@@ -40,7 +23,18 @@ type PlanResponse = {
   items?: StarterPlanItem[];
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`Starter plan ${r.status}`);
+    return r.json();
+  });
+
+const planUrl = (areasKey: string) =>
+  `/api/onboarding/starter-plan?areas=${encodeURIComponent(areasKey)}`;
+
+export function preloadStarterPlan(areasKey: string) {
+  preload(planUrl(areasKey), fetcher).catch(() => {});
+}
 
 function fill(
   template: string | undefined,
@@ -48,6 +42,7 @@ function fill(
   vars: { n: number; name: string; frog: string },
 ) {
   return (template ?? fallback)
+    .replace(/\{habits\}/g, vars.n === 1 ? '1 habit' : `${vars.n} habits`)
     .replace(/\{n\}/g, String(vars.n))
     .replace(/\{name\}/g, vars.name)
     .replace(/\{frog\}/g, vars.frog)
@@ -55,63 +50,28 @@ function fill(
     .trim();
 }
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 export default function StarterPlanStep({
   selections,
   onSelect,
   onNext,
   saving,
-  direction,
 }: OnboardingStepProps) {
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const humanName = selections.humanName?.[0]?.trim() || '';
   const focusAreas = useMemo(() => selections.focusAreas ?? [], [selections.focusAreas]);
   const areasKey = focusAreas.join(',');
 
-  const { data, isLoading } = useSWR<PlanResponse>(
-    areasKey
-      ? `/api/onboarding/starter-plan?areas=${encodeURIComponent(areasKey)}`
-      : null,
-    fetcher,
-  );
+  const { data, error } = useSWR<PlanResponse>(planUrl(areasKey), fetcher);
+  const items = useMemo(() => data?.items ?? [], [data]);
+  const ready = !!data || !!error;
 
-  const baseItems = useMemo(() => data?.items ?? [], [data]);
-  const [dayStart, setDayStart] = useState<StarterDayStart | undefined>(() =>
-    normalizeStarterDayStart(selections.starterPlanDayStart?.[0]),
-  );
-  const items = useMemo(
-    () => sortStarterPlanItems(applyStarterDayStart(baseItems, dayStart)),
-    [baseItems, dayStart],
-  );
-  const baseEarliest = useMemo(() => earliestStarterTime(baseItems), [baseItems]);
-  const tagColors = useMemo(() => {
-    const taken = new Set<string>();
-    const map = new Map<string, string>();
-    for (const item of baseItems) {
-      if (map.has(item.categoryId)) continue;
-      const color = pickStarterTagColor(item.categoryId, taken, item.categoryAccent);
-      taken.add(color.toLowerCase());
-      map.set(item.categoryId, color);
-    }
-    return map;
-  }, [baseItems]);
-  const sliderMinutes = useMemo(
-    () =>
-      clampStarterDayStartMinutes(
-        starterTimeToMinutes(dayStart ?? baseEarliest) ??
-          STARTER_DAY_START_MIN_MINUTES,
-      ),
-    [dayStart, baseEarliest],
-  );
-  const sliderPercent =
-    ((sliderMinutes - STARTER_DAY_START_MIN_MINUTES) /
-      (STARTER_DAY_START_MAX_MINUTES - STARTER_DAY_START_MIN_MINUTES)) *
-    100;
   const [checked, setChecked] = useState<string[] | null>(null);
-  const skippedRef = useRef(false);
+  const [committed, setCommitted] = useState(false);
   const seenRef = useRef(false);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-  const [dragging, setDragging] = useState(false);
+  const onNextRef = useRef(onNext);
+  onNextRef.current = onNext;
 
   useEffect(() => {
     if (checked !== null || items.length === 0) return;
@@ -135,322 +95,151 @@ export default function StarterPlanStep({
   }, [items, focusAreas]);
 
   useEffect(() => {
-    if (isLoading || skippedRef.current) return;
-    if (!areasKey || (data && items.length === 0)) {
-      skippedRef.current = true;
-      onNext();
-    }
-  }, [isLoading, data, items, areasKey, onNext]);
+    if (committed) onNextRef.current();
+  }, [committed]);
+
+  const commit = (ids: string[]) => {
+    if (committed) return;
+    onSelect('starterPlanChoice', ids.length > 0 ? 'accept' : 'skip');
+    onSelect('starterPlan', '__clear__');
+    ids.forEach((id) => onSelect('starterPlan', id, true));
+    setCommitted(true);
+  };
+
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  useEffect(() => {
+    if (ready && items.length === 0) commitRef.current([]);
+  }, [ready, items]);
 
   const selectedIds = checked ?? [];
   const vars = { n: selectedIds.length, name: humanName, frog: frogName };
-  const headline = fill(data?.copy?.headline, 'Your starting plan', vars);
-  const subheadline = fill(
-    data?.copy?.subheadline,
-    'Small on purpose — the kind you actually keep.',
-    vars,
-  );
-  const acceptLabel = fill(data?.copy?.acceptLabel, 'Start with this plan', vars);
-  const declineLabel = fill(data?.copy?.declineLabel, "I'll add my own", vars);
-  const footnote = fill(
-    data?.copy?.footnote,
-    'Change the days, the time, or remove any of them later.',
-    vars,
-  );
+  const headline = fill(data?.copy?.headline, 'Start small', vars);
+  const subheadline = fill(data?.copy?.subheadline, "Tiny daily habits you'll actually keep.", vars);
+  const acceptLabel = fill(data?.copy?.acceptLabel, 'Add {habits}', vars);
+  const declineLabel = fill(data?.copy?.declineLabel, 'Skip for now', vars);
+  const footnote = fill(data?.copy?.footnote, 'Change or remove any of them later.', vars);
+  const loading = checked === null;
+  const busy = saving || committed;
 
   const toggle = (id: string) => {
     hapticSelect();
     setChecked((prev) => {
       const current = prev ?? [];
-      return current.includes(id)
-        ? current.filter((x) => x !== id)
-        : [...current, id];
+      return current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     });
-  };
-
-  const commit = (ids: string[]) => {
-    onSelect('starterPlanChoice', ids.length > 0 ? 'accept' : 'skip');
-    onSelect('starterPlanDayStart', dayStart ?? '');
-    onSelect('starterPlan', '__clear__');
-    ids.forEach((id) => onSelect('starterPlan', id, true));
-    onNext();
-  };
-
-  const setDayStartMinutes = useCallback((minutes: number) => {
-    const next = starterMinutesToTime(clampStarterDayStartMinutes(minutes));
-    setDayStart((prev) => {
-      if (prev === next) return prev;
-      hapticTick();
-      return next;
-    });
-  }, []);
-
-  const setDayStartFromPointer = useCallback(
-    (clientX: number) => {
-      const track = trackRef.current;
-      if (!track) return;
-      const rect = track.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      setDayStartMinutes(
-        STARTER_DAY_START_MIN_MINUTES +
-          ratio * (STARTER_DAY_START_MAX_MINUTES - STARTER_DAY_START_MIN_MINUTES),
-      );
-    },
-    [setDayStartMinutes],
-  );
-
-  const handleSliderPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (saving) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    draggingRef.current = true;
-    setDragging(true);
-    hapticGrab();
-    setDayStartFromPointer(event.clientX);
-  };
-
-  const handleSliderPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    event.preventDefault();
-    setDayStartFromPointer(event.clientX);
-  };
-
-  const endSliderDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    setDragging(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    trackAnalyticsEvent('starter_plan_day_start', {
-      day_start: starterMinutesToTime(sliderMinutes),
-    });
-  };
-
-  const handleSliderKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (saving) return;
-    const jump = event.shiftKey ? 60 : STARTER_DAY_START_STEP_MINUTES;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-      event.preventDefault();
-      setDayStartMinutes(sliderMinutes - jump);
-    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      setDayStartMinutes(sliderMinutes + jump);
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      setDayStartMinutes(STARTER_DAY_START_MIN_MINUTES);
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      setDayStartMinutes(STARTER_DAY_START_MAX_MINUTES);
-    }
   };
 
   return (
     <div className="relative flex flex-1 flex-col">
-      <OnboardingFrogHeader title={headline} subtitle={subheadline} />
+      <div className="flex w-full flex-col pt-[calc(4.5rem+env(safe-area-inset-top))] md:mx-auto md:max-w-md md:pt-24">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="text-center"
+        >
+          <h1 className="text-balance text-[28px] font-black leading-[1.15] tracking-tight text-foreground">
+            {headline}
+          </h1>
+          <p className="mx-auto mt-2 max-w-[19rem] text-balance text-[15px] font-medium leading-snug text-muted-foreground">
+            {subheadline}
+          </p>
+        </motion.div>
 
-      <motion.div
-        key="starter-plan"
-        custom={direction}
-        initial={{ opacity: 0, x: direction * 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: direction * -40 }}
-        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
-      >
-        <div className="flex w-full flex-col gap-2 pb-2 md:mx-auto md:max-w-md">
-          {!isLoading && checked !== null && baseEarliest && (
-            <div className="rounded-xl border border-border/60 bg-card px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-muted">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[13px] font-black tracking-wide text-muted-foreground">
-                  My day starts at
-                </span>
-                <motion.span
-                  key={sliderMinutes}
-                  initial={{ opacity: 0.4, y: -3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="text-base font-black tabular-nums tracking-tight text-primary"
-                >
-                  {starterTimeLabel(starterMinutesToTime(sliderMinutes))}
-                </motion.span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Moon
-                  aria-hidden
-                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
-                />
-                <div
-                  role="slider"
-                  tabIndex={saving ? -1 : 0}
-                  aria-label="My day starts at"
-                  aria-valuemin={STARTER_DAY_START_MIN_MINUTES}
-                  aria-valuemax={STARTER_DAY_START_MAX_MINUTES}
-                  aria-valuenow={sliderMinutes}
-                  aria-valuetext={starterTimeLabel(
-                    starterMinutesToTime(sliderMinutes),
-                  )}
-                  aria-disabled={saving || undefined}
-                  onPointerDown={handleSliderPointerDown}
-                  onPointerMove={handleSliderPointerMove}
-                  onPointerUp={endSliderDrag}
-                  onPointerCancel={endSliderDrag}
-                  onKeyDown={handleSliderKeyDown}
-                  className={cn(
-                    'flex-1 touch-none select-none py-2 outline-none',
-                    saving ? 'cursor-not-allowed opacity-70' : 'cursor-grab',
-                    dragging && 'cursor-grabbing',
-                  )}
-                >
-                  <div ref={trackRef} className="relative h-2 rounded-full bg-muted">
-                    <span
-                      aria-hidden
-                      className="absolute inset-y-0 left-0 rounded-full bg-primary"
-                      style={{ width: `${sliderPercent}%` }}
-                    />
-                    <span
-                      aria-hidden
-                      className="absolute top-1/2 -ml-3 -mt-3 block h-6 w-6"
-                      style={{ left: `${sliderPercent}%` }}
-                    >
-                      <motion.span
-                        animate={{ scale: dragging ? 1.15 : 1 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                        className={cn(
-                          'grid h-full w-full place-items-center rounded-full border-[3px] border-primary bg-background shadow-md transition-shadow',
-                          dragging && 'shadow-lg ring-4 ring-primary/20',
-                        )}
-                      >
-                        <span className="h-1 w-1 rounded-full bg-primary" />
-                      </motion.span>
-                    </span>
-                  </div>
-                </div>
-                <Sun
-                  aria-hidden
-                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
-                />
-              </div>
-            </div>
-          )}
-
-          {!isLoading && checked !== null && items.length > 0 && (
-            <div className="flex items-baseline justify-between px-1 pt-1">
-              <span className="text-[13px] font-black tracking-wide text-muted-foreground">
-                Your day
-              </span>
-              <span className="text-[12px] font-bold tabular-nums tracking-wide text-muted-foreground/70">
-                {selectedIds.length} added
-              </span>
-            </div>
-          )}
-
-          {isLoading || checked === null
-            ? [0, 1, 2].map((i) => (
-                <div
+        <ul aria-label="Suggested habits" className="mt-7 flex flex-col gap-2.5">
+          {loading
+            ? [0, 1, 2, 3, 4].map((i) => (
+                <li
                   key={i}
-                  className="h-[76px] animate-pulse rounded-xl bg-muted/50"
-                />
+                  className="flex items-center gap-3.5 rounded-[20px] border-2 border-border/40 px-3.5 py-3"
+                >
+                  <span className="h-12 w-12 shrink-0 animate-pulse rounded-2xl bg-muted" />
+                  <span className="block h-3.5 w-3/5 animate-pulse rounded-full bg-muted" />
+                </li>
               ))
             : items.map((item, index) => {
                 const isChecked = selectedIds.includes(item.id);
-                const tagColor = tagColors.get(item.categoryId);
-                const tagLabel = item.categoryShortLabel?.trim() || item.categoryName;
+                const cue = item.cadence === 'daily' ? null : item.cadenceLabel;
                 return (
-                  <motion.button
+                  <motion.li
                     key={item.id}
-                    type="button"
-                    aria-pressed={isChecked}
-                    onClick={() => toggle(item.id)}
-                    disabled={saving}
-                    initial={{ opacity: 0, y: 14 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: 0.05 * index,
-                      duration: 0.3,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                    whileTap={{ scale: 0.99 }}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors duration-200',
-                      isChecked
-                        ? 'border-primary/40 bg-card shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-muted'
-                        : 'border-transparent bg-muted/40 opacity-60',
-                      saving && 'cursor-not-allowed opacity-70',
-                    )}
+                    transition={{ delay: 0.1 + 0.05 * index, duration: 0.35, ease: EASE }}
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="mb-1 flex flex-wrap items-center gap-1">
-                        {item.timeLabel && item.startTime ? (
-                          <motion.span
-                            key={item.startTime}
-                            initial={{ opacity: 0, y: -3 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="inline-flex"
-                          >
-                            <TimeTag startTime={item.timeLabel} className="text-[11px]" />
-                          </motion.span>
-                        ) : null}
-                        {tagColor ? (
-                          <span
-                            className="tag-chip inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-bold tracking-normal shadow-sm"
-                            style={
-                              {
-                                backgroundColor: `${tagColor}20`,
-                                borderColor: `${tagColor}40`,
-                                '--tag-color': tagColor,
-                              } as React.CSSProperties
-                            }
-                          >
-                            {tagLabel}
-                          </span>
-                        ) : null}
-                        {item.cadence !== 'daily' ? (
-                          <span className="inline-flex items-center rounded-md border border-border/60 bg-muted px-1.5 py-0.5 text-[11px] font-bold text-muted-foreground">
-                            {item.cadenceLabel}
-                          </span>
-                        ) : null}
-                      </span>
-
-                      <span className="block text-[15px] font-semibold leading-snug text-foreground md:text-[17px]">
-                        {item.text}
-                      </span>
-                    </span>
-
-                    <span
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isChecked}
+                      onClick={() => toggle(item.id)}
+                      disabled={busy}
                       className={cn(
-                        'grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-all duration-200',
+                        'flex w-full items-center gap-3.5 rounded-[20px] border-2 bg-card px-3.5 py-3 text-left transition-[border-color,box-shadow,transform] duration-200 [-webkit-tap-highlight-color:transparent] active:translate-y-[2px] active:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20',
                         isChecked
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-muted-foreground/30 bg-transparent text-transparent',
+                          ? 'border-primary/40 shadow-[0_3px_0_0_hsl(var(--primary)/0.22)]'
+                          : 'border-border/60 shadow-[0_3px_0_0_rgba(0,0,0,0.05)]',
                       )}
-                      aria-hidden
                     >
-                      <Check className="h-4 w-4 stroke-[3.5]" />
-                    </span>
-                  </motion.button>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-muted/70 text-2xl leading-none transition-[opacity,filter] duration-200',
+                          !isChecked && 'opacity-50 grayscale',
+                        )}
+                      >
+                        {item.emoji || '✨'}
+                      </span>
+                      <span
+                        className={cn(
+                          'min-w-0 flex-1 transition-opacity duration-200',
+                          !isChecked && 'opacity-55',
+                        )}
+                      >
+                        <span className="block text-[15px] font-bold leading-snug text-foreground">
+                          {item.text}
+                        </span>
+                        {cue ? (
+                          <span className="mt-0.5 block text-[13px] font-medium leading-snug text-muted-foreground">
+                            {cue}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-[background-color,border-color,color,transform] duration-200',
+                          isChecked
+                            ? 'scale-100 border-primary bg-primary text-primary-foreground'
+                            : 'scale-95 border-muted-foreground/25 text-transparent',
+                        )}
+                      >
+                        <Check className="h-4 w-4" strokeWidth={3.5} />
+                      </span>
+                    </button>
+                  </motion.li>
                 );
               })}
+        </ul>
 
-          <p className="px-2 pt-1 text-center text-xs font-medium leading-snug text-muted-foreground">
+        {!loading && (
+          <p className="mt-4 text-center text-[13px] font-medium text-muted-foreground">
             {footnote}
           </p>
-        </div>
-      </motion.div>
+        )}
+      </div>
 
       <div className="flex-1" />
 
       <OnboardingFooter>
         <OnboardingButton
           onClick={() => commit(selectedIds)}
-          disabled={checked === null || selectedIds.length === 0}
+          disabled={loading || selectedIds.length === 0 || (committed && !saving)}
           loading={saving}
         >
           {acceptLabel}
         </OnboardingButton>
-        <OnboardingButton variant="ghost" onClick={() => commit([])} disabled={saving}>
+        <OnboardingButton variant="ghost" onClick={() => commit([])} disabled={busy}>
           {declineLabel}
         </OnboardingButton>
       </OnboardingFooter>

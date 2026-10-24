@@ -1,18 +1,74 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
+import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 export const ONBOARDING_BODY_CLASS =
-  'pt-[calc(430px+env(safe-area-inset-top))] short:pt-[calc(382px+env(safe-area-inset-top))] md:pt-[398px]';
+  'pt-[calc(440px+env(safe-area-inset-top))] short:pt-[calc(392px+env(safe-area-inset-top))] md:pt-[434px]';
 
 // Phone viewports are short enough that a bottom-pinned action lands just below
 // the content. A desktop window is far taller, so cap how far the spacer pushes.
 export const ONBOARDING_FOOTER_SPACER_CLASS = 'flex-[8] md:max-h-40';
+
+export const ONBOARDING_DOCK_POSITION_CLASS =
+  'inset-x-3 top-[calc(286px+env(safe-area-inset-top))] h-14 short:top-[calc(238px+env(safe-area-inset-top))] md:inset-x-0 md:top-[278px] md:mx-auto md:w-full md:max-w-lg lg:max-w-xl';
+const ONBOARDING_DOCK_SURFACE_CLASS =
+  'rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]';
+
+export function OnboardingProgressDock({
+  done,
+  total,
+  className,
+  style,
+}: {
+  done: number;
+  total: number;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const filled = Math.min(total, done + 1);
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute',
+        ONBOARDING_DOCK_POSITION_CLASS,
+        ONBOARDING_DOCK_SURFACE_CLASS,
+        className,
+      )}
+      style={style}
+    >
+      <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20" />
+      <div className="flex h-full items-center px-4 pt-2.5">
+        <div
+          role="progressbar"
+          aria-label="Onboarding progress"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={filled}
+          className="flex min-w-0 flex-1 items-center gap-1.5"
+        >
+          {Array.from({ length: total }, (_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'h-2.5 flex-1 rounded-full transition-[background-color,box-shadow] duration-500',
+                i < filled
+                  ? 'bg-primary shadow-[inset_0_-2px_0_0_rgba(0,0,0,0.14)]'
+                  : 'bg-primary/15 dark:bg-primary/20',
+              )}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Default to the bare frog (no hat/body/hand item) so every onboarding screen
 // shows the same plain frog instead of a random outfit.
@@ -23,41 +79,118 @@ const DEFAULT_FROG_INDICES: Partial<Record<WardrobeSlot, number>> = {
   hand_item: 0,
 };
 
+export type FrogPose = {
+  y: number;
+  motion: 'hidden' | 'hop' | 'seated';
+  clip: string | null;
+  fromX: number;
+  fromY: number;
+  rise: number;
+  peak: number;
+  emote: FrogEmote | null;
+  bump: number;
+};
+
 type StageProps = {
   indices?: Partial<Record<WardrobeSlot, number>>;
   emote?: FrogEmote | null;
+  hidden?: boolean;
+  pose?: FrogPose | null;
 };
+
+const poseTransition = (motion: FrogPose['motion']) =>
+  motion === 'seated' ? 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)' : undefined;
 
 // Rendered once at the page level so the Rive canvas survives step
 // transitions instead of remounting (and re-initializing) on every step.
 export function OnboardingFrogStage({
   indices = DEFAULT_FROG_INDICES,
   emote = null,
+  hidden = false,
+  pose = null,
 }: StageProps) {
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const frogWidth = isDesktop ? 280 : 230;
+  const frogHeight = isDesktop ? 315 : 259;
+  const bumpClass =
+    pose?.motion === 'seated' && pose.bump > 0
+      ? pose.bump % 2
+        ? 'adopt-frog-bump-a'
+        : 'adopt-frog-bump-b'
+      : undefined;
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
-      <div className="hidden md:block">
-        <Frog width={280} height={315} indices={indices} emote={emote} />
-      </div>
-      <div className="block origin-top md:hidden short:scale-[0.85]">
-        <Frog width={230} height={259} indices={indices} emote={emote} />
+    <div
+      className={cn(
+        'pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10',
+        hidden && 'opacity-0',
+      )}
+      style={
+        pose
+          ? {
+              transform: `translate3d(0, ${pose.y}px, 0)`,
+              transition: poseTransition(pose.motion),
+              clipPath: pose.clip ?? undefined,
+            }
+          : undefined
+      }
+    >
+      <div
+        data-onboarding-frog
+        className={isDesktop ? undefined : 'origin-top short:scale-[0.85]'}
+        style={{ width: frogWidth, height: frogHeight }}
+      >
+        <div
+          className={cn(pose?.motion === 'hop' && 'adopt-frog-hop', bumpClass)}
+          style={
+            pose
+              ? ({
+                  '--adopt-from-x': `${pose.fromX}px`,
+                  '--adopt-from-y': `${pose.fromY}px`,
+                  '--adopt-rise': `${pose.rise}px`,
+                  '--adopt-peak': `${pose.peak}px`,
+                  transformOrigin: '50% 96%',
+                  transform:
+                    pose.motion === 'hidden'
+                      ? `translate3d(${pose.fromX}px, ${pose.fromY + pose.rise}px, 0)`
+                      : undefined,
+                } as CSSProperties)
+              : undefined
+          }
+        >
+          <Frog
+            width={frogWidth}
+            height={frogHeight}
+            indices={indices}
+            emote={pose ? pose.emote : emote}
+            paused={hidden || pose?.motion === 'hidden'}
+            placeholder={indices === DEFAULT_FROG_INDICES}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
 type Props = {
-  eyebrow?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
   speechBubbleMessage?: string;
+  speechTypedChars?: number;
 };
 
+export const ONBOARDING_TITLE_CLASS =
+  'line-clamp-2 text-balance text-center text-xl font-black leading-6 tracking-tight text-foreground';
+export const ONBOARDING_SUBTITLE_CLASS =
+  'line-clamp-2 text-balance text-center text-[15px] font-medium leading-5 text-muted-foreground md:text-base';
+
+export const ONBOARDING_HEADER_TOP_CLASS =
+  'top-[calc(346px+env(safe-area-inset-top))] short:top-[calc(298px+env(safe-area-inset-top))] md:top-[338px]';
+
 export function OnboardingFrogHeader({
-  eyebrow,
   title,
   subtitle,
   speechBubbleMessage,
+  speechTypedChars,
 }: Props) {
   return (
     <>
@@ -69,35 +202,18 @@ export function OnboardingFrogHeader({
               done={0}
               total={0}
               fixedMessage={speechBubbleMessage}
-              className="!top-20 md:!top-24"
-              messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
+              typedChars={speechTypedChars}
+              className="!top-[162px] short:!top-[138px] md:!top-[197px]"
             />
           </div>
         </div>
       ) : (
-        <div
-          className={
-            eyebrow
-              ? 'absolute inset-x-0 top-[calc(300px+env(safe-area-inset-top))] z-20 px-5 short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px] md:px-8'
-              : 'absolute inset-x-0 top-[calc(312px+env(safe-area-inset-top))] z-20 px-5 short:top-[calc(264px+env(safe-area-inset-top))] md:top-[294px] md:px-8'
-          }
-        >
-          {eyebrow ? (
-            <p className="mb-1 flex h-5 items-center justify-center text-center text-[13px] font-black text-muted-foreground">
-              {eyebrow}
-            </p>
-          ) : null}
-          <div className="flex items-center justify-center h-10">
-            <h1 className="text-lg font-black leading-5 tracking-tight text-center line-clamp-2 text-foreground md:text-xl md:leading-6">
-              {title}
-            </h1>
+        <div className={cn('absolute inset-x-0 z-20 px-5 md:px-8', ONBOARDING_HEADER_TOP_CLASS)}>
+          <div className="flex h-12 items-end justify-center">
+            <h1 className={ONBOARDING_TITLE_CLASS}>{title}</h1>
           </div>
-          <div className="flex items-start justify-center h-10 mt-1">
-            {subtitle ? (
-              <p className="text-base font-medium leading-5 text-center line-clamp-2 text-muted-foreground md:text-lg md:leading-6">
-                {subtitle}
-              </p>
-            ) : null}
+          <div className="mt-1.5 flex h-10 items-start justify-center">
+            {subtitle ? <p className={ONBOARDING_SUBTITLE_CLASS}>{subtitle}</p> : null}
           </div>
         </div>
       )}
