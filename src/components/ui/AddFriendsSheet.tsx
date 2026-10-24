@@ -2,12 +2,15 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'framer-motion';
 import { Search, QrCode, Gift } from 'lucide-react';
-import {
-  RewardTile,
-  type QuestRewardCatalogItem,
-} from '@/components/ui/QuestCards';
+import { type QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+import { giftPreviewIndices } from '@/lib/friends/social';
+import { warmFrogStamps } from '@/lib/frogStampEngine';
+import { riveDevicePixelRatio } from '@/lib/riveLoader';
+import { cn } from '@/lib/utils';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { EnterFriendCodeModal } from '@/components/ui/EnterFriendCodeModal';
@@ -29,13 +32,13 @@ type InviteConfigResponse = {
  * cycles the outfits that can actually be sent — the promise is real, the
  * particular outfit is not.
  */
+const ROLL_FROG_PX = 58;
+
 function GiftOutfitRoll({
   items,
   active,
 }: {
   items: QuestRewardCatalogItem[];
-  /** Held false until the sheet has finished opening, so the Rive tile (and
-   *  the WASM runtime behind it) instantiates after the slide, not during. */
   active: boolean;
 }) {
   const reduceMotion = useReducedMotion();
@@ -54,28 +57,27 @@ function GiftOutfitRoll({
     return () => window.clearInterval(timer);
   }, [active, reduceMotion, items.length]);
 
-  const catalog = useMemo(
-    () => Object.fromEntries(items.map((item) => [item.id, item])),
-    [items],
-  );
   const item = items[shown % Math.max(1, items.length)];
-  if (!active || !item)
-    return (
-      <span className="flex h-11 w-11 items-center justify-center">
-        <Gift className="h-6 w-6 text-[#447d3f]" strokeWidth={2.25} />
-      </span>
-    );
-
+  const rarity = item?.rarity ?? 'uncommon';
   return (
-    <RewardTile
-      reward={{ type: 'ITEM', itemId: item.id }}
-      rewardCatalog={catalog}
-      isPremium={false}
-      compact
-      hideBadge
-      className="h-11 w-11 rounded-xl"
-      frogClassName="h-[142%] w-[142%] -translate-y-[20%]"
-    />
+    <span
+      className={cn(
+        'flex h-11 w-11 shrink-0 items-end justify-center overflow-hidden rounded-xl border-2 bg-gradient-to-br',
+        RARITY_CONFIG[rarity].gradient,
+        RARITY_CONFIG[rarity].border,
+      )}
+    >
+      {item ? (
+        <span className="shrink-0">
+          <FrogSnapshot
+            width={ROLL_FROG_PX}
+            height={ROLL_FROG_PX}
+            visualOffsetY={0}
+            indices={giftPreviewIndices(item)}
+          />
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -96,7 +98,7 @@ export function AddFriendsSheet({
   // consistently faulted for missing — the ladder already exists, so the sheet
   // states where you are on it instead of asking blind.
   const { data: inviteConfig } = useSWR<InviteConfigResponse>(
-    open ? '/api/invite/config' : null,
+    '/api/invite/config',
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -121,6 +123,14 @@ export function AddFriendsSheet({
         .filter((item): item is QuestRewardCatalogItem => !!item),
     [inviteConfig],
   );
+
+  useEffect(() => {
+    if (!giftItems.length) return;
+    return warmFrogStamps(
+      giftItems.map(giftPreviewIndices),
+      Math.round(ROLL_FROG_PX * riveDevicePixelRatio()),
+    );
+  }, [giftItems]);
 
   const joined = inviteStatus?.claimedCount ?? 0;
   const nextReward =
@@ -190,22 +200,13 @@ export function AddFriendsSheet({
                     You get
                   </span>
                   <span className="flex h-11 w-[4.3rem] items-center justify-center">
-                    {entered && (
-                      <motion.span
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.25 }}
-                        className="flex items-center"
-                      >
-                        <Fly size={38} interactive={false} paused />
-                        <Fly
-                          size={38}
-                          interactive={false}
-                          paused
-                          className="-ml-3 translate-y-1"
-                        />
-                      </motion.span>
-                    )}
+                    <Fly size={38} interactive={false} paused />
+                    <Fly
+                      size={38}
+                      interactive={false}
+                      paused
+                      className="-ml-3 translate-y-1"
+                    />
                   </span>
                   <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
                     {perFlies} flies per {perTasks} tasks

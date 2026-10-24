@@ -10,6 +10,35 @@ const SECOND_ASK_DELAY_MS = 3 * DAY_MS;
 
 export const TASK_COMPLETED_EVENT = 'frogress:task-completed';
 export const PLEDGE_MADE_EVENT = 'frogress:pledge-made';
+const PLEDGE_ASK_KEY = 'frogress_widget_pledge_asks';
+
+function readPledgeAskedUids(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(PLEDGE_ASK_KEY) ?? '[]');
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function recordPledgeAsk(uid: string): void {
+  try {
+    const uids = readPledgeAskedUids().filter((id) => id !== uid);
+    localStorage.setItem(PLEDGE_ASK_KEY, JSON.stringify([...uids, uid].slice(-20)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** The pledge is its own ask, once per account, outside the two-ask ladder. */
+export function shouldAskAfterPledge(input: {
+  pinState: WidgetPinState;
+  uid: string;
+}): boolean {
+  if (!input.uid) return false;
+  if (input.pinState === 'unsupported' || input.pinState === 'pinned') return false;
+  return !readPledgeAskedUids().includes(input.uid);
+}
 
 export function announcePledgeMade(): void {
   try {

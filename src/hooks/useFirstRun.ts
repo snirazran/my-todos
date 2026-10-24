@@ -48,7 +48,8 @@ const STREAK_WAIT_MS = 6000;
 const YUM_MIN_MS = 1900;
 const AFTER_STREAK_MS = 450;
 const MISSING_CLAIM_MS = 8000;
-const FINALE_MS = 7000;
+const FINALE_MAX_MS = 2 * 60_000;
+const AFTER_OWN_TASK_MS = 1200;
 const RELEASE_GRACE_MS = 2500;
 
 const GUIDED: ReadonlySet<FirstRunPhase> = new Set<FirstRunPhase>([
@@ -74,6 +75,7 @@ export function useFirstRun({
   starterDone,
   hasClaim,
   revealCount,
+  taskCount,
   onFinish,
 }: {
   pending: boolean;
@@ -81,6 +83,7 @@ export function useFirstRun({
   starterDone: boolean;
   hasClaim: boolean;
   revealCount: number;
+  taskCount: number;
   onFinish: () => void;
 }) {
   const [phase, setPhase] = useState<FirstRunPhase>('off');
@@ -151,9 +154,24 @@ export function useFirstRun({
       finishedRef.current = true;
       onFinishRef.current();
     }
-    const timer = window.setTimeout(() => setPhase('off'), FINALE_MS);
+    const timer = window.setTimeout(() => setPhase('off'), FINALE_MAX_MS);
     return () => window.clearTimeout(timer);
   }, [phase]);
+
+  const finaleTaskCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (phase !== 'finale') {
+      finaleTaskCountRef.current = null;
+      return;
+    }
+    if (finaleTaskCountRef.current === null) {
+      finaleTaskCountRef.current = taskCount;
+      return;
+    }
+    if (taskCount <= finaleTaskCountRef.current) return;
+    const timer = window.setTimeout(() => setPhase('off'), AFTER_OWN_TASK_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase, taskCount]);
 
   useEffect(() => {
     if (phase === 'off' || trackedPhasesRef.current.has(phase)) return;

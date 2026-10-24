@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, ArrowRight } from 'lucide-react';
+import { X } from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -16,8 +16,8 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type FrogIndices = React.ComponentProps<typeof Frog>['indices'];
 
-const FROG_W = 64;
-const FROG_H = 58;
+const FROG_W = 110;
+const FROG_H = 100;
 
 export function BuddyNudgeCardView({
   indices,
@@ -31,73 +31,51 @@ export function BuddyNudgeCardView({
   onDismiss: () => void;
 }) {
   return (
-    <div className="mx-1.5 mt-3 md:mx-4 md:mt-6">
+    <div className="mx-1.5 mt-16 md:mx-4 md:mt-20">
       <div className="relative">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="group relative flex w-full items-center gap-3.5 overflow-hidden rounded-[20px] border border-border/60 bg-card p-2 pr-11 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-colors active:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [@media(hover:hover)]:hover:bg-muted/30"
-        >
-          <span
-            aria-hidden
-            className="relative h-[88px] w-[110px] shrink-0 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-100 via-sky-50 to-emerald-50 dark:from-sky-950/60 dark:via-sky-950/30 dark:to-emerald-950/30"
-          >
-            <svg
-              viewBox="0 0 110 88"
-              className="absolute inset-0 h-full w-full"
-              fill="none"
-            >
-              <path
-                d="M27 40 C 33 10, 77 10, 83 40"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeDasharray="2.5 5"
-                strokeLinecap="round"
-                className="text-emerald-600/40 dark:text-emerald-300/40"
-              />
-            </svg>
-            <span className="absolute inset-x-0 bottom-0 h-[17px] rounded-t-[10px] bg-card/95 shadow-[0_-1px_0_rgba(15,23,42,0.06)]" />
-            <span className="absolute -left-1.5 bottom-[7px]">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-[98px] flex justify-center">
+          <span className="relative flex items-end">
+            <span className="-mr-4">
               <Frog width={FROG_W} height={FROG_H} indices={indices} paused />
             </span>
-            <span className="absolute -right-1.5 bottom-[7px] -scale-x-100">
+            <span className="-ml-4 -scale-x-100">
               <Frog width={FROG_W} height={FROG_H} paused />
             </span>
-            <span className="buddy-nudge-fly absolute left-1/2 top-[3px] -ml-[13px]">
-              <Fly size={26} y={-1} paused interactive={false} />
+            <span className="buddy-nudge-fly absolute left-1/2 top-[26px] -ml-[14px]">
+              <Fly size={28} y={-1} paused interactive={false} />
             </span>
           </span>
+        </div>
 
-          <span className="min-w-0 flex-1 py-1">
-            <span className="block text-[15.5px] font-black leading-tight tracking-tight text-foreground md:text-[16px]">
-              Share a goal with a friend
-            </span>
-            <span className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-bold leading-none text-muted-foreground">
-              Both finish
-              <span className="h-[3px] w-[3px] shrink-0 rounded-full bg-muted-foreground/40" />
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 py-0.5 pl-0.5 pr-2 font-black text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
-                <span className="grid h-[18px] w-[18px] place-items-center">
-                  <Fly size={20} y={-2} paused interactive={false} />
-                </span>
-                +{bonusFlies} each
+        <div className="relative overflow-hidden rounded-[24px] border border-border/60 bg-card px-5 pb-4 pt-6 text-center shadow-[0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_-22px_rgba(15,23,42,0.35)]">
+          <h3 className="text-[17px] font-black leading-tight tracking-tight text-foreground">
+            Habits are better together
+          </h3>
+          <p className="mx-auto mt-1.5 max-w-[19rem] text-balance text-[13.5px] font-semibold leading-snug text-muted-foreground">
+            Share a goal with a friend. When you both finish it, you each get{' '}
+            <span className="inline-flex translate-y-[3px] items-center gap-0.5 rounded-full bg-amber-100 py-0.5 pl-0.5 pr-2 text-[12.5px] font-black leading-none text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+              <span className="grid h-[18px] w-[18px] place-items-center">
+                <Fly size={20} y={-2} paused interactive={false} />
               </span>
+              +{bonusFlies}
             </span>
-            <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-black text-primary">
-              Pick a friend
-              <ArrowRight
-                className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
-                strokeWidth={3}
-              />
-            </span>
-          </span>
-        </button>
+          </p>
+          <button
+            type="button"
+            onClick={onOpen}
+            className="mt-4 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-[16px] font-black text-primary-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.16)] transition-[transform,filter] duration-150 active:translate-y-[2px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 [@media(hover:hover)]:hover:brightness-105"
+          >
+            Buddy up
+          </button>
+        </div>
+
         <button
           type="button"
           aria-label="Dismiss buddy suggestion"
           onClick={onDismiss}
-          className="absolute right-1.5 top-1.5 grid h-8 w-8 touch-manipulation place-items-center rounded-full text-muted-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="absolute right-2 top-2 grid h-8 w-8 touch-manipulation place-items-center rounded-full bg-muted/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
-          <X aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
+          <X aria-hidden="true" className="h-4 w-4" strokeWidth={2.75} />
         </button>
       </div>
     </div>

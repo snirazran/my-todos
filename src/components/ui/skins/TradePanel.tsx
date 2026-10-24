@@ -69,8 +69,7 @@ import {
 
 // Import from gift-box for the reward UI
 import {
-  GoldenRewardButton,
-  PlusOfferButton,
+  BonusOfferButton,
   RewardCard,
   SkipAdsLink,
 } from '@/components/ui/gift-box/RewardCard';
@@ -1637,52 +1636,38 @@ export function TradePanel({
                 onClaim={handleClaimReward}
                 paused={paused}
                 offerEquip
+                bonus={
+                  rerollClaimId ? (
+                    <>
+                      <BonusOfferButton
+                        mode={isPremium ? 'included' : rewardedAdsAvailable() ? 'ad' : 'plus'}
+                        visual={<Dices className="h-6 w-6" strokeWidth={2.5} />}
+                        title="Reroll for another"
+                        busy={rerollBusy}
+                        busyLabel={isPremium ? 'Rerolling...' : 'Loading ad...'}
+                        onClick={() => {
+                          if (isPremium || rewardedAdsAvailable()) void handleReroll();
+                          else openPlusOffer('trade_reroll');
+                        }}
+                      />
+                      {!isPremium && rewardedAdsAvailable() && (
+                        <SkipAdsLink
+                          quiet
+                          label="Skip the ad with Plus"
+                          placement="trade_reroll"
+                          disabled={rerollBusy}
+                          onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
+                        />
+                      )}
+                      {rerollError && (
+                        <p className="text-center text-xs font-bold text-red-300">
+                          {rerollError}
+                        </p>
+                      )}
+                    </>
+                  ) : undefined
+                }
               />
-              {rerollClaimId && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.9 }}
-                  className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
-                >
-                  {isPremium ? (
-                    <GoldenRewardButton
-                      onClick={() => void handleReroll()}
-                      disabled={rerollBusy}
-                      className="py-4 text-lg"
-                    >
-                      <Dices className="h-4 w-4" />
-                      {rerollBusy ? 'Rerolling...' : 'Reroll Reward'}
-                    </GoldenRewardButton>
-                  ) : (
-                    <PlusOfferButton
-                      mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
-                      intent="reroll"
-                      visual={<Dices className="h-6 w-6" strokeWidth={2.5} />}
-                      title="Reroll reward"
-                      busy={rerollBusy}
-                      busyLabel="Loading ad..."
-                      onClick={() => {
-                        if (rewardedAdsAvailable()) void handleReroll();
-                        else openPlusOffer('trade_reroll');
-                      }}
-                    />
-                  )}
-                  {!isPremium && rewardedAdsAvailable() && (
-                    <SkipAdsLink
-                      label="Reroll with Plus"
-                      placement="trade_reroll"
-                      disabled={rerollBusy}
-                      onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
-                    />
-                  )}
-                  {rerollError && (
-                    <p className="text-center text-xs font-bold text-red-300">
-                      {rerollError}
-                    </p>
-                  )}
-                </motion.div>
-              )}
             </div>
           </div>,
           document.body

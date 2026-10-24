@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
+import Fly from '@/components/ui/fly';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftOutfitPreview } from '@/components/ui/friends/GiftOutfitPreview';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -712,17 +713,17 @@ function GiftStage({ gift, ready, onClose }: { gift: GiftOption | null; ready: b
         </button>
       </div>
 
-      <span aria-hidden className="absolute bottom-[13px] left-1/2 z-10 h-4 w-32 -translate-x-1/2 rounded-[50%] bg-black/25 blur-[6px]" />
       <svg
         aria-hidden
         preserveAspectRatio="none"
         viewBox="0 0 100 16"
         className="absolute inset-x-0 bottom-[-1px] z-10 h-5 w-full fill-background"
       >
-        <path d="M0 0 Q50 12 100 0 L100 16 L0 16 Z" />
+        <path d="M0 8 Q50 -8 100 8 L100 16 L0 16 Z" />
       </svg>
+      <span aria-hidden className="absolute bottom-[10px] left-1/2 z-10 h-3 w-36 -translate-x-1/2 rounded-[50%] bg-black/[0.14] blur-[5px] dark:bg-black/40" />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-[6px] z-20 flex justify-center">
+      <div className="pointer-events-none absolute inset-x-0 z-20 flex justify-center" style={{ bottom: isBox ? 17 : 18 - Math.round(frogHeight * 0.045) }}>
         <motion.div animate={hop} style={{ transformOrigin: '50% 100%' }}>
           {isBox && item ? (
             <div className="h-[150px] w-[150px]">
@@ -833,7 +834,7 @@ function NextRewardRow({ reward, onClick }: { reward: RewardTier; onClick: () =>
         </span>
       ) : (
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/[0.12]">
-          <img src="/fly.svg" width={26} height={26} alt="" />
+          <Fly size={30} y={-2} paused interactive={false} />
         </span>
       )}
       <span className="min-w-0 flex-1">
@@ -896,7 +897,7 @@ function RewardPreview({ reward, fallbackItem, ready }: {
     const amount = reward.amountMode === 'random' ? reward.maxAmount : reward.amount;
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1">
-        <img src="/fly.svg" width={42} height={42} alt="" />
+        <Fly size={46} y={-3} paused interactive={false} />
         <span className="text-xs font-black text-foreground">+{amount ?? 0}</span>
       </div>
     );

@@ -19,7 +19,7 @@ import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type Phase = 'compose' | 'sent';
 
-async function checkNotifGranted(): Promise<boolean> {
+export async function checkNotifGranted(): Promise<boolean> {
   try {
     if (Capacitor.isNativePlatform()) {
       const s = await FirebaseMessaging.checkPermissions();
@@ -33,7 +33,7 @@ async function checkNotifGranted(): Promise<boolean> {
   }
 }
 
-async function requestNotif(): Promise<boolean> {
+export async function requestNotif(): Promise<boolean> {
   try {
     if (Capacitor.isNativePlatform()) {
       const s = await FirebaseMessaging.requestPermissions();

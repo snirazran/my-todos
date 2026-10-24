@@ -21,7 +21,7 @@ import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox, GiftRive } from './GiftBox';
 import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
-import { PlusOfferButton, RewardCard, SkipAdsLink } from './RewardCard';
+import { BonusOfferButton, RewardCard, SkipAdsLink } from './RewardCard';
 import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
 import { queueFirstGiftPaywall } from '@/lib/plus/firstGiftPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
@@ -349,19 +349,17 @@ export default function GiftBoxOpening({
                 paused={paused}
                 offerEquip={!!user}
                 spareCount={prizeMeta?.duplicate ? prizeMeta.owned : undefined}
-                upsell={
+                bonus={
                   user && doubleClaimId ? (
                     <>
-                      <PlusOfferButton
+                      <BonusOfferButton
                         mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
-                        intent="another"
-                        rarity={giftDef?.rarity}
                         visual={
-                          <span className="pointer-events-none absolute -top-[26px] left-1/2 h-[72px] w-[54px] -translate-x-1/2">
+                          <span className="pointer-events-none absolute -top-[14px] left-1/2 h-[56px] w-[42px] -translate-x-1/2">
                             <GiftRive color={giftColor} className="h-full w-full" />
                           </span>
                         }
-                        title="Open another"
+                        title="Open another gift"
                         busy={adBusy}
                         busyLabel="Loading ad..."
                         onClick={() => {
@@ -371,7 +369,8 @@ export default function GiftBoxOpening({
                       />
                       {rewardedAdsAvailable() && (
                         <SkipAdsLink
-                          label="Open another with Plus"
+                          quiet
+                          label="Skip the ad with Plus"
                           placement="gift_double"
                           disabled={adBusy}
                           onClick={() => openPlusOffer(skipAdsPlacement('gift_double'))}

@@ -5,6 +5,7 @@ import { InAppReview } from '@capacitor-community/in-app-review';
 import { useCampaignStore } from '@/lib/campaigns/orchestrator';
 import { isScreenBusy } from '@/lib/popupGate';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { auth } from '@/lib/firebase';
 
 export type RatingMoment = 'quest_reward' | 'clean_sweep' | 'streak_goal';
 export type NegativeMoment = 'streak_broken' | 'ad_failed' | 'purchase_failed';
@@ -62,6 +63,11 @@ function writeString(key: string, value: string) {
   } catch {}
 }
 
+function accountKey(base: string) {
+  const uid = auth?.currentUser?.uid;
+  return uid ? `${base}:${uid}` : base;
+}
+
 function localDayKey(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -107,9 +113,9 @@ async function appVersion(): Promise<string | null> {
 export function recordAppUsageDay() {
   if (typeof window === 'undefined') return;
   const today = localDayKey();
-  const days = readJson<string[]>(USAGE_DAYS_KEY, []);
+  const days = readJson<string[]>(accountKey(USAGE_DAYS_KEY), []);
   if (days.includes(today)) return;
-  writeJson(USAGE_DAYS_KEY, [...days, today].slice(-30));
+  writeJson(accountKey(USAGE_DAYS_KEY), [...days, today].slice(-30));
 }
 
 export function markNegativeMoment(reason: NegativeMoment) {
@@ -122,12 +128,12 @@ export function maybeRequestAppRating(moment: RatingMoment) {
   if (typeof window === 'undefined') return;
   if (!Capacitor.isNativePlatform()) return;
 
-  const positive = (Number(readString(POSITIVE_KEY)) || 0) + 1;
-  writeString(POSITIVE_KEY, String(positive));
+  const positive = (Number(readString(accountKey(POSITIVE_KEY))) || 0) + 1;
+  writeString(accountKey(POSITIVE_KEY), String(positive));
 
   if (requestInFlight) return;
 
-  const usageDays = readJson<string[]>(USAGE_DAYS_KEY, []);
+  const usageDays = readJson<string[]>(accountKey(USAGE_DAYS_KEY), []);
   const skip = (reason: string, blocker?: string) =>
     trackAnalyticsEvent('app_review_skipped', {
       moment,

@@ -21,7 +21,6 @@ import { useIdleImageWarmup } from '@/lib/imageWarmup';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
 import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
-import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { BuddyNudgeSheet } from '@/components/ui/BuddyNudgeSheet';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
 import { type FriendSummary } from '@/lib/friends/indices';
@@ -52,7 +51,7 @@ import {
   POND_ROW,
   POND_ROW_PRESS,
 } from '@/components/ui/friends/PondSocial';
-import { BuddyPickerSheet, KeepsakeSheet, FocusRoomSheet } from '@/components/ui/friends/PondSheets';
+import { KeepsakeSheet, FocusRoomSheet } from '@/components/ui/friends/PondSheets';
 import { usePond, pondFetcher } from '@/hooks/usePond';
 import { useTaskData } from '@/hooks/useTaskData';
 import type { Keepsake } from '@/lib/friends/social';
@@ -113,7 +112,6 @@ export default function FriendsPage() {
   const [removeTarget, setRemoveTarget] = useState<FriendSummary | null>(null);
   const [detailTarget, setDetailTarget] = useState<FriendSummary | null>(null);
   const [buddyTarget, setBuddyTarget] = useState<FriendSummary | null>(null);
-  const [buddyPickerOpen, setBuddyPickerOpen] = useState(false);
   const [buddyInviteOpen, setBuddyInviteOpen] = useState(false);
   const [keepsakeTarget, setKeepsakeTarget] = useState<Keepsake | null>(null);
   const [roomOpen, setRoomOpen] = useState(false);
@@ -128,7 +126,7 @@ export default function FriendsPage() {
     inboxOpen ||
     !!removeTarget ||
     !!detailTarget ||
-    !!buddyTarget || buddyPickerOpen || buddyInviteOpen || !!keepsakeTarget || roomOpen;
+    !!buddyTarget || buddyInviteOpen || !!keepsakeTarget || roomOpen;
 
   const claimable = friendsData?.claimable ?? 0;
   const gate = friendsData?.gate;
@@ -208,7 +206,7 @@ export default function FriendsPage() {
     );
   }, [friends, pond.data?.habits, buddyInviteByFriend]);
   const filteredRows = rows.filter((friend) => (friend.name + ' ' + friend.frogName).toLocaleLowerCase().includes(friendSearch.toLocaleLowerCase().trim()));
-  const startBuddy = () => friends.length ? setBuddyPickerOpen(true) : setBuddyInviteOpen(true);
+  const startBuddy = () => setBuddyInviteOpen(true);
   const openRoom = (id?: string) => { pond.clearActionError(); setRoomId(id ?? null); setRoomOpen(true); };
 
   const { unseenCount: unseenLooks } = useLookReactions(!!user);
@@ -396,7 +394,6 @@ export default function FriendsPage() {
         </div>
       </div>
 
-      <BuddyPickerSheet open={buddyPickerOpen} onClose={() => setBuddyPickerOpen(false)} friends={rows} onSelect={(friend) => { setBuddyPickerOpen(false); setBuddyTarget(friend); }} />
       <BuddyStartFlow open={buddyInviteOpen} onClose={() => setBuddyInviteOpen(false)} friends={friends} indices={indices} source="friends_pond" />
       <KeepsakeSheet item={keepsakeTarget} onClose={() => setKeepsakeTarget(null)} pinnedId={pond.data?.pinnedKeepsakeId} onPin={pond.pinKeepsake} busy={pond.busy} error={pond.actionError} />
       <FocusRoomSheet open={roomOpen} roomId={roomId} room={pond.data?.rooms.find((room) => room.id === roomId)} serverNow={pond.data?.serverNow} busy={pond.busy} error={pond.actionError} onClose={() => setRoomOpen(false)} onAction={async (action, options) => { const id = await pond.roomAction(action, options); if (id && action !== 'leave') setRoomId(id); return id; }} />
@@ -427,10 +424,13 @@ export default function FriendsPage() {
         }}
         allFriends={friendsData?.friends}
       />
-      <BuddyUpFlow
+      <BuddyStartFlow
         open={!!buddyTarget}
-        friend={buddyTarget}
         onClose={() => setBuddyTarget(null)}
+        friends={friends}
+        indices={indices}
+        source="friend_detail"
+        presetFriend={buddyTarget}
       />
       <RemoveFriendDialog
         target={removeTarget}

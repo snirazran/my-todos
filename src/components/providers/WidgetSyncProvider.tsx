@@ -16,6 +16,8 @@ import {
   PLEDGE_MADE_EVENT,
   TASK_COMPLETED_EVENT,
   readCompletedEver,
+  recordPledgeAsk,
+  shouldAskAfterPledge,
   shouldAskForWidget,
 } from '@/lib/widget/prompt';
 import { useSheetStore } from '@/lib/sheetStore';
@@ -215,19 +217,13 @@ export function WidgetSyncProvider() {
     if (!pledgeAskPending || sheetOpen) return;
     const timer = window.setTimeout(() => {
       setPledgeAskPending(false);
-      if (
-        !shouldAskForWidget({
-          pinState,
-          completedEver: Math.max(1, readCompletedEver()),
-          streak,
-        })
-      )
-        return;
+      if (!shouldAskAfterPledge({ pinState, uid })) return;
+      recordPledgeAsk(uid);
       setUserInitiated(false);
       setPromptOpen(true);
     }, PLEDGE_ASK_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [pledgeAskPending, sheetOpen, pinState, streak]);
+  }, [pledgeAskPending, sheetOpen, pinState, uid]);
 
   if (!native) return null;
 

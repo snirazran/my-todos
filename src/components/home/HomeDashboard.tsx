@@ -585,6 +585,7 @@ export default function HomeDashboard() {
     starterDone: !starterTask || !!starterTask.completed,
     hasClaim: !!questsData?.claimables?.some((c) => c.placement === 'onboarding'),
     revealCount: revealQueueLength,
+    taskCount: tasks.length,
     onFinish: () => {
       clearFirstRunPending();
       markIntroSeen('firstRun');
@@ -1205,8 +1206,8 @@ export default function HomeDashboard() {
                 </motion.div>
                 )}
                 </AnimatePresence>
-                {!firstRun.active && <BuddyNudgeCard />}
                 {!firstRun.active && <HomeShopRail />}
+                {!firstRun.active && <BuddyNudgeCard />}
               </div>
             </div>
           </div>

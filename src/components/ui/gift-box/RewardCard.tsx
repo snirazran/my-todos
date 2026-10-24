@@ -7,7 +7,7 @@ import {
   Variants,
 } from 'framer-motion';
 import { mutate as mutateGlobal } from 'swr';
-import { Check, ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
+import { ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
@@ -29,7 +29,7 @@ import {
   useBackgrounds,
 } from '@/hooks/useBackgrounds';
 import { ItemDef, type Rarity } from '@/lib/skins/catalog';
-import { hapticSelect, hapticTick } from '@/lib/haptics';
+import { hapticTick } from '@/lib/haptics';
 import {
   canFlyToInventory,
   flyFliesToCounter,
@@ -64,6 +64,7 @@ type RewardCardProps = {
   onWatchAd?: () => void | Promise<void>;
   doublePlacement?: string;
   upsell?: React.ReactNode;
+  bonus?: React.ReactNode;
   paused?: boolean;
   flyCollectAmount?: number;
   offerEquip?: boolean;
@@ -138,62 +139,6 @@ async function equipReward(prize: Prize) {
   }
 }
 
-function EquipCheckbox({
-  checked,
-  disabled,
-  rarity,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  rarity: Rarity;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  const palette = GIFT_BUTTON_PALETTE[rarity] ?? GIFT_BUTTON_PALETTE.common;
-  return (
-    <label
-      className={cn(
-        'relative mx-auto -mt-1 flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-2xl px-3 text-[15px] font-black text-white/85 transition-colors hover:bg-white/10 hover:text-white',
-        disabled && 'pointer-events-none opacity-60',
-      )}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => {
-          hapticSelect();
-          onChange(event.target.checked);
-        }}
-        className="peer sr-only"
-      />
-      <span
-        aria-hidden
-        className={cn(
-          'grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-[background-color,border-color] duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-white peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-slate-950',
-          !checked && 'border-white/45 bg-white/5',
-        )}
-        style={
-          checked
-            ? { backgroundColor: palette.bottom, borderColor: palette.top }
-            : undefined
-        }
-      >
-        <Check
-          className={cn(
-            'h-4 w-4 text-white transition-transform duration-150',
-            checked ? 'scale-100' : 'scale-0',
-          )}
-          strokeWidth={3.5}
-        />
-      </span>
-      {label}
-    </label>
-  );
-}
-
 function GiftOpenButton({
   rarity,
   label,
@@ -201,6 +146,7 @@ function GiftOpenButton({
   busyLabel,
   disabled,
   onClick,
+  icon = true,
 }: {
   rarity: Rarity;
   label: string;
@@ -208,6 +154,7 @@ function GiftOpenButton({
   busyLabel: string;
   disabled?: boolean;
   onClick: () => void;
+  icon?: boolean;
 }) {
   const palette = GIFT_BUTTON_PALETTE[rarity] ?? GIFT_BUTTON_PALETTE.common;
   return (
@@ -232,9 +179,9 @@ function GiftOpenButton({
         <span aria-hidden className="gift-open-shine" />
         {busy ? (
           <Loader2 className="relative h-6 w-6 animate-spin" strokeWidth={2.75} />
-        ) : (
+        ) : icon ? (
           <Gift className="gift-open-icon relative h-6 w-6" strokeWidth={2.5} />
-        )}
+        ) : null}
         <span className="relative">{busy ? busyLabel : label}</span>
       </span>
       {!busy &&
@@ -296,6 +243,7 @@ export function SkipAdsLink({
   onClick,
   disabled,
   tone = 'dark',
+  quiet = false,
   className,
 }: {
   label: string;
@@ -304,6 +252,7 @@ export function SkipAdsLink({
   onClick: () => void;
   disabled?: boolean;
   tone?: 'dark' | 'light';
+  quiet?: boolean;
   className?: string;
 }) {
   const trackedRef = useRef(false);
@@ -313,6 +262,28 @@ export function SkipAdsLink({
     trackedRef.current = true;
     trackAnalyticsEvent('skip_ads_offered', { placement });
   }, [visible, placement]);
+
+  if (quiet) {
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        disabled={disabled}
+        aria-label={`${label}. Try it free.`}
+        className={cn(
+          'group mx-auto flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-[13px] font-bold text-white/55 transition-colors duration-150 hover:text-white disabled:opacity-50',
+          className,
+        )}
+      >
+        <Icon name="frogPlus" className="h-4 w-4 shrink-0" />
+        <span>{label}</span>
+        <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" strokeWidth={3} />
+      </button>
+    );
+  }
 
   return (
     <button
@@ -538,6 +509,73 @@ export function PlusOfferButton({
   );
 }
 
+export function BonusOfferButton({
+  mode,
+  visual,
+  title,
+  busy,
+  busyLabel,
+  disabled,
+  onClick,
+}: {
+  mode: 'ad' | 'plus' | 'included';
+  visual: React.ReactNode;
+  title: string;
+  busy?: boolean;
+  busyLabel?: string;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  const subline =
+    mode === 'ad'
+      ? 'Watch a short ad'
+      : mode === 'plus'
+        ? 'Free with Plus trial'
+        : 'Included with Plus';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      aria-label={`${title}. ${subline}`}
+      className="group relative flex h-[62px] w-full items-center gap-3 rounded-[20px] bg-white/[0.08] pl-2.5 pr-2.5 text-left text-white ring-1 ring-inset ring-white/15 backdrop-blur-md transition-[transform,background-color] duration-150 hover:bg-white/[0.13] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span
+        aria-hidden
+        className="relative grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[14px] bg-white/[0.12]"
+      >
+        {visual}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="truncate text-[16px] font-black tracking-tight">
+          {busy ? (busyLabel ?? 'Loading...') : title}
+        </span>
+        <span className="mt-0.5 flex items-center gap-1 truncate text-[12px] font-bold text-white/60">
+          {mode !== 'ad' && (
+            <Icon name="frogPlus" label="Plus" className="h-3.5 w-3.5 shrink-0" />
+          )}
+          {subline}
+        </span>
+      </span>
+      <span
+        aria-hidden
+        className={cn(
+          'grid h-9 w-9 shrink-0 place-items-center rounded-full shadow-[inset_0_-2px_0_rgba(0,0,0,0.14)]',
+          mode === 'ad' ? 'bg-white text-slate-900' : 'bg-[#fbbf24] text-[#3b2708]',
+        )}
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
+        ) : mode === 'ad' ? (
+          <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
+        ) : (
+          <ChevronRight className="h-4 w-4" strokeWidth={3} />
+        )}
+      </span>
+    </button>
+  );
+}
+
 export function FlyGlyph() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -562,6 +600,7 @@ export const RewardCard = ({
   onWatchAd,
   doublePlacement = 'double_reward',
   upsell,
+  bonus,
   paused = false,
   flyCollectAmount,
   offerEquip = false,
@@ -569,7 +608,7 @@ export const RewardCard = ({
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
   const [launched, setLaunched] = useState(false);
-  const [equipOnClaim, setEquipOnClaim] = useState(false);
+  const [claimChoice, setClaimChoice] = useState<'wear' | 'keep' | null>(null);
   const artRef = useRef<HTMLDivElement | null>(null);
   const stampRef = useRef<HTMLCanvasElement | null>(null);
   const releaseHoldRef = useRef<(() => void) | null>(null);
@@ -583,7 +622,7 @@ export const RewardCard = ({
   const alreadyWearing = isBackgroundPrize
     ? backgroundsData?.equipped === prize.id
     : inventoryData?.wardrobe?.equipped?.[prize.slot] === prize.id;
-  const showEquip = equippable && (!alreadyWearing || equipOnClaim);
+  const showEquip = equippable && (!alreadyWearing || claimChoice === 'wear');
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
   const isSpare = !quantity && !!spareCount && spareCount > 1;
@@ -651,9 +690,10 @@ export const RewardCard = ({
     flyItemToInventory({ from, visual, rarity: prize.rarity });
   };
 
-  const handleClaimClick = () => {
+  const handleClaimClick = (wear = false) => {
     setLocalClaiming(true);
-    if (showEquip && equipOnClaim) void equipReward(prize);
+    if (showEquip) setClaimChoice(wear ? 'wear' : 'keep');
+    if (showEquip && wear) void equipReward(prize);
     launchCollect();
     setTimeout(() => {
       onClaim();
@@ -931,11 +971,31 @@ export const RewardCard = ({
               quantity && quantity > 1 ? `Opening ${quantity}...` : 'Opening...'
             }
             disabled={isProcessing || !showContent}
-            onClick={handleClaimClick}
+            onClick={() => handleClaimClick()}
           />
+        ) : showEquip ? (
+          <div className="flex flex-col gap-1">
+            <GiftOpenButton
+              rarity={prize.rarity}
+              icon={false}
+              label={isBackgroundPrize ? 'Use it' : 'Wear it'}
+              busy={isProcessing && claimChoice === 'wear'}
+              busyLabel={isBackgroundPrize ? 'Using it...' : 'Putting it on...'}
+              disabled={isProcessing || !showContent}
+              onClick={() => handleClaimClick(true)}
+            />
+            <button
+              type="button"
+              onClick={() => handleClaimClick(false)}
+              disabled={isProcessing || !showContent}
+              className="mx-auto flex min-h-11 items-center rounded-2xl px-4 text-[15px] font-black text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Keep in closet
+            </button>
+          </div>
         ) : (
           <button
-            onClick={handleClaimClick}
+            onClick={() => handleClaimClick()}
             disabled={isProcessing || !showContent}
             className={cn(
               'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl font-black transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
@@ -970,15 +1030,6 @@ export const RewardCard = ({
             )}
           </button>
         )}
-        {showEquip && (
-          <EquipCheckbox
-            checked={equipOnClaim}
-            disabled={isProcessing || !showContent}
-            rarity={prize.rarity}
-            label={isBackgroundPrize ? 'Use it now' : 'Wear it now'}
-            onChange={setEquipOnClaim}
-          />
-        )}
         {prize.slot === 'container' && onOpenLater && (
           <button
             type="button"
@@ -989,6 +1040,7 @@ export const RewardCard = ({
             {openLaterLabel}
           </button>
         )}
+        {bonus ? <div className="mt-2 flex flex-col gap-1">{bonus}</div> : null}
       </div>
       {doubleError && (
         <p className="mt-2 text-center text-xs font-bold text-red-300">

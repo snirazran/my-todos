@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { Capacitor } from '@capacitor/core';
@@ -51,6 +58,10 @@ type ReturningAccount = {
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
 const SAVED_HOLD_MS = 650;
+const CARD_FULL_PX = 80;
+const CARD_COMPACT_PX = 64;
+
+type CardSize = 'full' | 'compact' | 'none';
 
 const LEGAL_LINK_CLASS =
   'font-semibold text-foreground/80 underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/70';
@@ -67,6 +78,8 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   const skin = findStarterSkin(selections.frogSkin?.[0]);
   const [saved, setSaved] = useState(false);
   const [skipAsk, setSkipAsk] = useState(false);
+  const roomRef = useRef<HTMLDivElement>(null);
+  const [cardSize, setCardSize] = useState<CardSize>('none');
   const [step, setStep] = useState<Step>('enter');
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -311,6 +324,21 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   );
   const providerButtons = appleFirst ? [apple(true), google(false)] : [google(true), apple(false)];
 
+  useLayoutEffect(() => {
+    const room = roomRef.current;
+    if (!room) return;
+    const measure = () => {
+      const height = room.clientHeight;
+      setCardSize(
+        height >= CARD_FULL_PX ? 'full' : height >= CARD_COMPACT_PX ? 'compact' : 'none',
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(room);
+    return () => observer.disconnect();
+  }, [step]);
+
   const swap = {
     initial: { opacity: 0, y: 8 },
     animate: { opacity: 1, y: 0 },
@@ -320,6 +348,16 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
 
   return (
     <div className="relative flex w-full flex-1 flex-col">
+      {step === 'enter' && !emailOpen ? (
+        <button
+          type="button"
+          onClick={() => setSkipAsk(true)}
+          disabled={busy}
+          className="absolute right-3 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex h-10 items-center rounded-full bg-background/90 px-4 text-[14px] font-black text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition animate-in fade-in duration-300 hover:bg-background disabled:opacity-60"
+        >
+          Skip
+        </button>
+      ) : null}
       <OnboardingFrogHeader
         title={step === 'enter' ? `Don't lose ${frogName}!` : 'Check your inbox'}
         subtitle={
@@ -333,12 +371,19 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
 
       <div className={cn('relative z-20 flex w-full flex-1 flex-col items-center', ONBOARDING_BODY_CLASS)}>
         {step === 'enter' ? (
-          <SaveCard
-            frogName={frogName}
-            humanName={humanName}
-            skin={skin}
-            saved={saved}
-          />
+          <div ref={roomRef} className="relative w-full flex-1 md:w-80">
+            {cardSize !== 'none' ? (
+              <div className="absolute inset-0 flex items-center">
+                <SaveCard
+                  frogName={frogName}
+                  humanName={humanName}
+                  skin={skin}
+                  saved={saved}
+                  compact={cardSize === 'compact'}
+                />
+              </div>
+            ) : null}
+          </div>
         ) : null}
         {step === 'email-sent' ? (
           <motion.div
@@ -361,7 +406,13 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       </div>
 
 
-      <OnboardingFooter>
+      <OnboardingFooter
+        className={
+          step === 'enter' && !emailOpen
+            ? 'pb-[calc(1rem+env(safe-area-inset-bottom))]'
+            : undefined
+        }
+      >
         <AnimatePresence mode="wait" initial={false}>
           {step === 'enter' && !emailOpen ? (
             <motion.div key="providers" {...swap} className="flex w-full flex-col gap-2 md:w-80">
@@ -437,20 +488,18 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         ) : null}
 
         {step === 'enter' ? (
-          <OnboardingButton
-            variant="ghost"
-            onClick={() => {
-              if (emailOpen) {
+          emailOpen ? (
+            <OnboardingButton
+              variant="ghost"
+              onClick={() => {
                 setEmailOpen(false);
                 setError(null);
-              } else {
-                setSkipAsk(true);
-              }
-            }}
-            disabled={busy}
-          >
-            {emailOpen ? 'Back' : 'Skip for now'}
-          </OnboardingButton>
+              }}
+              disabled={busy}
+            >
+              Back
+            </OnboardingButton>
+          ) : null
         ) : (
           <OnboardingButton variant="ghost" onClick={() => setStep('enter')} disabled={saving}>
             Use a different email
@@ -524,11 +573,13 @@ function SaveCard({
   humanName,
   skin,
   saved,
+  compact,
 }: {
   frogName: string;
   humanName: string | null;
   skin: ReturnType<typeof findStarterSkin>;
   saved: boolean;
+  compact: boolean;
 }) {
   const owner = humanName ? `${humanName}’s` : 'Your';
   return (
@@ -536,12 +587,15 @@ function SaveCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-      className="relative -top-3 my-auto w-full overflow-hidden rounded-[22px] border-2 border-border/60 bg-card shadow-[0_3px_0_0_rgba(0,0,0,0.05)] short:hidden md:w-80"
+      className="w-full overflow-hidden rounded-[22px] border-2 border-border/60 bg-card shadow-[0_3px_0_0_rgba(0,0,0,0.05)]"
     >
-      <div className="flex items-center gap-3 px-3.5 py-3">
+      <div className={cn('flex items-center gap-3 px-3.5', compact ? 'py-2' : 'py-3')}>
         <span
           aria-hidden
-          className="flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-hidden rounded-2xl"
+          className={cn(
+            'flex shrink-0 items-end justify-center overflow-hidden rounded-2xl',
+            compact ? 'h-11 w-11' : 'h-[52px] w-[52px]',
+          )}
           style={{ backgroundColor: `${skin.color}38` }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
