@@ -1647,12 +1647,12 @@ export function TradePanel({
                           <>
                             {!isPremium && rewardedAdsAvailable() && (
                               <SkipAdsLink
-                                quiet
-                                label="Skip the ad with Plus"
+                                featured
+                                label="Free rerolls with Plus"
                                 placement="trade_reroll"
                                 disabled={rerollBusy}
                                 onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
-                                className="mt-1.5"
+                                className="mt-2"
                               />
                             )}
                             {rerollError && (

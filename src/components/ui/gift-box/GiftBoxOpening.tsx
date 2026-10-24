@@ -422,7 +422,7 @@ export default function GiftBoxOpening({
                           <SkipAdsLink
                             key="plus"
                             featured
-                            label="Skip the ad with Plus"
+                            label="2× rewards with Plus"
                             placement="gift_double"
                             disabled={adBusy}
                             onClick={() => openPlusOffer(skipAdsPlacement('gift_double'))}

@@ -288,7 +288,7 @@ export function SkipAdsLink({
         )}
       >
         <Icon name="frogPlus" className="bonus-plus-shake h-9 w-9 shrink-0 drop-shadow-[0_2px_0_rgba(0,0,0,0.25)]" />
-        <span>{label}</span>
+        <span className="whitespace-nowrap">{label}</span>
         <ChevronRight aria-hidden className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" strokeWidth={3} />
       </button>
     );
@@ -613,7 +613,7 @@ export function BonusHeroButton({
 
         <span aria-hidden className="relative h-11 w-11 shrink-0">
           <span className="absolute inset-0 rounded-full bg-white/30 shadow-[inset_0_-3px_0_rgba(0,0,0,0.1)]" />
-          <span className="pointer-events-none absolute bottom-[12px] left-1/2 -ml-[36px] h-[96px] w-[72px] drop-shadow-[0_3px_3px_rgba(0,0,0,0.25)]">
+          <span className="pointer-events-none absolute bottom-[13px] left-1/2 -ml-[31px] h-[82px] w-[62px] drop-shadow-[0_3px_3px_rgba(0,0,0,0.25)]">
             {visual}
           </span>
         </span>
@@ -811,7 +811,7 @@ function ActionStages({
         }}
         className={cn('col-start-1 row-start-1 self-start', !advanced && 'pointer-events-none')}
       >
-        <div inert={!advanced} className="flex flex-col items-center">
+        <div inert={!advanced} className="flex flex-col items-center gap-2">
           {second.map((node, index) => (
             <motion.div key={index} variants={item} className="flex w-full justify-center">
               {node}
@@ -1042,7 +1042,7 @@ export const RewardCard = ({
   const choiceChip = (
     <p
       key="chip"
-      className="mb-4 flex h-8 max-w-full items-center gap-1.5 rounded-full bg-white/10 pl-1.5 pr-3.5 text-[13.5px] font-black text-white ring-1 ring-inset ring-white/15"
+      className="mb-3 flex h-8 max-w-full items-center gap-1.5 rounded-full bg-white/10 pl-1.5 pr-3.5 text-[13.5px] font-black text-white ring-1 ring-inset ring-white/15"
     >
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-400 text-emerald-950">
         <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={3.5} />
