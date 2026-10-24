@@ -16,7 +16,6 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { FrogStampIndices } from '@/lib/frogStampEngine';
 import Frog from '@/components/ui/frog';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
-import { useSettled } from '@/hooks/useSettled';
 import {
   formatPlusPrice,
   getPlusPricing,
@@ -517,6 +516,9 @@ export function usePlusPaywall({
 
 export function PlusUpgradeModal(props: PlusPaywallArgs) {
   const { open, onClose } = props;
+  useEffect(() => {
+    void loadLiveShowcaseItems();
+  }, []);
   const {
     mounted,
     view,
@@ -841,16 +843,7 @@ function useShowcaseLook(rotating: boolean) {
 }
 
 
-const CHEER_LINES = [
-  'I feel so fancy!',
-  'You work, I glow up!',
-  'My fly loves it too!',
-  'Can we keep this one?',
-  'Double flies? Yes please!',
-  'Next look, even cuter!',
-  'Let’s make habits fun!',
-  'Me + my fly = ready!',
-];
+const OFFER_LINE = 'Psst! Want to grow\nfaster together?';
 
 /** One live frog changes outfits in place; no remount between looks or plan choices. */
 function useLookHop(look: ShowcaseLook, dressed: boolean, reduceMotion: boolean) {
@@ -892,9 +885,8 @@ function Sparkle({ className, delay }: { className: string; delay: string }) {
 
 function FrogBand({ desktop = false }: { desktop?: boolean }) {
   const reduceMotion = useReducedMotion();
-  const settled = useSettled(150);
   const [dressed, setDressed] = useState(false);
-  const { look, tick } = useShowcaseLook(dressed && !reduceMotion);
+  const { look } = useShowcaseLook(dressed && !reduceMotion);
   const { shownLook, hop } = useLookHop(look, dressed, !!reduceMotion);
   const size = desktop ? 354 : 236;
   const height = Math.round(size * 1.125);
@@ -905,35 +897,27 @@ function FrogBand({ desktop = false }: { desktop?: boolean }) {
       <span className={cn('absolute left-1/2 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.2),rgba(255,255,255,0.06)_55%,transparent)]', desktop ? 'bottom-[40px] h-[440px] w-[520px]' : '-bottom-6 h-[300px] w-[380px]')} />
       {BAND_SPARKLES.map((sparkle) => <Sparkle key={sparkle.delay} {...sparkle} />)}
       <div className={cn(
-        'absolute left-1/2 z-20 w-max -translate-x-1/2',
+        'absolute left-1/2 z-20 w-max -translate-x-1/2 transition-[bottom] duration-300 ease-out',
         desktop
           ? cn('max-w-[80%]', hasHat ? 'bottom-[243px]' : 'bottom-[177px]')
           : cn('max-w-[min(78%,280px)]', hasHat ? 'bottom-[162px] short:bottom-[113px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[143px]' : 'bottom-[118px] short:bottom-[83px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[104px]'),
       )}>
-        <AnimatePresence mode="wait" initial={false}>
-          {dressed ? (
-            <motion.div
-              key={tick}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92, transition: { duration: 0.12 } }}
-              transition={{ type: 'spring', stiffness: 440, damping: 24 }}
-              className={cn('relative origin-bottom rounded-2xl bg-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.45)]', desktop ? 'px-4 py-2.5' : 'px-3.5 py-2')}
-            >
-              <p className={cn('text-center font-black leading-snug text-slate-900', desktop ? 'text-[16px]' : 'text-[14px] short:text-[13px]')}>{CHEER_LINES[tick % CHEER_LINES.length]}</p>
-              <span className="absolute -bottom-1.5 left-1/2 -ml-[7px] h-3.5 w-3.5 rotate-45 rounded-[3px] bg-white" />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <motion.div
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 440, damping: 24, delay: 0.12 }}
+          className={cn('relative origin-bottom rounded-2xl bg-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.45)]', desktop ? 'px-4 py-2.5' : 'px-3.5 py-2')}
+        >
+          <p className={cn('whitespace-pre-line text-center font-black leading-snug text-slate-900', desktop ? 'text-[16px]' : 'text-[14px] short:text-[13px]')}>{OFFER_LINE}</p>
+          <span className="absolute -bottom-1.5 left-1/2 -ml-[7px] h-3.5 w-3.5 rotate-45 rounded-[3px] bg-white" />
+        </motion.div>
       </div>
       <div className={cn('absolute inset-0 origin-bottom', !desktop && 'short:scale-[0.7] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:scale-[0.88]')}>
         <div className="absolute inset-0 motion-safe:animate-[plus-frog-float_3.6s_ease-in-out_infinite]">
-          <motion.div animate={hop} className={cn('absolute left-1/2 origin-[50%_77%] transition-opacity duration-200 ease-out', dressed ? 'opacity-100' : 'opacity-0')} style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
-            {settled ? (
-              <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
-                paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
-                ignoreIdlePause onDressed={() => setDressed(true)} />
-            ) : null}
+          <motion.div animate={hop} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
+            <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
+              paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
+              ignoreIdlePause onDressed={() => setDressed(true)} />
             {dressed ? (
               <PremiumFrogAura
                 show
@@ -1119,29 +1103,12 @@ export function TrialTimeline({ trial, showFrog, compact = false }: { trial: Tri
   );
 }
 
-const PROMISE_LINES = [
-  'I’ll remind you before it ends. Promise!',
-  'No charge today. Just fun!',
-  'My golden fly is already here!',
-  'Cancel anytime. I won’t mind!',
-  'Double flies start right now!',
-  'Let’s make every day count!',
-];
-const PROMISE_ROTATE_MS = 3600;
+const PROMISE_LINE = 'I’ll remind you before it ends. Promise!';
 
 function TrialPromise() {
   const reduceMotion = useReducedMotion();
-  const settled = useSettled(880);
   const [dressed, setDressed] = useState(false);
   const [look] = useState(() => createShowcaseDrawer(liveShowcaseItems ?? STATIC_SHOWCASE_ITEMS)() ?? EMPTY_LOOK);
-  const [line, setLine] = useState(0);
-  useEffect(() => {
-    if (!dressed || reduceMotion) return;
-    const id = window.setInterval(() => {
-      if (!document.hidden) setLine((current) => (current + 1) % PROMISE_LINES.length);
-    }, PROMISE_ROTATE_MS);
-    return () => window.clearInterval(id);
-  }, [dressed, reduceMotion]);
   const size = 168;
   const height = Math.round(size * 1.125);
   return (
@@ -1151,31 +1118,23 @@ function TrialPromise() {
       <Sparkle className="left-[6%] top-[30%] h-2.5 w-2.5" delay="1.4s" />
       <Sparkle className="right-[8%] top-[18%] h-3 w-3" delay="2.1s" />
       <div className="absolute bottom-0 left-0 h-[136px] w-[132px] origin-bottom-left short:scale-[0.84]">
-        <div className={cn('absolute left-1/2 transition-opacity duration-300 ease-out', dressed ? 'opacity-100' : 'opacity-0')} style={{ bottom: -Math.round(height * 0.2), width: size, height, marginLeft: -size / 2 }}>
-          {settled ? (
-            <Frog width={size} height={height} indices={look.indices} visualOffsetY={-5}
-              paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
-              ignoreIdlePause onDressed={() => setDressed(true)} />
-          ) : null}
+        <div className="absolute left-1/2" style={{ bottom: -Math.round(height * 0.2), width: size, height, marginLeft: -size / 2 }}>
+          <Frog width={size} height={height} indices={look.indices} visualOffsetY={-5}
+            paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
+            ignoreIdlePause onDressed={() => setDressed(true)} />
           {dressed ? <PremiumFrogAura show alwaysPlay paused={!!reduceMotion} flySize={40} className="[--premium-fly-top:12%] [--premium-fly-x-max:44px] [--premium-fly-x-min:-58px] [--premium-fly-y-max:18px] [--premium-fly-y-min:0px]" /> : null}
         </div>
       </div>
       <div className="relative flex min-w-0 flex-1">
-        <AnimatePresence mode="wait" initial={false}>
-          {dressed ? (
-            <motion.div
-              key={line}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -6, scale: 0.85 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, transition: { duration: 0.14 } }}
-              transition={{ type: 'spring', stiffness: 440, damping: 26 }}
-              className="relative w-fit max-w-full origin-bottom-left rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_8px_18px_-8px_rgba(0,0,0,0.45)]"
-            >
-              <p className="text-[14px] font-black leading-snug text-slate-900">{PROMISE_LINES[line]}</p>
-              <span className="absolute -left-1.5 bottom-3 h-3.5 w-3.5 rotate-45 rounded-[3px] bg-white" />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <motion.div
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -6, scale: 0.85 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 440, damping: 26, delay: 0.12 }}
+          className="relative w-fit max-w-full origin-bottom-left rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_8px_18px_-8px_rgba(0,0,0,0.45)]"
+        >
+          <p className="text-[14px] font-black leading-snug text-slate-900">{PROMISE_LINE}</p>
+          <span className="absolute -left-1.5 bottom-3 h-3.5 w-3.5 rotate-45 rounded-[3px] bg-white" />
+        </motion.div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import {
   DEFAULT_BACKGROUND_IMAGES,
   useBackgrounds,
@@ -10,7 +10,7 @@ import { useOnboardingBackgroundStore } from '@/lib/onboardingBackgroundStore';
 
 // Renders the randomized onboarding background (chosen in OnboardingFrogHeader and
 // shared via the store). Falls back to the default background until one is rolled.
-export function OnboardingBackground() {
+export function OnboardingBackground({ style }: { style?: CSSProperties }) {
   const { data } = useBackgrounds();
   const backgroundId = useOnboardingBackgroundStore((s) => s.backgroundId);
 
@@ -30,7 +30,7 @@ export function OnboardingBackground() {
     <picture
       key={background?.id ?? 'default-bg'}
       aria-hidden
-      style={backgroundFadeMaskStyle}
+      style={style ? { ...backgroundFadeMaskStyle, ...style } : backgroundFadeMaskStyle}
       className="pointer-events-none absolute left-0 right-0 top-0 -z-10 block h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden animate-in fade-in duration-500 md:h-[480px]"
     >
       {images.webLarge && (

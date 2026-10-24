@@ -15,15 +15,17 @@ type NudgeConfig = {
   suppressAfterDismissals: number;
   minVisits: number;
   blocking: boolean;
+  inline?: boolean;
 };
 
 const NUDGES = {
   home_buddy: {
-    maxImpressions: 5,
+    maxImpressions: Number.POSITIVE_INFINITY,
     cooldownHours: 48,
-    suppressAfterDismissals: 2,
-    minVisits: 2,
+    suppressAfterDismissals: 3,
+    minVisits: 1,
     blocking: false,
+    inline: true,
   },
   friends_buddy: {
     maxImpressions: 2,
@@ -89,7 +91,8 @@ function writeRecord(
 
 function readyAt(record: NudgeRecord, config: NudgeConfig) {
   if (!record.lastShownAt) return 0;
-  return record.lastShownAt + config.cooldownHours * 3 ** record.dismissals * HOUR_MS;
+  const backoff = config.inline ? Math.max(0, record.dismissals - 1) : record.dismissals;
+  return record.lastShownAt + config.cooldownHours * 3 ** backoff * HOUR_MS;
 }
 
 export function useNudge(
@@ -114,6 +117,12 @@ export function useNudge(
     if (record.impressions >= config.maxImpressions) return;
     if (record.visits < config.minVisits) return;
     if (Date.now() < readyAt(record, config)) return;
+
+    if (config.inline) {
+      writeRecord(key, uid, { impressions: record.impressions + 1 });
+      setShow(true);
+      return;
+    }
 
     // Waits out anything that owns the screen first — the daily streak flow
     // above all — so the impression is only ever recorded for a nudge the user

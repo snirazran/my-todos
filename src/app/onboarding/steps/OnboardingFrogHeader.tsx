@@ -81,6 +81,7 @@ const DEFAULT_FROG_INDICES: Partial<Record<WardrobeSlot, number>> = {
 
 export type FrogPose = {
   y: number;
+  lift?: number;
   motion: 'hidden' | 'hop' | 'seated';
   clip: string | null;
   fromX: number;

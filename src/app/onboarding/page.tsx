@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { mutate, preload } from 'swr';
 import { format } from 'date-fns';
 import type { OnboardingStepProps } from './steps/types';
-import AdoptFrogStep from './steps/AdoptFrogStep';
+import AdoptFrogStep, { KEYBOARD_EASE } from './steps/AdoptFrogStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
@@ -416,6 +416,12 @@ export default function OnboardingPage() {
     direction,
   };
 
+  const nameLift = currentId === 'name' && !celebrating ? (frogPose?.lift ?? 0) : 0;
+  const backdropLift: CSSProperties = {
+    transform: nameLift ? `translate3d(0, ${-nameLift}px, 0)` : undefined,
+    transition: KEYBOARD_EASE,
+  };
+
   return (
     <main
       ref={mainRef}
@@ -423,9 +429,10 @@ export default function OnboardingPage() {
     >
       {(currentId !== 'plan' || celebrating) && !paywallOpen && (
         <>
-          <OnboardingBackground />
+          <OnboardingBackground style={backdropLift} />
           <div
             aria-hidden
+            style={backdropLift}
             className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(300px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px]"
           />
           <OnboardingProgressDock

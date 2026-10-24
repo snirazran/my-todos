@@ -348,6 +348,7 @@ export default function GiftBoxOpening({
                 onClaim={handleClaim}
                 paused={paused}
                 offerEquip={!!user}
+                bonusAfterChoice
                 spareCount={prizeMeta?.duplicate ? prizeMeta.owned : undefined}
                 bonus={
                   user && doubleClaimId ? (

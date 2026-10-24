@@ -7,7 +7,7 @@ import {
   Variants,
 } from 'framer-motion';
 import { mutate as mutateGlobal } from 'swr';
-import { ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Crown, Gift, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
@@ -29,7 +29,7 @@ import {
   useBackgrounds,
 } from '@/hooks/useBackgrounds';
 import { ItemDef, type Rarity } from '@/lib/skins/catalog';
-import { hapticTick } from '@/lib/haptics';
+import { hapticSelect, hapticTick } from '@/lib/haptics';
 import {
   canFlyToInventory,
   flyFliesToCounter,
@@ -65,6 +65,7 @@ type RewardCardProps = {
   doublePlacement?: string;
   upsell?: React.ReactNode;
   bonus?: React.ReactNode;
+  bonusAfterChoice?: boolean;
   paused?: boolean;
   flyCollectAmount?: number;
   offerEquip?: boolean;
@@ -601,6 +602,7 @@ export const RewardCard = ({
   doublePlacement = 'double_reward',
   upsell,
   bonus,
+  bonusAfterChoice = false,
   paused = false,
   flyCollectAmount,
   offerEquip = false,
@@ -609,6 +611,7 @@ export const RewardCard = ({
   const [localClaiming, setLocalClaiming] = useState(false);
   const [launched, setLaunched] = useState(false);
   const [claimChoice, setClaimChoice] = useState<'wear' | 'keep' | null>(null);
+  const [held, setHeld] = useState(false);
   const artRef = useRef<HTMLDivElement | null>(null);
   const stampRef = useRef<HTMLCanvasElement | null>(null);
   const releaseHoldRef = useRef<(() => void) | null>(null);
@@ -623,9 +626,15 @@ export const RewardCard = ({
     ? backgroundsData?.equipped === prize.id
     : inventoryData?.wardrobe?.equipped?.[prize.slot] === prize.id;
   const showEquip = equippable && (!alreadyWearing || claimChoice === 'wear');
+  const holdForBonus = bonusAfterChoice && !!bonus && showEquip;
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
   const isSpare = !quantity && !!spareCount && spareCount > 1;
+
+  useEffect(() => {
+    setHeld(false);
+    setClaimChoice(null);
+  }, [prize]);
 
   useEffect(() => {
     // If the parent says we are done claiming, reset our local loading state
@@ -690,7 +699,22 @@ export const RewardCard = ({
     flyItemToInventory({ from, visual, rarity: prize.rarity });
   };
 
+  const finishClaim = () => {
+    setLocalClaiming(true);
+    launchCollect();
+    setTimeout(() => {
+      onClaim();
+    }, 200);
+  };
+
   const handleClaimClick = (wear = false) => {
+    if (holdForBonus && !held) {
+      setClaimChoice(wear ? 'wear' : 'keep');
+      if (wear) void equipReward(prize);
+      hapticSelect();
+      setHeld(true);
+      return;
+    }
     setLocalClaiming(true);
     if (showEquip) setClaimChoice(wear ? 'wear' : 'keep');
     if (showEquip && wear) void equipReward(prize);
@@ -973,6 +997,40 @@ export const RewardCard = ({
             disabled={isProcessing || !showContent}
             onClick={() => handleClaimClick()}
           />
+        ) : held ? (
+          <div className="flex flex-col items-center gap-2">
+            <motion.p
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-[13.5px] font-black text-white/90"
+            >
+              <Check aria-hidden className="h-4 w-4 shrink-0 text-emerald-300" strokeWidth={3.25} />
+              <span className="truncate">
+                {claimChoice === 'wear'
+                  ? isBackgroundPrize
+                    ? `${prize.name} is your pond now`
+                    : `Now wearing ${prize.name}`
+                  : `${prize.name} is in your closet`}
+              </span>
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 24, delay: 0.06 }}
+              className="flex w-full flex-col gap-1 [&>button:first-child]:bg-white/[0.15] [&>button:first-child]:ring-2 [&>button:first-child]:ring-white/35"
+            >
+              {bonus}
+            </motion.div>
+            <button
+              type="button"
+              onClick={finishClaim}
+              disabled={isProcessing}
+              className="mx-auto flex min-h-11 items-center rounded-2xl px-6 text-[15px] font-black text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Done
+            </button>
+          </div>
         ) : showEquip ? (
           <div className="flex flex-col gap-1">
             <GiftOpenButton
@@ -1040,7 +1098,7 @@ export const RewardCard = ({
             {openLaterLabel}
           </button>
         )}
-        {bonus ? <div className="mt-2 flex flex-col gap-1">{bonus}</div> : null}
+        {bonus && !held ? <div className="mt-2 flex flex-col gap-1">{bonus}</div> : null}
       </div>
       {doubleError && (
         <p className="mt-2 text-center text-xs font-bold text-red-300">

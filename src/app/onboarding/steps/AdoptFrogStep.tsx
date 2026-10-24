@@ -111,7 +111,7 @@ const LAND_MS = 1160;
 const SETTLE_MS = 1300;
 const HANDOFF_MS = 300;
 const SKIN_LINE_MS = 2600;
-const KEYBOARD_EASE = 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)';
+export const KEYBOARD_EASE = 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)';
 const HEADER_TOP_CLASS =
   'top-[calc(362px+env(safe-area-inset-top))] short:top-[calc(314px+env(safe-area-inset-top))] md:top-[354px]';
 const BODY_TOP_CLASS =
@@ -351,6 +351,7 @@ export default function AdoptFrogStep({
     appliedY.current = y;
     onFrogPose({
       y,
+      lift,
       motion: frogMotion,
       clip,
       fromX,
