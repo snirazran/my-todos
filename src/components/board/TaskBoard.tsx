@@ -333,11 +333,13 @@ const SavedRow = React.memo(function SavedRow({
   count,
   hinted,
   bordered,
+  expanded,
   onOpen,
 }: {
   count: number;
   hinted: boolean;
   bordered: boolean;
+  expanded: boolean;
   onOpen: () => void;
 }) {
   return (
@@ -346,6 +348,7 @@ const SavedRow = React.memo(function SavedRow({
         type="button"
         data-hint={hinted ? 'saved-tasks' : undefined}
         aria-label={count ? `Saved tasks, ${count}` : 'Saved tasks'}
+        aria-expanded={expanded}
         onClick={onOpen}
         className={`flex w-full items-center justify-between gap-2 rounded-[14px] py-2.5 pl-3.5 pr-3 text-left transition-colors active:bg-foreground/[0.07] [@media(hover:hover)]:hover:bg-foreground/[0.05] ${
           bordered ? 'mt-0.5' : ''
@@ -2832,6 +2835,7 @@ export default function TaskBoard({
                           count={backlog.length}
                           hinted={i === pageIndex}
                           bordered={!pastDay}
+                          expanded={backlogOpen}
                           onOpen={openBacklog}
                         />
                       )}
@@ -2963,6 +2967,7 @@ export default function TaskBoard({
               transition={{ type: 'spring', stiffness: 460, damping: 32 }}
               type="button"
               data-hint={isMobile ? undefined : 'saved-tasks'}
+              aria-expanded={backlogOpen}
               aria-label={
                 backlog.length ? `Saved tasks, ${backlog.length}` : 'Saved tasks'
               }

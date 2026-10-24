@@ -7,7 +7,8 @@ import { ensureGiftRulesConfig } from '@/lib/models/GiftRulesConfig';
 import { giftLuckUpdate, readUserGiftLuck } from '@/lib/skins/giftLuck';
 import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
-import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
+import { DOUBLE_CLAIM_WINDOW_MS, type AdDoubleClaim } from '@/lib/rewards/adDouble';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { consumeAdView, refundAdView } from '@/lib/rewards/adBudget';
 import { isPremiumActive } from '@/lib/skins/dailyDeal';
 
@@ -21,7 +22,43 @@ type GiftDoubleClaim = {
   createdAt: Date | string;
 };
 
-type LeanUser = UserDoc & { _id: string; giftDoubleClaim?: GiftDoubleClaim };
+type LeanUser = UserDoc & {
+  _id: string;
+  giftDoubleClaim?: GiftDoubleClaim;
+  adDoubleClaim?: AdDoubleClaim;
+};
+
+async function grantBundledFlies(user: LeanUser, flyClaimId: string, premium: boolean) {
+  const claim = user.adDoubleClaim;
+  if (!claim || claim.id !== flyClaimId || claim.doubled || !(claim.fliesGranted > 0)) {
+    return null;
+  }
+  if (Date.now() - new Date(claim.createdAt).getTime() > DOUBLE_CLAIM_WINDOW_MS) {
+    return null;
+  }
+  const updated = await UserModel.findOneAndUpdate(
+    { _id: user._id, 'adDoubleClaim.id': flyClaimId, 'adDoubleClaim.doubled': false },
+    {
+      $set: { 'adDoubleClaim.doubled': true },
+      $inc: { 'wardrobe.flies': claim.fliesGranted },
+    },
+    { returnDocument: 'after', projection: { 'wardrobe.flies': 1 } },
+  ).lean<{ wardrobe?: { flies?: number } }>();
+  if (!updated) return null;
+  await recordAnalyticsEvent({
+    userId: String(user._id),
+    name: 'fly_earned',
+    properties: {
+      source: 'rewarded_ad_double',
+      fly_amount: claim.fliesGranted,
+      is_premium: premium,
+    },
+  });
+  return {
+    fliesGranted: claim.fliesGranted,
+    flyBalanceAfter: updated.wardrobe?.flies ?? 0,
+  };
+}
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -31,7 +68,7 @@ export async function POST(req: NextRequest) {
     return json({ error: 'Unauthorized' }, 401);
   }
 
-  let body: { claimId?: string } = {};
+  let body: { claimId?: string; flyClaimId?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -39,6 +76,7 @@ export async function POST(req: NextRequest) {
   }
   const claimId = String(body.claimId ?? '');
   if (!claimId) return json({ error: 'Missing claimId' }, 400);
+  const flyClaimId = typeof body.flyClaimId === 'string' ? body.flyClaimId : '';
 
   try {
     await connectMongo();
@@ -127,10 +165,18 @@ export async function POST(req: NextRequest) {
 
     await dropFromWishlist(userId, user.wardrobe, prize.id, prize.kind);
 
+    const flies = flyClaimId
+      ? await grantBundledFlies(user, flyClaimId, premium).catch((err) => {
+          console.error('Bundled fly double failed:', err);
+          return null;
+        })
+      : null;
+
     return json({
       granted: true,
       ok: true,
       prize,
+      flies,
       prizeMeta: {
         duplicate: roll.duplicate,
         owned: ownedOf(prize) + 1,

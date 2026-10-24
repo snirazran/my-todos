@@ -73,6 +73,7 @@ type QuestRewardRevealEntry = {
   doubled?: boolean;
   grantPremium?: boolean;
   suppressFlyPill?: boolean;
+  flyBundle?: { amount: number; claimId: string; double: FlyRewardDouble };
 };
 
 type FlyGainToast = {
@@ -303,17 +304,25 @@ export function presentFlyReward({
   const granted = Math.max(0, Math.floor(amount));
   if (granted <= 0) return;
   landFlies(granted, balanceAfter, source);
-  if (double && rewardedAdsAvailable()) {
-    revealStore.setState({
-      flyOffer: {
-        id: ++flyOfferCounter,
-        amount: granted,
-        placement,
-        notBefore: Date.now() + offerDelayMs,
-        run: double,
-      },
-    });
-  }
+  if (double) offerFlyDouble(granted, double, placement, offerDelayMs);
+}
+
+function offerFlyDouble(
+  amount: number,
+  run: FlyRewardDouble,
+  placement: string,
+  delayMs: number,
+) {
+  if (!rewardedAdsAvailable()) return;
+  revealStore.setState({
+    flyOffer: {
+      id: ++flyOfferCounter,
+      amount,
+      placement,
+      notBefore: Date.now() + delayMs,
+      run,
+    },
+  });
 }
 
 const INTERLUDE_MS = 1100;
@@ -463,31 +472,40 @@ export function enqueueQuestRewardReveal(
   const [flyEntry, ...prizeEntries] = nextEntries;
   if (flyEntry.fliesGranted) {
     const claimId = flyEntry.doubleClaimId;
+    const flies = flyEntry.fliesGranted;
+    const double: FlyRewardDouble | null =
+      claimId && !isPremium
+        ? async () => {
+            const res = await fetch('/api/rewards/double', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ claimId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.granted) {
+              throw new Error('Could not double this reward — try again later.');
+            }
+            const balanceAfter =
+              typeof data?.summary?.flyBalanceAfter === 'number'
+                ? data.summary.flyBalanceAfter
+                : knownFlyBalance + flies;
+            return { bonus: flies, balanceAfter };
+          }
+        : null;
+    const bundleGift =
+      claimId && double && rewardedAdsAvailable()
+        ? prizeEntries.find((entry) => entry.item.slot === 'container')
+        : undefined;
+    if (bundleGift && claimId && double) {
+      bundleGift.flyBundle = { amount: flies, claimId, double };
+    }
     presentFlyReward({
-      amount: flyEntry.fliesGranted,
+      amount: flies,
       balanceAfter: flyEntry.flyBalanceAfter,
       source: options.source,
       placement: 'quest_reward_double',
       offerDelayMs: prizeEntries.length ? 1400 : 650,
-      double:
-        claimId && !isPremium
-          ? async () => {
-              const res = await fetch('/api/rewards/double', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ claimId }),
-              });
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok || !data?.granted) {
-                throw new Error('Could not double this reward — try again later.');
-              }
-              const balanceAfter =
-                typeof data?.summary?.flyBalanceAfter === 'number'
-                  ? data.summary.flyBalanceAfter
-                  : knownFlyBalance + (flyEntry.fliesGranted ?? 0);
-              return { bonus: flyEntry.fliesGranted ?? 0, balanceAfter };
-            }
-          : null,
+      double: bundleGift ? null : double,
     });
     if (prizeEntries.length) {
       window.setTimeout(() => {
@@ -523,6 +541,14 @@ function showFlyGainToast(entry: QuestRewardRevealEntry) {
 }
 
 function handleClaim(entry?: QuestRewardRevealEntry) {
+  if (entry?.flyBundle) {
+    offerFlyDouble(
+      entry.flyBundle.amount,
+      entry.flyBundle.double,
+      'quest_reward_double',
+      OFFER_ENTER_DELAY_MS,
+    );
+  }
   if (
     entry &&
     entry.item.slot !== 'container' &&
@@ -833,6 +859,15 @@ export function QuestRewardRevealHost() {
           key={`${giftOpening.entry.key}-${giftOpening.instance}`}
           giftBoxId={giftOpening.entry.item.id}
           onClose={handleGiftBoxClosed}
+          bundle={
+            giftOpening.instance === 0 && giftOpening.entry.flyBundle
+              ? {
+                  flies: giftOpening.entry.flyBundle.amount,
+                  claimId: giftOpening.entry.flyBundle.claimId,
+                  onDoubled: landFlies,
+                }
+              : undefined
+          }
           onWin={() => {
             markFlyEarn();
             mutateInventoryCaches();

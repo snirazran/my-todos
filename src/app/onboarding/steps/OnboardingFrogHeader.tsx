@@ -33,6 +33,7 @@ export function OnboardingProgressDock({
   style?: CSSProperties;
 }) {
   const filled = Math.min(total, done + 1);
+  const pct = total > 0 ? (filled / total) * 100 : 0;
   return (
     <div
       className={cn(
@@ -44,27 +45,24 @@ export function OnboardingProgressDock({
       style={style}
     >
       <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20" />
-      <div className="flex h-full items-center px-4 pt-2.5">
-        <div
-          role="progressbar"
-          aria-label="Onboarding progress"
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={filled}
-          className="flex min-w-0 flex-1 items-center gap-1.5"
-        >
-          {Array.from({ length: total }, (_, i) => (
-            <span
-              key={i}
-              className={cn(
-                'h-2.5 flex-1 rounded-full transition-[background-color,box-shadow] duration-500',
-                i < filled
-                  ? 'bg-primary shadow-[inset_0_-2px_0_0_rgba(0,0,0,0.14)]'
-                  : 'bg-primary/15 dark:bg-primary/20',
-              )}
-            />
-          ))}
-        </div>
+      <div className="flex h-full items-center px-5">
+        {total > 0 && (
+          <div
+            role="progressbar"
+            aria-label="Onboarding progress"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={filled}
+            className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-primary/15 dark:bg-primary/20"
+          >
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-primary shadow-[inset_0_-2px_0_0_rgba(0,0,0,0.14)] transition-[width] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              style={{ width: `${pct}%` }}
+            >
+              <span className="absolute inset-x-2 top-[3px] h-[3px] rounded-full bg-white/30" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

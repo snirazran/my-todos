@@ -18,7 +18,6 @@ import {
   Check,
   ChevronDown,
   Crosshair,
-  Dices,
   Repeat,
   ShoppingBag,
   Trash2,
@@ -69,7 +68,6 @@ import {
 
 // Import from gift-box for the reward UI
 import {
-  BonusOfferButton,
   RewardCard,
   SkipAdsLink,
 } from '@/components/ui/gift-box/RewardCard';
@@ -1636,36 +1634,36 @@ export function TradePanel({
                 onClaim={handleClaimReward}
                 paused={paused}
                 offerEquip
-                bonus={
-                  rerollClaimId ? (
-                    <>
-                      <BonusOfferButton
-                        mode={isPremium ? 'included' : rewardedAdsAvailable() ? 'ad' : 'plus'}
-                        visual={<Dices className="h-6 w-6" strokeWidth={2.5} />}
-                        title="Reroll for another"
-                        busy={rerollBusy}
-                        busyLabel={isPremium ? 'Rerolling...' : 'Loading ad...'}
-                        onClick={() => {
+                reroll={
+                  rerollClaimId
+                    ? {
+                        mode: isPremium ? 'included' : rewardedAdsAvailable() ? 'ad' : 'plus',
+                        busy: rerollBusy,
+                        onClick: () => {
                           if (isPremium || rewardedAdsAvailable()) void handleReroll();
                           else openPlusOffer('trade_reroll');
-                        }}
-                      />
-                      {!isPremium && rewardedAdsAvailable() && (
-                        <SkipAdsLink
-                          quiet
-                          label="Skip the ad with Plus"
-                          placement="trade_reroll"
-                          disabled={rerollBusy}
-                          onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
-                        />
-                      )}
-                      {rerollError && (
-                        <p className="text-center text-xs font-bold text-red-300">
-                          {rerollError}
-                        </p>
-                      )}
-                    </>
-                  ) : undefined
+                        },
+                        footer: (
+                          <>
+                            {!isPremium && rewardedAdsAvailable() && (
+                              <SkipAdsLink
+                                quiet
+                                label="Skip the ad with Plus"
+                                placement="trade_reroll"
+                                disabled={rerollBusy}
+                                onClick={() => openPlusOffer(skipAdsPlacement('trade_reroll'))}
+                                className="mt-1.5"
+                              />
+                            )}
+                            {rerollError && (
+                              <p className="mt-1 text-center text-xs font-bold text-red-300">
+                                {rerollError}
+                              </p>
+                            )}
+                          </>
+                        ),
+                      }
+                    : undefined
                 }
               />
             </div>

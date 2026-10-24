@@ -3002,14 +3002,57 @@ body.dragging {
 
 .gift-open-btn[data-busy] .ad-offer-play,
 .gift-open-btn[data-busy] .ad-offer-dice,
-.gift-open-btn[data-busy] .ad-offer-badge {
+.gift-open-btn[data-busy] .ad-offer-badge,
+.gift-open-btn[data-busy] .decision-icon {
   animation: none;
+}
+
+.decision-face {
+  height: 108px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.decision-icon {
+  transform-origin: 50% 85%;
+  animation: gift-open-hop 2.8s ease-in-out infinite;
+}
+
+.bonus-plus-shake {
+  transform-origin: 50% 70%;
+  animation: bonus-plus-shake 4.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1.4s infinite;
+}
+
+@keyframes bonus-plus-shake {
+  0%,
+  74%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  77% {
+    transform: rotate(-14deg) scale(1.14);
+  }
+  81% {
+    transform: rotate(12deg) scale(1.14);
+  }
+  85% {
+    transform: rotate(-9deg) scale(1.1);
+  }
+  89% {
+    transform: rotate(6deg) scale(1.05);
+  }
+  93% {
+    transform: rotate(-2deg) scale(1.02);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ad-offer-play,
   .ad-offer-dice,
-  .ad-offer-badge {
+  .ad-offer-badge,
+  .decision-icon,
+  .bonus-plus-shake {
     animation: none;
   }
 }

@@ -62,7 +62,6 @@ import Frog, { type WardrobeSlot } from './frog';
 import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { QuestTrack } from './QuestTrack';
-import { StatusDock, statusDockRowClass } from '@/components/home/StatusDock';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -604,15 +603,13 @@ export function QuestsPanel({
                           {data.activeSeason && (
                             <QuestSeasonBanner
                               season={data.activeSeason}
-                              rewardCatalog={data.rewardCatalog}
-                              isPremium={data.isPremium}
                               onView={() => setOpenSeasonKind('active')}
                             />
                           )}
                           <div
                             className={cn(
                               'mx-auto flex w-full max-w-3xl flex-col gap-7 md:gap-9',
-                              data.activeSeason && 'px-3 pt-7 md:px-6 md:pt-10',
+                              data.activeSeason && 'px-3 pt-3 md:px-6 md:pt-6',
                             )}
                           >
                             {!data.activeSeason && (
@@ -751,10 +748,6 @@ function useSeasonCountdown(endsAt?: string) {
   return label;
 }
 
-function seasonTierEntry(season: QuestSeasonView, tier: number) {
-  return season.rewardsByTier.find((entry) => entry.tier === tier) ?? null;
-}
-
 /** The rung the board points at: the cheapest thing waiting, else the next one up. */
 function seasonFocusTier(season: QuestSeasonView) {
   return (
@@ -835,27 +828,17 @@ function SeasonStepBar({
 
 function QuestSeasonBanner({
   season,
-  rewardCatalog,
-  isPremium,
   onView,
 }: {
   season: QuestSeasonView;
-  rewardCatalog: Record<string, ItemDef>;
-  isPremium: boolean;
   onView: () => void;
 }) {
   const timeLeft = useSeasonCountdown(season.endsAt);
-  const focusTier = seasonFocusTier(season);
-  const focusEntry = seasonTierEntry(season, focusTier);
-  const previewReward =
-    focusEntry?.freeRewards?.[0] ?? focusEntry?.premiumRewards?.[0];
-  const seasonComplete =
-    season.tier >= season.tierCount && season.claimableCount === 0;
-  const goal = Math.max(1, season.dailyTaskGoal);
+  const waiting = season.claimableCount;
 
   return (
     <section className="relative">
-      <div className="relative h-[372px] overflow-hidden md:h-[340px]">
+      <div className="relative h-[calc(300px+env(safe-area-inset-top))] overflow-hidden md:h-[340px]">
         {hasSeasonCover(season.images) ? (
           <SeasonCoverImage
             images={season.images}
@@ -865,127 +848,43 @@ function QuestSeasonBanner({
         ) : (
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_88%)]" />
-        <div className="absolute inset-x-0 top-[calc(3rem+env(safe-area-inset-top))] flex justify-center p-4 md:top-[4.5rem]">
-          <div className="flex flex-col items-center gap-3 md:gap-2">
-            <span
-              className="inline-flex items-center gap-1.5 text-base leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)] sm:text-lg md:text-xl"
-              style={{
-                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.95)',
-                paintOrder: 'stroke fill',
-              }}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="rgb(15 23 42)"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" fill="white" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              {timeLeft}
-            </span>
-            <h2
-              className="max-w-[calc(100%-2rem)] text-center text-4xl leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl md:max-w-[38rem] md:text-5xl"
-              style={{
-                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
-                paintOrder: 'stroke fill',
-              }}
-            >
-              {season.name}
-            </h2>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 -mt-[68px] px-3 md:-mt-14 md:px-6">
-        <StatusDock>
-          <div
-            data-dock-row
-            role="button"
-            tabIndex={0}
-            aria-label={
-              season.claimable ? 'Claim season rewards' : 'See season rewards'
-            }
-            onClick={onView}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              onView();
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[calc(5.5rem+env(safe-area-inset-top))] bg-[linear-gradient(to_bottom,rgba(15,23,42,0.28),transparent)]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)]" />
+        <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-8 md:gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-950/40 py-1 pl-1.5 pr-2.5 text-[12px] font-black tabular-nums leading-none text-white backdrop-blur-sm md:text-[13px]">
+            <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+            {timeLeft}
+          </span>
+          <h2
+            className="max-w-[20rem] text-balance text-center text-[24px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.95)] md:max-w-[38rem] md:text-5xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)]"
+            style={{
+              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+              WebkitTextStroke: '2px rgba(15, 23, 42, 0.95)',
+              paintOrder: 'stroke fill',
             }}
-            className={cn(
-              statusDockRowClass(season.claimable ? 'ready' : 'idle'),
-              'rounded-[19px] border-t-0 py-3 md:flex-1 md:rounded-[19px] md:border-l-0',
-            )}
           >
-            <span className="relative h-12 w-12 shrink-0">
-              {seasonComplete ? (
-                <span className="grid h-full w-full place-items-center rounded-2xl bg-[#447d3f] text-white">
-                  <Check className="h-6 w-6" strokeWidth={4} />
-                </span>
-              ) : previewReward ? (
-                <SeasonRewardPreview
-                  reward={previewReward}
-                  rewardCatalog={rewardCatalog}
-                  isPremium={isPremium}
-                  showRays
-                  className="[&>div:first-child]:bg-muted/60"
-                />
-              ) : (
-                <span className="grid h-full w-full place-items-center rounded-2xl bg-muted/60">
-                  <Gift className="h-6 w-6 text-muted-foreground" />
-                </span>
-              )}
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-bold leading-tight text-foreground">
-                {season.claimable && (
-                  <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white">
-                    <Check className="h-2.5 w-2.5" strokeWidth={4} />
-                  </span>
-                )}
-                <span className="min-w-0 truncate">
-                  {seasonComplete
-                    ? 'Season complete!'
-                    : season.claimableCount > 0
-                      ? `Tier ${focusTier} unlocked!`
-                      : `Tier ${season.tier} of ${season.tierCount}`}
-                </span>
+            {season.name}
+          </h2>
+        </div>
+        <div className="absolute inset-x-0 bottom-9 flex justify-center md:bottom-10">
+          <button
+            type="button"
+            onClick={onView}
+            aria-label={
+              waiting > 0
+                ? `View event, ${waiting} ${waiting === 1 ? 'reward' : 'rewards'} ready`
+                : 'View event'
+            }
+            className="relative h-11 touch-manipulation rounded-full bg-[#f28c1e] px-7 text-[16px] font-black text-white shadow-[0_4px_0_#b45309,0_12px_24px_-8px_rgba(15,23,42,0.55)] transition-[transform,box-shadow] duration-100 [text-shadow:0_1px_0_rgba(0,0,0,0.18)] active:translate-y-[4px] active:shadow-[0_0_0_#b45309,0_6px_14px_-8px_rgba(15,23,42,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#f28c1e]"
+          >
+            View Event
+            {waiting > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full bg-rose-500 px-1.5 text-[12px] font-black tabular-nums leading-none text-white ring-2 ring-white [text-shadow:none]">
+                {waiting}
               </span>
-              {seasonComplete ? (
-                <span className="text-[12.5px] font-semibold text-muted-foreground">
-                  All {season.tierCount} tiers claimed
-                </span>
-              ) : (
-                <QuestTrack
-                  progress={Math.min(season.tasksToday, goal)}
-                  target={goal}
-                  size="lg"
-                  action={
-                    season.claimable
-                      ? {
-                          label:
-                            season.claimableCount > 1
-                              ? `Claim ${season.claimableCount}`
-                              : 'Claim',
-                          onPress: onView,
-                        }
-                      : null
-                  }
-                />
-              )}
-            </div>
-            {!season.claimable && (
-              <QuestGoButton onPress={onView} label="See season rewards" />
             )}
-          </div>
-        </StatusDock>
+          </button>
+        </div>
       </div>
     </section>
   );

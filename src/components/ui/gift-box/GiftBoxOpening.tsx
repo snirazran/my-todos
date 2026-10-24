@@ -21,7 +21,7 @@ import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox, GiftRive } from './GiftBox';
 import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
-import { BonusOfferButton, RewardCard, SkipAdsLink } from './RewardCard';
+import { BonusHeroButton, type BonusPart, FlyGlyph, RewardCard, SkipAdsLink } from './RewardCard';
 import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
 import { queueFirstGiftPaywall } from '@/lib/plus/firstGiftPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
@@ -36,16 +36,24 @@ type PrizeMeta = {
   tierBumped: boolean;
 };
 
+export type GiftFlyBundle = {
+  flies: number;
+  claimId: string;
+  onDoubled: (amount: number, balanceAfter: number | undefined, source: DOMRect | null) => void;
+};
+
 export default function GiftBoxOpening({
   onClose,
   onWin,
   giftBoxId = 'gift_box_1',
   paused = false,
+  bundle,
 }: {
   onClose: () => void;
   onWin?: (item: ItemDef) => void;
   giftBoxId?: string;
   paused?: boolean;
+  bundle?: GiftFlyBundle;
 }) {
   const { user } = useAuth();
   useAutoPopupHold('gift-opening', true);
@@ -61,6 +69,7 @@ export default function GiftBoxOpening({
   const [revealCount, setRevealCount] = useState(0);
   const [adBusy, setAdBusy] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
+  const [bundleUsed, setBundleUsed] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [showPlusOffer, setShowPlusOffer] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('gift_double');
@@ -185,8 +194,10 @@ export default function GiftBoxOpening({
     onClose();
   };
 
-  const handleDouble = async (viaPlus = false) => {
-    if (adBusy || !doubleClaimId) return;
+  const flies = bundle && !bundleUsed ? bundle : null;
+
+  const handleDouble = async (viaPlus = false, source: DOMRect | null = null) => {
+    if (adBusy || (!doubleClaimId && !flies)) return;
     setAdBusy(true);
     setAdError(null);
     try {
@@ -199,8 +210,26 @@ export default function GiftBoxOpening({
           return;
         }
       }
+      if (!doubleClaimId && flies) {
+        const res = await fetch('/api/rewards/double', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claimId: flies.claimId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.granted) {
+          if (!viaPlus) creditRewardedAd('gift_double');
+          setAdError('Could not double your flies — try again later.');
+          return;
+        }
+        setBundleUsed(true);
+        flies.onDoubled(flies.flies, data.summary?.flyBalanceAfter, source);
+        if (takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('gift_double'));
+        return;
+      }
       const claimId = doubleClaimId;
       setDoubleClaimId(null);
+      if (flies) setBundleUsed(true);
       setPhase('shaking');
       const animationPromise = new Promise((resolve) =>
         setTimeout(resolve, 1500),
@@ -208,9 +237,12 @@ export default function GiftBoxOpening({
       const apiPromise = fetch('/api/skins/open-gift/double', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId }),
+        body: JSON.stringify({ claimId, flyClaimId: flies?.claimId }),
       }).then((res) => res.json());
       const [, data] = await Promise.all([animationPromise, apiPromise]);
+      if (flies && data.flies?.fliesGranted) {
+        flies.onDoubled(data.flies.fliesGranted, data.flies.flyBalanceAfter, source);
+      }
       if (data.granted && data.prize) {
         setIsBonusReveal(true);
         setRevealCount((c) => c + 1);
@@ -244,6 +276,11 @@ export default function GiftBoxOpening({
     void handleOpen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
+
+  const bonusParts: BonusPart[] = [
+    ...(doubleClaimId ? [{ kind: 'gift' as const, amount: 1 }] : []),
+    ...(flies ? [{ kind: 'flies' as const, amount: flies.flies }] : []),
+  ];
 
   const giftDef = byId[giftBoxId];
   const giftColor = giftDef?.riveIndex ?? 0;
@@ -351,39 +388,53 @@ export default function GiftBoxOpening({
                 bonusAfterChoice
                 spareCount={prizeMeta?.duplicate ? prizeMeta.owned : undefined}
                 bonus={
-                  user && doubleClaimId ? (
-                    <>
-                      <BonusOfferButton
-                        mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
-                        visual={
-                          <span className="pointer-events-none absolute -top-[14px] left-1/2 h-[56px] w-[42px] -translate-x-1/2">
-                            <GiftRive color={giftColor} className="h-full w-full" />
-                          </span>
-                        }
-                        title="Open another gift"
-                        busy={adBusy}
-                        busyLabel="Loading ad..."
-                        onClick={() => {
-                          if (rewardedAdsAvailable()) void handleDouble();
-                          else openPlusOffer('gift_double');
-                        }}
-                      />
-                      {rewardedAdsAvailable() && (
-                        <SkipAdsLink
-                          quiet
-                          label="Skip the ad with Plus"
-                          placement="gift_double"
-                          disabled={adBusy}
-                          onClick={() => openPlusOffer(skipAdsPlacement('gift_double'))}
-                        />
-                      )}
-                      {adError && (
-                        <p className="text-center text-xs font-bold text-red-300">
-                          {adError}
-                        </p>
-                      )}
-                    </>
-                  ) : undefined
+                  user && (doubleClaimId || flies)
+                    ? [
+                        <BonusHeroButton
+                          key="hero"
+                          mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
+                          visual={
+                            doubleClaimId ? (
+                              <GiftRive color={giftColor} className="h-full w-full" />
+                            ) : (
+                              <span className="flex h-full w-full items-end justify-center pb-1.5">
+                                <FlyGlyph />
+                              </span>
+                            )
+                          }
+                          title={
+                            flies
+                              ? doubleClaimId
+                                ? 'Double it all'
+                                : 'Double your flies'
+                              : 'Open another gift'
+                          }
+                          parts={flies ? bonusParts : undefined}
+                          busy={adBusy}
+                          busyLabel="Loading ad..."
+                          onClick={(event) => {
+                            const source = event.currentTarget.getBoundingClientRect();
+                            if (rewardedAdsAvailable()) void handleDouble(false, source);
+                            else openPlusOffer('gift_double');
+                          }}
+                        />,
+                        rewardedAdsAvailable() ? (
+                          <SkipAdsLink
+                            key="plus"
+                            featured
+                            label="Skip the ad with Plus"
+                            placement="gift_double"
+                            disabled={adBusy}
+                            onClick={() => openPlusOffer(skipAdsPlacement('gift_double'))}
+                          />
+                        ) : null,
+                        adError ? (
+                          <p key="error" className="mb-1 text-center text-xs font-bold text-red-300">
+                            {adError}
+                          </p>
+                        ) : null,
+                      ]
+                    : undefined
                 }
               />
             </motion.div>
@@ -408,7 +459,7 @@ export default function GiftBoxOpening({
         open={showPlusOffer}
         placement={plusPlacement}
         onStartTrial={async () => {
-          if (doubleClaimId) await handleDouble(true);
+          if (doubleClaimId || flies) await handleDouble(true);
         }}
         onClose={() => setShowPlusOffer(false)}
       />
