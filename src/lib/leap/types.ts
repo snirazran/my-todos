@@ -126,6 +126,10 @@ export type LeapWeekResult = {
   shieldsLeft: number;
   weeksSettled: number;
   firstWeek?: boolean;
+  moveUpAt?: number;
+  stayAt?: number;
+  newItemIds?: string[];
+  newBackgroundIds?: string[];
 };
 
 export type LeapJoin = { weekKey: string; giftIds: string[] };

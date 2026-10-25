@@ -88,7 +88,7 @@ import {
   isSavedDropHidden,
 } from '@/lib/tour/plannerTour';
 import { useNotification } from '@/components/providers/NotificationProvider';
-import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { isFocusWrapUp, useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
@@ -1108,6 +1108,7 @@ export default function TaskBoard({
     const isRehydrationArtifact = Date.now() - boardMountTimeRef.current < 4000;
     lastHandledCompletionRef.current = lastCompletionId;
     if (isRehydrationArtifact) return;
+    if (isFocusWrapUp(useFrogodoroStore.getState())) return;
 
     if (useSheetStore.getState().count > 0) return;
     if (

@@ -177,13 +177,13 @@ const RESULT_BASE: Omit<LeapWeekResult, 'outcome' | 'leagueBefore' | 'leagueAfte
 
 export const LEAP_LAB_RESULTS: Array<{ label: string; result: LeapWeekResult }> = (
   [
-    ['Advanced', 'up', 1, 2, { newBest: true }],
-    ['First week, advanced', 'up', 0, 1, { newBest: true, firstWeek: true, hops: 9, scheduled: 12 }],
-    ['First week, stayed', 'stay', 0, 0, { firstWeek: true, hops: 4, scheduled: 12, fliesGranted: 18, grantedItemIds: ['gift_box_1'] }],
-    ['Stayed on top', 'top', 4, 4, {}],
-    ['Stayed', 'stay', 2, 2, { hops: 8 }],
-    ['Lily Pad saved it', 'covered', 3, 3, { hops: 2, shieldsLeft: 0 }],
-    ['Demoted', 'down', 3, 2, { hops: 1, fliesGranted: 2, grantedItemIds: [] }],
+    ['Advanced', 'up', 1, 2, { newBest: true, moveUpAt: 12, stayAt: 7, newItemIds: ['gift_box_rare'] }],
+    ['First week, advanced', 'up', 0, 1, { newBest: true, firstWeek: true, hops: 9, scheduled: 12, moveUpAt: 6, newItemIds: ['gift_box_1'] }],
+    ['First week, stayed', 'stay', 0, 0, { firstWeek: true, hops: 4, scheduled: 12, moveUpAt: 6, fliesGranted: 18, grantedItemIds: ['gift_box_1'] }],
+    ['Stayed on top', 'top', 4, 4, { moveUpAt: 14, stayAt: 7 }],
+    ['Stayed', 'stay', 2, 2, { hops: 8, moveUpAt: 12, stayAt: 7 }],
+    ['Lily Pad saved it', 'covered', 3, 3, { hops: 2, shieldsLeft: 0, moveUpAt: 13, stayAt: 7 }],
+    ['Demoted', 'down', 3, 2, { hops: 1, fliesGranted: 2, grantedItemIds: [], moveUpAt: 13, stayAt: 7 }],
   ] as Array<[string, LeapWeekOutcome, number, number, Partial<LeapWeekResult>]>
 ).map(([label, outcome, leagueBefore, leagueAfter, extra]) => ({
   label,
@@ -197,9 +197,18 @@ export const LEAP_LAB_RESULTS: Array<{ label: string; result: LeapWeekResult }> 
   },
 }));
 
-export function labHop(
-  kind: 'hop' | 'comeback' | 'lucky' | 'first' | 'hold' | 'leap' | 'top',
-): LeapHopResult {
+export type LeapLabHopKind =
+  | 'early'
+  | 'hop'
+  | 'stay'
+  | 'comeback'
+  | 'lucky'
+  | 'first'
+  | 'hold'
+  | 'leap'
+  | 'top';
+
+export function labHop(kind: LeapLabHopKind): LeapHopResult {
   const grant = { fliesGranted: 0, grantedItemIds: [], grantedBackgroundIds: [], shieldsGranted: 0 };
   const base: LeapHopResult = {
     hops: 1,
@@ -220,7 +229,18 @@ export function labHop(
     isPremium: false,
     catalog: {},
   };
+  const leaf = {
+    league: 0,
+    leagueLabel: 'Lily Leaf',
+    nextLeagueLabel: 'Lily Bud',
+  };
   switch (kind) {
+    case 'early':
+      return { ...base, ...leaf, meter: { hops: 2, target: 8, holdTarget: 0, reached: [] } };
+    case 'hop':
+      return { ...base, ...leaf, meter: { hops: 5, target: 8, holdTarget: 0, reached: [] } };
+    case 'stay':
+      return base;
     case 'comeback':
       return { ...base, comebackFlies: 6 };
     case 'lucky':

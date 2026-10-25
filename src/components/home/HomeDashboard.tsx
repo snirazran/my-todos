@@ -75,7 +75,7 @@ import {
   HungerStatus,
 } from '@/hooks/useTaskData';
 import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
-import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { isFocusWrapUp, useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
@@ -492,6 +492,7 @@ export default function HomeDashboard() {
     const isRehydrationArtifact = Date.now() - homeMountTimeRef.current < 4000;
     lastHandledTimerCompletionRef.current = lastCompletionId;
     if (isRehydrationArtifact) return;
+    if (isFocusWrapUp(useFrogodoroStore.getState())) return;
 
     // Prefer this page's own (richer) Frogodoro popup when nothing is blocking
     // it. If another popup/menu is open, leave it to the global completion popup

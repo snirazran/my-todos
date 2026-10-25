@@ -613,7 +613,7 @@ export function BonusHeroButton({
 
         <span aria-hidden className="relative h-11 w-11 shrink-0">
           <span className="absolute inset-0 rounded-full bg-white/30 shadow-[inset_0_-3px_0_rgba(0,0,0,0.1)]" />
-          <span className="pointer-events-none absolute bottom-[13px] left-1/2 -ml-[31px] h-[82px] w-[62px] drop-shadow-[0_3px_3px_rgba(0,0,0,0.25)]">
+          <span className="pointer-events-none absolute bottom-[3px] left-1/2 -ml-[25px] h-[68px] w-[50px] drop-shadow-[0_3px_3px_rgba(0,0,0,0.25)]">
             {visual}
           </span>
         </span>

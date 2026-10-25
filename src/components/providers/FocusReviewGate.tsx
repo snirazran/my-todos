@@ -1,14 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import useSWR from 'swr';
 import {
-  FocusReviewSheet,
+  FocusWrapUp,
   type PendingReview,
   type ReviewOutcome,
-} from '@/components/ui/FocusReviewSheet';
+  type WrapUpOrigin,
+  type WrapUpScene,
+} from '@/components/ui/FocusWrapUp';
 import {
   SESSION_ENDED_EVENT,
+  endedSessionDetail,
+  isFocusWrapUp,
   useFrogodoroStore,
   type SessionEndedDetail,
 } from '@/lib/frogodoroStore';
@@ -17,6 +28,21 @@ import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 type ReviewResponse = { session?: PendingReview | null };
 
 const MIN_REVIEWABLE_FOCUS_SECONDS = 60;
+const RETURN_WINDOW_MS = 8000;
+const DEEP_FOCUS_MIN_SECONDS = 15 * 60;
+
+function focusCardOrigin(): WrapUpOrigin | null {
+  const card = document.querySelector<HTMLElement>('[data-focus-card]');
+  if (!card) return null;
+  const rect = card.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  return {
+    top: Math.max(0, rect.top),
+    right: Math.max(0, window.innerWidth - rect.right),
+    bottom: Math.max(0, window.innerHeight - rect.bottom),
+    left: Math.max(0, rect.left),
+  };
+}
 
 // The bookkeeping half of ending a session. The "what next" half is answerable
 // from the island, so a phone user has already chosen break-or-stop out there;
@@ -25,14 +51,19 @@ const MIN_REVIEWABLE_FOCUS_SECONDS = 60;
 export function FocusReviewGate() {
   const [open, setOpen] = useState(false);
   const [review, setReview] = useState<PendingReview | null>(null);
+  const [scene, setScene] = useState<WrapUpScene | null>(null);
   const [endedHere, setEndedHere] = useState<PendingReview | null>(null);
   const dismissedRef = useRef<Set<string>>(new Set());
+  const returnedAtRef = useRef(Date.now());
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     [],
   );
   const openSheets = useFrogodoroUiStore((state) => state.openSheets);
+  const setWrapUpOpen = useFrogodoroUiStore((state) => state.setWrapUpOpen);
+  const focusWrapUp = useFrogodoroStore(isFocusWrapUp);
+  const awaitingDone = useFrogodoroStore((state) => state.awaitingDone);
 
   const { data, mutate: refresh } = useSWR<ReviewResponse>(
     `/api/frogodoro/review?timezone=${encodeURIComponent(timezone)}`,
@@ -41,13 +72,63 @@ export function FocusReviewGate() {
   );
 
   useEffect(() => {
+    setWrapUpOpen(open);
+  }, [open, setWrapUpOpen]);
+  useEffect(() => () => setWrapUpOpen(false), [setWrapUpOpen]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') returnedAtRef.current = Date.now();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  const acknowledge = useCallback(() => {
+    const store = useFrogodoroStore.getState();
+    if (!isFocusWrapUp(store)) return;
+    store.setAwaitingDone(false);
+    store.stopTimer();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!focusWrapUp || open) return;
+    const ended = endedSessionDetail();
+    if (!ended || dismissedRef.current.has(ended.id)) {
+      acknowledge();
+      return;
+    }
+    const store = useFrogodoroStore.getState();
+    setReview({ ...ended, subjectTags: [] });
+    setScene({
+      later: Date.now() - returnedAtRef.current < RETURN_WINDOW_MS / 2,
+      origin: focusCardOrigin(),
+      sessionFocusSeconds: store.sessionStats.focusTime,
+      bonusFly:
+        store.deepFocus &&
+        !store.lastPhasePaused &&
+        store.lastFocusElapsed >= DEEP_FOCUS_MIN_SECONDS,
+      nextLocked: false,
+    });
+    setEndedHere(null);
+    setOpen(true);
+  }, [focusWrapUp, open, acknowledge]);
+
+  useEffect(() => {
     const pending = endedHere ?? data?.session;
     if (!pending || open) return;
     if (dismissedRef.current.has(pending.id)) return;
-    if (openSheets > 0) return;
+    if (openSheets > 0 || awaitingDone) return;
     setReview(pending);
+    setScene({
+      later: !endedHere && Date.now() - returnedAtRef.current < RETURN_WINDOW_MS,
+      origin: null,
+      sessionFocusSeconds: null,
+      bonusFly: false,
+      nextLocked: useFrogodoroStore.getState().timerActive,
+    });
     setOpen(true);
-  }, [endedHere, data?.session, open, openSheets]);
+  }, [endedHere, data?.session, open, openSheets, awaitingDone]);
 
   useEffect(() => {
     const onSessionEnded = (event: Event) => {
@@ -69,12 +150,15 @@ export function FocusReviewGate() {
 
   const handleOutcome = useCallback(
     (outcome: ReviewOutcome) => {
+      acknowledge();
       if (review) dismissedRef.current.add(review.id);
       setEndedHere(null);
+      setOpen(false);
       const store = useFrogodoroStore.getState();
       if (outcome.kind === 'break') {
         store.rotateSession();
         store.startBreak(outcome.seconds);
+        store.setPhaseElapsedResult('focus', 0);
       } else if (outcome.kind === 'focus') {
         store.rotateSession();
         store.setFocusMinutes(outcome.seconds / 60);
@@ -82,14 +166,15 @@ export function FocusReviewGate() {
       }
       void refresh();
     },
-    [review, refresh],
+    [review, refresh, acknowledge],
   );
 
   return (
-    <FocusReviewSheet
+    <FocusWrapUp
       open={open}
-      onOpenChange={setOpen}
       review={review}
+      scene={scene}
+      onAcknowledge={acknowledge}
       onOutcome={handleOutcome}
     />
   );

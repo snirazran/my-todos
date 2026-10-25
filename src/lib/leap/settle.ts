@@ -165,6 +165,8 @@ export async function settleLeapWeeks(args: {
   };
   let result: LeapWeekResult | null = null;
   let weeksSettled = 0;
+  const newItemIds: string[] = [];
+  const newBackgroundIds: string[] = [];
   const weekDocs = await LeapWeekModel.find({
     userId,
     weekKey: { $gte: first, $lte: lastWeek },
@@ -300,9 +302,13 @@ export async function settleLeapWeeks(args: {
     }
 
     weeksSettled += 1;
+    newItemIds.push(...grant.grantedItemIds);
+    newBackgroundIds.push(...grant.grantedBackgroundIds);
     if (outcome === 'quiet') continue;
     const firstWeek = played === 0;
     played += 1;
+    const leapLine = targets.find((mark) => mark.id === 'leap');
+    const holdLine = targets.find((mark) => mark.id === 'hold');
     result = {
       weekKey: week,
       outcome,
@@ -316,11 +322,15 @@ export async function settleLeapWeeks(args: {
       shieldsLeft: 0,
       weeksSettled,
       firstWeek,
+      moveUpAt: leapLine?.available ? leapLine.target : 0,
+      stayAt: holdLine?.available ? holdLine.target : 0,
     };
   }
 
   if (result) {
     result.weeksSettled = weeksSettled;
+    result.newItemIds = newItemIds;
+    result.newBackgroundIds = newBackgroundIds;
     result.shieldsLeft = (await readShields()).count;
     state.pendingResult = result;
   }

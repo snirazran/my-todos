@@ -18,6 +18,10 @@ interface FrogodoroUiState {
   removeOpenSheet: () => void;
   suppressedCompletionId: number | null;
   suppressCompletionPopup: (completionId: number) => void;
+  // The focus wrap-up covers the whole screen; an open timer sheet steps out
+  // from underneath it instead of sliding away on its own.
+  wrapUpOpen: boolean;
+  setWrapUpOpen: (open: boolean) => void;
 }
 
 // Deliberately NOT persisted — it's transient mount state.
@@ -37,4 +41,6 @@ export const useFrogodoroUiStore = create<FrogodoroUiState>((set) => ({
   suppressedCompletionId: null,
   suppressCompletionPopup: (completionId) =>
     set({ suppressedCompletionId: completionId }),
+  wrapUpOpen: false,
+  setWrapUpOpen: (open) => set({ wrapUpOpen: open }),
 }));

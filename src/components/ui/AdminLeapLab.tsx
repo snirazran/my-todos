@@ -17,25 +17,39 @@ import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { LeapDayContent, LeapDaySheet } from '@/components/leap/LeapDaySheet';
 import { LeapJoinContent, LeapJoinSheet } from '@/components/leap/LeapJoinSheet';
 import { announceLeapHop, buildLeapHopToast } from '@/components/leap/leapHopToast';
+import { LeapZoneContent, LeapZoneSheet } from '@/components/leap/LeapZoneSheet';
 import {
   LEAP_LAB_JOINS,
   LEAP_LAB_RESULTS,
   LEAP_LAB_SCENARIOS,
   labHop,
+  type LeapLabHopKind,
 } from '@/lib/leap/labScenarios';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import type { LeapView, LeapWeekResult } from '@/lib/leap/types';
 import { cn } from '@/lib/utils';
 
-const HOP_KINDS = [
-  ['Plain hop', 'hop'],
+const HOP_KINDS: Array<[string, LeapLabHopKind]> = [
+  ['Early in the week', 'early'],
+  ['Past halfway', 'hop'],
+  ['Below the stay line', 'stay'],
   ['Comeback', 'comeback'],
   ['Lucky flies', 'lucky'],
-  ['First habit ever', 'first'],
   ['Out of the demotion zone', 'hold'],
-  ['Promotion zone', 'leap'],
-  ['Top prize', 'top'],
-] as const;
+];
+
+type MomentPick =
+  | { kind: 'join'; index: number }
+  | { kind: 'zone'; hop: 'leap' | 'top' }
+  | { kind: 'result'; index: number };
+
+function PhoneFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative flex h-[780px] w-[390px] max-w-full shrink-0 flex-col overflow-hidden rounded-[40px] border-[6px] border-foreground/85 bg-background shadow-xl">
+      {children}
+    </div>
+  );
+}
 
 const SAMPLE_TAGS = [
   { id: 'lab-fitness', name: 'Fitness', color: '#8b5cf6' },
@@ -116,6 +130,9 @@ export function AdminLeapLab() {
   const [catalog, setCatalog] = useState<Record<string, unknown>>({});
   const [result, setResult] = useState<LeapWeekResult | null>(null);
   const [joinIndex, setJoinIndex] = useState<number | null>(null);
+  const [zoneHop, setZoneHop] = useState<'leap' | 'top' | null>(null);
+  const [pick, setPick] = useState<MomentPick>({ kind: 'join', index: 0 });
+  const [pickKey, setPickKey] = useState(0);
 
   useEffect(() => {
     void fetch('/api/admin/leap')
@@ -145,6 +162,72 @@ export function AdminLeapLab() {
     [catalog],
   );
   const openJoin = joinIndex === null ? null : joins[joinIndex];
+  const zoneResult = (hop: 'leap' | 'top') => ({ ...labHop(hop), catalog });
+  const choose = (next: MomentPick) => {
+    setPick(next);
+    setPickKey((key) => key + 1);
+  };
+  const playPick = () => {
+    if (pick.kind === 'join') setJoinIndex(pick.index);
+    else if (pick.kind === 'zone') setZoneHop(pick.hop);
+    else setResult(LEAP_LAB_RESULTS[pick.index]?.result ?? null);
+  };
+  const moments: Array<{ label: string; value: MomentPick }> = [
+    ...joins.map((entry, index) => ({
+      label: `Join: ${entry.label}`,
+      value: { kind: 'join' as const, index },
+    })),
+    { label: 'Promotion zone reached', value: { kind: 'zone', hop: 'leap' } },
+    { label: 'Top prize reached', value: { kind: 'zone', hop: 'top' } },
+    ...LEAP_LAB_RESULTS.map((entry, index) => ({
+      label: `Results: ${entry.label}`,
+      value: { kind: 'result' as const, index },
+    })),
+  ];
+  const samePick = (a: MomentPick, b: MomentPick) => JSON.stringify(a) === JSON.stringify(b);
+  const renderMoment = (wide: boolean) => {
+    const key = `${pickKey}-${wide ? 'web' : 'phone'}`;
+    if (pick.kind === 'join' && joins[pick.index]) {
+      return (
+        <LeapJoinContent
+          key={key}
+          join={joins[pick.index].join}
+          view={joins[pick.index].view}
+          active
+          quiet
+          wide={wide}
+          onClose={() => {}}
+        />
+      );
+    }
+    if (pick.kind === 'zone') {
+      return (
+        <LeapZoneContent
+          key={key}
+          result={zoneResult(pick.hop)}
+          view={resultView}
+          active
+          quiet
+          wide={wide}
+          onClose={() => {}}
+        />
+      );
+    }
+    if (pick.kind === 'result' && LEAP_LAB_RESULTS[pick.index]) {
+      return (
+        <LeapDayContent
+          key={key}
+          result={LEAP_LAB_RESULTS[pick.index].result}
+          view={resultView}
+          active
+          quiet
+          wide={wide}
+          onClose={() => {}}
+        />
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="mx-auto max-w-[1300px] space-y-10 px-4 py-8">
@@ -226,7 +309,10 @@ export function AdminLeapLab() {
         ))}
       </Section>
 
-      <Section title="Hop toasts" note="What appears when a habit is ticked. Play shows the real toast.">
+      <Section
+        title="Hop toasts"
+        note="What appears when a habit is ticked. The first habit, the promotion zone and the top prize open full-screen moments instead. Play shows the real toast."
+      >
         {HOP_KINDS.map(([label, kind]) => {
           const hop = { ...labHop(kind), catalog };
           const spec = buildLeapHopToast(hop);
@@ -238,7 +324,7 @@ export function AdminLeapLab() {
               >
                 <div className="min-w-0 flex-1 text-sm font-semibold">{spec?.content}</div>
                 {spec?.gifts.length ? (
-                  <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[13px] font-black text-primary">
+                  <span className="flex h-8 shrink-0 items-center rounded-full bg-white/20 px-3.5 text-sm font-black text-primary">
                     Open
                   </span>
                 ) : null}
@@ -256,56 +342,49 @@ export function AdminLeapLab() {
         })}
       </Section>
 
-      <Section
-        title="Joining the league"
-        note="Shown once, the first time a repeating task is ticked. It carries the first-habit gift."
-      >
-        {joins.map((entry, index) => (
-          <Frame key={entry.label} label={entry.label}>
-            <div className="rounded-[24px] bg-card px-4 pb-4 pt-5">
-              <LeapJoinContent
-                join={entry.join}
-                view={entry.view}
-                active
-                quiet
-                onClose={() => setJoinIndex(index)}
-              />
-            </div>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-[18px] font-black text-foreground">Full-screen moments</h2>
+          <p className="text-[13px] font-semibold text-muted-foreground">
+            Joining the league (once, first habit), reaching the promotion zone or top prize (once a week), and the
+            Monday results (once a week). Play opens the real full-screen version.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-start gap-6">
+          <PhoneFrame>{renderMoment(false)}</PhoneFrame>
+          <div className="flex max-w-[360px] flex-col gap-2">
+            {moments.map((moment) => (
+              <button
+                key={moment.label}
+                type="button"
+                onClick={() => choose(moment.value)}
+                className={cn(
+                  'rounded-xl px-3 py-2 text-left text-[13px] font-black transition',
+                  samePick(pick, moment.value)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/70 text-foreground hover:bg-muted',
+                )}
+              >
+                {moment.label}
+              </button>
+            ))}
             <button
               type="button"
-              onClick={() => setJoinIndex(index)}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[12px] font-black text-foreground"
+              onClick={playPick}
+              className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-[12.5px] font-black text-background"
             >
               <Play className="h-3 w-3 fill-current" />
-              Open as sheet
+              Play full screen
             </button>
-          </Frame>
-        ))}
-      </Section>
-
-      <Section title="Monday results" note="Shown once, the first time the app opens in a new week.">
-        {LEAP_LAB_RESULTS.map((entry) => (
-          <Frame key={entry.label} label={entry.label}>
-            <div className="rounded-[24px] bg-card px-4 pb-4 pt-5">
-              <LeapDayContent
-                result={entry.result}
-                view={resultView}
-                active
-                quiet
-                onClose={() => setResult(entry.result)}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setResult(entry.result)}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[12px] font-black text-foreground"
-            >
-              <Play className="h-3 w-3 fill-current" />
-              Open as sheet
-            </button>
-          </Frame>
-        ))}
-      </Section>
+          </div>
+        </div>
+        <p className="pt-2 text-[12px] font-black uppercase tracking-[0.06em] text-muted-foreground">
+          Web (1024px and wider)
+        </p>
+        <div className="relative flex h-[640px] w-full max-w-[1180px] flex-col overflow-hidden rounded-[20px] border-[6px] border-foreground/85 bg-background shadow-xl">
+          {renderMoment(true)}
+        </div>
+      </section>
 
       {openJoin && (
         <LeapJoinSheet
@@ -313,6 +392,15 @@ export function AdminLeapLab() {
           view={openJoin.view}
           open={!!openJoin}
           onClose={() => setJoinIndex(null)}
+        />
+      )}
+
+      {zoneHop && (
+        <LeapZoneSheet
+          result={zoneResult(zoneHop)}
+          view={resultView}
+          open={!!zoneHop}
+          onClose={() => setZoneHop(null)}
         />
       )}
 

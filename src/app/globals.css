@@ -1306,6 +1306,52 @@ body.dragging {
   --streak-dim: rgba(0, 0, 0, 0.3);
 }
 
+.leap-stage {
+  --leap-water: linear-gradient(
+    to bottom,
+    #f6fcf8 0%,
+    #e4f5ec 46%,
+    #c9ecdb 100%
+  );
+  --leap-glow: rgba(255, 228, 150, 0.6);
+  --leap-ring: rgba(46, 125, 88, 0.17);
+  --leap-burst: rgba(46, 140, 96, 0.55);
+  --leap-ink: #16351a;
+  --leap-ink-muted: rgba(22, 53, 26, 0.66);
+  --leap-eyebrow: #2f6b2c;
+  --leap-note: #b45309;
+  --leap-card: #ffffff;
+  --leap-card-line: rgba(31, 98, 28, 0.13);
+  --leap-card-shadow: rgba(31, 98, 28, 0.16);
+  --leap-track: rgba(22, 53, 26, 0.08);
+  --leap-divider: rgba(22, 53, 26, 0.09);
+  --leap-tick: #16351a;
+  --leap-chip: rgba(22, 53, 26, 0.06);
+}
+
+.dark .leap-stage {
+  --leap-water: linear-gradient(
+    to bottom,
+    #10251d 0%,
+    #0f2a20 46%,
+    #0a1d16 100%
+  );
+  --leap-glow: rgba(255, 205, 110, 0.13);
+  --leap-ring: rgba(150, 225, 185, 0.11);
+  --leap-burst: rgba(160, 235, 195, 0.45);
+  --leap-ink: #eaf4ec;
+  --leap-ink-muted: rgba(234, 244, 236, 0.64);
+  --leap-eyebrow: #8fc394;
+  --leap-note: #fcd34d;
+  --leap-card: #16301f;
+  --leap-card-line: rgba(142, 208, 127, 0.15);
+  --leap-card-shadow: rgba(0, 0, 0, 0.45);
+  --leap-track: rgba(255, 255, 255, 0.09);
+  --leap-divider: rgba(255, 255, 255, 0.08);
+  --leap-tick: #eaf4ec;
+  --leap-chip: rgba(255, 255, 255, 0.08);
+}
+
 .frog-bubble {
   filter: drop-shadow(0 0 0.6px rgba(15, 23, 42, 0.3)) drop-shadow(0 1px 1px rgba(15, 23, 42, 0.06))
     drop-shadow(0 8px 14px rgba(15, 23, 42, 0.14));

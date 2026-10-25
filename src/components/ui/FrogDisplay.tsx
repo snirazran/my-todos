@@ -14,6 +14,15 @@ import type { FrogSpeechContext } from '@/lib/frogSpeech';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { cn } from '@/lib/utils';
 import { prefetchQuests } from './QuestsPanel';
+import { useLeapView } from '@/components/leap/useLeapView';
+import {
+  leagueName,
+  leagueTitle,
+  leapCompeting,
+  leapLeft,
+  leapRepeating,
+  nextLeagueName,
+} from '@/components/leap/leapCopy';
 
 import { FrogBellyDeck } from './FrogBellyDeck';
 
@@ -127,6 +136,7 @@ export function FrogDisplay({
   }>(speechEnabled ? '/api/user' : null, bootstrapFetcher, {
     revalidateOnFocus: false,
   });
+  const { data: leapView } = useLeapView(speechEnabled);
 
   const speechFacts = React.useMemo<FrogSpeechContext>(() => {
     const rawName = profile?.name?.trim();
@@ -145,8 +155,17 @@ export function FrogDisplay({
           ? firstName
           : null,
       frogName: frogName && frogName.length <= 12 ? frogName : null,
+      ...(leapView?.enabled && leapRepeating(leapView)
+        ? {
+            leapLeft:
+              leapCompeting(leapView) && !leapView.week.leap.reached ? leapLeft(leapView) : 0,
+            leapNext: nextLeagueName(leapView),
+            leapLeague: leagueTitle(leagueName(leapView)),
+            leapWeekStart: leapView.week.todayKey === leapView.week.weekKey,
+          }
+        : {}),
     };
-  }, [profile, streakView, hunger, maxHunger]);
+  }, [profile, streakView, hunger, maxHunger, leapView]);
 
   const wardrobeBadge = unseenCount + unseenContainerCount;
 

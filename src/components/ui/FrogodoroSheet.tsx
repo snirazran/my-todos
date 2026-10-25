@@ -22,6 +22,7 @@ import {
   FOCUS_PRESETS,
   announceSessionEnded,
   endedSessionDetail,
+  isFocusWrapUp,
 } from '@/lib/frogodoroStore';
 import { DurationDial } from '@/components/ui/DurationDial';
 import {
@@ -45,7 +46,6 @@ import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { Bell, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
-import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { FocusScene } from '@/components/ui/FocusScene';
 import { FocusSubjectPanel } from '@/components/ui/FocusSubjectPicker';
 import {
@@ -201,6 +201,8 @@ function settledCatchesOf(s: TickState, focusFlyDaily?: FocusFlyDaily) {
 // Tongue offset + flight: long enough for the frog to land the grab before the
 // session tears down. The "+1" arc finishes after, over the now-idle card.
 const SETTLE_CATCH_MS = 1150;
+
+const WRAP_UP_HANDOFF_MS = 600;
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -423,10 +425,8 @@ export default function FrogodoroSheet({
     lastCompletedPhase,
     lastFocusElapsed,
     lastBreakElapsed,
-    lastPhasePaused,
     deepFocus,
     setDeepFocus,
-    extendFocus,
     pausedThisPhase,
   } = useFrogodoroStore(
     useShallow((s) => ({
@@ -452,10 +452,8 @@ export default function FrogodoroSheet({
       lastCompletedPhase: s.lastCompletedPhase,
       lastFocusElapsed: s.lastFocusElapsed,
       lastBreakElapsed: s.lastBreakElapsed,
-      lastPhasePaused: s.lastPhasePaused,
       deepFocus: s.deepFocus,
       setDeepFocus: s.setDeepFocus,
-      extendFocus: s.extendFocus,
       pausedThisPhase: s.pausedThisPhase,
     })),
   );
@@ -477,6 +475,19 @@ export default function FrogodoroSheet({
   );
   const addOpenSheet = useFrogodoroUiStore((s) => s.addOpenSheet);
   const removeOpenSheet = useFrogodoroUiStore((s) => s.removeOpenSheet);
+  const wrapUpOpen = useFrogodoroUiStore((s) => s.wrapUpOpen);
+  const wrapUpHandoff = isFocusWrapUp({ awaitingDone, lastCompletedPhase });
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
+  useEffect(() => {
+    if (!open || !wrapUpOpen) return;
+    const t = window.setTimeout(
+      () => onOpenChangeRef.current(false),
+      WRAP_UP_HANDOFF_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [open, wrapUpOpen]);
 
   const [previewingId, setPreviewingId] = useState<TimerSound | null>(null);
   const {
@@ -646,12 +657,12 @@ export default function FrogodoroSheet({
       // Dismissing the popup also acknowledges a finished session: silence the
       // alarm (GlobalTimer stops playback when this flips false) and end the
       // session so the next phase is left fresh rather than active.
-      if (awaitingDone) {
+      if (awaitingDone && !wrapUpHandoff) {
         setAwaitingDone(false);
         stopTimer();
       }
     }
-  }, [open, awaitingDone, setAwaitingDone, stopTimer]);
+  }, [open, awaitingDone, wrapUpHandoff, setAwaitingDone, stopTimer]);
 
   // Stop any sound preview when the picker closes
   useEffect(() => {
@@ -803,18 +814,6 @@ export default function FrogodoroSheet({
     announceSessionEnded(ended);
   };
 
-  // The end of a focus session, in the order the two halves belong: the sheet
-  // steps aside so the review can ask what got finished, and the break/keep-
-  // going choice lives on the far side of that.
-  const handleWrapUp = () => {
-    hapticImpact();
-    const ended = endedSessionDetail();
-    setAwaitingDone(false);
-    stopTimer();
-    onOpenChange(false);
-    announceSessionEnded(ended ? { ...ended, forceReview: true } : ended);
-  };
-
   // Stop ends the current session and stays on the popup (now idle), so you can
   // pick a mode and start a new session if you like.
   const performStop = async () => {
@@ -855,11 +854,6 @@ export default function FrogodoroSheet({
     void runGuarded(performStop);
   };
 
-  const handleKeepGoing = () => {
-    setAwaitingDone(false);
-    extendFocus(5 * 60);
-  };
-
   // Fast-forward means "I'm done now", not "skip to the break". It ends the
   // phase at the time actually focused and lands on the same wrap-up screen the
   // clock running out would — so the session is still reviewed, and the break
@@ -874,20 +868,7 @@ export default function FrogodoroSheet({
       onMutateToday?.();
     }
     hapticImpact();
-    const wasFocus = phase === 'focus';
-    if (wasFocus) {
-      useFrogodoroUiStore
-        .getState()
-        .suppressCompletionPopup(useFrogodoroStore.getState().lastCompletionId + 1);
-    }
     completePhase(false, liveElapsed, true, true);
-    if (wasFocus) {
-      const ended = endedSessionDetail();
-      setAwaitingDone(false);
-      stopTimer();
-      onOpenChange(false);
-      announceSessionEnded(ended ? { ...ended, forceReview: true } : ended);
-    }
   };
   const persistTaskSettings = async (settingsToSave: typeof DEFAULT_SETTINGS) => {
     if (selectedTaskId) {
@@ -953,10 +934,6 @@ export default function FrogodoroSheet({
   const breakSeconds = lastBreakElapsed;
 
   const soundIsSilent = normalizeTimerSound(settings.timerSound) === 'none';
-
-  const celebrateFocus = awaitingDone && displayPhase === 'focus' && !splitDone;
-  const deepFocusBonusEarned =
-    celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
 
   // Focused seconds this session (same store-derived formula the home hero
   // uses, so every surface shows the same swarm/caught count). The phase pays
@@ -1081,7 +1058,10 @@ export default function FrogodoroSheet({
               }}
               className="pointer-events-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)] will-change-transform"
             >
-              <div className="relative rounded-[28px] bg-popover shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
+              <div
+                data-focus-card
+                className="relative rounded-[28px] bg-popover shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden"
+              >
                 {/* Drag handle – mobile only. Overlaid so the timer view's
                     colour reaches the rounded top edge (no white strip). */}
                 {!isDesktop && (
@@ -1565,19 +1545,10 @@ export default function FrogodoroSheet({
                           </div>
                         ) : null}
 
-                        {/* Time Display — celebration payoff for a finished focus
-                            session, split focus/break summary with auto-start
-                            breaks, otherwise the single phase time/countdown. */}
-                        {celebrateFocus ? (
-                          <div className="mb-4">
-                            <FocusCelebration
-                              seconds={lastFocusElapsed}
-                              bonusFly={deepFocusBonusEarned}
-                              fliesCaught={fliesCaught}
-                              showFrog={false}
-                            />
-                          </div>
-                        ) : splitDone ? (
+                        {/* Time Display — split focus/break summary with
+                            auto-start breaks, otherwise the single phase
+                            time/countdown. */}
+                        {splitDone ? (
                           <div className="mb-4 flex items-stretch">
                             <div className="flex-1 text-center">
                               <p className="text-[13px] font-black text-white/80">Focus</p>
@@ -1735,10 +1706,9 @@ export default function FrogodoroSheet({
                           </div>
                         )}
 
-                        {/* Controls — a finished focus offers the break as the
-                            primary action (the natural next step), with +5 more
-                            and Done beside it. Any other completion just needs
-                            Done, which silences the alarm and ends the session. */}
+                        {/* Controls — a finished focus hands off to the wrap-up;
+                            any other completion just needs Done, which silences
+                            the alarm and ends the session. */}
                         {awaitingDone ? (
                           <div className="mt-20 flex flex-col items-center gap-3">
                             <div className="relative">
@@ -1758,41 +1728,17 @@ export default function FrogodoroSheet({
                                   )}
                                 </div>
                               </div>
-                              {celebrateFocus ? (
-                                <button
-                                  onClick={() => void runGuarded(handleWrapUp)}
-                                  disabled={actionBusy}
-                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-emerald-600 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color,color,opacity] active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-emerald-700 min-[380px]:px-10"
-                                >
-                                  <Check className="mr-1.5 h-5 w-5" />
-                                  WRAP UP
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => void runGuarded(handleDone)}
-                                  disabled={actionBusy}
-                                  className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
+                              <button
+                                onClick={() => void runGuarded(handleDone)}
+                                disabled={actionBusy || wrapUpHandoff}
+                                className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
  font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-[transform,box-shadow,background-color,color,opacity] ${getPhaseAccent()}`}
-                                >
-                                  <Check className="w-5 h-5 mr-1.5" />
-                                  DONE
-                                </button>
-                              )}
+                              >
+                                <Check className="w-5 h-5 mr-1.5" />
+                                DONE
+                              </button>
                             </div>
-
-                            {celebrateFocus && (
-                              <div className="flex items-center justify-center gap-2.5">
-                                <button
-                                  onClick={() => void runGuarded(handleKeepGoing)}
-                                  disabled={actionBusy}
-                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-[transform,box-shadow,background-color,color,opacity] hover:bg-white/30 active:scale-95"
-                                >
-                                  <Zap className="mr-1 h-3.5 w-3.5 fill-current" />
-                                  +5 MORE
-                                </button>
-                              </div>
-                            )}
                           </div>
                         ) : (
                         <div className="relative z-10 flex flex-col items-center gap-2.5">

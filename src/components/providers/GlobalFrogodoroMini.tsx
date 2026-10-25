@@ -4,19 +4,17 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Zap } from 'lucide-react';
+import { Check } from 'lucide-react';
 import {
   announceSessionEnded,
   endedSessionDetail,
+  isFocusWrapUp,
   useFrogodoroStore,
 } from '@/lib/frogodoroStore';
-import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { useInventory } from '@/hooks/useInventory';
-import { fliesCaughtFor, priorDayFocusSeconds } from '@/lib/focusFlies';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import CircularTimer from '@/components/ui/CircularTimer';
@@ -59,9 +57,6 @@ export default function GlobalFrogodoroMini() {
     sessionStats,
     setAwaitingDone,
     stopTimer,
-    deepFocus,
-    lastPhasePaused,
-    extendFocus,
   } = useFrogodoroStore(
     useShallow((s) => ({
       awaitingDone: s.awaitingDone,
@@ -73,9 +68,6 @@ export default function GlobalFrogodoroMini() {
       sessionStats: s.sessionStats,
       setAwaitingDone: s.setAwaitingDone,
       stopTimer: s.stopTimer,
-      deepFocus: s.deepFocus,
-      lastPhasePaused: s.lastPhasePaused,
-      extendFocus: s.extendFocus,
     })),
   );
 
@@ -90,10 +82,12 @@ export default function GlobalFrogodoroMini() {
 
   // A full sheet open already shows its own Done — don't stack the global one.
   const showDone =
-    awaitingDone && openSheets === 0 && !hostWillHandle && !loadingScreenVisible;
+    awaitingDone &&
+    !isFocusWrapUp({ awaitingDone, lastCompletedPhase }) &&
+    openSheets === 0 &&
+    !hostWillHandle &&
+    !loadingScreenVisible;
   const { indices: frogIndices } = useWardrobeIndices(showDone);
-  const { data: inventorySummary } = useInventory(showDone, true);
-  const focusFlyDaily = inventorySummary?.wardrobe?.focusFlyDaily;
   // Live frog mounts only after the card's pop-in settles (static stamp until
   // then) so the entrance never competes with Rive canvas setup.
   const [cardEntered, setCardEntered] = useState(false);
@@ -119,21 +113,6 @@ export default function GlobalFrogodoroMini() {
     stopTimer();
     announceSessionEnded(ended);
   };
-
-  const handleKeepGoing = () => {
-    setAwaitingDone(false);
-    extendFocus(5 * 60);
-  };
-
-  const celebrateFocus = displayPhase === 'focus' && !splitDone;
-  const bonusFly =
-    celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
-
-  const sessionFocus = sessionStats.focusTime;
-  const fliesCaught = fliesCaughtFor(
-    sessionFocus,
-    priorDayFocusSeconds(focusFlyDaily, sessionFocus),
-  );
 
   return (
     <>
@@ -185,17 +164,7 @@ export default function GlobalFrogodoroMini() {
                           Time&apos;s up!
                         </p>
 
-                        {celebrateFocus ? (
-                          <div className="mb-5">
-                            <FocusCelebration
-                              seconds={lastFocusElapsed}
-                              bonusFly={bonusFly}
-                              fliesCaught={fliesCaught}
-                              compact
-                              showFrog={false}
-                            />
-                          </div>
-                        ) : splitDone ? (
+                        {splitDone ? (
                           <div className="mb-5 flex">
                             <div className="flex-1 text-center">
                               <p className="text-[13px] font-black text-white/80">Focus</p>
@@ -217,15 +186,6 @@ export default function GlobalFrogodoroMini() {
                         )}
 
                         <div className="mt-20 flex items-end justify-center gap-2.5">
-                          {celebrateFocus && (
-                            <button
-                              onClick={handleKeepGoing}
-                              className="flex items-center justify-center gap-1 rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color,color,opacity] hover:bg-white/30 active:translate-y-1.5 active:shadow-none"
-                            >
-                              <Zap className="h-4 w-4 fill-current" />
-                              +5 more
-                            </button>
-                          )}
                           <div className="relative">
                             {/* Same perch as the full sheet's Done screen. */}
                             <div

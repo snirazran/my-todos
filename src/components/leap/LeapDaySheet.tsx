@@ -1,24 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
-import confetti from 'canvas-confetti';
-import { motion, useReducedMotion } from 'framer-motion';
-import { Check } from 'lucide-react';
-import { BaseSheet } from '@/components/ui/BaseSheet';
-import { FlyAmount } from '@/components/ui/FlyAmount';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
-import { hapticCelebrate } from '@/lib/haptics';
+import { useReducedMotion } from 'framer-motion';
+import {
+  enqueueQuestRewardReveal,
+  type RevealCatalog,
+} from '@/components/ui/questRewardReveal';
 import type { LeapView, LeapWeekResult } from '@/lib/leap/types';
-import { cn } from '@/lib/utils';
-import { leagueArt } from './leapCopy';
-
-const SPRING = { type: 'spring' as const, stiffness: 260, damping: 18 };
-
-const GIFT_RIVE_FALLBACKS: Record<string, number> = {
-  gift_box_1: 0,
-  gift_box_rare: 1,
-  gift_box_legendary: 2,
-};
+import { resultFrogLine } from './leapCopy';
+import { giftRiveIndexFor } from './LeapJoinSheet';
+import { LeapStage, LeapStageBody, LeapStageButton, type LeapStageProps } from './LeapStage';
+import { LeapWeekReceipt } from './LeapStagePanels';
 
 function labelFor(view: LeapView | undefined, index: number) {
   return view?.leagues[index]?.label ?? 'Lily';
@@ -40,9 +31,7 @@ function copyFor(result: LeapWeekResult, view: LeapView | undefined) {
     case 'up':
       return {
         title: `You advanced to the ${after} League!`,
-        body: upNext
-          ? `${result.firstWeek ? 'Your first week, done. ' : ''}Next up: the ${upNext} League.`
-          : "That's the top league!",
+        body: upNext ? `Next up: the ${upNext} League.` : "That's the top league!",
       };
     case 'top':
       return { title: 'You stayed on top!', body: `The ${after} League is still yours.` };
@@ -61,6 +50,85 @@ function copyFor(result: LeapWeekResult, view: LeapView | undefined) {
   }
 }
 
+export function revealLeapPrizes(result: LeapWeekResult, view: LeapView | undefined) {
+  const items = result.newItemIds ?? [];
+  const backgrounds = result.newBackgroundIds ?? [];
+  if (!view || (!items.length && !backgrounds.length)) return;
+  enqueueQuestRewardReveal(
+    { fliesGranted: 0, grantedItemIds: items, grantedBackgroundIds: backgrounds },
+    {
+      catalog: view.rewardCatalog as RevealCatalog,
+      isPremium: view.isPremium,
+      showFlyGainPill: false,
+    },
+  );
+}
+
+function useResultStage(
+  result: LeapWeekResult,
+  view: LeapView | undefined,
+  active: boolean,
+  onClose: (openPrize: boolean) => void,
+): LeapStageProps {
+  const reduceMotion = useReducedMotion();
+  const { title, body } = copyFor(result, view);
+  const gifts = result.grantedItemIds.filter((id) => id.startsWith('gift_box'));
+  const newPrizes = (result.newItemIds?.length ?? 0) + (result.newBackgroundIds?.length ?? 0);
+  const newGift = (result.newItemIds ?? []).some((id) => id.startsWith('gift_box'));
+  const leagues = view?.leagues.length
+    ? view.leagues.map((league) => league.label)
+    : [labelFor(view, result.leagueBefore)];
+  const stayAt = result.stayAt ?? 0;
+  const moveUpAt = result.moveUpAt ?? 0;
+  const stayLine = (result.outcome === 'down' || result.outcome === 'covered') && stayAt > 0;
+  return {
+    leagues,
+    from: view?.leagues.length ? result.leagueBefore : 0,
+    to: view?.leagues.length ? result.leagueAfter : 0,
+    eyebrow: 'Weekly Leap',
+    title,
+    body,
+    frogLine: resultFrogLine(result),
+    celebrate: result.outcome === 'up' || result.outcome === 'top',
+    panel: (
+      <LeapWeekReceipt
+        hops={result.hops}
+        scheduled={result.scheduled}
+        lineAt={stayLine ? stayAt : moveUpAt}
+        lineLabel={stayLine ? `${stayAt} to stay` : `${moveUpAt} to move up`}
+        flies={result.fliesGranted}
+        gifts={gifts.length}
+        giftColor={giftRiveIndexFor(view?.rewardCatalog ?? {}, gifts[0])}
+        paused={!active || !!reduceMotion}
+      />
+    ),
+    actions: (
+      <LeapStageButton onClick={() => onClose(newPrizes > 0)}>
+        {newPrizes > 0 ? (newGift ? 'Open your gift' : 'See your prize') : "Let's go"}
+      </LeapStageButton>
+    ),
+  };
+}
+
+export function LeapDayContent({
+  result,
+  view,
+  active,
+  onClose,
+  quiet = false,
+  wide = false,
+}: {
+  result: LeapWeekResult;
+  view: LeapView | undefined;
+  active: boolean;
+  onClose: (openPrize: boolean) => void;
+  quiet?: boolean;
+  wide?: boolean;
+}) {
+  const stage = useResultStage(result, view, active, onClose);
+  return <LeapStageBody {...stage} active={active} quiet={quiet} wide={wide} />;
+}
+
 export function LeapDaySheet({
   result,
   view,
@@ -70,181 +138,15 @@ export function LeapDaySheet({
   result: LeapWeekResult;
   view: LeapView | undefined;
   open: boolean;
-  onClose: () => void;
+  onClose: (openPrize: boolean) => void;
 }) {
+  const stage = useResultStage(result, view, open, onClose);
   return (
-    <BaseSheet
+    <LeapStage
+      {...stage}
       open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      zIndex={1320}
-      className="select-none sm:max-w-[420px]"
-      closeAriaLabel="Close"
-    >
-      {() => (
-        <div className="px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-5 sm:px-6 sm:pb-6 sm:pt-8">
-          <LeapDayContent result={result} view={view} active={open} onClose={onClose} />
-        </div>
-      )}
-    </BaseSheet>
-  );
-}
-
-export function LeapDayContent({
-  result,
-  view,
-  active,
-  onClose,
-  quiet = false,
-}: {
-  result: LeapWeekResult;
-  view: LeapView | undefined;
-  active: boolean;
-  onClose: () => void;
-  quiet?: boolean;
-}) {
-  const reduceMotion = useReducedMotion();
-  const climbed = result.outcome === 'up';
-  const celebrate = climbed || result.outcome === 'top';
-  const { title, body } = copyFor(result, view);
-  const giftIds = result.grantedItemIds.filter((id) => id.startsWith('gift_box'));
-  const giftCatalogItem = view?.rewardCatalog[giftIds[0]] as
-    | { riveIndex?: unknown }
-    | undefined;
-  const giftRiveIndex =
-    typeof giftCatalogItem?.riveIndex === 'number'
-      ? giftCatalogItem.riveIndex
-      : (GIFT_RIVE_FALLBACKS[giftIds[0]] ?? 0);
-
-  useEffect(() => {
-    if (!active || !celebrate || quiet) return;
-    const timer = window.setTimeout(() => {
-      hapticCelebrate();
-      if (!reduceMotion) {
-        void confetti({
-          particleCount: result.newBest ? 120 : 70,
-          spread: 70,
-          origin: { y: 0.5 },
-          zIndex: 2000,
-        });
-      }
-    }, climbed ? 1050 : 500);
-    return () => window.clearTimeout(timer);
-  }, [active, celebrate, quiet, climbed, reduceMotion, result.newBest]);
-
-  return (
-    <div className="flex flex-col items-center text-center">
-      <div className="relative flex h-36 w-full items-end justify-center">
-        {climbed && (
-          <motion.img
-            src={leagueArt(result.leagueBefore)}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className="absolute bottom-1 left-[calc(50%-8.5rem)] h-20 w-24 object-contain"
-            initial={reduceMotion ? false : { opacity: 1, scale: 1 }}
-            animate={{ opacity: 0.55, scale: 0.86 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-          />
-        )}
-        {climbed && !reduceMotion && (
-          <motion.span
-            aria-hidden="true"
-            className="absolute bottom-0 left-1/2 h-3 w-3 rounded-full bg-amber-300 shadow-[0_0_12px_4px_rgba(245,179,1,0.7)]"
-            initial={{ x: -88, y: -56, opacity: 0 }}
-            animate={{
-              x: [-88, -24, 40],
-              y: [-56, -118, -62],
-              opacity: [0, 1, 0],
-            }}
-            transition={{ duration: 0.75, delay: 0.35, ease: [0.32, 0.06, 0.24, 1] }}
-          />
-        )}
-        <motion.img
-          src={leagueArt(result.leagueAfter)}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          className={cn(
-            'relative h-32 w-40 object-contain',
-            climbed && 'translate-x-10',
-            celebrate &&
-              'drop-shadow-[0_0_14px_rgba(202,138,4,0.55)] dark:drop-shadow-[0_0_12px_rgba(245,179,1,0.45)]',
-          )}
-          initial={
-            reduceMotion || !climbed
-              ? false
-              : { scale: 0.4, opacity: 0, y: 24 }
-          }
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ ...SPRING, delay: climbed ? 1 : 0.15 }}
-        />
-      </div>
-
-      <motion.h2
-        className="mt-3 text-[24px] font-black leading-tight tracking-tight text-foreground"
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: climbed ? 1.15 : 0.3 }}
-      >
-        {title}
-      </motion.h2>
-      <motion.p
-        className="mt-1 max-w-[300px] text-[14px] font-semibold leading-snug text-muted-foreground"
-        initial={reduceMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.35, delay: climbed ? 1.3 : 0.45 }}
-      >
-        {body}
-      </motion.p>
-
-      {(result.hops > 0 || result.fliesGranted > 0 || giftIds.length > 0) && (
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-muted/60 px-3.5 py-1.5 text-[13px] font-black text-foreground">
-          <span className="text-muted-foreground">Last week</span>
-          {result.scheduled > 0 && (
-            <span
-              className="inline-flex items-center gap-1 tabular-nums"
-              aria-label={`${result.hops} of ${result.scheduled} habits`}
-            >
-              <span
-                aria-hidden="true"
-                className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#4f9149] text-white"
-              >
-                <Check className="h-2.5 w-2.5" strokeWidth={4} />
-              </span>
-              <span aria-hidden="true">
-                {result.hops}/{result.scheduled}
-              </span>
-            </span>
-          )}
-          {result.fliesGranted > 0 && <FlyAmount amount={result.fliesGranted} />}
-          {giftIds.length > 0 && (
-            <span
-              className="inline-flex items-center gap-0.5"
-              aria-label={`${giftIds.length} gift${giftIds.length === 1 ? '' : 's'}`}
-            >
-              <span aria-hidden="true" className="-my-3.5 aspect-[282/381] h-12 w-auto shrink-0 -translate-y-[9px]">
-                <GiftRive
-                  className="h-full w-full"
-                  color={giftRiveIndex}
-                  paused={!active || !!reduceMotion}
-                  ambient="jump"
-                />
-              </span>
-              <span aria-hidden="true" className="tabular-nums">{giftIds.length}</span>
-            </span>
-          )}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-6 h-12 w-full rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition active:translate-y-[2px] active:shadow-none"
-      >
-        Let&apos;s go
-      </button>
-    </div>
+      onClose={() => onClose(false)}
+      label={stage.title}
+    />
   );
 }

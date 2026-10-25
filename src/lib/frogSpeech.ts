@@ -12,12 +12,17 @@ export type FrogFacts = {
   weekday: number;
   isFirstVisitToday: boolean;
   tapCount: number;
+  leapLeft: number;
+  leapNext: string | null;
+  leapLeague: string | null;
+  leapWeekStart: boolean;
 };
 
 export type FrogSpeechContext = Pick<
   FrogFacts,
   'hungerPercent' | 'streak' | 'name' | 'frogName'
->;
+> &
+  Partial<Pick<FrogFacts, 'leapLeft' | 'leapNext' | 'leapLeague' | 'leapWeekStart'>>;
 
 export function makeFacts(partial: Partial<FrogFacts>): FrogFacts {
   const now = new Date();
@@ -33,6 +38,10 @@ export function makeFacts(partial: Partial<FrogFacts>): FrogFacts {
     weekday: now.getDay(),
     isFirstVisitToday: false,
     tapCount: 0,
+    leapLeft: 0,
+    leapNext: null,
+    leapLeague: null,
+    leapWeekStart: false,
     ...partial,
   };
 }
@@ -94,6 +103,25 @@ const WELCOME_RULES: Rule[] = [
       "Day {streak}!\nWe're unstoppable.",
       "{streak} days in a row.\nThat's MY human.",
       'Streak day {streak}!\nStill hopping strong.',
+    ],
+  },
+  {
+    tier: 4,
+    when: (f) => f.isFirstVisitToday && f.leapLeft > 0 && f.leapLeft <= 3 && !!f.leapNext,
+    lines: [
+      '{leapMore} and we\nleap to {leapNext}!',
+      'Psst. {leapMore}\nto {leapNext}. Just saying.',
+      "{leapNext} is SO close.\n{leapMore}, that's it.",
+      'I can see {leapNext}\nfrom here. {leapMore}!',
+    ],
+  },
+  {
+    tier: 4,
+    when: (f) => f.isFirstVisitToday && f.leapWeekStart && !!f.leapLeague,
+    lines: [
+      'New league week!\n{leapLeague}, here we go.',
+      "Fresh week in the\n{leapLeague}. Let's climb.",
+      'League week starts now.\nEvery habit moves us up.',
     ],
   },
   {
@@ -311,6 +339,9 @@ function lineIsUsable(line: string, f: FrogFacts): boolean {
   if (line.includes('{frog}') && !f.frogName) return false;
   if (line.includes('{streak}') && f.streak <= 0) return false;
   if (line.includes('{left}') && left(f) <= 0) return false;
+  if (line.includes('{leapMore}') && f.leapLeft <= 0) return false;
+  if (line.includes('{leapNext}') && !f.leapNext) return false;
+  if (line.includes('{leapLeague}') && !f.leapLeague) return false;
   return true;
 }
 
@@ -319,7 +350,10 @@ function fillLine(line: string, f: FrogFacts): string {
     .replace(/\{name\}/g, f.name ?? '')
     .replace(/\{frog\}/g, f.frogName ?? '')
     .replace(/\{streak\}/g, String(f.streak))
-    .replace(/\{left\}/g, String(left(f)));
+    .replace(/\{left\}/g, String(left(f)))
+    .replace(/\{leapMore\}/g, `${f.leapLeft} more habit${f.leapLeft === 1 ? '' : 's'}`)
+    .replace(/\{leapNext\}/g, f.leapNext ?? '')
+    .replace(/\{leapLeague\}/g, f.leapLeague ?? '');
 }
 
 function pickFromPool(pool: string[], f: FrogFacts): string {

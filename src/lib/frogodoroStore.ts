@@ -884,6 +884,13 @@ export const useFrogodoroStore = create<FrogodoroState>()(
 );
 
 /** Snapshot of the sitting that just ended, from the live store. */
+/** A finished focus phase still waiting on its wrap-up screen. */
+export function isFocusWrapUp(
+  state: Pick<FrogodoroState, 'awaitingDone' | 'lastCompletedPhase'>,
+): boolean {
+  return state.awaitingDone && state.lastCompletedPhase === 'focus';
+}
+
 export function endedSessionDetail(): SessionEndedDetail | undefined {
   const live = useFrogodoroStore.getState();
   if (!live.sessionId || !live.selectedTaskId) return undefined;

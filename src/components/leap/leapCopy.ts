@@ -1,4 +1,9 @@
-import type { BonusRewards, LeapView } from '@/lib/leap/types';
+import type {
+  BonusRewards,
+  LeapHopResult,
+  LeapView,
+  LeapWeekResult,
+} from '@/lib/leap/types';
 import { lineGoal } from '@/lib/leap/targets';
 import { LILY_LADDER_ART } from './LeapRail';
 
@@ -161,4 +166,64 @@ export function leapHint(view: LeapView): string {
     ? ` Finish ${habitsWord(stay)} to stay in the ${leagueTitle(leagueName(view))}.`
     : '';
   return `Every repeating task you finish counts. ${goal}${keep}`;
+}
+
+const moreHabits = (count: number) => `${count} more habit${count === 1 ? '' : 's'}`;
+
+export function hopProgressLine(result: LeapHopResult): string {
+  const { meter, leagueLabel } = result;
+  const next = result.nextLeagueLabel;
+  if (meter.reached.includes('leap')) {
+    return next
+      ? `Moving up to ${next} on ${weekdayOf(result.weekKey)}`
+      : 'Top prize won this week';
+  }
+  const holdLeft = meter.holdTarget - meter.hops;
+  if (result.league > 0 && meter.holdTarget > 0 && !meter.reached.includes('hold') && holdLeft > 0) {
+    return `${moreHabits(holdLeft)} to stay in ${leagueLabel}`;
+  }
+  const left = meter.target - meter.hops;
+  if (meter.target > 0 && left > 0) {
+    const goal = next ? `to reach ${next}` : 'for the top prize';
+    return meter.hops < left
+      ? `${meter.hops} of ${meter.target} habits ${goal}`
+      : `${moreHabits(left)} ${goal}`;
+  }
+  return `${habitsWord(meter.hops)} this week in ${leagueTitle(leagueLabel)}`;
+}
+
+export function joinFrogLine(view: LeapView): string {
+  const { week } = view;
+  const next = nextLeagueName(view);
+  if (leapHasHabits(view) && leapCompeting(view) && !week.leap.reached && next) {
+    return `Every habit you finish moves us up. ${leapTarget(view)} by ${weekEndDay(week.weekKey)} and we leap to ${next}!`;
+  }
+  return `Every habit you finish counts. Our first league week starts ${weekdayOf(week.weekKey)}.`;
+}
+
+export function zoneFrogLine(result: LeapHopResult): string {
+  if (!result.nextLeagueLabel) return 'Top of the pond again. I could get used to this.';
+  return `${habitsWord(result.meter.hops)} this week! I'm already packing for ${result.nextLeagueLabel}.`;
+}
+
+export function resultFrogLine(result: LeapWeekResult): string {
+  const short = (result.moveUpAt ?? 0) - result.hops;
+  switch (result.outcome) {
+    case 'up':
+      return result.firstWeek
+        ? "Week one and we already moved up. I'm telling every frog in the pond."
+        : `${habitsWord(result.hops)} last week! I hopped so hard my legs hurt.`;
+    case 'top':
+      return 'Top of the pond again. I could get used to this.';
+    case 'covered':
+      return 'Phew! A Lily Pad saved us. Same league, fresh week.';
+    case 'down':
+      return 'We slipped a lily. Happens to the best frogs. We hop back this week.';
+    default:
+      if (result.firstWeek) return 'Week one, done! This week we aim higher.';
+      if (short > 0 && result.hops > 0) {
+        return `${moreHabits(short)} would have moved us up. This week, maybe?`;
+      }
+      return "Same lily, fresh week. Let's leap this time.";
+  }
 }
