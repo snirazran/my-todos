@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { create } from 'zustand';
 import { mutate } from 'swr';
@@ -118,6 +118,7 @@ function WelcomeContent({
   const reduceMotion = useReducedMotion();
   const { indices } = useWardrobeIndices(true);
   const trial = useMemo(() => trialInfo(status), [status]);
+  const [landed, setLanded] = useState(false);
   useAutoPopupHold('plus-welcome', true);
 
   useEffect(() => {
@@ -157,11 +158,16 @@ function WelcomeContent({
           </div>
           <div className="relative -mb-0.5" style={{ width: 170, height: 180 }}>
             {entered && (
-              <>
-                <Frog width={170} height={180} indices={indices} emote="love" />
-                <PremiumFrogAura show compact alwaysPlay />
-              </>
+              <Frog
+                width={170}
+                height={180}
+                indices={indices}
+                emote="love"
+                arrive="hop"
+                onArrived={() => setLanded(true)}
+              />
             )}
+            {landed && <PremiumFrogAura show compact alwaysPlay />}
           </div>
         </div>
 

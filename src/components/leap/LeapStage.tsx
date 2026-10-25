@@ -10,6 +10,7 @@ import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import { hapticCelebrate } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { leagueArt } from './leapCopy';
@@ -221,7 +222,6 @@ export function LeapStageBody({
   const frogHeight = wide ? 204 : shortScreen ? 168 : 184;
   const frogWidth = Math.round((frogHeight * 128) / 144);
   const [focus, setFocus] = useState(from);
-  const [frogReady, setFrogReady] = useState(false);
   const [landed, setLanded] = useState(false);
   const moves = from !== to;
 
@@ -229,7 +229,6 @@ export function LeapStageBody({
     if (!active) return;
     setFocus(from);
     setLanded(false);
-    const frogTimer = window.setTimeout(() => setFrogReady(true), 380);
     const moveTimer = window.setTimeout(() => setFocus(to), moves ? 700 : 0);
     const landTimer = window.setTimeout(
       () => {
@@ -252,7 +251,6 @@ export function LeapStageBody({
       moves ? 1250 : 650,
     );
     return () => {
-      window.clearTimeout(frogTimer);
       window.clearTimeout(moveTimer);
       window.clearTimeout(landTimer);
     };
@@ -323,9 +321,16 @@ export function LeapStageBody({
         className="pointer-events-none absolute bottom-[calc(100%-10px)] left-[-18px] z-20"
         style={{ width: frogWidth, height: frogHeight }}
       >
-        {frogReady && (
-          <Frog ref={frogRef} width={frogWidth} height={frogHeight} indices={indices} placeholder />
-        )}
+        <Frog
+          ref={frogRef}
+          width={frogWidth}
+          height={frogHeight}
+          indices={indices}
+          placeholder
+          arrive="hop"
+          arriveDelay={180}
+          holdArrival={!landed}
+        />
       </div>
       {landed && (
         <FrogSpeechBubble
@@ -421,6 +426,7 @@ export function LeapStage({
 }: LeapStageProps & { open: boolean; onClose: () => void; label: string }) {
   useRegisterOpenSheet(open);
   const wide = useWideStage();
+  const { entered, markEntered } = useEntrance(open);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
@@ -452,9 +458,12 @@ export function LeapStage({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          onAnimationComplete={markEntered}
           className="pointer-events-auto fixed inset-0 z-[1400] flex select-none flex-col overflow-hidden bg-background"
         >
-          <LeapStageBody {...props} active={open} wide={wide} onDismiss={onClose} />
+          <SheetEnteredContext.Provider value={entered}>
+            <LeapStageBody {...props} active={open} wide={wide} onDismiss={onClose} />
+          </SheetEnteredContext.Provider>
         </motion.div>
       )}
     </AnimatePresence>,

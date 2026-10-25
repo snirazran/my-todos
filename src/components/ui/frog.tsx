@@ -19,7 +19,9 @@ import {
   useViewModelInstanceNumber,
   useViewModelInstanceTrigger,
 } from '@rive-app/react-canvas-lite';
+import { useReducedMotion } from 'framer-motion';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
+import { useSheetEntered } from '@/lib/sheetEntered';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
@@ -97,7 +99,18 @@ const HIT_TEST_MIN_ALPHA = 8;
 export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_TABLET = { x: -19, y: 18 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_DESKTOP = { x: -21, y: 26 } as const;
+const FEET_Y = 114;
 /* ========================================================================= */
+
+export type FrogArrival = 'hop' | 'drop' | 'rise' | 'pop';
+
+const ARRIVAL_MS: Record<FrogArrival, number> = {
+  hop: 760,
+  drop: 720,
+  rise: 800,
+  pop: 520,
+};
+const ENTRANCE_FALLBACK_MS = 1200;
 
 export interface FrogHandle {
   getMouthPoint: () => { x: number; y: number };
@@ -132,6 +145,10 @@ interface FrogProps {
    *  unmounting while the live canvas is still transparent. */
   onDressed?: () => void;
   placeholder?: boolean;
+  arrive?: FrogArrival;
+  arriveDelay?: number;
+  holdArrival?: boolean;
+  onArrived?: () => void;
 }
 
 const Frog = memo(
@@ -149,11 +166,33 @@ const Frog = memo(
       ignoreIdlePause = false,
       onDressed,
       placeholder = false,
+      arrive,
+      arriveDelay = 0,
+      holdArrival = false,
+      onArrived,
     },
     ref,
   ) {
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const riveUrl = useRiveAsset('/frog_idle.riv');
+    const sheetEntered = useSheetEntered();
+    const [live, setLive] = React.useState(sheetEntered);
+    useEffect(() => {
+      if (live) return;
+      const goLive = () => setLive(true);
+      if (!sheetEntered) {
+        const fallback = window.setTimeout(goLive, ENTRANCE_FALLBACK_MS);
+        return () => window.clearTimeout(fallback);
+      }
+      let second = 0;
+      const first = requestAnimationFrame(() => {
+        second = requestAnimationFrame(goLive);
+      });
+      return () => {
+        cancelAnimationFrame(first);
+        cancelAnimationFrame(second);
+      };
+    }, [live, sheetEntered]);
     const [dressed, setDressed] = React.useState(false);
     const dressedRef = useRef(false);
     const onDressedRef = useRef(onDressed);
@@ -524,17 +563,42 @@ const Frog = memo(
       },
     }));
 
-    const placeholderScale =
-      placeholder && typeof width === 'number' && typeof height === 'number'
-        ? Math.min(width / ARTBOARD_WIDTH, height / ARTBOARD_HEIGHT)
-        : 0;
+    const reduceMotion = useReducedMotion();
+    const arrivedRef = useRef(false);
+    const onArrivedRef = useRef(onArrived);
+    onArrivedRef.current = onArrived;
+    const finishArrival = React.useCallback(() => {
+      if (arrivedRef.current) return;
+      arrivedRef.current = true;
+      onArrivedRef.current?.();
+    }, []);
+    const numericBox = typeof width === 'number' && typeof height === 'number';
+    const boxScale = numericBox
+      ? Math.min(width / ARTBOARD_WIDTH, height / ARTBOARD_HEIGHT)
+      : 0;
+    const feetOrigin = numericBox
+      ? `${Math.round((height - ARTBOARD_HEIGHT * boxScale) / 2 + FEET_Y * boxScale + resolvedVisualOffsetY)}px`
+      : '86%';
 
-    return (
-      <div
-        ref={wrapperRef}
-        className={className}
-        style={{ width, height, position: 'relative', overflow: 'visible' }}
-      >
+    const placeholderScale = placeholder ? boxScale : 0;
+    const arrivalReady = dressed || placeholderScale > 0;
+
+    useEffect(() => {
+      if (!arrivalReady || !arrive || holdArrival) return;
+      if (reduceMotion) {
+        finishArrival();
+        return;
+      }
+      const timer = window.setTimeout(
+        finishArrival,
+        ARRIVAL_MS[arrive] + arriveDelay + 200,
+      );
+      return () => window.clearTimeout(timer);
+    }, [arrivalReady, arrive, arriveDelay, holdArrival, reduceMotion, finishArrival]);
+    const arriving = !!arrive && arrivalReady && !holdArrival && !reduceMotion;
+
+    const content = (
+      <>
         {placeholderScale > 0 && (
           <img
             src={PLACEHOLDER_SRC}
@@ -559,7 +623,7 @@ const Frog = memo(
             }}
           />
         )}
-        {riveUrl && (
+        {riveUrl && live && (
           <RiveComponent
             style={{
               width: '100%',
@@ -570,6 +634,34 @@ const Frog = memo(
               transition: 'opacity 150ms ease-out',
             }}
           />
+        )}
+      </>
+    );
+
+    return (
+      <div
+        ref={wrapperRef}
+        className={className}
+        style={{ width, height, position: 'relative', overflow: 'visible' }}
+      >
+        {arrive ? (
+          <div
+            className={arriving ? `frog-arrive-${arrive}` : undefined}
+            style={{
+              width: '100%',
+              height: '100%',
+              transformOrigin: `50% ${feetOrigin}`,
+              animationDelay: arriveDelay ? `${arriveDelay}ms` : undefined,
+              opacity: holdArrival ? 0 : undefined,
+            }}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget) finishArrival();
+            }}
+          >
+            {content}
+          </div>
+        ) : (
+          content
         )}
       </div>
     );

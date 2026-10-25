@@ -9,6 +9,8 @@ import {
   useState,
 } from 'react';
 import useSWR from 'swr';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import {
   FocusWrapUp,
   type PendingReview,
@@ -20,6 +22,7 @@ import {
   SESSION_ENDED_EVENT,
   endedSessionDetail,
   isFocusWrapUp,
+  lapsedFocusDetail,
   useFrogodoroStore,
   type SessionEndedDetail,
 } from '@/lib/frogodoroStore';
@@ -55,6 +58,9 @@ export function FocusReviewGate() {
   const [endedHere, setEndedHere] = useState<PendingReview | null>(null);
   const dismissedRef = useRef<Set<string>>(new Set());
   const returnedAtRef = useRef(Date.now());
+  const openRef = useRef(open);
+  openRef.current = open;
+  const lapsedIdRef = useRef<string | null>(null);
 
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -76,20 +82,72 @@ export function FocusReviewGate() {
   }, [open, setWrapUpOpen]);
   useEffect(() => () => setWrapUpOpen(false), [setWrapUpOpen]);
 
+  const openLapsedFocus = useCallback(() => {
+    if (openRef.current) return;
+    const lapsed = lapsedFocusDetail();
+    if (!lapsed || dismissedRef.current.has(lapsed.id)) return;
+    const store = useFrogodoroStore.getState();
+    openRef.current = true;
+    lapsedIdRef.current = lapsed.id;
+    setReview({ ...lapsed, subjectTags: [] });
+    setScene({
+      later: true,
+      origin: focusCardOrigin(),
+      sessionFocusSeconds:
+        store.sessionStats.focusTime +
+        Math.max(0, lapsed.focusSeconds - store.phaseElapsed),
+      bonusFly:
+        store.deepFocus &&
+        !store.pausedThisPhase &&
+        lapsed.focusSeconds >= DEEP_FOCUS_MIN_SECONDS,
+      nextLocked: false,
+    });
+    setEndedHere(null);
+    setOpen(true);
+  }, []);
+
   useEffect(() => {
+    let cancelled = false;
+    let appStateHandle: { remove: () => void } | null = null;
+    const onReturn = () => {
+      returnedAtRef.current = Date.now();
+      openLapsedFocus();
+    };
     const onVisible = () => {
-      if (document.visibilityState === 'visible') returnedAtRef.current = Date.now();
+      if (document.visibilityState === 'visible') onReturn();
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
+    if (Capacitor.isNativePlatform()) {
+      void App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive && !cancelled) onReturn();
+      })
+        .then((handle) => {
+          if (cancelled) handle.remove();
+          else appStateHandle = handle;
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      appStateHandle?.remove();
+    };
+  }, [openLapsedFocus]);
 
   const acknowledge = useCallback(() => {
     const store = useFrogodoroStore.getState();
-    if (!isFocusWrapUp(store)) return;
+    if (!isFocusWrapUp(store) && !lapsedFocusDetail()) return;
     store.setAwaitingDone(false);
     store.stopTimer();
   }, []);
+
+  useLayoutEffect(() => {
+    if (!open || !awaitingDone) return;
+    const store = useFrogodoroStore.getState();
+    if (!lapsedIdRef.current || lapsedIdRef.current !== store.sessionId) return;
+    store.setAwaitingDone(false);
+    store.stopTimer();
+  }, [open, awaitingDone]);
 
   useLayoutEffect(() => {
     if (!focusWrapUp || open) return;
@@ -99,6 +157,7 @@ export function FocusReviewGate() {
       return;
     }
     const store = useFrogodoroStore.getState();
+    lapsedIdRef.current = null;
     setReview({ ...ended, subjectTags: [] });
     setScene({
       later: Date.now() - returnedAtRef.current < RETURN_WINDOW_MS / 2,
@@ -119,6 +178,7 @@ export function FocusReviewGate() {
     if (!pending || open) return;
     if (dismissedRef.current.has(pending.id)) return;
     if (openSheets > 0 || awaitingDone) return;
+    lapsedIdRef.current = null;
     setReview(pending);
     setScene({
       later: !endedHere && Date.now() - returnedAtRef.current < RETURN_WINDOW_MS,
@@ -152,6 +212,7 @@ export function FocusReviewGate() {
     (outcome: ReviewOutcome) => {
       acknowledge();
       if (review) dismissedRef.current.add(review.id);
+      lapsedIdRef.current = null;
       setEndedHere(null);
       setOpen(false);
       const store = useFrogodoroStore.getState();

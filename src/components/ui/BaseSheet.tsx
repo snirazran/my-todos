@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { SheetEnteredContext } from '@/lib/sheetEntered';
 import { CloseButton } from '@/components/ui/CloseButton';
 
 export interface BaseSheetRenderProps {
@@ -329,13 +330,15 @@ export function BaseSheet({
                 />
               )}
 
-              {children({
-                isDesktop,
-                dragControls,
-                isDragging,
-                entered,
-                bindScroll: overscroll.bind,
-              })}
+              <SheetEnteredContext.Provider value={entered}>
+                {children({
+                  isDesktop,
+                  dragControls,
+                  isDragging,
+                  entered,
+                  bindScroll: overscroll.bind,
+                })}
+              </SheetEnteredContext.Provider>
             </motion.div>
           </div>
         </>

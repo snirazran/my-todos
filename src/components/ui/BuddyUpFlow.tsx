@@ -15,6 +15,7 @@ import type { FriendSummary } from '@/lib/friends/indices';
 import { mutate as mutateGlobal } from 'swr';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type Phase = 'compose' | 'sent';
@@ -65,6 +66,9 @@ export function BuddyUpFlow({
   const [notifGranted, setNotifGranted] = useState(false);
   const sentBtnRef = useRef<HTMLButtonElement>(null);
   useRegisterOpenSheet(open && phase === 'sent');
+  const { entered: sentEntered, markEntered: markSentEntered } = useEntrance(
+    open && phase === 'sent',
+  );
 
   useEffect(() => {
     if (open) {
@@ -164,11 +168,20 @@ export function BuddyUpFlow({
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                onAnimationComplete={markSentEntered}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-none rounded-t-[28px] bg-background px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-8 text-center sm:max-w-md sm:rounded-[28px]"
               >
                 <div className="mx-auto mb-4 w-fit">
-                  <Frog width={130} height={120} indices={friend.indices} paused />
+                  <SheetEnteredContext.Provider value={sentEntered}>
+                    <Frog
+                      width={130}
+                      height={120}
+                      indices={friend.indices}
+                      paused
+                      arrive="drop"
+                    />
+                  </SheetEnteredContext.Provider>
                 </div>
                 <h2 className="text-xl font-black tracking-tight text-foreground">
                   Invitation sent to {friendName}!

@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import {
   DEFAULT_BACKGROUND_IMAGES,
   readCachedBackground,
   useBackgrounds,
   writeCachedBackground,
-  type BackgroundImages,
 } from '@/hooks/useBackgrounds';
 import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { useUIStore } from '@/lib/uiStore';
+import { BackgroundCrossfade } from '@/components/ui/BackgroundCrossfade';
 
 export function GlobalPageBackground() {
   const pathname = usePathname();
@@ -21,7 +20,6 @@ export function GlobalPageBackground() {
   );
   const { user, loading } = useAuth();
   const { data } = useBackgrounds(!!user && !loading);
-  const reduceMotion = useReducedMotion();
   const [cachedBackground, setCachedBackground] =
     useState<ReturnType<typeof readCachedBackground>>(null);
   useEffect(() => {
@@ -67,85 +65,8 @@ export function GlobalPageBackground() {
       style={backgroundFadeMaskStyle}
       className="pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[480px]"
     >
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={backgroundKey}
-          className="absolute inset-0"
-          initial={
-            reduceMotion
-              ? { opacity: 0 }
-              : {
-                  opacity: 0,
-                  scale: 1.06,
-                  clipPath: 'polygon(0 0, 0 0, 0 100%, 0 100%)',
-                }
-          }
-          animate={
-            reduceMotion
-              ? { opacity: 1 }
-              : {
-                  opacity: 1,
-                  scale: 1,
-                  clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)',
-                }
-          }
-          exit={
-            reduceMotion
-              ? { opacity: 0 }
-              : {
-                  opacity: 0,
-                  scale: 1.02,
-                  filter: 'saturate(0.85) brightness(0.95)',
-                }
-          }
-          transition={{
-            opacity: { duration: 0.45, ease: 'easeOut' },
-            scale: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
-            clipPath: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-            filter: { duration: 0.35, ease: 'easeOut' },
-          }}
-        >
-          <BackgroundPicture images={images} />
-          <div className="absolute inset-0 animate-[background-glint_700ms_ease-out] bg-gradient-to-b from-white/10 via-transparent to-black/5 opacity-0" />
-        </motion.div>
-      </AnimatePresence>
+      <BackgroundCrossfade id={backgroundKey} images={images} />
       <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset]" />
-      <style jsx global>{`
-        @keyframes background-glint {
-          0% {
-            opacity: 0.8;
-            transform: translateX(-18%);
-          }
-          100% {
-            opacity: 0;
-            transform: translateX(18%);
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          [data-background-picture] {
-            animation: none !important;
-          }
-        }
-      `}</style>
     </div>
-  );
-}
-
-function BackgroundPicture({ images }: { images: BackgroundImages }) {
-  return (
-    <picture data-background-picture className="block h-full w-full">
-      {images.webLarge && (
-        <source media="(min-width: 1920px)" srcSet={images.webLarge} />
-      )}
-      {images.web && <source media="(min-width: 1280px)" srcSet={images.web} />}
-      {images.tablet && (
-        <source media="(min-width: 768px)" srcSet={images.tablet} />
-      )}
-      <img
-        src={images.mobile}
-        alt=""
-        className="h-full w-full object-cover object-top"
-      />
-    </picture>
   );
 }

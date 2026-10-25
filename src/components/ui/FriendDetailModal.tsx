@@ -131,16 +131,19 @@ export function FriendDetailModal({
   const [peekTarget, setPeekTarget] = useState<PeekTarget | null>(null);
   const [enteredFor, setEnteredFor] = useState<string | null>(null);
   const [dressedFor, setDressedFor] = useState<string | null>(null);
+  const [landedFor, setLandedFor] = useState<string | null>(null);
   const entryFrames = React.useRef<number[]>([]);
   const reduceMotion = useReducedMotion();
   const entered = !!entry && enteredFor === entry.userId;
   const liveReady = !!entry && dressedFor === entry.userId;
+  const landed = !!entry && landedFor === entry.userId;
 
   useEffect(() => {
     if (!entry) {
       setPeekTarget(null);
       setEnteredFor(null);
       setDressedFor(null);
+      setLandedFor(null);
     }
   }, [entry]);
   useEffect(() => () => { entryFrames.current.forEach(cancelAnimationFrame); entryFrames.current = []; }, [entry?.userId]);
@@ -354,7 +357,7 @@ export function FriendDetailModal({
                 </div>
 
                 {/* Focusing right now — flies + tongue lunges over the banner */}
-                {liveReady && !reduceMotion && <FriendFocusScene
+                {landed && !reduceMotion && <FriendFocusScene
                   frogRef={friendFrogRef}
                   frogBoxRef={friendFrogBoxRef}
                   active={entered && !!entry.focusing}
@@ -379,11 +382,13 @@ export function FriendDetailModal({
                             indices={entry.indices}
                             mouthOpen={friendMouthOpen}
                             onDressed={() => setDressedFor(entry.userId)}
+                            arrive="drop"
+                            onArrived={() => setLandedFor(entry.userId)}
                           />
                         )}
                       </div>
                     )}
-                    {liveReady && !reduceMotion && <PremiumFrogAura show={!!entry.premium} alwaysPlay />}
+                    {landed && !reduceMotion && <PremiumFrogAura show={!!entry.premium} alwaysPlay />}
                   </div>
                 </div>
               </div>

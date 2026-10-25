@@ -36,6 +36,7 @@ import {
 } from '@/components/leap/leapCopy';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/lib/uiStore';
+import { holdAutoPopups, QUEST_CLAIM_HOLD, releaseAutoPopups } from '@/lib/popupGate';
 import {
   statusDockRowClass,
   type StatusDockRowState,
@@ -277,6 +278,7 @@ export function NextQuestStrip({
       return;
     }
     setClaiming(true);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
     try {
       const res = await fetch(request.url, {
         method: 'POST',
@@ -309,6 +311,7 @@ export function NextQuestStrip({
       primeQuestsPageCache();
       await refreshQuestHomeView();
     } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaiming(false);
     }
   };

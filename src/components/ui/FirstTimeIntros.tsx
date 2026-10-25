@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { Icon as AppIcon } from '@/components/ui/Icon';
@@ -56,6 +57,7 @@ function IntroCta({ label, onClick }: { label: string; onClick: () => void }) {
 // — the shared visual signature of these one-time explainers.
 function FrogPerch({ open }: { open: boolean }) {
   const { indices } = useWardrobeIndices(open);
+  const [landed, setLanded] = useState(false);
   return (
     <div className="pointer-events-none relative z-10 -mb-[12px] -mt-3 flex justify-center">
       <div className="relative translate-y-[20px]">
@@ -65,10 +67,14 @@ function FrogPerch({ open }: { open: boolean }) {
           indices={indices}
           paused={!open}
           visualOffsetY={0}
+          arrive="drop"
+          onArrived={() => setLanded(true)}
         />
-        <span className="absolute -left-7 top-9 animate-[fly-bob_2.2s_ease-in-out_infinite] motion-reduce:animate-none">
-          <Fly size={34} alwaysPlay interactive={false} oversample={1.5} />
-        </span>
+        {landed && (
+          <span className="absolute -left-7 top-9 animate-[fly-bob_2.2s_ease-in-out_infinite] motion-reduce:animate-none">
+            <Fly size={34} alwaysPlay interactive={false} oversample={1.5} />
+          </span>
+        )}
       </div>
     </div>
   );

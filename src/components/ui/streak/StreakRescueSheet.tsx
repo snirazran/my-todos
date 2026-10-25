@@ -11,6 +11,7 @@ import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { dismissStreakRescue, rescueStreak } from '@/hooks/useLoginStreak';
 import { useRewardGate } from '@/hooks/useRewardGate';
@@ -73,7 +74,7 @@ export function StreakRescueSheet({
   const [adsWatched, setAdsWatched] = useState(0);
   const [saved, setSaved] = useState<RescueResult | null>(null);
   const [showRewards, setShowRewards] = useState(false);
-  const [frogReady, setFrogReady] = useState(false);
+  const { entered, markEntered } = useEntrance(open);
 
   useRegisterOpenSheet(open);
 
@@ -96,11 +97,8 @@ export function StreakRescueSheet({
     setError(null);
     setSaved(null);
     setShowRewards(false);
-    const t = window.setTimeout(() => setFrogReady(true), 300);
     document.body.style.overflow = 'hidden';
     return () => {
-      window.clearTimeout(t);
-      setFrogReady(false);
       document.body.style.overflow = '';
     };
   }, [open, offer]);
@@ -181,8 +179,10 @@ export function StreakRescueSheet({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.22 }}
+          onAnimationComplete={markEntered}
           className="fixed inset-0 z-[1400]"
         >
+          <SheetEnteredContext.Provider value={entered}>
           <div className="absolute inset-0 bg-background md:bg-black/60 md:backdrop-blur-sm" />
 
           <div className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6">
@@ -192,23 +192,14 @@ export function StreakRescueSheet({
                   <div className="pointer-events-none absolute inset-0 opacity-30">
                     <RotatingRays colorClass="text-white" />
                   </div>
-                  <motion.div
-                    initial={{ y: 40, opacity: 0, scale: 0.8 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-                  >
-                    {frogReady ? (
-                      <Frog
-                        ref={frogRef}
-                        width={190}
-                        height={190}
-                        indices={indices}
-                        emote="love"
-                      />
-                    ) : (
-                      <div style={{ width: 190, height: 190 }} />
-                    )}
-                  </motion.div>
+                  <Frog
+                    ref={frogRef}
+                    width={190}
+                    height={190}
+                    indices={indices}
+                    emote="love"
+                    arrive="hop"
+                  />
                   <div className="relative mt-2 flex items-center gap-3">
                     <Flame className="h-16 w-16 fill-yellow-200 text-yellow-100 drop-shadow-[0_3px_10px_rgba(255,200,50,0.55)]" />
                     <motion.span
@@ -237,24 +228,15 @@ export function StreakRescueSheet({
                 </div>
               ) : (
                 <div className="relative flex h-full flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 px-6 py-8">
-                  <motion.div
-                    initial={{ y: 40, opacity: 0, scale: 0.8 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+                  <Frog
+                    ref={frogRef}
                     className="shrink-0"
-                  >
-                    {frogReady ? (
-                      <Frog
-                        ref={frogRef}
-                        width={150}
-                        height={150}
-                        indices={indices}
-                        emote="question"
-                      />
-                    ) : (
-                      <div style={{ width: 150, height: 150 }} />
-                    )}
-                  </motion.div>
+                    width={150}
+                    height={150}
+                    indices={indices}
+                    emote="question"
+                    arrive="rise"
+                  />
 
                   <h2 className="mt-3 text-center text-2xl font-black tracking-tight text-white">
                     {multi
@@ -387,6 +369,7 @@ export function StreakRescueSheet({
               result={toCelebrationResult(saved)}
             />
           )}
+          </SheetEnteredContext.Provider>
         </motion.div>
       )}
     </AnimatePresence>,

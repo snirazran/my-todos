@@ -942,6 +942,7 @@ function WardrobeManagerContent({
       indices={{ ...equippedIndices, [purchaseItem.slot]: purchaseItem.riveIndex }}
       width={240}
       height={240}
+      arrive="pop"
     />
   ) : purchaseBg ? (
     <div className="relative h-full w-full">
@@ -957,6 +958,7 @@ function WardrobeManagerContent({
           height={186}
           indices={equippedIndices}
           visualOffsetY={-8}
+          arrive="drop"
         />
       </div>
     </div>

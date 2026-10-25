@@ -1724,6 +1724,7 @@ export default function FrogodoroSheet({
                                       width={144}
                                       height={162}
                                       indices={frogIndices}
+                                      arrive="drop"
                                     />
                                   )}
                                 </div>

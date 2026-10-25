@@ -390,6 +390,8 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
+    await advanceUserTimer(userId, { silent: true }).catch(() => null);
+
     const existing = await UserModel.findById(userId, {
       liveActivity: 1,
       notificationPrefs: 1,

@@ -14,6 +14,7 @@ import { hapticCelebrate, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useSettled } from '@/hooks/useSettled';
+import { SheetEnteredContext } from '@/lib/sheetEntered';
 import {
   useLoginStreak,
   patchStreakView,
@@ -695,7 +696,9 @@ function RevealStep({
   const frogRef = useRef<FrogHandle>(null);
   const [count, setCount] = useState(celebration.previousCount);
   const [popped, setPopped] = useState(false);
-  const [frogReady, setFrogReady] = useState(false);
+  const [landed, setLanded] = useState(false);
+  const [minDelayDone, setMinDelayDone] = useState(false);
+  const [capDone, setCapDone] = useState(false);
   const shortScreen = useMediaQuery('(max-height: 800px)');
   const frogHeight = shortScreen ? 234 : 300;
   const frogWidth = Math.round((frogHeight * 128) / 144);
@@ -710,27 +713,34 @@ function RevealStep({
     view.goal && view.goal.progress < view.goal.days ? view.goal : null;
 
   useEffect(() => {
-    const frogTimer = window.setTimeout(() => setFrogReady(true), 450);
-    const popTimer = window.setTimeout(() => {
-      setCount(view.count);
-      setPopped(true);
-      frogRef.current?.fireEmote('love');
-      confetti({
-        particleCount: 110,
-        spread: 90,
-        startVelocity: 40,
-        origin: { y: 0.3 },
-        zIndex: 99999,
-        colors: ['#fbbf24', '#fde68a', '#93df6e', '#4f9a45', '#ffffff'],
-        disableForReducedMotion: true,
-      });
-      hapticCelebrate();
-    }, 1000);
+    const minTimer = window.setTimeout(() => setMinDelayDone(true), 1000);
+    const capTimer = window.setTimeout(() => setCapDone(true), 2600);
     return () => {
-      window.clearTimeout(frogTimer);
-      window.clearTimeout(popTimer);
+      window.clearTimeout(minTimer);
+      window.clearTimeout(capTimer);
     };
-  }, [view.count]);
+  }, []);
+
+  const readyToPop = minDelayDone && (landed || capDone);
+  useEffect(() => {
+    if (!readyToPop || popped) return;
+    setPopped(true);
+    frogRef.current?.fireEmote('love');
+    confetti({
+      particleCount: 110,
+      spread: 90,
+      startVelocity: 40,
+      origin: { y: 0.3 },
+      zIndex: 99999,
+      colors: ['#fbbf24', '#fde68a', '#93df6e', '#4f9a45', '#ffffff'],
+      disableForReducedMotion: true,
+    });
+    hapticCelebrate();
+  }, [readyToPop, popped]);
+
+  useEffect(() => {
+    if (popped) setCount(view.count);
+  }, [popped, view.count]);
 
   return (
     <div className="streak-stage relative flex min-h-0 flex-1 flex-col bg-[color:var(--streak-base)]">
@@ -817,10 +827,7 @@ function RevealStep({
             day streak
           </p>
 
-          <motion.div
-            initial={{ y: 40, opacity: 0, scale: 0.85 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+          <div
             className="pointer-events-none relative z-20"
             style={{
               width: frogWidth,
@@ -829,16 +836,16 @@ function RevealStep({
               marginBottom: shortScreen ? -27 : -11,
             }}
           >
-            {frogReady && (
-              <Frog
-                ref={frogRef}
-                width={frogWidth}
-                height={frogHeight}
-                indices={indices}
-                emote="love"
-              />
-            )}
-            {popped && (
+            <Frog
+              ref={frogRef}
+              width={frogWidth}
+              height={frogHeight}
+              indices={indices}
+              emote="love"
+              arrive="drop"
+              onArrived={() => setLanded(true)}
+            />
+            {popped && landed && (
               <FrogSpeechBubble
                 rate={0}
                 done={0}
@@ -847,7 +854,7 @@ function RevealStep({
                 className={shortScreen ? '!top-[142px]' : '!top-[188px]'}
               />
             )}
-          </motion.div>
+          </div>
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}
@@ -1040,14 +1047,10 @@ function CommitStep({
       : null;
   useWarmSkinRolls(view.goalTiers, rewardCatalog);
   const frogRef = useRef<FrogHandle>(null);
-  const [frogReady, setFrogReady] = useState(false);
+  const [frogLanded, setFrogLanded] = useState(false);
   const shortScreen = useMediaQuery('(max-height: 800px)');
   const frogHeight = shortScreen ? 190 : 210;
   const frogWidth = Math.round((frogHeight * 128) / 144);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setFrogReady(true), 320);
-    return () => window.clearTimeout(timer);
-  }, []);
   const choose = (days: number) => {
     setSelectedDays(days);
     setError(null);
@@ -1131,28 +1134,30 @@ function CommitStep({
                 className="pointer-events-none absolute bottom-[calc(100%-11px)] left-[-22px] z-20"
                 style={{ width: frogWidth, height: frogHeight }}
               >
-                {frogReady && (
-                  <Frog
-                    ref={frogRef}
-                    width={frogWidth}
-                    height={frogHeight}
-                    indices={indices}
-                  />
-                )}
+                <Frog
+                  ref={frogRef}
+                  width={frogWidth}
+                  height={frogHeight}
+                  indices={indices}
+                  arrive="hop"
+                  onArrived={() => setFrogLanded(true)}
+                />
               </div>
-              <FrogSpeechBubble
-                key={selectedDays ?? 'ask'}
-                side
-                rate={0}
-                done={0}
-                total={0}
-                fixedMessage={pledgeFrogLine(selectedDays)}
-                messageClassName="!text-[14px]"
-                className={cn(
-                  '[--bubble-max:calc(100vw-11.5rem)] md:[--bubble-max:14rem]',
-                  shortScreen ? '!left-[128px] !top-[-30px]' : '!left-[144px] !top-[-30px]',
-                )}
-              />
+              {frogLanded && (
+                <FrogSpeechBubble
+                  key={selectedDays ?? 'ask'}
+                  side
+                  rate={0}
+                  done={0}
+                  total={0}
+                  fixedMessage={pledgeFrogLine(selectedDays)}
+                  messageClassName="!text-[14px]"
+                  className={cn(
+                    '[--bubble-max:calc(100vw-11.5rem)] md:[--bubble-max:14rem]',
+                    shortScreen ? '!left-[128px] !top-[-30px]' : '!left-[144px] !top-[-30px]',
+                  )}
+                />
+              )}
 
               <div className="pond-panel relative z-10 w-full rounded-[24px] border border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3.5 pt-5 shadow-[0_3px_0_0_var(--pond-line)] short-screen:pb-3">
                 <fieldset
@@ -1337,7 +1342,6 @@ function CommitStep({
 function HomeStep({
   view,
   indices,
-  frogReady,
   rewardCatalog,
   isPremium,
   onGetLilyPad,
@@ -1347,7 +1351,6 @@ function HomeStep({
 }: {
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
-  frogReady: boolean;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   onGetLilyPad: () => void;
@@ -1408,9 +1411,7 @@ function HomeStep({
             aria-hidden
             className="relative mb-1 -mt-14 h-[196px] w-[196px] motion-safe:animate-[streak-frog-bob_3.2s_ease-in-out_infinite] short-screen:-mt-16"
           >
-            {frogReady && (
-              <Frog width={196} height={196} indices={indices} emote="love" />
-            )}
+            <Frog width={196} height={196} indices={indices} emote="love" arrive="rise" />
           </div>
 
           <WeekStrip view={view} />
@@ -1593,7 +1594,7 @@ export function StreakSheet({
 
   const [step, setStep] = useState<Step>('home');
   const [buyOpen, setBuyOpen] = useState(false);
-  const [frogReady, setFrogReady] = useState(false);
+  const [enteredStep, setEnteredStep] = useState<Step | null>(null);
   const [openSeen, setOpenSeen] = useState(open);
   if (open !== openSeen) {
     setOpenSeen(open);
@@ -1605,7 +1606,7 @@ export function StreakSheet({
             ? 'reveal'
             : 'home',
       );
-      setFrogReady(false);
+      setEnteredStep(null);
     }
   }
 
@@ -1625,11 +1626,8 @@ export function StreakSheet({
 
   useEffect(() => {
     if (!open) return;
-    const t = window.setTimeout(() => setFrogReady(true), 420);
     document.body.style.overflow = 'hidden';
     return () => {
-      window.clearTimeout(t);
-      setFrogReady(false);
       document.body.style.overflow = '';
     };
   }, [open]);
@@ -1684,6 +1682,9 @@ export function StreakSheet({
           initial={false}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
+          onAnimationEnd={(event) => {
+            if (event.target === event.currentTarget) setEnteredStep(step);
+          }}
           className="sheet-backdrop-in pointer-events-auto fixed inset-0 z-[1400] overflow-hidden"
         >
           <div className="absolute inset-0 bg-background md:bg-black/60" />
@@ -1702,9 +1703,15 @@ export function StreakSheet({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -60 }}
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                onAnimationComplete={(definition) => {
+                  if ((definition as { opacity?: number }).opacity === 1) {
+                    setEnteredStep(step);
+                  }
+                }}
                 onClick={(event) => event.stopPropagation()}
                 className="relative mx-auto flex h-full w-full transform-gpu flex-col overflow-hidden will-change-transform [backface-visibility:hidden] md:h-auto md:max-h-[min(40rem,calc(100dvh-3rem))] md:w-[min(100%,40rem)] md:rounded-[32px] md:shadow-2xl"
               >
+                <SheetEnteredContext.Provider value={enteredStep === step}>
                 {(step === 'home' || step === 'commit') && (
                   <button
                     type="button"
@@ -1742,7 +1749,6 @@ export function StreakSheet({
                   <HomeStep
                     view={view}
                     indices={indices}
-                    frogReady={frogReady}
                     rewardCatalog={rewardCatalog}
                     isPremium={isPremium}
                     onGetLilyPad={() => openShieldSheet()}
@@ -1754,6 +1760,7 @@ export function StreakSheet({
                     }}
                   />
                 )}
+                </SheetEnteredContext.Provider>
               </motion.div>
             </AnimatePresence>
           </div>

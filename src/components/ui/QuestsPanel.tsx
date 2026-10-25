@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
   DailyQuestProgressView,
@@ -52,6 +53,7 @@ import {
   type RevealCatalog,
 } from './questRewardReveal';
 import type { RatingMoment } from '@/lib/rateApp';
+import { holdAutoPopups, QUEST_CLAIM_HOLD, releaseAutoPopups } from '@/lib/popupGate';
 import {
   refreshQuestHomeView,
   takeQuestScrollTarget,
@@ -379,6 +381,7 @@ export function QuestsPanel({
     if (claimingStreak) return;
     setClaimingStreak(true);
     setClaimMessage(null);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
     try {
       const res = await fetch('/api/quests/streak/claim', {
         method: 'POST',
@@ -405,6 +408,7 @@ export function QuestsPanel({
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaimingStreak(false);
     }
   };
@@ -414,6 +418,7 @@ export function QuestsPanel({
     if (claimingMoveToWeb) return;
     setClaimingMoveToWeb(true);
     setClaimMessage(null);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
     try {
       const res = await fetch('/api/quests/move-to-web/claim', {
         method: 'POST',
@@ -425,6 +430,7 @@ export function QuestsPanel({
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaimingMoveToWeb(false);
     }
   };
@@ -433,6 +439,7 @@ export function QuestsPanel({
     if (claimingObjectiveId) return;
     setClaimingObjectiveId(objectiveId);
     setClaimMessage(null);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
     try {
       const res = await fetch('/api/quests/claim-objective', {
         method: 'POST',
@@ -446,6 +453,7 @@ export function QuestsPanel({
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaimingObjectiveId(null);
     }
   };
@@ -458,6 +466,7 @@ export function QuestsPanel({
     if (!seasonId || claimingSeason) return;
     setClaimingSeason(true);
     setClaimMessage(null);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
     try {
       const res = await fetch('/api/quests/season/claim', {
         method: 'POST',
@@ -480,6 +489,7 @@ export function QuestsPanel({
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaimingSeason(false);
     }
   };
@@ -1876,6 +1886,7 @@ function LockedPlusPreview({
   onUpgrade?: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const { entered, markEntered } = useEntrance(true);
   const { frogOnLeft, rotation } = useMemo(() => {
     const tilts = [-9, -6, -4, 4, 6, 9];
     return {
@@ -1985,6 +1996,7 @@ function LockedPlusPreview({
           ease: [0.32, 0.72, 0, 1],
           duration: reduceMotion ? 0.12 : 0.4,
         }}
+        onAnimationComplete={markEntered}
         className="no-scrollbar relative max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-background px-5 pb-[calc(1.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.35)] md:max-w-md md:rounded-3xl md:px-6 md:pb-7 md:pt-5"
       >
         <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 md:hidden" />
@@ -1997,49 +2009,53 @@ function LockedPlusPreview({
           <X className="h-5 w-5" />
         </button>
 
-        {rewards.length > 1 ? (
-          <div className="relative mx-auto mt-10 flex w-full max-w-[22rem] items-end justify-between px-1 md:mt-7">
-            {rewardCard(rewards[0], 0)}
-            <div className="absolute bottom-0 left-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-10 min-[420px]:h-28 min-[420px]:w-28">
-              <Frog
-                className="h-full w-full -translate-x-[20%]"
-                width={144}
-                height={144}
-                indices={
-                  {
-                    ...wardrobeIndices,
-                    mood: 2,
-                  } as Partial<Record<WardrobeSlot, number>>
-                }
-              />
+        <SheetEnteredContext.Provider value={entered}>
+          {rewards.length > 1 ? (
+            <div className="relative mx-auto mt-10 flex w-full max-w-[22rem] items-end justify-between px-1 md:mt-7">
+              {rewardCard(rewards[0], 0)}
+              <div className="absolute bottom-0 left-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-10 min-[420px]:h-28 min-[420px]:w-28">
+                <Frog
+                  className="h-full w-full -translate-x-[20%]"
+                  width={144}
+                  height={144}
+                  indices={
+                    {
+                      ...wardrobeIndices,
+                      mood: 2,
+                    } as Partial<Record<WardrobeSlot, number>>
+                  }
+                  arrive="hop"
+                />
+              </div>
+              {rewardCard(rewards[1], 1)}
             </div>
-            {rewardCard(rewards[1], 1)}
-          </div>
-        ) : (
-          <div className="mt-2 flex items-center justify-center">
-            <div
-              className={cn(
-                'relative z-10 h-44 w-44 shrink-0 -translate-y-4 md:h-48 md:w-48',
-                frogOnLeft ? '-mr-12 md:-mr-14' : 'order-2 -ml-12 md:-ml-14',
-              )}
-            >
-              <Frog
-                className="h-full w-full"
-                width={192}
-                height={192}
-                indices={
-                  {
-                    ...wardrobeIndices,
-                    mood: 2,
-                  } as Partial<Record<WardrobeSlot, number>>
-                }
-              />
+          ) : (
+            <div className="mt-2 flex items-center justify-center">
+              <div
+                className={cn(
+                  'relative z-10 h-44 w-44 shrink-0 -translate-y-4 md:h-48 md:w-48',
+                  frogOnLeft ? '-mr-12 md:-mr-14' : 'order-2 -ml-12 md:-ml-14',
+                )}
+              >
+                <Frog
+                  className="h-full w-full"
+                  width={192}
+                  height={192}
+                  indices={
+                    {
+                      ...wardrobeIndices,
+                      mood: 2,
+                    } as Partial<Record<WardrobeSlot, number>>
+                  }
+                  arrive="hop"
+                />
+              </div>
+              <div className={frogOnLeft ? '' : 'order-1'}>
+                {rewards[0] ? rewardCard(rewards[0], 0) : null}
+              </div>
             </div>
-            <div className={frogOnLeft ? '' : 'order-1'}>
-              {rewards[0] ? rewardCard(rewards[0], 0) : null}
-            </div>
-          </div>
-        )}
+          )}
+        </SheetEnteredContext.Provider>
 
         <div className={cn('text-center', rewards.length > 1 ? 'mt-2' : 'mt-4')}>
           <h3

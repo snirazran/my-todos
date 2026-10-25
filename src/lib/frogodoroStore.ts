@@ -147,7 +147,11 @@ interface FrogodoroState {
   // Records a server-driven phase completion (the advance path doesn't go
   // through completePhase) so the UI can react: bump the completion signal that
   // opens the popup, and set whether the alarm is awaiting acknowledgement.
-  registerCompletion: (completedPhase: PomodoroPhase, awaitDone: boolean) => void;
+  registerCompletion: (
+    completedPhase: PomodoroPhase,
+    awaitDone: boolean,
+    silent?: boolean,
+  ) => void;
   setAwaitingDone: (value: boolean) => void;
   setDeepFocus: (value: boolean) => void;
   // Overtime: immediately start a short extra focus run on the same task
@@ -675,7 +679,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         });
       },
 
-      registerCompletion: (completedPhase, awaitDone) =>
+      registerCompletion: (completedPhase, awaitDone, silent = false) =>
         set((state) => ({
           lastCompletionId: state.lastCompletionId + 1,
           lastCompletedTaskId: state.selectedTaskId,
@@ -684,7 +688,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           pausedThisPhase: false,
           awaitingDone: awaitDone,
           // A server-driven completion is the clock running out, so it rings.
-          doneSilent: false,
+          doneSilent: silent,
         })),
 
       setAwaitingDone: (value) =>
@@ -759,6 +763,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             phaseElapsed:
               snapshot.finished === true ? full : state.phaseElapsed,
             awaitingDone: snapshot.finished === true ? true : state.awaitingDone,
+            lastCompletedPhase:
+              snapshot.finished === true && !state.awaitingDone
+                ? phase
+                : state.lastCompletedPhase,
             remainingByPhase: {
               ...state.remainingByPhase,
               [phase]: timeLeft,
@@ -883,14 +891,22 @@ export const useFrogodoroStore = create<FrogodoroState>()(
   ),
 );
 
-/** Snapshot of the sitting that just ended, from the live store. */
-/** A finished focus phase still waiting on its wrap-up screen. */
 export function isFocusWrapUp(
   state: Pick<FrogodoroState, 'awaitingDone' | 'lastCompletedPhase'>,
 ): boolean {
   return state.awaitingDone && state.lastCompletedPhase === 'focus';
 }
 
+export function lapsedFocusDetail(): SessionEndedDetail | undefined {
+  const live = useFrogodoroStore.getState();
+  if (!live.timerActive || !live.isRunning || live.phase !== 'focus') return undefined;
+  if (!live.endTime || live.endTime > Date.now()) return undefined;
+  if (live.settings.autoStartBreaks) return undefined;
+  const detail = endedSessionDetail();
+  return detail && { ...detail, focusSeconds: getPhaseDuration('focus', live.settings) };
+}
+
+/** Snapshot of the sitting that just ended, from the live store. */
 export function endedSessionDetail(): SessionEndedDetail | undefined {
   const live = useFrogodoroStore.getState();
   if (!live.sessionId || !live.selectedTaskId) return undefined;

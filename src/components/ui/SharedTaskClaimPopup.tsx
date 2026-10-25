@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 
 export function SharedTaskClaimPopup({
   text,
@@ -20,6 +21,7 @@ export function SharedTaskClaimPopup({
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const bonusFlies = useBuddyBonusFlies();
+  const { entered, markEntered } = useEntrance(true);
 
   useEffect(() => {
     const rect = btnRef.current?.getBoundingClientRect();
@@ -52,20 +54,23 @@ export function SharedTaskClaimPopup({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          onAnimationComplete={markEntered}
           onClick={(e) => e.stopPropagation()}
           className="w-full max-w-none rounded-t-[28px] bg-background px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-8 text-center sm:max-w-md sm:rounded-[28px]"
         >
-          <div className="mx-auto mb-3 flex h-24 w-40 items-end justify-center">
-            <div className="relative z-10 translate-x-4">
-              <Frog width={132} height={118} paused />
+          <SheetEnteredContext.Provider value={entered}>
+            <div className="mx-auto mb-3 flex h-24 w-40 items-end justify-center">
+              <div className="relative z-10 translate-x-4">
+                <Frog width={132} height={118} paused arrive="pop" />
+              </div>
+              <div className="relative z-0 -ml-10 -translate-x-2 scale-90">
+                <Frog width={132} height={118} paused arrive="pop" arriveDelay={140} />
+              </div>
+              <span className="absolute translate-y-1">
+                <Fly size={28} y={-3} paused />
+              </span>
             </div>
-            <div className="relative z-0 -ml-10 -translate-x-2 scale-90">
-              <Frog width={132} height={118} paused />
-            </div>
-            <span className="absolute translate-y-1">
-              <Fly size={28} y={-3} paused />
-            </span>
-          </div>
+          </SheetEnteredContext.Provider>
 
           <h2 className="text-xl font-black tracking-tight text-foreground">
             You&apos;re goal buddies with {partnerName}!

@@ -41,6 +41,7 @@ import { todayYmd } from '@/components/board/helpers';
 import { warmFrogStamps } from '@/lib/frogStampEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import type { FriendSummary } from '@/lib/friends/indices';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
@@ -184,6 +185,7 @@ function BuddyFlowScreen({
   const { inset } = useKeyboardInset(step === 'new');
   const keyboardInset = inputFocused ? inset : 0;
   useRegisterOpenSheet(true);
+  const { entered, markEntered } = useEntrance(true);
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data: shareable } = useSWR<ShareableResponse>(
@@ -490,18 +492,21 @@ function BuddyFlowScreen({
       animate={{ opacity: 1, y: 0 }}
       exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
       transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+      onAnimationComplete={markEntered}
       className="fixed inset-0 z-[1400] flex flex-col overflow-hidden bg-background"
     >
-      <PondHeader
-        tall={tall}
-        fill={space}
-        indices={indices}
-        frogRef={frogRef}
-        bubble={bubble}
-        target={tall ? target : null}
-        onBack={step === 'sent' ? null : goBack}
-        onClose={onClose}
-      />
+      <SheetEnteredContext.Provider value={entered}>
+        <PondHeader
+          tall={tall}
+          fill={space}
+          indices={indices}
+          frogRef={frogRef}
+          bubble={bubble}
+          target={tall ? target : null}
+          onBack={step === 'sent' ? null : goBack}
+          onClose={onClose}
+        />
+      </SheetEnteredContext.Provider>
 
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div ref={bodyRef}>
@@ -603,6 +608,7 @@ function PondHeader({
   onClose: () => void;
 }) {
   const [failed, setFailed] = useState(false);
+  const [landed, setLanded] = useState(false);
   const image = useMemo(
     () => readCachedBackground()?.images?.mobile || DEFAULT_BACKGROUND_IMAGES.mobile,
     [],
@@ -699,10 +705,17 @@ function PondHeader({
         className="pointer-events-none absolute inset-x-0 z-20 flex justify-center"
         style={{ bottom: FROG_SEAT_PX }}
       >
-        <Frog ref={frogRef} width={FROG_W} height={FROG_H} indices={indices} />
+        <Frog
+          ref={frogRef}
+          width={FROG_W}
+          height={FROG_H}
+          indices={indices}
+          arrive="rise"
+          onArrived={() => setLanded(true)}
+        />
       </div>
 
-      {bubble && (
+      {bubble && landed && (
         <div
           className="pointer-events-none absolute inset-x-0 z-30 h-0"
           style={{ bottom: FROG_HEAD_PX + 8 }}

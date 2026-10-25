@@ -13,6 +13,7 @@ import type { RevealCatalog } from '@/components/ui/questRewardReveal';
 import { useDismissNotification } from '@/components/providers/NotificationProvider';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import { useUIStore } from '@/lib/uiStore';
+import { holdAutoPopups, QUEST_CLAIM_HOLD, releaseAutoPopups } from '@/lib/popupGate';
 import type { RatingMoment } from '@/lib/rateApp';
 
 const RewardTile = dynamic(
@@ -846,6 +847,7 @@ function ClaimRewardToast({
       return;
     }
     setClaiming(true);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
     try {
       const res = await fetch(request.url, {
         method: 'POST',
@@ -867,6 +869,7 @@ function ClaimRewardToast({
       primeQuestsPageCache();
       await refreshQuestHomeView();
     } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaiming(false);
     }
   };

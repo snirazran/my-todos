@@ -25,6 +25,8 @@ import { useUIStore } from '@/lib/uiStore';
 /** Held by the daily login-streak flow, from check-in until its sheet closes. */
 export const LOGIN_STREAK_HOLD = 'login-streak';
 
+export const QUEST_CLAIM_HOLD = 'quest-claim';
+
 /** A hold nobody releases would mute every popup forever, so each one expires. */
 const DEFAULT_HOLD_MS = 20_000;
 /** Quiet beat after the holder is done, so the next popup isn't a jump cut. */

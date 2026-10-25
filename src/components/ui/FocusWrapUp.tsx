@@ -61,6 +61,7 @@ type ReviewTask = { id: string; text: string; completed: boolean; tags?: string[
 type QuestHome = { claimables?: Claimable[]; trackables?: Trackable[] };
 
 const Z_INDEX = 10060;
+const WIDE_QUERY = '(min-width: 1024px)';
 const CLOSE_SHIELD_MS = 450;
 const OTHERS_SHOWN = 4;
 const BREAK_IDEA_DELAY_MS = 6500;
@@ -321,7 +322,7 @@ export function FocusWrapUp({
   onOutcome: (outcome: ReviewOutcome) => void;
 }>) {
   const reduceMotion = !!useReducedMotion();
-  const isDesktop = useMediaQuery('(min-width: 640px)');
+  const wide = useMediaQuery(WIDE_QUERY);
   const compact = useMediaQuery('(max-height: 740px)');
   const [mounted, setMounted] = useState(false);
   const [breakMinutes, setBreakMinutes] = useState(5);
@@ -568,7 +569,7 @@ export function FocusWrapUp({
     const amount = focusAmount(review.focusSeconds);
     const headline = subjectHeadline(review.subjectKind, review.subjectLabel);
     const subtitle = review.subjectKind === 'open' ? 'of focus' : `on ${headline}`;
-    const frogWidth = compact ? 168 : 200;
+    const frogWidth = !wide && compact ? 168 : 200;
     const frogHeight = Math.round(frogWidth * 1.125);
     const spokenLine = line || openingLine;
     const checkedOthers = others.filter((t) => finishedIds.has(t.id)).length;
@@ -649,168 +650,336 @@ export function FocusWrapUp({
       </div>
     );
 
-    return (
-      <div className={cn('flex flex-col', !isDesktop && 'min-h-full')}>
-        <div className="relative flex flex-1 flex-col items-center px-5 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pt-4">
-          <div className="relative z-30 flex w-full justify-end">
+    const closeButton = (
+      <button
+        type="button"
+        onClick={() => finish({ kind: 'done' })}
+        aria-label="Close"
+        className={cn(
+          'grid place-items-center rounded-full bg-white/20 text-white transition-[background-color,transform] hover:bg-white/30 active:scale-95',
+          wide ? 'h-11 w-11' : 'h-10 w-10',
+        )}
+      >
+        <X className="h-5 w-5" strokeWidth={2.75} />
+      </button>
+    );
+
+    const heroStats = (
+      <>
+        <motion.h2
+          id="focus-wrapup-title"
+          aria-label={`${amount.value} ${amount.spoken} ${subtitle}`}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.18 }}
+          className={cn(
+            'flex items-baseline',
+            wide ? 'origin-left gap-3' : 'justify-center gap-2',
+          )}
+        >
+          <span
+            className={cn(
+              'font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums',
+              wide ? 'text-[136px]' : compact ? 'text-[68px]' : 'text-[84px]',
+            )}
+          >
+            <CountUp value={amount.value} run={!reduceMotion} />
+          </span>
+          <span
+            className={cn(
+              'font-black leading-none tracking-tight text-white/80 drop-shadow-lg',
+              wide ? 'text-[40px]' : compact ? 'text-[24px]' : 'text-[28px]',
+            )}
+          >
+            {amount.unit}
+          </span>
+        </motion.h2>
+        <motion.p
+          {...rise(0.3)}
+          className={cn(
+            'font-black text-white/85',
+            wide
+              ? 'mt-1 line-clamp-2 max-w-[26rem] text-[22px] leading-snug'
+              : 'mt-2.5 max-w-[19rem] truncate text-[15px]',
+          )}
+          aria-hidden="true"
+        >
+          {subtitle}
+        </motion.p>
+
+        {(showFly || scene.bonusFly || questReady) && (
+          <div
+            className={cn(
+              'flex flex-wrap items-center gap-2',
+              wide ? 'mt-6' : 'mt-3 justify-center',
+            )}
+          >
+            {showFly && (
+              <motion.span
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.8 }}
+                className="flex h-8 items-center gap-1.5 rounded-full bg-black/20 pl-2.5 pr-3 text-[13px] font-black text-white"
+              >
+                <FlyIcon textPx={14} />+{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
+              </motion.span>
+            )}
+            {scene.bonusFly && (
+              <motion.span
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.92 }}
+                className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
+              >
+                <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                +1 fly · Deep focus
+              </motion.span>
+            )}
+            {questReady && (
+              <motion.span
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 1.02 }}
+                className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                Quest reward ready!
+              </motion.span>
+            )}
+          </div>
+        )}
+
+        {focusQuest && (wide || !compact) && !questReady && (
+          <motion.div
+            {...rise(0.95)}
+            className={cn(
+              'w-full rounded-2xl bg-black/15 px-3.5 py-2.5 text-left',
+              wide ? 'mt-6 max-w-[360px]' : 'mt-3 max-w-[300px]',
+            )}
+          >
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <p className="truncate text-[12px] font-black text-white/90">
+                {focusQuest.objectiveLabel}
+              </p>
+              <p className="shrink-0 text-[12px] font-black tabular-nums text-white">
+                {Math.min(focusQuest.progress, questTarget)}/{questTarget}
+              </p>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-black/25">
+              <motion.div
+                className="h-full w-full rounded-full bg-white"
+                style={{ originX: 0 }}
+                initial={{ scaleX: reduceMotion ? questTo : questFrom }}
+                animate={{ scaleX: questTo }}
+                transition={{ delay: 1.1, duration: 0.9, ease: SOFT_EASE }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </>
+    );
+
+    const frogStage = (
+      <div
+        className="pointer-events-none relative z-20"
+        style={{
+          width: frogWidth,
+          height: frogHeight,
+          marginTop: wide ? 0 : -Math.round(frogHeight * 0.22),
+          marginBottom: -10,
+        }}
+      >
+        {frogDressed && spokenLine && (
+          <FrogSpeechBubble
+            rate={0}
+            done={0}
+            total={0}
+            fixedMessage={spokenLine}
+            className={frogWidth === 168 ? '!top-[105px]' : '!top-[125px]'}
+          />
+        )}
+        {!reduceMotion && <Burst />}
+        <motion.div
+          className="absolute inset-0"
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -40, scale: 0.85 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={
+            reduceMotion
+              ? { duration: 0.2 }
+              : { delay: 0.42, type: 'spring', stiffness: 380, damping: 19 }
+          }
+        >
+          {!frogDressed && (
+            <FrogSnapshot
+              indices={frogIndices}
+              width={frogWidth}
+              height={frogHeight}
+              className="absolute inset-0"
+            />
+          )}
+          {entered && (
+            <div className="absolute inset-0">
+              <Frog
+                ref={frogRef}
+                width={frogWidth}
+                height={frogHeight}
+                indices={frogIndices}
+                emote={cheering ? 'love' : null}
+                ignoreIdlePause
+                onDressed={() => setFrogDressed(true)}
+              />
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
+
+    const panelBody = (
+      <>
+        {(tasksLoading || subjectTask || others.length > 0) && (
+          <motion.section {...rise(0.4)} aria-labelledby="focus-wrapup-tasks" className="mb-5">
+            <h3
+              id="focus-wrapup-tasks"
+              className="mb-3 px-0.5 text-[19px] font-black tracking-[-0.01em] text-foreground"
+            >
+              {subjectTask || (tasksLoading && review.subjectKind === 'task')
+                ? 'Did you finish?'
+                : 'Did you finish anything?'}
+            </h3>
+
+            {tasksLoading ? (
+              <div className="h-16 animate-pulse rounded-[20px] bg-muted" />
+            ) : subjectTask ? (
+              <>
+                <TaskCheckRow
+                  task={subjectTask}
+                  done={finishedIds.has(subjectTask.id)}
+                  big
+                  onToggle={() => toggleFinished(subjectTask, true)}
+                />
+                {others.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        hapticTick();
+                        setOthersOpen((v) => !v);
+                      }}
+                      aria-expanded={othersOpen}
+                      className="flex h-11 w-full items-center gap-2.5 rounded-2xl px-1 text-[14px] font-black text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <motion.span
+                        animate={{ rotate: othersOpen ? 45 : 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                        className="grid h-7 w-7 place-items-center rounded-full bg-muted"
+                      >
+                        <Plus className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
+                      </motion.span>
+                      {!othersOpen && checkedOthers > 0
+                        ? `${checkedOthers} more done`
+                        : 'Finished something else?'}
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {othersOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.26, ease: SOFT_EASE }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-1">{othersList}</div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </>
+            ) : (
+              othersList
+            )}
+          </motion.section>
+        )}
+
+        <motion.div {...rise(0.5)} className="flex flex-col gap-3">
+          {scene.nextLocked ? (
             <button
               type="button"
               onClick={() => finish({ kind: 'done' })}
-              aria-label="Close"
-              className="grid h-10 w-10 place-items-center rounded-full bg-white/20 text-white transition-[background-color,transform] hover:bg-white/30 active:scale-95"
+              className="flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[17px] font-black text-primary-foreground shadow-[0_5px_0_0_#2c511a] transition-[transform,box-shadow] duration-100 active:translate-y-[5px] active:shadow-none"
             >
-              <X className="h-5 w-5" strokeWidth={2.75} />
+              <Check className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
+              Done
             </button>
-          </div>
-
-          <div className="flex w-full flex-1 flex-col items-center justify-center pb-2 text-center">
-            <motion.h2
-              id="focus-wrapup-title"
-              aria-label={`${amount.value} ${amount.spoken} ${subtitle}`}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.18 }}
-              className="flex items-baseline justify-center gap-2"
-            >
-              <span
-                className={cn(
-                  'insights-title leading-none tabular-nums',
-                  compact ? 'text-[60px]' : 'text-[76px]',
-                )}
+          ) : (
+            <>
+              {breakFirst ? (
+                <>
+                  {breakButton}
+                  {focusButton}
+                </>
+              ) : (
+                <>
+                  {focusButton}
+                  {breakButton}
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => finish({ kind: 'done' })}
+                className="h-11 w-full rounded-2xl text-[15px] font-black text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
               >
-                <CountUp value={amount.value} run={!reduceMotion} />
-              </span>
-              <span className={cn('insights-title leading-none', compact ? 'text-[28px]' : 'text-[34px]')}>
-                {amount.unit}
-              </span>
-            </motion.h2>
-            <motion.p
-              {...rise(0.3)}
-              className="mt-2.5 max-w-[19rem] truncate text-[15px] font-black text-white/85"
-              aria-hidden="true"
-            >
-              {subtitle}
-            </motion.p>
+                I&apos;m done for now
+              </button>
+            </>
+          )}
+        </motion.div>
+      </>
+    );
 
-            {(showFly || scene.bonusFly || questReady) && (
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                {showFly && (
-                  <motion.span
-                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.8 }}
-                    className="flex h-8 items-center gap-1.5 rounded-full bg-black/20 pl-2.5 pr-3 text-[13px] font-black text-white"
-                  >
-                    <FlyIcon textPx={14} />+{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
-                  </motion.span>
-                )}
-                {scene.bonusFly && (
-                  <motion.span
-                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.92 }}
-                    className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
-                  >
-                    <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-                    +1 fly · Deep focus
-                  </motion.span>
-                )}
-                {questReady && (
-                  <motion.span
-                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 1.02 }}
-                    className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    Quest reward ready!
-                  </motion.span>
-                )}
-              </div>
-            )}
-
-            {focusQuest && !compact && !questReady && (
-              <motion.div
-                {...rise(0.95)}
-                className="mt-3 w-full max-w-[300px] rounded-2xl bg-black/15 px-3.5 py-2.5 text-left"
-              >
-                <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                  <p className="truncate text-[12px] font-black text-white/90">
-                    {focusQuest.objectiveLabel}
-                  </p>
-                  <p className="shrink-0 text-[12px] font-black tabular-nums text-white">
-                    {Math.min(focusQuest.progress, questTarget)}/{questTarget}
-                  </p>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-black/25">
-                  <motion.div
-                    className="h-full w-full rounded-full bg-white"
-                    style={{ originX: 0 }}
-                    initial={{ scaleX: reduceMotion ? questTo : questFrom }}
-                    animate={{ scaleX: questTo }}
-                    transition={{ delay: 1.1, duration: 0.9, ease: SOFT_EASE }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </div>
-
-          {!reduceMotion && <Ripples />}
-
+    if (wide) {
+      return (
+        <div className="relative flex min-h-full px-12 py-12">
           <div
-            className="pointer-events-none relative z-20"
-            style={{
-              width: frogWidth,
-              height: frogHeight,
-              marginTop: -Math.round(frogHeight * 0.22),
-              marginBottom: -10,
-            }}
-          >
-            {frogDressed && spokenLine && (
-              <FrogSpeechBubble
-                rate={0}
-                done={0}
-                total={0}
-                fixedMessage={spokenLine}
-                className={compact ? '!top-[105px]' : '!top-[125px]'}
-              />
-            )}
-            {!reduceMotion && <Burst />}
-            <motion.div
-              className="absolute inset-0"
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -40, scale: 0.85 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={
-                reduceMotion
-                  ? { duration: 0.2 }
-                  : { delay: 0.42, type: 'spring', stiffness: 380, damping: 19 }
-              }
-            >
-              {!frogDressed && (
-                <FrogSnapshot
-                  indices={frogIndices}
-                  width={frogWidth}
-                  height={frogHeight}
-                  className="absolute inset-0"
-                />
-              )}
-              {entered && (
-                <div className="absolute inset-0">
-                  <Frog
-                    ref={frogRef}
-                    width={frogWidth}
-                    height={frogHeight}
-                    indices={frogIndices}
-                    emote={cheering ? 'love' : null}
-                    ignoreIdlePause
-                    onDressed={() => setFrogDressed(true)}
-                  />
-                </div>
-              )}
-            </motion.div>
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_45%,rgba(255,255,255,0.13),transparent_55%)]"
+          />
+          <div className="relative m-auto grid w-full max-w-[64rem] grid-cols-[1.1fr_1fr] items-center gap-16">
+            <div className="flex min-w-0 flex-col items-start text-left">{heroStats}</div>
+            <div className="flex w-full max-w-[26rem] flex-col items-center justify-self-center">
+              <div className="relative flex w-full justify-center">
+                {!reduceMotion && <Ripples />}
+                {frogStage}
+              </div>
+              <motion.div
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={
+                  reduceMotion
+                    ? { duration: 0.2 }
+                    : { type: 'spring', stiffness: 300, damping: 30, delay: 0.2 }
+                }
+                className="relative z-10 w-full rounded-[32px] bg-background px-7 pb-6 pt-7 text-foreground shadow-[0_28px_60px_-24px_rgba(10,40,16,0.6)]"
+              >
+                {panelBody}
+              </motion.div>
+            </div>
           </div>
+          <div className="absolute right-6 top-6 z-30">{closeButton}</div>
         </div>
+      );
+    }
 
+    return (
+      <div className="flex min-h-full flex-col">
+        <div className="relative flex flex-1 flex-col items-center px-5 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+          <div className="relative z-30 flex w-full justify-end">{closeButton}</div>
+          <div className="flex w-full flex-1 flex-col items-center justify-center pb-2 text-center">
+            {heroStats}
+          </div>
+          {!reduceMotion && <Ripples />}
+          {frogStage}
+        </div>
         <motion.div
           initial={reduceMotion ? { opacity: 0 } : { y: '100%' }}
           animate={{ y: 0, opacity: 1 }}
@@ -819,156 +988,28 @@ export function FocusWrapUp({
               ? { duration: 0.2 }
               : { type: 'spring', stiffness: 300, damping: 34, delay: 0.2 }
           }
-          className="relative z-10 rounded-t-[32px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-7 text-foreground shadow-[0_-14px_32px_-14px_rgba(10,40,16,0.5)] sm:px-6 sm:pb-5"
+          className="relative z-10 rounded-t-[32px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-7 text-foreground shadow-[0_-14px_32px_-14px_rgba(10,40,16,0.5)]"
         >
-          {(tasksLoading || subjectTask || others.length > 0) && (
-            <motion.section {...rise(0.4)} aria-labelledby="focus-wrapup-tasks" className="mb-5">
-              <h3
-                id="focus-wrapup-tasks"
-                className="mb-3 px-0.5 text-[19px] font-black tracking-[-0.01em] text-foreground"
-              >
-                {subjectTask || (tasksLoading && review.subjectKind === 'task')
-                  ? 'Did you finish?'
-                  : 'Did you finish anything?'}
-              </h3>
-
-              {tasksLoading ? (
-                <div className="h-16 animate-pulse rounded-[20px] bg-muted" />
-              ) : subjectTask ? (
-                <>
-                  <TaskCheckRow
-                    task={subjectTask}
-                    done={finishedIds.has(subjectTask.id)}
-                    big
-                    onToggle={() => toggleFinished(subjectTask, true)}
-                  />
-                  {others.length > 0 && (
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          hapticTick();
-                          setOthersOpen((v) => !v);
-                        }}
-                        aria-expanded={othersOpen}
-                        className="flex h-11 w-full items-center gap-2.5 rounded-2xl px-1 text-[14px] font-black text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        <motion.span
-                          animate={{ rotate: othersOpen ? 45 : 0 }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                          className="grid h-7 w-7 place-items-center rounded-full bg-muted"
-                        >
-                          <Plus className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
-                        </motion.span>
-                        {!othersOpen && checkedOthers > 0
-                          ? `${checkedOthers} more done`
-                          : 'Finished something else?'}
-                      </button>
-                      <AnimatePresence initial={false}>
-                        {othersOpen && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.26, ease: SOFT_EASE }}
-                            className="overflow-hidden"
-                          >
-                            <div className="pt-1">{othersList}</div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
-                </>
-              ) : (
-                othersList
-              )}
-            </motion.section>
-          )}
-
-          <motion.div {...rise(0.5)} className="flex flex-col gap-3">
-            {scene.nextLocked ? (
-              <button
-                type="button"
-                onClick={() => finish({ kind: 'done' })}
-                className="flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[17px] font-black text-primary-foreground shadow-[0_5px_0_0_#2c511a] transition-[transform,box-shadow] duration-100 active:translate-y-[5px] active:shadow-none"
-              >
-                <Check className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
-                Done
-              </button>
-            ) : (
-              <>
-                {breakFirst ? (
-                  <>
-                    {breakButton}
-                    {focusButton}
-                  </>
-                ) : (
-                  <>
-                    {focusButton}
-                    {breakButton}
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => finish({ kind: 'done' })}
-                  className="h-11 w-full rounded-2xl text-[15px] font-black text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                >
-                  I&apos;m done for now
-                </button>
-              </>
-            )}
-          </motion.div>
+          <div className="mx-auto w-full max-w-[28rem]">{panelBody}</div>
         </motion.div>
       </div>
     );
   })();
 
-  const origin: WrapUpOrigin =
-    scene?.origin ??
-    (typeof window !== 'undefined'
-      ? { top: Math.round(window.innerHeight * 0.45), right: 12, bottom: 16, left: 12 }
-      : { top: 0, right: 0, bottom: 0, left: 0 });
+  const defaultOrigin = (): WrapUpOrigin => {
+    if (typeof window === 'undefined') return { top: 0, right: 0, bottom: 0, left: 0 };
+    const { innerWidth: w, innerHeight: h } = window;
+    if (!wide) return { top: Math.round(h * 0.45), right: 12, bottom: 16, left: 12 };
+    const side = Math.max(24, Math.round((w - 440) / 2));
+    const edge = Math.max(24, Math.round(h * 0.16));
+    return { top: edge, right: side, bottom: edge, left: side };
+  };
+  const origin: WrapUpOrigin = scene?.origin ?? defaultOrigin();
 
   return createPortal(
     <>
       <AnimatePresence>
-        {visible && isDesktop && (
-          <motion.div
-            key="wrapup-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            onClick={() => finish({ kind: 'done' })}
-            className="fixed inset-0 bg-black/70"
-            style={{ zIndex: Z_INDEX }}
-          />
-        )}
-        {visible && isDesktop && (
-          <div
-            key="wrapup-card"
-            className="pointer-events-none fixed inset-0 flex items-center justify-center p-6"
-            style={{ zIndex: Z_INDEX + 1 }}
-          >
-            <motion.div
-              ref={dialogRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="focus-wrapup-title"
-              tabIndex={-1}
-              onPointerDownCapture={acknowledge}
-              onKeyDownCapture={acknowledge}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 14 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.18 } }}
-              transition={reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 380, damping: 32 }}
-              className="pointer-events-auto max-h-[min(880px,92dvh)] w-full max-w-[440px] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[32px] bg-primary text-primary-foreground shadow-2xl outline-none dark:bg-green-700 dark:text-white"
-            >
-              {content}
-            </motion.div>
-          </div>
-        )}
-        {visible && !isDesktop && (
+        {visible && (
           <motion.div
             key="wrapup-sheet"
             ref={dialogRef}

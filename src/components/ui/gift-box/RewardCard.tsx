@@ -1225,6 +1225,7 @@ export const RewardCard = ({
                         width={300}
                         height={300}
                         paused={paused}
+                        arrive="pop"
                       />
                     )}
                   </motion.div>

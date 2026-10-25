@@ -14,6 +14,7 @@ import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 import { useUIStore } from '@/lib/uiStore';
 import { WardrobePageSkeleton } from '@/components/ui/Skeleton';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
+import { BackgroundCrossfade } from '@/components/ui/BackgroundCrossfade';
 import {
   PurchaseBurst,
   usePurchaseCelebration,
@@ -73,6 +74,8 @@ function WardrobePageInner() {
     return bgItem?.images ?? DEFAULT_BACKGROUND_IMAGES;
   }, [bgData?.equipped, bgData?.catalog]);
   const stageImages = tryOn?.kind === 'bg' ? tryOn.images : equippedBgImages;
+  const stageBackgroundId =
+    tryOn?.kind === 'bg' ? tryOn.id : (bgData?.equipped ?? 'default-bg');
 
   const purchaseBurst = usePurchaseCelebration();
 
@@ -122,22 +125,7 @@ function WardrobePageInner() {
 
   const stageBackground = (
     <div className="absolute inset-x-0 top-0 h-[calc(440px+env(safe-area-inset-top))] md:h-[480px]">
-      <picture key={tryOn?.kind === 'bg' ? tryOn.id : 'equipped'} className="block h-full w-full">
-        {stageImages.webLarge && (
-          <source media="(min-width: 1920px)" srcSet={stageImages.webLarge} />
-        )}
-        {stageImages.web && <source media="(min-width: 1280px)" srcSet={stageImages.web} />}
-        {stageImages.tablet && (
-          <source media="(min-width: 768px)" srcSet={stageImages.tablet} />
-        )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={stageImages.mobile}
-          alt=""
-          draggable={false}
-          className="h-full w-full object-cover object-top"
-        />
-      </picture>
+      <BackgroundCrossfade id={stageBackgroundId} images={stageImages} />
     </div>
   );
 

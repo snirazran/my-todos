@@ -8,6 +8,7 @@ import useSWR, { mutate as swrMutate } from 'swr';
 import jsQR from 'jsqr';
 import Frog from '@/components/ui/frog';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import { isNativeScan, parseFriendValue } from '@/lib/friends/scan';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { shareLink } from '@/lib/share';
@@ -30,6 +31,7 @@ export function QRFriendModal({
   indices?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
 }) {
   useRegisterOpenSheet(open);
+  const { entered, markEntered } = useEntrance(open);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -56,6 +58,7 @@ export function QRFriendModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          onAnimationComplete={markEntered}
           className="fixed inset-0 z-[1500] flex justify-center sm:items-center sm:bg-black/70 sm:p-6"
           data-qr-modal
           onClick={(e) => {
@@ -76,7 +79,9 @@ export function QRFriendModal({
               {!isDesktop && tab === 'scan' ? (
                 <ScanView active={open && tab === 'scan'} onClose={onClose} />
               ) : (
-                <MyCodeView indices={indices} isDesktop={isDesktop} />
+                <SheetEnteredContext.Provider value={entered}>
+                  <MyCodeView indices={indices} isDesktop={isDesktop} />
+                </SheetEnteredContext.Provider>
               )}
             </div>
 
@@ -201,6 +206,7 @@ function MyCodeView({
             width={isDesktop ? 230 : 150}
             height={isDesktop ? 259 : 169}
             indices={indices}
+            arrive="drop"
           />
         </div>
 

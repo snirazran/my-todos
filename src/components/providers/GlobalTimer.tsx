@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogodoroStore';
+import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import {
   playTimerSoundUntilStopped,
   playTransitionBeep,
@@ -535,7 +536,11 @@ export function GlobalTimer() {
           playTransitionBeep();
           hapticImpact();
         } else {
-          registerCompletion(completedPhase, true);
+          registerCompletion(
+            completedPhase,
+            true,
+            useFrogodoroUiStore.getState().wrapUpOpen,
+          );
         }
       }
 
@@ -556,8 +561,9 @@ export function GlobalTimer() {
     const state = await getCurrentLiveActivityState();
     if (!state?.active) return;
 
+    const phaseText = state.finished ? state.subtitle : state.label;
     const phase: PomodoroPhase =
-      state.label.toLowerCase().includes('break') ? 'break' : 'focus';
+      phaseText.toLowerCase().includes('break') ? 'break' : 'focus';
     const running = !state.paused && state.endTime > 0 && state.finished !== true;
     const timeLeft = running
       ? Math.max(0, Math.round((state.endTime - Date.now()) / 1000))

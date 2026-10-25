@@ -73,10 +73,10 @@ export function BuddyNudgeSheet({
                   className="relative flex h-full w-full items-end justify-center"
                 >
                   <div className="relative z-10 translate-x-4">
-                    <Frog width={132} height={118} indices={indices} paused />
+                    <Frog width={132} height={118} indices={indices} paused arrive="pop" />
                   </div>
                   <div className="relative z-0 -ml-10 -translate-x-2 scale-90">
-                    <Frog width={132} height={118} paused />
+                    <Frog width={132} height={118} paused arrive="pop" arriveDelay={140} />
                   </div>
                   <span className="absolute -top-1 left-1/2 -translate-x-1/2">
                     <Fly size={30} y={-3} paused />
