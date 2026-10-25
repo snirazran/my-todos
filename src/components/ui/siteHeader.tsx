@@ -2299,10 +2299,10 @@ function QuickTilesGrid({
   return (
     <div className="grid grid-cols-2 gap-3">
       <QuickTile
-        icon={<Icon name="compass" label="Areas" className="h-[52px] w-[52px]" />}
-        title="Areas"
-        subtitle="Pick your focus"
-        onClick={onOpenQuestFocus}
+        icon={<Icon name="patterns" label="Your patterns" className="h-[52px] w-[52px]" />}
+        title="Your patterns"
+        subtitle="See what’s working"
+        onClick={() => window.location.assign('/insights')}
       />
       <QuickTile
         icon={<Icon name="shuffle" label="Style Shuffle" className="h-[52px] w-[52px]" />}
@@ -2311,10 +2311,10 @@ function QuickTilesGrid({
         onClick={() => setRotationOpen(true)}
       />
       <QuickTile
-        icon={<Icon name="patterns" label="Your patterns" className="h-[52px] w-[52px]" />}
-        title="Your patterns"
-        subtitle="See what’s working"
-        onClick={() => window.location.assign('/insights')}
+        icon={<Icon name="compass" label="Areas" className="h-[52px] w-[52px]" />}
+        title="Areas"
+        subtitle="Pick your focus"
+        onClick={onOpenQuestFocus}
       />
       <QuickTile
         icon={<Icon name="clock" label="Focus timer" className="h-[52px] w-[52px]" />}

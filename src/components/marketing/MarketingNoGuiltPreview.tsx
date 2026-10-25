@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
+import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 
 const states = [
   {
@@ -58,12 +59,9 @@ export function MarketingNoGuiltPreview() {
         </div>
 
         <div className="relative mt-8 flex h-[210px] items-end justify-center">
-          <p
-            key={`line-${state.id}`}
-            className="ph-bubble-in absolute left-1/2 top-0 z-20 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-white px-4 py-2 text-sm font-black text-[#0f2e1d] shadow-[0_3px_0_rgba(15,46,29,0.12)]"
-          >
-            {state.line}
-          </p>
+          <div className="pointer-events-none absolute inset-x-0 top-[72px] z-20 h-0">
+            <FrogSpeechBubble rate={0} done={0} total={0} fixedMessage={state.line} className="!top-0" />
+          </div>
           <Image
             key={state.frog}
             src={state.frog}

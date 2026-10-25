@@ -83,7 +83,7 @@ export function WeeklyCoachCard({ facts }: { facts: WeeklyFacts }) {
 
   return (
     <section
-      className="relative overflow-hidden rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6"
+      className="relative overflow-hidden rounded-[24px] border border-border/60 bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_-22px_rgba(15,23,42,0.35)] md:p-6"
       aria-labelledby="coach-heading"
     >
       <div className="flex items-center gap-2">

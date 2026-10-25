@@ -31,7 +31,7 @@ export function BuddyNudgeCardView({
   onDismiss: () => void;
 }) {
   return (
-    <div className="mx-1.5 mt-16 md:mx-4 md:mt-20">
+    <div className="mx-1.5 mt-[76px] md:mx-4 md:mt-[92px]">
       <div className="relative">
         <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-[98px] flex justify-center">
           <span className="relative flex items-end">
@@ -42,7 +42,7 @@ export function BuddyNudgeCardView({
               <Frog width={FROG_W} height={FROG_H} paused />
             </span>
             <span className="buddy-nudge-fly absolute left-1/2 top-[26px] -ml-[14px]">
-              <Fly size={28} y={-1} paused interactive={false} />
+              <Fly size={28} y={-1} interactive={false} />
             </span>
           </span>
         </div>

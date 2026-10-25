@@ -1700,6 +1700,13 @@ body.dragging {
   outline-offset: 3px;
 }
 
+.plus-paywall .frog-bubble {
+  --card: 0 0% 100%;
+  --foreground: 0 0% 3.9%;
+  --primary: 115 33% 37%;
+  filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.08)) drop-shadow(0 6px 12px rgba(15, 23, 42, 0.16));
+}
+
 @keyframes plus-emblem-float {
   0%,
   100% {
@@ -1792,6 +1799,87 @@ body.dragging {
   100% {
     opacity: 1;
     transform: translateX(440%) skewX(-20deg);
+  }
+}
+
+@keyframes plus-benefit-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes plus-benefit-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-14deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.1) rotate(4deg);
+  }
+  78% {
+    transform: scale(0.96) rotate(-1.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .plus-benefit-rise {
+    animation: plus-benefit-rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: transform, opacity;
+  }
+
+  .plus-benefit-pop {
+    animation: plus-benefit-pop 560ms cubic-bezier(0.33, 1, 0.68, 1) both;
+    will-change: transform, opacity;
+  }
+}
+
+.insights-title {
+  font-family: var(--font-display), 'Luckiest Guy', cursive;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: #fffdf5;
+  -webkit-text-stroke: 4px #0f2e1d;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 #0f2e1d;
+}
+
+@keyframes insights-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes insights-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .insights-grow-x {
+    transform-origin: left;
+    animation: insights-grow-x 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .insights-grow-y {
+    transform-origin: bottom;
+    animation: insights-grow-y 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
 
@@ -1992,17 +2080,6 @@ body.dragging {
   50% { box-shadow: 0 0 0 7px rgba(79, 145, 73, 0); }
 }
 
-@keyframes ph-bubble-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 8px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
-  }
-}
-
 @keyframes ph-frog-swap {
   0% { transform: translateY(18px) scaleY(0.9); opacity: 0.4; }
   55% { transform: translateY(-6px) scaleY(1.04); opacity: 1; }
@@ -2027,9 +2104,6 @@ body.dragging {
 [data-public-home] .ph-fly-ring {
   animation: ph-fly-ring 1.8s ease-in-out infinite;
 }
-[data-public-home] .ph-bubble-in {
-  animation: ph-bubble-in 360ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
-}
 [data-public-home] .ph-frog-swap {
   transform-origin: bottom center;
   animation: ph-frog-swap 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -2042,7 +2116,6 @@ body.dragging {
   [data-public-home] .ph-task-in,
   [data-public-home] .ph-check-pop,
   [data-public-home] .ph-fly-ring,
-  [data-public-home] .ph-bubble-in,
   [data-public-home] .ph-frog-swap {
     animation: none;
   }

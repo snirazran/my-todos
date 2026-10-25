@@ -2,12 +2,10 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR, { mutate as revalidateAll } from 'swr';
-import { Check, ChevronDown, Loader2 } from 'lucide-react';
-import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
+import { Check, ChevronDown, Loader2, Play } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
-import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
@@ -358,89 +356,73 @@ function FreeFliesCard({
         disabled={busy || exhausted || waiting}
         aria-label={idle ? `Watch an ad for ${reward} flies` : undefined}
         className={cn(
-          'group relative flex w-full items-center gap-3 rounded-[24px] p-3 text-left ring-1 transition-all sm:p-3.5',
+          'group relative flex w-full items-center gap-3 rounded-[22px] py-3 pl-3 pr-3.5 text-left transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
           exhausted
-            ? 'bg-muted/40 ring-border/60'
-            : 'bg-card ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.10)] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.35)]',
-          idle && 'hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none',
+            ? 'bg-muted/50'
+            : 'bg-gradient-to-b from-amber-100/80 to-amber-50 dark:from-amber-950/70 dark:to-slate-900',
+          idle && 'active:scale-[0.985]',
         )}
       >
         <span
+          aria-hidden
           className={cn(
-            'grid h-12 w-12 shrink-0 place-items-center rounded-2xl sm:h-14 sm:w-14',
-            exhausted ? 'bg-muted' : 'bg-primary/10',
+            'relative h-14 w-14 shrink-0 rounded-full',
+            exhausted ? 'grid place-items-center bg-muted' : 'bg-white/80 dark:bg-white/10',
           )}
         >
-          {busy ? (
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          {exhausted ? (
+            <Check className="h-6 w-6 text-muted-foreground" strokeWidth={3} />
           ) : (
-            <AdPlayIcon
-              className={cn(
-                'h-6 w-6 sm:h-7 sm:w-7',
-                exhausted ? 'text-muted-foreground' : 'text-primary',
-              )}
-              strokeWidth={2.5}
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/widgets/Fly.svg" alt="" className="absolute left-[13px] top-[15px] h-[30px] w-[30px] motion-safe:animate-[fly-bob_2.4s_ease-in-out_infinite]" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/widgets/Fly.svg" alt="" className="absolute right-0.5 top-0 h-4 w-4 motion-safe:animate-[fly-bob_2.8s_ease-in-out_0.4s_infinite]" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/widgets/Fly.svg" alt="" className="absolute bottom-1 left-0 h-3.5 w-3.5 motion-safe:animate-[fly-bob_2.6s_ease-in-out_0.9s_infinite]" />
+            </>
           )}
         </span>
 
         <span className="min-w-0 flex-1">
-          <span
-            className={cn(
-              'block text-sm font-black tracking-tight sm:text-[15px]',
-              exhausted ? 'text-muted-foreground' : 'text-foreground',
-            )}
-          >
-            {exhausted
-              ? 'All caught for today'
-              : waiting
-                ? 'Warming up the next one'
-                : `Get ${reward} flies`}
-          </span>
-          <span
-            className={cn(
-              'mt-0.5 block text-xs font-semibold',
-              exhausted ? 'text-muted-foreground/70' : 'text-muted-foreground',
-            )}
-          >
-            {exhausted
-              ? `Your ${cap} free rounds refill tomorrow.`
-              : waiting
-                ? 'One at a time — just a moment.'
-                : 'They land straight in your jar.'}
-          </span>
-          {/* Rounds left is the only honest scarcity in this sheet, so it is
-              drawn as something countable rather than buried in a fraction. */}
-          {!exhausted && cap <= 8 && (
-            <span className="mt-1.5 flex items-center gap-1">
-              {Array.from({ length: cap }, (_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    'h-1.5 w-4 rounded-full',
-                    i < remaining ? 'bg-primary' : 'bg-primary/20',
-                  )}
-                />
-              ))}
+          {exhausted ? (
+            <span className="block text-[15px] font-black tracking-tight text-muted-foreground">
+              All caught for today
+            </span>
+          ) : (
+            <span className="flex items-baseline gap-1.5 text-foreground">
+              <span className="text-[22px] font-black leading-none tabular-nums tracking-tight">{reward}</span>
+              <span className="text-[15px] font-black tracking-tight">free flies</span>
             </span>
           )}
+          <span className="mt-1 block text-xs font-semibold text-muted-foreground">
+            {exhausted
+              ? `Your ${cap} free videos refill tomorrow.`
+              : waiting
+                ? 'Almost ready'
+                : 'Watch a short video'}
+          </span>
         </span>
 
         {!exhausted && (
           <span
+            aria-hidden
             className={cn(
-              'flex h-11 min-w-[68px] shrink-0 items-center justify-center gap-1 rounded-2xl px-3 text-sm font-black tracking-wide text-white transition-all',
-              waiting
-                ? 'bg-muted-foreground/40'
-                : 'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 group-active:translate-y-1 group-active:shadow-none',
+              'flex h-10 min-w-[84px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-[14px] font-black transition-[transform,box-shadow] duration-100',
+              waiting || busy
+                ? 'bg-foreground/10 text-muted-foreground'
+                : 'bg-gradient-to-b from-[#fbbf24] to-[#f97316] text-white shadow-[0_3px_0_#c2410c] [text-shadow:0_1px_0_rgba(194,65,12,0.45)] group-active:translate-y-[3px] group-active:shadow-none',
             )}
           >
-            {waiting ? (
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
+            ) : waiting ? (
               <span className="tabular-nums">{cooldown}s</span>
             ) : (
-              <span className="rounded-full bg-white py-0.5 pl-2 pr-2 text-[#24451f]">
-                <FlyAmount amount={`+${reward}`} size={14} />
-              </span>
+              <>
+                <Play className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
+                Watch
+              </>
             )}
           </span>
         )}

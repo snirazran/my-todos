@@ -16,6 +16,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { FrogStampIndices } from '@/lib/frogStampEngine';
 import Frog from '@/components/ui/frog';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
+import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import {
   formatPlusPrice,
   getPlusPricing,
@@ -561,6 +562,10 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
     ctaContent,
     caption,
   } = usePlusPaywall(props);
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (!open) setEntered(false);
+  }, [open]);
 
   if (!mounted) return null;
 
@@ -601,6 +606,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
+                  onAnimationComplete={() => { if (open) setEntered(true); }}
                   className="plus-paywall fixed inset-0 z-[10009] m-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground shadow-2xl outline-none md:h-[min(760px,calc(100dvh-3rem))] md:w-[min(940px,calc(100vw-3rem))] md:rounded-[32px]"
                 >
                   <Dialog.Title className="sr-only">Frogress Plus</Dialog.Title>
@@ -608,6 +614,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                     A weekly coach for your habits, double quest and gift rewards, and more outfits every season.
                     Choose a subscription below. Prices and eligible offers come from your store.
                   </Dialog.Description>
+                  <PaywallEnteredContext.Provider value={entered}>
                   <div inert={needsAccount || undefined} className="flex min-h-0 flex-1 flex-col">
                     <header className={cn('relative flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] short:pb-1 md:px-7 md:pt-4', !isDesktop && view === 'offer' && step === 'offer' && 'absolute inset-x-0 top-0 z-20')}>
                       {showBack ? (
@@ -630,7 +637,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                     <div className="flex min-h-0 flex-1">
                       {isDesktop && view === 'offer' ? (
                         <div className="flex w-[43%] shrink-0 p-4 pr-0 pt-1">
-                          <DesktopHero context={paywallContext} />
+                          <DesktopHero context={paywallContext} line={offerLine(selected?.trialDuration)} />
                         </div>
                       ) : null}
                       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -660,7 +667,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                                 </section>
                               ) : (
                                 <>
-                                  {!isDesktop ? <FrogHero context={paywallContext} /> : null}
+                                  {!isDesktop ? <FrogHero context={paywallContext} line={offerLine(selected?.trialDuration)} /> : null}
                                   <div className={cn(isDesktop && 'flex flex-1 flex-col justify-center')}>
                                     <OfferBenefits context={paywallContext} onSeeAll={() => changeView('compare')} />
                                   </div>
@@ -690,6 +697,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                       </div>
                     </div>
                   </div>
+                  </PaywallEnteredContext.Provider>
 
               <PlusAccountPrompt
                 open={needsAccount}
@@ -714,7 +722,7 @@ type ShowcaseItem = Pick<ItemDef, 'slot' | 'rarity' | 'riveIndex'>;
 type ShowcaseLook = { indices: FrogStampIndices; rarity: Rarity };
 
 const SHOWCASE_RARITIES: readonly Rarity[] = ['rare', 'epic', 'legendary'];
-const LOOK_ROTATE_MS = 4000;
+const LOOK_ROTATE_MS = 7000;
 
 let liveShowcaseItems: ShowcaseItem[] | null = null;
 let liveShowcaseRequest: Promise<ShowcaseItem[] | null> | null = null;
@@ -843,7 +851,82 @@ function useShowcaseLook(rotating: boolean) {
 }
 
 
-const OFFER_LINE = 'Psst! Want to grow\nfaster together?';
+const offerLine = (trialDuration?: string | null) =>
+  trialDuration ? `Psst! You can try it\nfree for ${trialDuration}!` : 'Psst! No commitment.\nCancel anytime!';
+const STEP_SLIDE_MS = 340;
+const PROMISE_SETTLE_MS = 840;
+
+const PaywallEnteredContext = React.createContext(true);
+
+function useFrogMount(settleMs: number) {
+  const entered = React.useContext(PaywallEnteredContext);
+  const settle = React.useRef(entered ? settleMs : 0);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!entered || ready) return;
+    const timer = window.setTimeout(() => setReady(true), settle.current);
+    return () => window.clearTimeout(timer);
+  }, [entered, ready]);
+  return ready;
+}
+
+const frogArrival = (depth: number) => ({
+  y: [depth, -depth * 0.2, 0, -depth * 0.05, 0],
+  scaleX: [0.8, 0.92, 1.14, 0.98, 1],
+  scaleY: [1.25, 1.12, 0.84, 1.04, 1],
+  transition: { duration: 0.8, times: [0, 0.4, 0.6, 0.8, 1], ease: 'easeOut' as const },
+});
+
+function useFrogArrival(controls: ReturnType<typeof useAnimationControls>, dressed: boolean, depth: number) {
+  const reduceMotion = useReducedMotion();
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    if (!dressed) return;
+    if (reduceMotion) {
+      setLanded(true);
+      return;
+    }
+    let live = true;
+    void controls.start(frogArrival(depth)).then(() => {
+      if (live) setLanded(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [controls, dressed, reduceMotion, depth]);
+  return landed;
+}
+
+const BURST_RAYS = [-165, -140, -115, -90, -65, -40, -15];
+
+function ArrivalBurst({ className }: { className: string }) {
+  return (
+    <span aria-hidden className={cn('pointer-events-none absolute left-1/2 h-0 w-0', className)}>
+      <motion.span
+        initial={{ scale: 0.2, opacity: 0.9 }}
+        animate={{ scale: 1, opacity: 0 }}
+        transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        className="absolute -left-[90px] -top-[90px] h-[180px] w-[180px] rounded-full border-[3px] border-white/80"
+      />
+      {BURST_RAYS.map((angle, index) => {
+        const rad = (angle * Math.PI) / 180;
+        const reach = index % 2 ? 104 : 128;
+        return (
+          <motion.svg
+            key={angle}
+            viewBox="0 0 16 16"
+            initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+            animate={{ x: Math.cos(rad) * reach, y: Math.sin(rad) * reach, scale: [0, 1.1, 0.4], opacity: [1, 1, 0] }}
+            transition={{ duration: 0.75, delay: 0.22 + index * 0.015, ease: 'easeOut' }}
+            className={cn('absolute -left-2 -top-2 h-4 w-4', index % 3 === 0 ? 'text-amber-300' : 'text-white')}
+          >
+            <path d="M8 0 9.8 6.2 16 8 9.8 9.8 8 16 6.2 9.8 0 8 6.2 6.2Z" fill="currentColor" />
+          </motion.svg>
+        );
+      })}
+    </span>
+  );
+}
 
 /** One live frog changes outfits in place; no remount between looks or plan choices. */
 function useLookHop(look: ShowcaseLook, dressed: boolean, reduceMotion: boolean) {
@@ -883,42 +966,46 @@ function Sparkle({ className, delay }: { className: string; delay: string }) {
   );
 }
 
-function FrogBand({ desktop = false }: { desktop?: boolean }) {
+function FrogBand({ line, desktop = false }: { line: string; desktop?: boolean }) {
   const reduceMotion = useReducedMotion();
+  const ready = useFrogMount(STEP_SLIDE_MS);
   const [dressed, setDressed] = useState(false);
-  const { look } = useShowcaseLook(dressed && !reduceMotion);
+  const [landedOnce, setLandedOnce] = useState(false);
+  const { look } = useShowcaseLook(landedOnce && !reduceMotion);
   const { shownLook, hop } = useLookHop(look, dressed, !!reduceMotion);
+  const depth = desktop ? 195 : 130;
+  const landed = useFrogArrival(hop, dressed, depth);
+  useEffect(() => {
+    if (landed) setLandedOnce(true);
+  }, [landed]);
   const size = desktop ? 354 : 236;
   const height = Math.round(size * 1.125);
-  const lift = desktop ? 27 : 18;
+  const lift = desktop ? 27 : 24;
   const hasHat = look.indices.hat !== 0;
   return (
     <>
       <span className={cn('absolute left-1/2 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.2),rgba(255,255,255,0.06)_55%,transparent)]', desktop ? 'bottom-[40px] h-[440px] w-[520px]' : '-bottom-6 h-[300px] w-[380px]')} />
       {BAND_SPARKLES.map((sparkle) => <Sparkle key={sparkle.delay} {...sparkle} />)}
-      <div className={cn(
-        'absolute left-1/2 z-20 w-max -translate-x-1/2 transition-[bottom] duration-300 ease-out',
-        desktop
-          ? cn('max-w-[80%]', hasHat ? 'bottom-[243px]' : 'bottom-[177px]')
-          : cn('max-w-[min(78%,280px)]', hasHat ? 'bottom-[162px] short:bottom-[113px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[143px]' : 'bottom-[118px] short:bottom-[83px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[104px]'),
-      )}>
-        <motion.div
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 440, damping: 24, delay: 0.12 }}
-          className={cn('relative origin-bottom rounded-2xl bg-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.45)]', desktop ? 'px-4 py-2.5' : 'px-3.5 py-2')}
-        >
-          <p className={cn('whitespace-pre-line text-center font-black leading-snug text-slate-900', desktop ? 'text-[16px]' : 'text-[14px] short:text-[13px]')}>{OFFER_LINE}</p>
-          <span className="absolute -bottom-1.5 left-1/2 -ml-[7px] h-3.5 w-3.5 rotate-45 rounded-[3px] bg-white" />
-        </motion.div>
-      </div>
-      <div className={cn('absolute inset-0 origin-bottom', !desktop && 'short:scale-[0.7] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:scale-[0.88]')}>
+      {landed ? (
+        <div className={cn(
+          'absolute inset-x-0 z-0 h-0 transition-[bottom] duration-300 ease-out',
+          desktop
+            ? hasHat ? 'bottom-[247px]' : 'bottom-[181px]'
+            : hasHat ? 'bottom-[172px] short:bottom-[105px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[150px]' : 'bottom-[128px] short:bottom-[75px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:bottom-[111px]',
+        )}>
+          <FrogSpeechBubble rate={0} done={0} total={0} fixedMessage={line} className="!top-0" />
+        </div>
+      ) : null}
+      <div className={cn('absolute inset-0 origin-bottom', !desktop && 'short:-translate-y-[6px] short:scale-[0.7] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:-translate-y-[3px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:scale-[0.88]')}>
         <div className="absolute inset-0 motion-safe:animate-[plus-frog-float_3.6s_ease-in-out_infinite]">
-          <motion.div animate={hop} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
-            <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
-              paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
-              ignoreIdlePause onDressed={() => setDressed(true)} />
-            {dressed ? (
+          {dressed && !reduceMotion ? <ArrivalBurst className={desktop ? 'bottom-[128px]' : 'bottom-[85px]'} /> : null}
+          <motion.div initial={reduceMotion ? false : { y: depth }} animate={hop} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
+            {ready ? (
+              <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
+                paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
+                ignoreIdlePause onDressed={() => setDressed(true)} />
+            ) : null}
+            {landedOnce ? (
               <PremiumFrogAura
                 show
                 alwaysPlay
@@ -936,12 +1023,16 @@ function FrogBand({ desktop = false }: { desktop?: boolean }) {
   );
 }
 
-function FrogHero({ context }: { context: PaywallContext }) {
+function FrogHero({ context, line }: { context: PaywallContext; line: string }) {
   return (
     <section className="flex flex-col items-center text-center">
-      <div aria-hidden className="relative -mx-5 self-stretch overflow-hidden bg-[hsl(var(--plus-band))] pt-[calc(max(0.75rem,env(safe-area-inset-top))+52px)] [clip-path:polygon(0_0,100%_0,100%_100%,0_calc(100%_-_12px))] short:pt-[calc(max(0.75rem,env(safe-area-inset-top))+48px)]">
+      <div aria-hidden className="relative isolate -mx-5 self-stretch overflow-hidden bg-[hsl(var(--plus-band))] pt-[calc(max(0.75rem,env(safe-area-inset-top))+52px)] short:pt-[calc(max(0.75rem,env(safe-area-inset-top))+48px)]">
+        <svg preserveAspectRatio="none" viewBox="0 0 100 16" className="absolute inset-x-0 bottom-[-1px] z-10 h-5 w-full fill-background">
+          <path d="M0 8 Q50 -8 100 8 L100 16 L0 16 Z" />
+        </svg>
+        <span className="absolute bottom-[5px] left-1/2 z-10 h-3 w-28 -translate-x-1/2 rounded-[50%] bg-black/[0.16] blur-[5px]" />
         <div className="relative h-[230px] short:h-[168px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:h-[205px]">
-          <FrogBand />
+          <FrogBand line={line} />
         </div>
       </div>
       <h2 className="mt-2 text-balance text-[24px] font-black leading-[1.12] tracking-tight short:mt-1 short:text-[21px]">
@@ -951,14 +1042,14 @@ function FrogHero({ context }: { context: PaywallContext }) {
   );
 }
 
-function DesktopHero({ context }: { context: PaywallContext }) {
+function DesktopHero({ context, line }: { context: PaywallContext; line: string }) {
   return (
     <section className="relative flex w-full flex-col overflow-hidden rounded-[28px] bg-[hsl(var(--plus-band))]">
       <h2 className="relative z-10 text-balance px-7 pt-7 text-[30px] font-black leading-[1.08] tracking-tight">
         {context.headline}<br /><span className="text-primary">{context.accent}</span>
       </h2>
       <div aria-hidden className="relative min-h-0 flex-1">
-        <FrogBand desktop />
+        <FrogBand line={line} desktop />
       </div>
     </section>
   );
@@ -971,38 +1062,30 @@ const BENEFIT_BLOBS = [
 ];
 
 function OfferBenefits({ context, onSeeAll }: { context: PaywallContext; onSeeAll: () => void }) {
-  const reduceMotion = useReducedMotion();
-  const enter = (index: number) => reduceMotion ? {} : {
-    initial: { opacity: 0, y: 8 },
-    animate: { opacity: 1, y: 0 },
-    transition: { delay: 0.12 + index * 0.05, duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
-  };
   return (
     <>
       <ul className="mt-4 space-y-3 rounded-[24px] bg-card px-4 py-4 short:mt-3 short:space-y-2 short:py-3 md:mt-1 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:mt-3 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:space-y-2.5 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:py-3.5">
         {context.benefits.map((benefit, index) => (
-          <motion.li key={benefit.title} {...enter(index)} className="flex items-center gap-3.5">
-            <motion.span
-              initial={reduceMotion ? false : { scale: 0.4, rotate: -14 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 520, damping: 17, delay: 0.2 + index * 0.07 }}
-              className={cn('flex h-12 w-[52px] shrink-0 items-center justify-center bg-amber-50 shadow-[0_3px_0_rgba(0,0,0,0.16)] short:h-10 short:w-11 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:h-[46px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:w-[50px]', BENEFIT_BLOBS[index % BENEFIT_BLOBS.length])}
+          <li key={benefit.title} className="plus-benefit-rise flex items-center gap-3.5" style={{ animationDelay: `${120 + index * 50}ms` }}>
+            <span
+              style={{ animationDelay: `${200 + index * 70}ms` }}
+              className={cn('plus-benefit-pop flex h-12 w-[52px] shrink-0 items-center justify-center bg-amber-50 shadow-[0_3px_0_rgba(0,0,0,0.16)] short:h-10 short:w-11 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:h-[46px] [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:w-[50px]', BENEFIT_BLOBS[index % BENEFIT_BLOBS.length])}
             >
               {benefit.icon === 'store' ? <span aria-hidden className="h-16 w-16 shrink-0 -translate-y-2"><GiftRive color={0} paused /></span> : <Icon name={benefit.icon} className="h-11 w-11 short:h-9 short:w-9 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:h-10 [@media(max-width:767px)_and_(min-height:701px)_and_(max-height:820px)]:w-10" />}
-            </motion.span>
+            </span>
             <span className="min-w-0 flex-1 text-left">
               <span className="block text-[15px] font-black leading-tight md:text-[16px]">{benefit.title}</span>
               <span className="mt-0.5 block text-[13px] font-semibold leading-snug text-muted-foreground short:hidden">{benefit.body}</span>
             </span>
-          </motion.li>
+          </li>
         ))}
       </ul>
-      <motion.div {...enter(context.benefits.length)} className="mt-2 flex justify-center short:mt-1">
+      <div className="plus-benefit-rise mt-2 flex justify-center short:mt-1" style={{ animationDelay: `${120 + context.benefits.length * 50}ms` }}>
         <button type="button" onClick={onSeeAll} className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-[14px] font-black text-primary transition-colors hover:bg-white/10 active:bg-white/15 short:min-h-9">
           See everything in Plus
           <ChevronRight className="h-4 w-4" strokeWidth={2.75} aria-hidden />
         </button>
-      </motion.div>
+      </div>
     </>
   );
 }
@@ -1031,15 +1114,27 @@ export function TrialTimeline({ trial, showFrog, compact = false }: { trial: Tri
   const [start] = useState(() => new Date());
   const end = trialEndsAt(trial, start);
   const reminder = new Date(end.getTime() - TRIAL_REMINDER_LEAD_MS);
-  const day = (date: Date) => date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  const rows: Array<{ key: string; icon: React.ReactNode; title: string; body: string; active?: boolean; action?: React.ReactNode }> = [
+  const day = (date: Date) => date.toLocaleDateString('en-US', { month: compact ? 'short' : 'long', day: 'numeric' });
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const dayCount = (date: Date) => Math.round((date.getTime() - start.getTime()) / DAY_MS);
+  const milestone = (date: Date) => dayCount(end) <= 31
+    ? { title: `Day ${dayCount(date)}`, date: day(date) }
+    : { title: day(date) };
+  const hasReminder = reminder.getTime() - start.getTime() >= 12 * 60 * 60 * 1000;
+  const leadDays = Math.round(TRIAL_REMINDER_LEAD_MS / DAY_MS);
+  const promiseLine = !hasReminder
+    ? 'Cancel before it ends and pay nothing. Promise!'
+    : notifications.isEnabled
+      ? `I’ll ping you ${leadDays}\u00a0days before it ends. No surprise charges!`
+      : `Turn on reminders and I’ll ping you ${leadDays}\u00a0days before it ends!`;
+  const rows: Array<{ key: string; icon: React.ReactNode; title: string; date?: string; body: string; active?: boolean; action?: React.ReactNode }> = [
     { key: 'today', icon: <Sparkles className="h-4 w-4" strokeWidth={2.75} />, title: 'Today', body: 'All of Plus unlocks. Nothing to pay today.', active: true },
   ];
-  if (reminder.getTime() - start.getTime() >= 12 * 60 * 60 * 1000) {
+  if (hasReminder) {
     rows.push({
       key: 'reminder',
       icon: <Bell className="h-4 w-4" strokeWidth={2.75} />,
-      title: day(reminder),
+      ...milestone(reminder),
       body: notifications.isEnabled ? 'We’ll send you a reminder that your trial is ending.' : compact ? 'Get a reminder before it ends.' : 'Turn on notifications to get a reminder before it ends.',
       action: !notifications.isEnabled && notifications.canEnable ? (
         <button type="button" onClick={() => void notifications.enableOrConfigure()} className={cn('inline-flex shrink-0 items-center rounded-xl bg-primary/10 font-black text-primary hover:bg-primary/15 active:scale-95', compact ? '-my-1 min-h-8 px-2.5 text-[12.5px]' : 'mt-1.5 min-h-9 px-3 text-[13px]')}>
@@ -1048,7 +1143,13 @@ export function TrialTimeline({ trial, showFrog, compact = false }: { trial: Tri
       ) : null,
     });
   }
-  rows.push({ key: 'end', icon: <Crown className="h-4 w-4" strokeWidth={2.75} />, title: day(end), body: 'Your Plus plan starts. Cancel before then and pay nothing.' });
+  rows.push({ key: 'end', icon: <Crown className="h-4 w-4" strokeWidth={2.75} />, ...milestone(end), body: 'Your trial ends and Plus starts. Cancel before then and pay nothing.' });
+  const rowTitle = (row: (typeof rows)[number]) => (
+    <>
+      {row.title}
+      {row.date ? <span className="font-bold text-muted-foreground"> · {row.date}</span> : null}
+    </>
+  );
   return (
     <section className={cn('mx-auto flex w-full max-w-md flex-col md:mx-0', !compact && 'flex-1')}>
       <div className={cn('flex flex-1 flex-col justify-center', !compact && 'py-2')}>
@@ -1076,11 +1177,11 @@ export function TrialTimeline({ trial, showFrog, compact = false }: { trial: Tri
             <div className={cn('min-w-0 pt-0.5 text-left', compact && 'flex-1')}>
               {compact ? (
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[15px] font-black leading-tight">{row.title}</p>
+                  <p className="text-[15px] font-black leading-tight">{rowTitle(row)}</p>
                   {row.action}
                 </div>
               ) : (
-                <p className="text-[16px] font-black leading-tight">{row.title}</p>
+                <p className="text-[16px] font-black leading-tight">{rowTitle(row)}</p>
               )}
               <p className={cn('font-semibold leading-snug text-muted-foreground', compact ? 'mt-0.5 text-[13px]' : 'mt-1 text-[14px]')}>{row.body}</p>
               {compact ? null : row.action}
@@ -1096,44 +1197,47 @@ export function TrialTimeline({ trial, showFrog, compact = false }: { trial: Tri
           transition={{ delay: 0.42, duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="mb-1 mt-4 shrink-0"
         >
-          <TrialPromise />
+          <TrialPromise line={promiseLine} />
         </motion.div>
       ) : null}
     </section>
   );
 }
 
-const PROMISE_LINE = 'I’ll remind you before it ends. Promise!';
-
-function TrialPromise() {
+function TrialPromise({ line }: { line: string }) {
   const reduceMotion = useReducedMotion();
+  const ready = useFrogMount(PROMISE_SETTLE_MS);
   const [dressed, setDressed] = useState(false);
+  const arrive = useAnimationControls();
+  const landed = useFrogArrival(arrive, dressed, 110);
   const [look] = useState(() => createShowcaseDrawer(liveShowcaseItems ?? STATIC_SHOWCASE_ITEMS)() ?? EMPTY_LOOK);
   const size = 168;
   const height = Math.round(size * 1.125);
   return (
-    <div aria-hidden className="relative isolate flex h-[136px] items-end overflow-hidden rounded-[24px] bg-[linear-gradient(160deg,hsl(110_32%_46%)_0%,hsl(112_32%_41%)_100%)] pb-[22px] pl-[132px] pr-3.5 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.45)] ring-1 ring-inset ring-white/15 short:h-[116px] short:pb-4 short:pl-[112px]">
+    <div aria-hidden className="relative isolate h-[136px] overflow-hidden rounded-[24px] bg-[linear-gradient(160deg,hsl(110_32%_46%)_0%,hsl(112_32%_41%)_100%)] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.45)] ring-1 ring-inset ring-white/15 short:h-[116px]">
       <span className="absolute -left-10 -bottom-12 -z-10 h-56 w-64 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.24),rgba(255,255,255,0.06)_55%,transparent)]" />
       <Sparkle className="left-[30%] top-[16%] h-3 w-3" delay="0.3s" />
       <Sparkle className="left-[6%] top-[30%] h-2.5 w-2.5" delay="1.4s" />
       <Sparkle className="right-[8%] top-[18%] h-3 w-3" delay="2.1s" />
+      {landed ? (
+        <FrogSpeechBubble
+          side
+          rate={0}
+          done={0}
+          total={0}
+          fixedMessage={line}
+          messageClassName="!text-[14px]"
+          className="!left-[124px] !top-[84px] !z-0 [--bubble-max:min(calc(100vw-190px),15rem)] short:!left-[104px] short:!top-[72px] short:[--bubble-max:min(calc(100vw-170px),15rem)]"
+        />
+      ) : null}
       <div className="absolute bottom-0 left-0 h-[136px] w-[132px] origin-bottom-left short:scale-[0.84]">
-        <div className="absolute left-1/2" style={{ bottom: -Math.round(height * 0.2), width: size, height, marginLeft: -size / 2 }}>
-          <Frog width={size} height={height} indices={look.indices} visualOffsetY={-5}
-            paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
-            ignoreIdlePause onDressed={() => setDressed(true)} />
-          {dressed ? <PremiumFrogAura show alwaysPlay paused={!!reduceMotion} flySize={40} className="[--premium-fly-top:12%] [--premium-fly-x-max:44px] [--premium-fly-x-min:-58px] [--premium-fly-y-max:18px] [--premium-fly-y-min:0px]" /> : null}
-        </div>
-      </div>
-      <div className="relative flex min-w-0 flex-1">
-        <motion.div
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -6, scale: 0.85 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 440, damping: 26, delay: 0.12 }}
-          className="relative w-fit max-w-full origin-bottom-left rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_8px_18px_-8px_rgba(0,0,0,0.45)]"
-        >
-          <p className="text-[14px] font-black leading-snug text-slate-900">{PROMISE_LINE}</p>
-          <span className="absolute -left-1.5 bottom-3 h-3.5 w-3.5 rotate-45 rounded-[3px] bg-white" />
+        <motion.div initial={reduceMotion ? false : { y: 110 }} animate={arrive} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2), width: size, height, marginLeft: -size / 2 }}>
+          {ready ? (
+            <Frog width={size} height={height} indices={look.indices} visualOffsetY={-5}
+              paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
+              ignoreIdlePause onDressed={() => setDressed(true)} />
+          ) : null}
+          {landed ? <PremiumFrogAura show alwaysPlay paused={!!reduceMotion} flySize={40} className="[--premium-fly-top:12%] [--premium-fly-x-max:44px] [--premium-fly-x-min:-58px] [--premium-fly-y-max:18px] [--premium-fly-y-min:0px]" /> : null}
         </motion.div>
       </div>
     </div>

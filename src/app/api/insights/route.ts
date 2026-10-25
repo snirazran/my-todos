@@ -337,7 +337,7 @@ export async function GET(req: NextRequest) {
       }))
       .filter((tag) => tag.planned >= 2)
       .sort((a, b) => b.planned - a.planned || b.rate - a.rate)
-      .slice(0, 6);
+      .slice(0, 8);
 
     const habitGroups = new Map<string, Instance[]>();
     for (const instance of patternInstances) {
@@ -364,7 +364,7 @@ export async function GET(req: NextRequest) {
       })
       .filter((habit) => habit.scheduled >= 3)
       .sort((a, b) => b.scheduled - a.scheduled || b.rate - a.rate)
-      .slice(0, 5);
+      .slice(0, 8);
 
     const timeBuckets = new Map<string, number>([
       ['Morning', 0],
@@ -389,100 +389,58 @@ export async function GET(req: NextRequest) {
     }
     const topTime = Array.from(timeBuckets.entries()).sort((a, b) => b[1] - a[1])[0];
     const timePattern = finishedEvents.length >= 3 && topTime?.[1]
-      ? { label: topTime[0], count: topTime[1], share: percent(topTime[1], finishedEvents.length) }
+      ? {
+          label: topTime[0],
+          count: topTime[1],
+          share: percent(topTime[1], finishedEvents.length),
+          buckets: Array.from(timeBuckets.entries()).map(([label, count]) => ({
+            label,
+            share: percent(count, finishedEvents.length),
+          })),
+        }
       : null;
 
-    const signals: Array<{ tone: 'positive' | 'watch' | 'neutral'; eyebrow: string; title: string; body: string }> = [];
-    if (bestDay) {
-      signals.push({
-        tone: 'positive',
-        eyebrow: 'Good spot',
-        title: `${bestDay.name} is your strongest day`,
-        body: `You finish ${bestDay.rate}% of what you plan on ${bestDay.name}s. That rhythm is worth protecting.`,
-      });
-    }
     const loadGap = loadPattern.lighterRate - loadPattern.heavierRate;
-    if (loadPattern.heavierDays >= 2 && loadGap >= 10) {
-      signals.push({
-        tone: 'watch',
-        eyebrow: 'Worth noticing',
-        title: 'A shorter list works better',
-        body: `On days with ${typicalLoad} tasks or fewer, your finish rate is ${loadPattern.lighterRate}%—${loadGap} points higher than fuller days.`,
-      });
-    } else if (hardestDay && bestDay && hardestDay.day !== bestDay.day && bestDay.rate - hardestDay.rate >= 10) {
-      signals.push({
-        tone: 'watch',
-        eyebrow: 'Weak spot',
-        title: `${hardestDay.name} needs a lighter touch`,
-        body: `Your finish rate is ${hardestDay.rate}% on ${hardestDay.name}s. Try moving one flexible task to your stronger days.`,
-      });
-    }
     const focusGap = focusPattern.focusedRate - focusPattern.otherRate;
-    if (focusPattern.focusedDays >= 2 && focusPattern.otherDays >= 2 && Math.abs(focusGap) >= 8) {
-      signals.push({
-        tone: focusGap > 0 ? 'positive' : 'neutral',
-        eyebrow: 'Focus pattern',
-        title: focusGap > 0 ? 'Focus time and follow-through show up together' : 'Focus days look different',
-        body: `You finish ${focusPattern.focusedRate}% on focus-session days, compared with ${focusPattern.otherRate}% on other planned days.`,
-      });
-    } else if (timePattern) {
-      signals.push({
-        tone: 'neutral',
-        eyebrow: 'Natural rhythm',
-        title: `${timePattern.label} is your finish window`,
-        body: `${timePattern.share}% of your recent task completions happened in the ${timePattern.label.toLowerCase()}.`,
-      });
-    }
-    if (!signals.length && current.planned > 0) {
-      signals.push({
-        tone: 'neutral',
-        eyebrow: 'Still learning',
-        title: 'Your patterns are taking shape',
-        body: 'Keep checking off tasks and using focus sessions. Clearer patterns appear as your history grows.',
-      });
-    }
 
     let nextStep = {
       title: 'Pick one task that matters most',
       body: 'Put it first tomorrow. A clear first win makes the rest of the list feel lighter.',
       href: `/planner?date=${shiftDay(today, 1)}`,
-      action: 'Plan Tomorrow',
+      action: 'Plan tomorrow',
     };
     if (loadPattern.heavierDays >= 2 && loadGap >= 10) {
       nextStep = {
         title: `Aim for ${Math.max(1, typicalLoad)} key tasks`,
         body: 'That is the load where your history shows the best follow-through. Extra tasks can stay saved for later.',
         href: '/planner',
-        action: 'Lighten My Plan',
+        action: 'Lighten my plan',
       };
     } else if (hardestDay && bestDay && bestDay.rate - hardestDay.rate >= 15) {
       nextStep = {
         title: `Make ${hardestDay.name} a little easier`,
         body: `Move one flexible task to ${bestDay.name}, your most reliable day.`,
         href: '/planner',
-        action: 'Adjust My Week',
+        action: 'Adjust my week',
       };
     } else if (focusPattern.focusedDays >= 2 && focusGap >= 10) {
       nextStep = {
         title: 'Start with one focus session',
         body: 'Focused days line up with stronger follow-through in your recent history.',
         href: '/',
-        action: 'Choose a Task',
+        action: 'Pick a task',
       };
     }
 
     const headline = current.planned === 0
       ? 'A fresh page'
-      : completionDelta >= 8
+      : previous.planned > 0 && completionDelta >= 8
         ? 'You’re gaining momentum'
         : current.completionRate >= 75
           ? 'Your rhythm looks strong'
           : current.completionRate >= 50
             ? 'You’re building a steady rhythm'
             : 'A gentle reset can help';
-    const summaryMessage = current.planned === 0
-      ? 'Plan a few tasks and your patterns will start appearing here.'
-      : `You completed ${current.completed} of ${current.planned} planned tasks${bestDay ? `, with your best rhythm on ${bestDay.name}s` : ''}.`;
 
     return NextResponse.json({
       range: { days: rangeDays, from: currentStart, to: lastFullDay, previousFrom: previousStart, previousTo: previousEnd },
@@ -492,7 +450,6 @@ export async function GET(req: NextRequest) {
         completionDelta,
         focusDelta,
         headline,
-        message: summaryMessage,
       },
       previous,
       timeline: timeline(currentDaily, rangeDays),
@@ -503,7 +460,6 @@ export async function GET(req: NextRequest) {
       timePattern,
       tags,
       habits,
-      signals: signals.slice(0, 3),
       nextStep,
       patternDays,
     });

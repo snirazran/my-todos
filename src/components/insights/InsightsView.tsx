@@ -1,34 +1,31 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import {
-  ArrowLeft,
-  ArrowRight,
-  BarChart3,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  CircleAlert,
-  Clock3,
-  Focus,
-  Leaf,
-  Lightbulb,
-  RotateCcw,
-  Sparkles,
-  Target,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleAlert, Moon, RotateCcw, Sun, Sunrise, Sunset, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
+import Frog from '@/components/ui/frog';
+import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { WeeklyCoachCard, type WeeklyFacts } from '@/components/insights/WeeklyCoachCard';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { cn } from '@/lib/utils';
 
+type FrogIndices = React.ComponentProps<typeof Frog>['indices'];
 type DailyPoint = { date: string; planned: number; completed: number; focusSeconds: number };
 type TimelinePoint = DailyPoint & { from: string; to: string };
-type InsightData = {
+type Weekday = {
+  day: number;
+  name: string;
+  short: string;
+  planned: number;
+  completed: number;
+  rate: number;
+  focusSeconds: number;
+};
+export type InsightData = {
   range: { days: number; from: string; to: string; previousFrom: string; previousTo: string };
   profile: { name: string | null; frogName: string | null };
   summary: {
@@ -41,19 +38,11 @@ type InsightData = {
     completionDelta: number;
     focusDelta: number | null;
     headline: string;
-    message: string;
   };
+  previous: { planned: number; completed: number; completionRate: number };
   timeline: TimelinePoint[];
   daily: DailyPoint[];
-  weekdayPatterns: Array<{
-    day: number;
-    name: string;
-    short: string;
-    planned: number;
-    completed: number;
-    rate: number;
-    focusSeconds: number;
-  }>;
+  weekdayPatterns: Weekday[];
   tags: Array<{ id: string; name: string; color: string; planned: number; completed: number; rate: number }>;
   habits: Array<{
     id: string;
@@ -71,15 +60,26 @@ type InsightData = {
     lighterDays: number;
     heavierDays: number;
   };
-  timePattern?: { label: string; count: number; share: number } | null;
-  signals: Array<{
-    tone: 'positive' | 'watch' | 'neutral';
-    eyebrow: string;
-    title: string;
-    body: string;
-  }>;
+  focusPattern?: { focusedRate: number; otherRate: number; focusedDays: number; otherDays: number };
+  timePattern?: {
+    label: string;
+    count: number;
+    share: number;
+    buckets: Array<{ label: string; share: number }>;
+  } | null;
   nextStep: { title: string; body: string; href: string; action: string };
   patternDays: number;
+};
+
+const CARD = 'rounded-[24px] bg-card shadow-[0_0_0_1px_rgba(15,23,42,0.07),0_3px_0_0_rgba(15,23,42,0.08)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_3px_0_0_rgba(0,0,0,0.35)]';
+const GREEN_FILL = 'bg-[linear-gradient(to_bottom,#7cc46f,#4e9446)]';
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const TIME_ICONS: Record<string, typeof Sun> = { Morning: Sunrise, Afternoon: Sun, Evening: Sunset, Night: Moon };
+const TIME_PHRASES: Record<string, string> = {
+  Morning: 'in the morning',
+  Afternoon: 'in the afternoon',
+  Evening: 'in the evening',
+  Night: 'at night',
 };
 
 const fetcher = async (url: string) => {
@@ -88,7 +88,7 @@ const fetcher = async (url: string) => {
   return response.json() as Promise<InsightData>;
 };
 
-const numberFormat = new Intl.NumberFormat();
+const numberFormat = new Intl.NumberFormat('en-US');
 function formatDuration(seconds: number) {
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${numberFormat.format(minutes)}m`;
@@ -98,7 +98,12 @@ function formatDuration(seconds: number) {
 }
 
 function formatDate(dayKey: string, options: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat(undefined, options).format(new Date(`${dayKey}T12:00:00`));
+  return new Intl.DateTimeFormat('en-US', options).format(new Date(`${dayKey}T12:00:00`));
+}
+
+function windowLabel(days: number) {
+  if (days === 90) return 'Last 3 months';
+  return days % 7 === 0 ? `Last ${days / 7} weeks` : `Last ${days} days`;
 }
 
 /** Numbers only — the coach never sees task titles beyond the recurring ones
@@ -144,6 +149,7 @@ function weeklyFacts(data: InsightData): WeeklyFacts {
 export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { indices } = useWardrobeIndices(!!user);
   const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', []);
   const { data, error, isLoading, mutate } = useSWR<InsightData>(
     user ? `/api/insights?days=${days}&timezone=${encodeURIComponent(timezone)}` : null,
@@ -155,441 +161,564 @@ export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
     if (!authLoading && !user) router.replace('/login');
   }, [authLoading, router, user]);
 
-  if (authLoading || (!data && isLoading)) return <InsightsSkeleton />;
+  if (authLoading || (!data && isLoading)) return <InsightsSkeleton days={days} />;
   if (!user) return null;
   if (error || !data) return <InsightsError onRetry={() => mutate()} />;
 
+  return <InsightsContent data={data} days={days} indices={indices} />;
+}
+
+export function InsightsContent({ data, days, indices }: { data: InsightData; days: 7 | 30 | 90; indices?: FrogIndices }) {
+  const hasHistory = data.summary.planned > 0 || data.weekdayPatterns.some((day) => day.planned > 0);
+  const period = windowLabel(data.patternDays);
+  const line = !hasHistory
+    ? 'Nothing to read yet!\nFinish a task and I’ll start.'
+    : data.summary.planned === 0
+      ? 'A quiet stretch!\nWant to plan a small win?'
+      : `${data.summary.headline}!`;
   return (
-    <div className="relative isolate min-h-[100dvh] overflow-x-hidden bg-background pb-10 md:pb-14">
+    <div className="relative isolate min-h-[100dvh] overflow-x-hidden pb-12 md:pb-16">
       {/* The desktop site header is absolutely positioned at the top of the
           scroll container, so every page owes it h-16 of clearance. */}
       <div aria-hidden="true" className="hidden h-16 md:block" />
-      <div className="mx-auto w-full max-w-6xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-6">
-        <header className="relative rounded-[24px] bg-card px-5 pb-5 pt-4 ring-1 ring-border md:flex md:items-center md:justify-between md:gap-8 md:px-8 md:py-7">
-          <div className="relative flex min-w-0 flex-1 items-start gap-3">
-            <Link
-              href="/"
-              aria-label="Back to Today"
-              className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-black text-primary">Your Patterns</p>
-              <h1 className="mt-0.5 text-balance text-2xl font-black tracking-[-0.035em] text-foreground md:text-4xl">
-                See what’s working
-              </h1>
-              <p className="mt-1 max-w-2xl text-pretty text-sm font-medium leading-relaxed text-muted-foreground md:text-base">
-                A simple view of your habits, focus, and follow-through—made from your real activity.
-              </p>
-            </div>
-          </div>
-          <nav className="relative mt-5 grid grid-cols-3 rounded-2xl bg-muted p-1 md:ml-auto md:mt-0 md:w-72" aria-label="Insights time range">
-            {([7, 30, 90] as const).map((range) => (
-              <Link
-                key={range}
-                href={`/insights?days=${range}`}
-                aria-current={days === range ? 'page' : undefined}
-                className={cn(
-                  'rounded-xl px-3 py-2 text-center text-xs font-black transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                  days === range
-                    ? 'bg-card text-foreground shadow-sm ring-1 ring-border'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {range === 7 ? '7 Days' : range === 30 ? '30 Days' : '3 Months'}
-              </Link>
-            ))}
-          </nav>
-        </header>
-
-        {data.summary.planned === 0 ? (
-          <EmptyInsights />
-        ) : (
-          <div className="mt-5 space-y-5 md:mt-7 md:space-y-7">
-            <SummaryHero data={data} />
-            <WeeklyCoachCard facts={weeklyFacts(data)} />
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
-              <ProgressChart data={data} days={days} />
-              <MetricStack data={data} />
-            </div>
-            <SignalsSection signals={data.signals} patternDays={data.patternDays} />
-            <div className="grid gap-5 lg:grid-cols-2">
-              <WeekdayRhythm data={data} />
-              <HabitSection habits={data.habits} patternDays={data.patternDays} />
-            </div>
-            {data.tags.length > 0 ? <TagSection tags={data.tags} patternDays={data.patternDays} /> : null}
+      <div className="mx-auto w-full max-w-5xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-6">
+        <InsightsHeader days={days} />
+        <PondStage line={line} indices={indices} />
+        {hasHistory ? (
+          <div className="relative z-10 -mt-[15px] space-y-4 md:space-y-5">
+            <ReportCard data={data} />
             <NextStepCard nextStep={data.nextStep} />
-            <DailyHistory daily={data.daily} />
+            {data.summary.planned > 0 ? <FollowThrough data={data} days={days} /> : null}
+            {days === 7 ? <WeeklyCoachCard facts={weeklyFacts(data)} /> : null}
+            <PatternsSection data={data} period={period} />
+            <div className="grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-2 lg:items-start">
+              <HabitSection habits={data.habits} period={period} />
+              {data.tags.length > 0 ? <AreaSection tags={data.tags} period={period} /> : null}
+            </div>
           </div>
+        ) : (
+          <EmptyInsights />
         )}
       </div>
     </div>
   );
 }
 
-function SummaryHero({ data }: { data: InsightData }) {
-  const rate = data.summary.completionRate;
-  const rangeLabel = data.range.days === 7 ? 'this week' : `in the last ${data.range.days} days`;
+function InsightsHeader({ days }: { days: 7 | 30 | 90 }) {
   return (
-    <section className="relative overflow-hidden rounded-[24px] bg-[#447d3f] px-5 py-6 text-white md:px-8 md:py-8" aria-labelledby="summary-heading">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(134,239,172,0.24),transparent_35%),linear-gradient(135deg,transparent,rgba(255,255,255,0.04))]" aria-hidden="true" />
-      <div className="relative grid items-center gap-6 md:grid-cols-[1fr_auto]">
-        <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[13px] font-black text-emerald-100 ring-1 ring-white/10">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            Your Check-In
-          </div>
-          <h2 id="summary-heading" className="mt-3 text-balance text-2xl font-black tracking-[-0.035em] md:text-4xl">
-            {data.summary.headline}
-          </h2>
-          <p className="mt-2 max-w-xl text-pretty text-sm font-medium leading-relaxed text-emerald-50/80 md:text-base">
-            {data.summary.message}
-          </p>
-          <p className="mt-4 text-xs font-bold text-emerald-100/65">
-            Based on {numberFormat.format(data.summary.planned)} planned tasks {rangeLabel}
-          </p>
-        </div>
-        <div
-          role="img"
-          aria-label={`${rate}% of planned tasks completed`}
-          className="relative mx-auto grid h-36 w-36 shrink-0 place-items-center rounded-full md:h-40 md:w-40"
-          style={{ background: `conic-gradient(#86efac ${rate * 3.6}deg, rgba(255,255,255,0.13) 0deg)` }}
-        >
-          <div className="grid h-[116px] w-[116px] place-items-center rounded-full bg-[#447d3f] text-center md:h-[132px] md:w-[132px]">
-            <div>
-              <span className="block text-4xl font-black tabular-nums tracking-[-0.05em]">{rate}%</span>
-              <span className="mt-0.5 block text-[12px] font-black text-emerald-100/70">Completed</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <header className="relative z-20 flex items-center gap-3">
+      <Link
+        href="/"
+        aria-label="Back to Today"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/90 text-[#16351a] shadow-[0_3px_0_rgba(15,46,29,0.18)] backdrop-blur transition-transform active:translate-y-[2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-slate-950/60 dark:text-white"
+      >
+        <ArrowLeft className="h-5 w-5" strokeWidth={2.75} aria-hidden="true" />
+      </Link>
+      <nav
+        aria-label="Time range"
+        className="ml-auto grid w-full max-w-[19rem] grid-cols-3 gap-1 rounded-full bg-white/80 p-1 shadow-[0_3px_0_rgba(15,46,29,0.14)] backdrop-blur dark:bg-slate-950/55"
+      >
+        {([7, 30, 90] as const).map((range) => (
+          <Link
+            key={range}
+            href={`/insights?days=${range}`}
+            replace
+            scroll={false}
+            aria-current={days === range ? 'page' : undefined}
+            className={cn(
+              'rounded-full py-2 text-center text-[13px] font-black transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              days === range
+                ? 'bg-primary text-primary-foreground shadow-[0_2px_0_rgba(0,0,0,0.2)]'
+                : 'text-[#16351a]/70 hover:text-[#16351a] dark:text-white/70 dark:hover:text-white',
+            )}
+          >
+            {range === 7 ? '7 days' : range === 30 ? '30 days' : '3 months'}
+          </Link>
+        ))}
+      </nav>
+    </header>
   );
 }
 
-function MetricStack({ data }: { data: InsightData }) {
-  const delta = data.summary.completionDelta;
-  const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Target;
-  const focusDelta = data.summary.focusDelta;
-  const focusDetail =
-    data.summary.focusSeconds === 0
-      ? 'Start a focus timer on any task'
-      : focusDelta === null || focusDelta === 0
-        ? 'Time spent in focus sessions'
-        : `${Math.abs(focusDelta)}% ${focusDelta > 0 ? 'more' : 'less'} than before`;
+function PondStage({ line, indices }: { line: string; indices?: FrogIndices }) {
   return (
-    <section className="grid grid-cols-3 gap-2 lg:grid-cols-1" aria-label="At a glance">
-      <MetricCard
-        icon={<Check className="h-5 w-5" aria-hidden="true" />}
-        tone="green"
-        value={`${numberFormat.format(data.summary.completed)}/${numberFormat.format(data.summary.planned)}`}
-        label="Tasks Finished"
-        detail={delta === 0 ? 'Same pace as before' : `${Math.abs(delta)} points ${delta > 0 ? 'higher' : 'lower'} than before`}
-        compactDetail
-      />
-      <MetricCard
-        icon={<Focus className="h-5 w-5" aria-hidden="true" />}
-        tone="violet"
-        value={formatDuration(data.summary.focusSeconds)}
-        label="Focus Time"
-        detail={focusDetail}
-        compactDetail={focusDelta !== null && focusDelta !== 0}
-      />
-      <MetricCard
-        icon={<DeltaIcon className="h-5 w-5" aria-hidden="true" />}
-        tone="amber"
-        value={numberFormat.format(data.summary.bestRun)}
-        label="Best Run"
-        detail={data.summary.bestRun === 1 ? 'Day with a completed task' : 'Days in a row with a win'}
-      />
-    </section>
-  );
-}
-
-function MetricCard({
-  icon,
-  tone,
-  value,
-  label,
-  detail,
-  compactDetail = false,
-}: {
-  icon: React.ReactNode;
-  tone: 'green' | 'violet' | 'amber';
-  value: string;
-  label: string;
-  detail: string;
-  compactDetail?: boolean;
-}) {
-  const toneClass = {
-    green: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    violet: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  }[tone];
-  return (
-    <div className="min-w-0 rounded-[20px] bg-card p-3 ring-1 ring-border md:p-4 lg:flex lg:items-center lg:gap-4">
-      <div className={cn('grid h-9 w-9 place-items-center rounded-xl lg:h-11 lg:w-11', toneClass)}>{icon}</div>
-      <div className="mt-2 min-w-0 lg:mt-0">
-        <p className="text-xl font-black tabular-nums tracking-[-0.04em] text-foreground md:text-2xl">{value}</p>
-        <p className="truncate text-[12px] font-black text-muted-foreground md:text-[13px]">{label}</p>
-        <p className={cn('mt-0.5 hidden text-xs font-medium text-muted-foreground lg:block', compactDetail && 'text-[11px]')}>{detail}</p>
+    <div className="relative flex flex-col items-center">
+      <h1 className="insights-title mt-4 text-center text-[40px] leading-none md:text-[52px]">Your Patterns</h1>
+      <div className="pointer-events-none relative z-20 -mt-16 md:-mt-14">
+        <Frog width={240} height={270} indices={indices} />
+        <FrogSpeechBubble rate={0} done={0} total={0} fixedMessage={line} className="!top-[150px]" />
       </div>
     </div>
   );
 }
 
-function ProgressChart({ data, days }: { data: InsightData; days: 7 | 30 | 90 }) {
-  const maxPlanned = Math.max(1, ...data.timeline.map((point) => point.planned));
-  const label = days === 7 ? 'Daily follow-through' : 'Weekly follow-through';
+function ReportCard({ data }: { data: InsightData }) {
+  const { summary, previous, range } = data;
+  const empty = summary.planned === 0;
+  const delta = previous.planned > 0 && !empty ? summary.completionDelta : 0;
+  const before = range.days === 7 ? 'the week before' : range.days === 30 ? 'the 30 days before' : 'the 3 months before';
   return (
-    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="progress-heading">
-      <SectionHeading
-        icon={<BarChart3 className="h-5 w-5" aria-hidden="true" />}
-        eyebrow={days === 7 ? 'This Week' : days === 30 ? 'Last 30 Days' : 'Last 3 Months'}
-        title={label}
-        description="Green shows what you finished. The full bar is what you planned."
-        id="progress-heading"
-      />
-      <div className="mt-6 flex h-44 items-end gap-2 border-b border-border/60 px-1 md:gap-3" role="img" aria-label={`${label} chart`}>
-        {data.timeline.map((point) => {
-          const plannedHeight = Math.max(point.planned > 0 ? 8 : 0, (point.planned / maxPlanned) * 128);
-          const completedHeight = point.planned > 0 ? (point.completed / point.planned) * plannedHeight : 0;
-          const dateLabel = point.from === point.to
-            ? formatDate(point.from, { weekday: 'short' })
-            : formatDate(point.from, { month: 'short', day: 'numeric' });
-          const fullLabel = point.from === point.to
-            ? formatDate(point.from, { weekday: 'long', month: 'short', day: 'numeric' })
-            : `${formatDate(point.from, { month: 'short', day: 'numeric' })}–${formatDate(point.to, { month: 'short', day: 'numeric' })}`;
-          return (
-            <div key={point.from} className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch" title={`${fullLabel}: ${point.completed} of ${point.planned} completed`}>
-              <span className="mb-1 text-[10px] font-black tabular-nums text-muted-foreground">{point.completed || ''}</span>
-              <div className="relative w-full max-w-9 overflow-hidden rounded-t-lg bg-muted" style={{ height: plannedHeight }}>
-                <div className="absolute inset-x-0 bottom-0 rounded-t-lg bg-gradient-to-t from-[#447d3f] to-[#7cc06f]" style={{ height: completedHeight }} />
-              </div>
-              <span className="mt-2 max-w-full truncate text-[9px] font-black text-muted-foreground md:text-[10px]">{dateLabel}</span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function SignalsSection({ signals, patternDays }: { signals: InsightData['signals']; patternDays: number }) {
-  if (!signals.length) return null;
-  return (
-    <section aria-labelledby="signals-heading">
-      <div className="flex items-end justify-between gap-4 px-1">
-        <div>
-          <p className="text-[13px] font-black text-primary">Plain-English Insights</p>
-          <h2 id="signals-heading" className="mt-0.5 text-xl font-black tracking-[-0.025em] text-foreground md:text-2xl">Things worth knowing</h2>
+    <section aria-labelledby="report-heading" className={cn(CARD, 'rounded-[28px] px-5 pb-5 pt-5 md:px-7 md:pb-6 md:pt-6')}>
+      <div className="md:flex md:items-end md:gap-8">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-black text-muted-foreground">
+            {formatDate(range.from, { month: 'short', day: 'numeric' })} – {formatDate(range.to, { month: 'short', day: 'numeric' })}
+          </p>
+          <h2 id="report-heading" className="mt-1 flex items-baseline gap-2">
+            <span className="font-display text-[46px] leading-none tracking-wide text-foreground">{empty ? '0%' : `${summary.completionRate}%`}</span>
+            <span className="text-[15px] font-black text-muted-foreground">of your plan done</span>
+          </h2>
+          <ChunkyBar
+            className="mt-3 h-10"
+            value={summary.completed}
+            max={summary.planned}
+            label={`${numberFormat.format(summary.completed)} / ${numberFormat.format(summary.planned)} tasks`}
+          />
+          {delta !== 0 ? (
+            <p className={cn('mt-2.5 flex items-center gap-1.5 text-[13px] font-black', delta > 0 ? 'text-primary' : 'text-muted-foreground')}>
+              {delta > 0 ? <TrendingUp className="h-4 w-4" strokeWidth={3} aria-hidden="true" /> : null}
+              {delta > 0 ? `Up ${delta} points on ${before}` : `${Math.abs(delta)} points under ${before}`}
+            </p>
+          ) : null}
         </div>
-        <p className="hidden text-xs font-semibold text-muted-foreground sm:block">Last {patternDays} days</p>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        {signals.map((signal) => {
-          const styles = {
-            positive: { card: 'border-emerald-200/80 bg-emerald-50/90 dark:border-emerald-400/20 dark:bg-emerald-500/10', icon: 'bg-[#447d3f] text-white', Icon: TrendingUp },
-            watch: { card: 'border-amber-200/80 bg-amber-50/90 dark:border-amber-400/20 dark:bg-amber-500/10', icon: 'bg-amber-400 text-amber-950', Icon: CircleAlert },
-            neutral: { card: 'border-sky-200/80 bg-sky-50/90 dark:border-sky-400/20 dark:bg-sky-500/10', icon: 'bg-sky-500 text-white', Icon: Lightbulb },
-          }[signal.tone];
-          return (
-            <article key={signal.title} className={cn('rounded-[22px] border p-4 shadow-sm', styles.card)}>
-              <div className={cn('grid h-9 w-9 place-items-center rounded-xl shadow-sm', styles.icon)}>
-                <styles.Icon className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <p className="mt-3 text-[12px] font-black text-muted-foreground">{signal.eyebrow}</p>
-              <h3 className="mt-1 text-pretty text-base font-black leading-snug tracking-[-0.02em] text-foreground">{signal.title}</h3>
-              <p className="mt-1.5 text-pretty text-xs font-medium leading-relaxed text-muted-foreground">{signal.body}</p>
-            </article>
-          );
-        })}
+        <dl className="mt-4 grid grid-cols-3 gap-2 md:mt-0 md:w-[22rem] md:shrink-0">
+          <StatTile icon="clock" label="Focus" value={summary.focusSeconds > 0 ? formatDuration(summary.focusSeconds) : '–'} />
+          <StatTile icon="date" label="Active days" value={`${summary.activeDays}/${range.days}`} />
+          <StatTile icon="leap" label="Best run" value={summary.bestRun === 1 ? '1 day' : `${summary.bestRun} days`} />
+        </dl>
       </div>
     </section>
   );
 }
 
-function WeekdayRhythm({ data }: { data: InsightData }) {
+function StatTile({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   return (
-    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="rhythm-heading">
-      <SectionHeading
-        icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
-        eyebrow={`Last ${data.patternDays} Days`}
-        title="Your weekly rhythm"
-        description="A calmer view of which days naturally click."
-        id="rhythm-heading"
-      />
-      <div className="mt-5 space-y-3">
-        {data.weekdayPatterns.map((day) => (
-          <div key={day.day} className="grid grid-cols-[2.75rem_1fr_2.25rem] items-center gap-3">
-            <span className="text-xs font-black text-muted-foreground">{day.short}</span>
-            <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-[#5da15b]" style={{ width: `${day.rate}%` }} />
-            </div>
-            <span className="text-right text-xs font-black tabular-nums text-foreground" aria-label={`${day.rate}% completed on ${day.name}s`}>
-              {day.planned > 0 ? `${day.rate}%` : '—'}
-            </span>
+    <div className="flex min-w-0 flex-col items-center rounded-[18px] bg-muted/60 px-1.5 pb-2.5 pt-2 text-center">
+      <Icon name={icon} className="h-9 w-9" />
+      <dd className="mt-1 text-[16px] font-black leading-tight tabular-nums text-foreground">{value}</dd>
+      <dt className="max-w-full truncate text-[11px] font-bold text-muted-foreground">{label}</dt>
+    </div>
+  );
+}
+
+function ChunkyBar({
+  value,
+  max,
+  label,
+  tone = 'green',
+  className,
+  delay = 0,
+}: {
+  value: number;
+  max: number;
+  label: string;
+  tone?: 'green' | 'soft';
+  className?: string;
+  delay?: number;
+}) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      className={cn('relative overflow-hidden rounded-full bg-muted', className)}
+    >
+      {pct > 0 ? (
+        <div className="absolute inset-[3px]">
+          <div
+            className={cn(
+              'insights-grow-x relative h-full min-w-6 overflow-hidden rounded-full',
+              tone === 'green' ? GREEN_FILL : 'bg-muted-foreground/30',
+            )}
+            style={{ width: `${pct}%`, animationDelay: `${delay}ms` }}
+          >
+            <span aria-hidden="true" className="absolute inset-x-2 top-[3px] h-[28%] rounded-full bg-white/35" />
+            {tone === 'green' ? (
+              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/25 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden" />
+            ) : null}
           </div>
-        ))}
+        </div>
+      ) : null}
+      <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-[14px] font-black tabular-nums text-foreground/70">
+        {label}
+      </span>
+      {tone === 'green' ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center text-[14px] font-black tabular-nums text-white [text-shadow:0_1px_0_rgba(31,98,28,0.55)]"
+          style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+        >
+          {label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
+  return (
+    <Link
+      href={nextStep.href}
+      aria-label={`${nextStep.action}: ${nextStep.title}`}
+      className={cn(CARD, 'group flex items-center gap-3.5 p-3.5 pr-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:p-4 md:pr-5')}
+    >
+      <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] bg-amber-100 dark:bg-amber-400/15">
+        <Icon name="quests" className="h-10 w-10" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] font-black text-amber-600 dark:text-amber-300">Next small win</span>
+        <span className="mt-0.5 block text-pretty text-[16px] font-black leading-snug tracking-[-0.01em] text-foreground">{nextStep.title}</span>
+        <span className="mt-0.5 line-clamp-2 text-pretty text-[13px] font-semibold leading-snug text-muted-foreground">{nextStep.body}</span>
+      </span>
+      <span className="flex h-11 shrink-0 items-center rounded-[14px] bg-amber-500 px-4 text-[15px] font-black text-white shadow-[0_3px_0_#b45309] transition-[transform,box-shadow] group-active:translate-y-[3px] group-active:shadow-none">
+        <span className="hidden md:inline">{nextStep.action}</span>
+        <span className="md:hidden">Go</span>
+      </span>
+    </Link>
+  );
+}
+
+function FollowThrough({ data, days }: { data: InsightData; days: 7 | 30 | 90 }) {
+  const points = data.timeline;
+  const maxPlanned = Math.max(1, ...points.map((point) => point.planned));
+  const label = (point: TimelinePoint) =>
+    point.from === point.to
+      ? formatDate(point.from, { weekday: 'short' })
+      : formatDate(point.from, { month: 'short', day: 'numeric' });
+  const fullLabel = (point: TimelinePoint) =>
+    point.from === point.to
+      ? formatDate(point.from, { weekday: 'long', month: 'short', day: 'numeric' })
+      : `${formatDate(point.from, { month: 'short', day: 'numeric' })}–${formatDate(point.to, { month: 'short', day: 'numeric' })}`;
+  return (
+    <section className={cn(CARD, 'p-5 md:p-6')} aria-labelledby="follow-heading">
+      <div className="flex items-center gap-3">
+        <Icon name="patterns" className="h-10 w-10 shrink-0" />
+        <h2 id="follow-heading" className="min-w-0 flex-1 text-[18px] font-black tracking-[-0.02em] text-foreground">
+          {days === 7 ? 'Day by day' : 'Week by week'}
+        </h2>
+        <div aria-hidden="true" className="flex shrink-0 items-center gap-3 text-[12px] font-bold text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className={cn('h-3 w-3 rounded-full', GREEN_FILL)} />Done</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-muted" />Planned</span>
+        </div>
+      </div>
+      <div
+        role="img"
+        aria-label={points.map((point) => `${fullLabel(point)}: ${point.completed} of ${point.planned} done`).join('. ')}
+        className="mt-5 flex items-end gap-1.5 md:gap-3"
+      >
+        {points.map((point, index) => {
+          const plannedHeight = point.planned > 0 ? Math.max(16, (point.planned / maxPlanned) * 112) : 0;
+          const doneShare = point.planned > 0 ? point.completed / point.planned : 0;
+          const showLabel = points.length <= 7 || index % 3 === 0;
+          return (
+            <div key={point.from} className="flex min-w-0 flex-1 flex-col items-center" title={`${fullLabel(point)}: ${point.completed} of ${point.planned} done`}>
+              <div className="flex h-[136px] w-full items-end justify-center">
+                <div className="flex w-full max-w-11 flex-col items-center">
+                  {points.length <= 7 && point.planned > 0 ? (
+                    <span className="mb-1 text-[12px] font-black tabular-nums text-muted-foreground">{point.completed}</span>
+                  ) : null}
+                  {point.planned > 0 ? (
+                    <div
+                      className="insights-grow-y relative w-full overflow-hidden rounded-[10px] bg-muted"
+                      style={{ height: plannedHeight, animationDelay: `${80 + index * 40}ms` }}
+                    >
+                      {doneShare > 0 ? (
+                        <div className={cn('absolute inset-x-0 bottom-0 rounded-[10px]', GREEN_FILL)} style={{ height: `${doneShare * 100}%` }}>
+                          {doneShare * plannedHeight >= 24 ? (
+                            <span aria-hidden="true" className="absolute inset-x-[24%] top-[4px] h-[6px] rounded-full bg-white/40" />
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="h-2 w-full rounded-full bg-muted" />
+                  )}
+                </div>
+              </div>
+              <span className={cn('mt-2 whitespace-nowrap text-[11px] font-black text-muted-foreground', !showLabel && 'invisible')}>
+                {label(point)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function HabitSection({ habits, patternDays }: { habits: InsightData['habits']; patternDays: number }) {
+function bestWeekday(weekdays: Weekday[]) {
+  return [...weekdays]
+    .filter((day) => day.planned >= 2 && day.completed > 0)
+    .sort((a, b) => b.rate - a.rate || b.completed - a.completed)[0] ?? null;
+}
+
+function PatternsSection({ data, period }: { data: InsightData; period: string }) {
+  const load = data.loadPattern;
+  const focus = data.focusPattern;
+  const cards: React.ReactNode[] = [];
+  if (bestWeekday(data.weekdayPatterns)) cards.push(<BestDayCard key="day" weekdays={data.weekdayPatterns} />);
+  if (load && load.typicalTasks > 0 && load.lighterDays >= 2 && load.heavierDays >= 2) cards.push(<SweetSpotCard key="load" load={load} />);
+  if (data.timePattern?.buckets?.length) cards.push(<FinishWindowCard key="time" time={data.timePattern} />);
+  if (focus && focus.focusedDays >= 2 && focus.otherDays >= 2 && focus.focusedRate - focus.otherRate >= 8) cards.push(<FocusCard key="focus" focus={focus} />);
   return (
-    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="habits-heading">
-      <SectionHeading
-        icon={<Leaf className="h-5 w-5" aria-hidden="true" />}
-        eyebrow={`Last ${patternDays} Days`}
-        title="Habits taking root"
-        description="Your repeating tasks, without the pressure of being perfect."
-        id="habits-heading"
-      />
-      {habits.length ? (
-        <div className="mt-4 divide-y divide-border/55">
-          {habits.map((habit) => (
-            <div key={habit.id} className="py-3.5 first:pt-1 last:pb-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-foreground" title={habit.title}>{habit.title}</p>
-                  <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                    {habit.completed} of {habit.scheduled} times
-                    {habit.streak > 1 ? ` · ${habit.streak} in a row` : ''}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 dark:text-emerald-300">{habit.rate}%</span>
-              </div>
-              <div className="mt-2.5 flex gap-1.5" aria-label={`Recent history for ${habit.title}`}>
-                {habit.recent.map((item) => (
-                  <span
-                    key={item.date}
-                    role="img"
-                    aria-label={`${formatDate(item.date, { month: 'short', day: 'numeric' })}: ${item.completed ? 'completed' : 'not completed'}`}
-                    title={`${formatDate(item.date, { month: 'short', day: 'numeric' })}: ${item.completed ? 'completed' : 'not completed'}`}
-                    className={cn(
-                      'grid h-6 w-6 place-items-center rounded-full border',
-                      item.completed
-                        ? 'border-[#5da15b] bg-[#5da15b] text-white'
-                        : 'border-border bg-muted/[0.55] text-transparent',
-                    )}
-                  >
-                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+    <section aria-labelledby="patterns-heading">
+      <SectionTitle id="patterns-heading" title="What works for you" period={period} className="px-1 pt-2" />
+      {cards.length ? (
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">{cards}</div>
       ) : (
-        <div className="mt-5 rounded-2xl bg-muted/[0.45] px-4 py-5 text-center">
-          <Leaf className="mx-auto h-7 w-7 text-muted-foreground" aria-hidden="true" />
-          <p className="mt-2 text-sm font-black text-foreground">No repeating pattern yet</p>
-          <p className="mt-1 text-xs font-medium text-muted-foreground">Repeating tasks will appear here after a few check-ins.</p>
+        <div className={cn(CARD, 'mt-3 flex items-center gap-3.5 p-4')}>
+          <Icon name="patterns" className="h-11 w-11 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[15px] font-black text-foreground">Your patterns are taking shape</p>
+            <p className="mt-0.5 text-[13px] font-semibold leading-snug text-muted-foreground">Keep checking off tasks. They show up after a couple of weeks.</p>
+          </div>
         </div>
       )}
     </section>
   );
 }
 
-function TagSection({ tags, patternDays }: { tags: InsightData['tags']; patternDays: number }) {
+function PatternCard({ icon, eyebrow, title, children }: { icon: IconName; eyebrow: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="areas-heading">
-      <SectionHeading
-        icon={<Target className="h-5 w-5" aria-hidden="true" />}
-        eyebrow={`Last ${patternDays} Days`}
-        title="Where your energy goes"
-        description="Your areas of life, ordered by how often they show up."
-        id="areas-heading"
-      />
-      <div className="mt-5 grid gap-x-8 gap-y-4 md:grid-cols-2">
-        {tags.map((tag) => (
-          <div key={tag.id}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} aria-hidden="true" />
-                <span className="truncate text-sm font-black text-foreground">{tag.name}</span>
-              </div>
-              <span className="shrink-0 text-xs font-black tabular-nums text-muted-foreground">{tag.completed}/{tag.planned}</span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full" style={{ width: `${tag.rate}%`, backgroundColor: tag.color }} />
-            </div>
-          </div>
-        ))}
+    <article className={cn(CARD, 'p-4 md:p-5')}>
+      <div className="flex items-center gap-3">
+        <Icon name={icon} className="h-11 w-11 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-[12px] font-black text-primary">{eyebrow}</p>
+          <h3 className="text-pretty text-[16px] font-black leading-snug tracking-[-0.015em] text-foreground">{title}</h3>
+        </div>
       </div>
-    </section>
+      {children}
+    </article>
   );
 }
 
-function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
+function BestDayCard({ weekdays }: { weekdays: Weekday[] }) {
+  const best = bestWeekday(weekdays);
+  if (!best) return null;
+  const ordered = WEEK_ORDER.map((day) => weekdays.find((item) => item.day === day)).filter((day): day is Weekday => !!day);
   return (
-    <section className="relative overflow-hidden rounded-[26px] border border-emerald-200 bg-[linear-gradient(120deg,#effdf1,#e6f8e8)] p-5 shadow-sm dark:border-emerald-400/20 dark:bg-[linear-gradient(120deg,rgba(34,197,94,0.13),rgba(16,185,129,0.06))] md:flex md:items-center md:gap-6 md:p-7" aria-labelledby="next-step-heading">
-      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#447d3f] text-white">
-        <Lightbulb className="h-6 w-6" aria-hidden="true" />
-      </div>
-      <div className="mt-4 min-w-0 flex-1 md:mt-0">
-        <p className="text-[12px] font-black text-primary">Your Next Small Win</p>
-        <h2 id="next-step-heading" className="mt-1 text-balance text-xl font-black tracking-[-0.025em] text-foreground">{nextStep.title}</h2>
-        <p className="mt-1 max-w-2xl text-pretty text-sm font-medium leading-relaxed text-muted-foreground">{nextStep.body}</p>
-      </div>
-      <Link
-        href={nextStep.href}
-        className="mt-5 inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,background-color] hover:bg-[#3d7038] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:mt-0 md:w-auto"
+    <PatternCard icon="date" eyebrow="Best day" title={`${best.name}s are your strongest`}>
+      <div
+        role="img"
+        aria-label={ordered.map((day) => `${day.name}: ${day.planned >= 2 ? `${day.rate}% done` : 'not enough tasks'}`).join('. ')}
+        className="mt-4 grid grid-cols-7 gap-1.5"
       >
-        {nextStep.action}
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-      </Link>
+        {ordered.map((day, index) => {
+          const isBest = day.day === best.day;
+          return (
+            <div key={day.day} className="flex flex-col items-center">
+              <span
+                className={cn(
+                  'mb-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none tabular-nums',
+                  isBest ? 'bg-primary text-primary-foreground shadow-[0_2px_0_rgba(0,0,0,0.18)]' : 'invisible',
+                )}
+              >
+                {day.rate}%
+              </span>
+              <div className="flex h-[72px] w-full max-w-10 items-end overflow-hidden rounded-[12px] bg-muted">
+                {day.planned >= 2 ? (
+                  <div
+                    className={cn('insights-grow-y relative w-full rounded-[12px]', isBest ? GREEN_FILL : 'bg-primary/25')}
+                    style={{ height: `${Math.max(12, day.rate)}%`, animationDelay: `${80 + index * 40}ms` }}
+                  >
+                    {isBest ? <span aria-hidden="true" className="absolute inset-x-[24%] top-[4px] h-[6px] rounded-full bg-white/40" /> : null}
+                  </div>
+                ) : null}
+              </div>
+              <span className={cn('mt-1.5 text-[11px] font-black', isBest ? 'text-primary' : 'text-muted-foreground')}>{day.short}</span>
+            </div>
+          );
+        })}
+      </div>
+    </PatternCard>
+  );
+}
+
+function SweetSpotCard({ load }: { load: NonNullable<InsightData['loadPattern']> }) {
+  const gap = load.lighterRate - load.heavierRate;
+  const lighter = load.typicalTasks === 1 ? '1 task' : `${load.typicalTasks} tasks or fewer`;
+  const title = gap >= 10
+    ? `Days with ${lighter} go best`
+    : gap <= -10
+      ? 'You shine on fuller days'
+      : 'Your pace holds on busy days';
+  return (
+    <PatternCard icon="planner" eyebrow="Sweet spot" title={title}>
+      <ComparisonBars
+        rows={[
+          { label: load.typicalTasks === 1 ? '1 task' : `Up to ${load.typicalTasks} tasks`, rate: load.lighterRate, lead: gap >= 0 },
+          { label: `${load.typicalTasks + 1}+ tasks`, rate: load.heavierRate, lead: gap < 0 },
+        ]}
+      />
+    </PatternCard>
+  );
+}
+
+function FocusCard({ focus }: { focus: NonNullable<InsightData['focusPattern']> }) {
+  return (
+    <PatternCard icon="clock" eyebrow="Focus" title="Focus sessions lift your days">
+      <ComparisonBars
+        rows={[
+          { label: 'With a focus session', rate: focus.focusedRate, lead: true },
+          { label: 'Without one', rate: focus.otherRate, lead: false },
+        ]}
+      />
+    </PatternCard>
+  );
+}
+
+function ComparisonBars({ rows }: { rows: Array<{ label: string; rate: number; lead: boolean }> }) {
+  return (
+    <div className="mt-4 space-y-2.5">
+      {rows.map((row, index) => (
+        <div key={row.label}>
+          <p className="mb-1 text-[13px] font-bold text-muted-foreground">{row.label}</p>
+          <ChunkyBar className="h-8" value={row.rate} max={100} label={`${row.rate}% done`} tone={row.lead ? 'green' : 'soft'} delay={120 + index * 90} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FinishWindowCard({ time }: { time: NonNullable<InsightData['timePattern']> }) {
+  return (
+    <PatternCard icon="compass" eyebrow="Finish window" title={`You get the most done ${TIME_PHRASES[time.label] ?? time.label.toLowerCase()}`}>
+      <div className="mt-4 grid grid-cols-4 gap-1.5">
+        {time.buckets.map((bucket) => {
+          const BucketIcon = TIME_ICONS[bucket.label] ?? Sun;
+          const top = bucket.label === time.label;
+          return (
+            <div
+              key={bucket.label}
+              className={cn(
+                'flex min-w-0 flex-col items-center rounded-[16px] px-1 py-2.5',
+                top
+                  ? 'bg-amber-100 text-amber-600 shadow-[0_3px_0_#f59e0b] dark:bg-amber-400/15 dark:text-amber-300 dark:shadow-[0_3px_0_rgba(245,158,11,0.5)]'
+                  : 'bg-muted/60 text-muted-foreground',
+              )}
+            >
+              <BucketIcon className="h-5 w-5" strokeWidth={2.5} aria-hidden="true" />
+              <span className={cn('mt-1 text-[16px] font-black tabular-nums', top ? 'text-amber-700 dark:text-amber-200' : 'text-foreground')}>{bucket.share}%</span>
+              <span className="max-w-full truncate text-[11px] font-bold">{bucket.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </PatternCard>
+  );
+}
+
+function HabitSection({ habits, period }: { habits: InsightData['habits']; period: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? habits : habits.slice(0, 3);
+  return (
+    <section className={cn(CARD, 'p-5 md:p-6')} aria-labelledby="habits-heading">
+      <SectionTitle id="habits-heading" icon="repeat" title="Habits taking root" period={period} />
+      {habits.length ? (
+        <>
+          <ul className="mt-2 divide-y divide-border/60">
+            {visible.map((habit) => (
+              <li key={habit.id} className="py-3 last:pb-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-[15px] font-black text-foreground" title={habit.title}>{habit.title}</p>
+                  {habit.streak > 1 ? (
+                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[12px] font-black text-primary">{habit.streak} in a row</span>
+                  ) : (
+                    <span className="shrink-0 text-[13px] font-black tabular-nums text-muted-foreground">{habit.completed}/{habit.scheduled}</span>
+                  )}
+                </div>
+                <div className="mt-2 flex items-center gap-1">
+                  {habit.recent.map((item) => {
+                    const when = formatDate(item.date, { month: 'short', day: 'numeric' });
+                    return item.completed ? (
+                      <Icon key={item.date} name="leap" label={`${when}: done`} className="h-7 w-7 shrink-0" />
+                    ) : (
+                      <span
+                        key={item.date}
+                        role="img"
+                        aria-label={`${when}: missed`}
+                        className="grid h-7 w-7 shrink-0 place-items-center"
+                      >
+                        <span className="h-[22px] w-[22px] rounded-full border-2 border-dashed border-muted-foreground/25" />
+                      </span>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {habits.length > 3 ? <ShowAllButton expanded={expanded} onToggle={() => setExpanded((value) => !value)} label={`Show all ${habits.length} habits`} /> : null}
+        </>
+      ) : (
+        <div className="mt-4 flex items-center gap-3 rounded-[18px] bg-muted/50 px-4 py-3.5">
+          <Icon name="lilyPad" className="h-9 w-9 shrink-0" />
+          <p className="text-[13px] font-semibold leading-snug text-muted-foreground">Repeating tasks show up here after a few check-ins.</p>
+        </div>
+      )}
     </section>
   );
 }
 
-function DailyHistory({ daily }: { daily: DailyPoint[] }) {
-  const recent = [...daily].reverse().slice(0, 14);
+function AreaSection({ tags, period }: { tags: InsightData['tags']; period: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const total = tags.reduce((sum, tag) => sum + tag.planned, 0) || 1;
+  const visible = expanded ? tags : tags.slice(0, 4);
   return (
-    <details className="group rounded-[24px] bg-card ring-1 ring-border">
-      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-[24px] px-5 py-4 transition-colors hover:bg-muted/[0.35] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
-          <Clock3 className="h-5 w-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-black text-foreground">Daily history</h2>
-          <p className="text-xs font-medium text-muted-foreground">Open the supporting detail</p>
-        </div>
-        <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
-      </summary>
-      <div className="border-t border-border/[0.55] px-5 pb-5">
-        <div className="divide-y divide-border/45">
-          {recent.map((day) => (
-            <div key={day.date} className="grid grid-cols-[1fr_auto] items-center gap-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-black text-foreground">{formatDate(day.date, { weekday: 'long' })}</p>
-                <p className="text-[11px] font-semibold text-muted-foreground">
-                  {formatDate(day.date, { month: 'long', day: 'numeric' })}
-                  {day.focusSeconds > 0 ? ` · ${formatDuration(day.focusSeconds)} focused` : ''}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-black tabular-nums text-foreground">{day.completed}/{day.planned}</p>
-                <p className="text-[12px] font-bold text-muted-foreground">Finished</p>
-              </div>
-            </div>
+    <section className={cn(CARD, 'p-5 md:p-6')} aria-labelledby="areas-heading">
+      <SectionTitle id="areas-heading" icon="filter" title="Where your energy goes" period={period} />
+      <div
+        role="img"
+        aria-label={tags.map((tag) => `${tag.name}: ${Math.round((tag.planned / total) * 100)}% of your tasks`).join('. ')}
+        className="mt-4 rounded-full bg-muted p-[3px]"
+      >
+        <div className="insights-grow-x flex h-4 gap-[3px] overflow-hidden rounded-full">
+          {tags.map((tag) => (
+            <span key={tag.id} className="relative h-full min-w-[8px] first:rounded-l-full last:rounded-r-full" style={{ flexGrow: tag.planned, flexBasis: 0, backgroundColor: tag.color }}>
+              <span aria-hidden="true" className="absolute inset-x-1 top-[2px] h-[4px] rounded-full bg-white/35" />
+            </span>
           ))}
         </div>
       </div>
-    </details>
+      <ul className="mt-2 divide-y divide-border/60">
+        {visible.map((tag) => (
+          <li key={tag.id} className="flex items-center gap-3 py-2.5 last:pb-1">
+            <span className="h-3 w-3 shrink-0 rounded-full shadow-[inset_0_-2px_0_rgba(0,0,0,0.15)]" style={{ backgroundColor: tag.color }} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-[15px] font-black text-foreground">{tag.name}</span>
+            <span className="shrink-0 text-[13px] font-bold tabular-nums text-muted-foreground">{Math.round((tag.planned / total) * 100)}%</span>
+            <span className="w-[76px] shrink-0 text-right text-[13px] font-black tabular-nums text-foreground">{tag.completed}/{tag.planned} done</span>
+          </li>
+        ))}
+      </ul>
+      {tags.length > 4 ? <ShowAllButton expanded={expanded} onToggle={() => setExpanded((value) => !value)} label={`Show all ${tags.length} areas`} /> : null}
+    </section>
   );
 }
 
-function SectionHeading({ icon, eyebrow, title, description, id }: { icon: React.ReactNode; eyebrow: string; title: string; description: string; id: string }) {
+function ShowAllButton({ expanded, onToggle, label }: { expanded: boolean; onToggle: () => void; label: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#447d3f]/10 text-primary">{icon}</div>
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="mt-2 flex h-10 w-full items-center justify-center gap-1 rounded-[14px] bg-muted/60 text-[13px] font-black text-primary transition-[transform,background-color] hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      {expanded ? 'Show less' : label}
+      <ChevronDown className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')} strokeWidth={2.75} aria-hidden="true" />
+    </button>
+  );
+}
+
+function SectionTitle({ id, icon, title, period, className }: { id: string; icon?: IconName; title: string; period: string; className?: string }) {
+  return (
+    <div className={cn('flex items-center gap-3', className)}>
+      {icon ? <Icon name={icon} className="h-10 w-10 shrink-0" /> : null}
       <div className="min-w-0">
-        <p className="text-[12px] font-black text-primary">{eyebrow}</p>
-        <h2 id={id} className="mt-0.5 text-lg font-black tracking-[-0.025em] text-foreground">{title}</h2>
-        <p className="mt-0.5 text-pretty text-xs font-medium leading-relaxed text-muted-foreground">{description}</p>
+        <h2 id={id} className="text-[18px] font-black leading-tight tracking-[-0.02em] text-foreground">{title}</h2>
+        <p className="text-[12px] font-bold text-muted-foreground">{period}</p>
       </div>
     </div>
   );
@@ -597,33 +726,34 @@ function SectionHeading({ icon, eyebrow, title, description, id }: { icon: React
 
 function EmptyInsights() {
   return (
-    <section className="mt-5 rounded-[24px] bg-card px-6 py-12 text-center ring-1 ring-border md:mt-7 md:py-16">
-      <div className="relative mx-auto grid h-20 w-20 place-items-center rounded-[26px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-        <Leaf className="h-9 w-9" aria-hidden="true" />
-        <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-amber-400" aria-hidden="true" />
-      </div>
-      <h2 className="mt-5 text-balance text-2xl font-black tracking-[-0.035em] text-foreground">Your patterns start with one small win</h2>
-      <p className="mx-auto mt-2 max-w-md text-pretty text-sm font-medium leading-relaxed text-muted-foreground">
-        Add a few tasks and check them off as you go. This page will turn that history into gentle, useful patterns.
+    <section className={cn(CARD, 'relative z-10 -mt-[15px] rounded-[28px] px-6 pb-7 pt-8 text-center')}>
+      <h2 className="text-balance text-[22px] font-black tracking-[-0.03em] text-foreground">Your patterns start with one small win</h2>
+      <p className="mx-auto mt-2 max-w-md text-pretty text-sm font-semibold leading-relaxed text-muted-foreground">
+        Check off a few tasks and this page fills in with what works for you.
       </p>
-      <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,background-color] hover:bg-[#3d7038] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-        Plan My First Win
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      <Link
+        href="/"
+        className="mt-5 inline-flex h-12 items-center justify-center rounded-2xl bg-primary px-6 text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-[4px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      >
+        Plan my first win
       </Link>
     </section>
   );
 }
 
-function InsightsSkeleton() {
+function InsightsSkeleton({ days }: { days: 7 | 30 | 90 }) {
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="relative isolate min-h-[100dvh] overflow-x-hidden">
       <div aria-hidden="true" className="hidden h-16 md:block" />
-      <div className="mx-auto w-full max-w-6xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-6" aria-label="Loading your patterns">
-        <div className="h-44 rounded-[24px] bg-card ring-1 ring-border motion-safe:animate-pulse" />
-        <div className="mt-5 h-64 rounded-[24px] bg-muted motion-safe:animate-pulse" />
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <div className="h-72 rounded-[24px] bg-card ring-1 ring-border motion-safe:animate-pulse" />
-          <div className="h-72 rounded-[24px] bg-card ring-1 ring-border motion-safe:animate-pulse" />
+      <div className="mx-auto w-full max-w-5xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-6" aria-label="Loading your patterns">
+        <InsightsHeader days={days} />
+        <div className="flex justify-center">
+          <h1 className="insights-title mt-4 text-center text-[40px] leading-none md:text-[52px]">Your Patterns</h1>
+        </div>
+        <div className="mt-[150px] space-y-4 md:space-y-5">
+          <div className={cn(CARD, 'h-[236px] rounded-[28px] motion-safe:animate-pulse md:h-[168px]')} />
+          <div className={cn(CARD, 'h-[86px] motion-safe:animate-pulse')} />
+          <div className={cn(CARD, 'h-[236px] motion-safe:animate-pulse')} />
         </div>
         <p className="sr-only" aria-live="polite">Loading your patterns…</p>
       </div>
@@ -640,9 +770,9 @@ function InsightsError({ onRetry }: { onRetry: () => void }) {
         </div>
         <h1 className="mt-4 text-xl font-black text-foreground">Your patterns need another moment</h1>
         <p className="mt-2 text-sm font-medium text-muted-foreground">Check your connection, then try loading them again.</p>
-        <button type="button" onClick={onRetry} className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground transition-[transform,opacity] hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+        <button type="button" onClick={onRetry} className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_3px_0_0_#34631f] transition-[transform,box-shadow] active:translate-y-[3px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          Try Again
+          Try again
         </button>
       </div>
     </div>

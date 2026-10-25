@@ -13,6 +13,9 @@ const RELEASE_DISTANCE = 96;
 const FAST_RELEASE_DISTANCE = 52;
 const FAST_RELEASE_VELOCITY = 0.55;
 const DRAG_START_DISTANCE = 8;
+const ARM_DELAY_MS = 140;
+const ARM_DISTANCE = 2;
+const LINGER_MS = 6000;
 
 type Props = {
   children: ReactNode;
@@ -40,6 +43,8 @@ export function FlyCatchSwipeLauncher({
   const suppressClickRef = useRef(false);
   const dragRafRef = useRef(0);
   const pendingArmedRef = useRef(false);
+  const armTimerRef = useRef(0);
+  const lingerTimerRef = useRef(0);
   const scrollLockRef = useRef<{
     element: HTMLElement;
     overflowY: string;
@@ -80,9 +85,17 @@ export function FlyCatchSwipeLauncher({
     element.style.overscrollBehavior = 'none';
   };
 
+  const mountGame = () => {
+    window.clearTimeout(armTimerRef.current);
+    armTimerRef.current = 0;
+    useFlyCatchOverlay.getState().activate(source);
+  };
+
   useEffect(
     () => () => {
       cancelAnimationFrame(dragRafRef.current);
+      window.clearTimeout(armTimerRef.current);
+      window.clearTimeout(lingerTimerRef.current);
       restoreScroll();
       const overlay = useFlyCatchOverlay.getState();
       if (!overlay.open) overlay.deactivate();
@@ -94,7 +107,10 @@ export function FlyCatchSwipeLauncher({
     if (disabled || event.button !== 0) return;
     if (shouldStart && !shouldStart(event.clientX, event.clientY)) return;
     const overlay = useFlyCatchOverlay.getState();
-    if (overlay.open || overlay.active) return;
+    const lingering = lingerTimerRef.current !== 0;
+    if (overlay.open || (overlay.active && !lingering)) return;
+    window.clearTimeout(lingerTimerRef.current);
+    lingerTimerRef.current = 0;
     pointerRef.current = event.pointerId;
     startYRef.current = event.clientY;
     lastYRef.current = event.clientY;
@@ -105,10 +121,10 @@ export function FlyCatchSwipeLauncher({
     draggingRef.current = false;
     suppressClickRef.current = false;
     pendingArmedRef.current = false;
-    // Mount the invisible game before the first drag frame. Previously it was
-    // mounted at the threshold-crossing move, which made mobile WebViews flash
-    // and drop frames while the finger was already moving.
-    overlay.activate(source);
+    if (!overlay.active) {
+      window.clearTimeout(armTimerRef.current);
+      armTimerRef.current = window.setTimeout(mountGame, ARM_DELAY_MS);
+    }
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -123,6 +139,7 @@ export function FlyCatchSwipeLauncher({
 
     const pull = Math.max(0, event.clientY - startYRef.current);
     pullRef.current = pull;
+    if (armTimerRef.current && pull >= ARM_DISTANCE) mountGame();
     if (!draggingRef.current) {
       if (pull < DRAG_START_DISTANCE) return;
       draggingRef.current = true;
@@ -147,7 +164,16 @@ export function FlyCatchSwipeLauncher({
     if (pointerRef.current !== event.pointerId) return;
     pointerRef.current = null;
     if (!draggingRef.current) {
-      useFlyCatchOverlay.getState().deactivate();
+      if (armTimerRef.current) {
+        window.clearTimeout(armTimerRef.current);
+        armTimerRef.current = 0;
+        return;
+      }
+      lingerTimerRef.current = window.setTimeout(() => {
+        lingerTimerRef.current = 0;
+        const overlay = useFlyCatchOverlay.getState();
+        if (!overlay.open) overlay.deactivate();
+      }, LINGER_MS);
       return;
     }
     draggingRef.current = false;
