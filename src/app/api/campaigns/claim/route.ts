@@ -3,12 +3,11 @@ import { requireAuth } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import CampaignModel from '@/lib/models/Campaign';
 import CampaignUserStateModel from '@/lib/models/CampaignUserState';
-import UserModel from '@/lib/models/User';
 import { buildAudience } from '@/lib/campaigns/audience';
 import { evaluateCampaign } from '@/lib/campaigns/eligibility';
-import { logFlyGrant } from '@/lib/economy/ledger';
+import { applyGrants, type GrantSummary } from '@/lib/campaigns/grants';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import type { CampaignReward, CampaignRewardGrant } from '@/lib/campaigns/types';
+import { riveButtonElementId, type CampaignReward } from '@/lib/campaigns/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,10 +20,24 @@ const dayKey = (now: Date) => now.toISOString().slice(0, 10);
  * request. The client says *which button* was pressed; what that button is
  * worth is not the client's to state.
  */
-function rewardFor(
-  campaign: { canvas?: { elements?: { id: string; action?: string; reward?: CampaignReward }[] }; cta?: { action?: string; reward?: CampaignReward } },
-  elementId: string,
-): CampaignReward | null {
+type RewardCampaign = {
+  canvas?: { elements?: { id: string; action?: string; reward?: CampaignReward }[] };
+  cta?: { action?: string; reward?: CampaignReward };
+  rive?: { buttons?: { signal: string; action?: string; reward?: CampaignReward }[] };
+};
+
+function rewardFor(campaign: RewardCampaign, elementId: string): CampaignReward | null {
+  if (elementId.startsWith('rive-')) {
+    const button = campaign.rive?.buttons?.find(
+      (item) => riveButtonElementId(item.signal) === elementId,
+    );
+    if (!button) return null;
+    if (button.action === 'claim_reward') return button.reward ?? null;
+    if (button.action === 'cta' && campaign.cta?.action === 'claim_reward') {
+      return campaign.cta.reward ?? null;
+    }
+    return null;
+  }
   if (elementId) {
     const element = campaign.canvas?.elements?.find((item) => item.id === elementId);
     if (!element || element.action !== 'claim_reward') return null;
@@ -32,56 +45,6 @@ function rewardFor(
   }
   if (campaign.cta?.action !== 'claim_reward') return null;
   return campaign.cta.reward ?? null;
-}
-
-type GrantSummary = { kind: string; id?: string; amount: number };
-
-/** Turns the campaign's grants into one Mongo update on the user document. */
-function buildUserUpdate(grants: CampaignRewardGrant[], premiumUntil: Date | null) {
-  const inc: Record<string, number> = {};
-  const set: Record<string, unknown> = {};
-  const addToSet: Record<string, unknown> = {};
-  const summary: GrantSummary[] = [];
-  let flies = 0;
-
-  for (const grant of grants) {
-    const amount = Math.floor(grant.amount);
-    if (amount <= 0) continue;
-
-    if (grant.kind === 'flies') {
-      flies += amount;
-      inc['wardrobe.flies'] = (inc['wardrobe.flies'] ?? 0) + amount;
-      summary.push({ kind: 'flies', amount });
-      continue;
-    }
-
-    if (grant.kind === 'plus_days') {
-      // Days stack onto whatever is left, so a gift to an existing member
-      // extends rather than truncates.
-      const base =
-        premiumUntil && premiumUntil > new Date() ? premiumUntil.getTime() : Date.now();
-      premiumUntil = new Date(base + amount * 86_400_000);
-      set.premiumUntil = premiumUntil;
-      summary.push({ kind: 'plus_days', amount });
-      continue;
-    }
-
-    const id = (grant.id ?? '').trim();
-    if (!id || !/^[\w-]+$/.test(id)) continue;
-
-    if (grant.kind === 'background') {
-      inc[`wardrobe.backgrounds.inventory.${id}`] =
-        (inc[`wardrobe.backgrounds.inventory.${id}`] ?? 0) + amount;
-      summary.push({ kind: 'background', id, amount });
-      continue;
-    }
-
-    inc[`wardrobe.inventory.${id}`] = (inc[`wardrobe.inventory.${id}`] ?? 0) + amount;
-    addToSet['wardrobe.unseenItems'] = { $each: [id] };
-    summary.push({ kind: 'item', id, amount });
-  }
-
-  return { inc, set, addToSet, summary, flies };
 }
 
 /**
@@ -159,46 +122,28 @@ export async function POST(req: NextRequest) {
       return json({ ok: true, alreadyClaimed: true, granted: [] });
     }
 
-    const user = await UserModel.findById(userId).select('premiumUntil').lean();
-    const { inc, set, addToSet, summary, flies } = buildUserUpdate(
-      reward.grants,
-      user?.premiumUntil ? new Date(user.premiumUntil) : null,
-    );
-
-    if (!summary.length) {
-      await CampaignUserStateModel.updateOne(
+    const releaseClaim = () =>
+      CampaignUserStateModel.updateOne(
         { userId, campaignId },
         { $unset: { [`claims.${claimKey}`]: '' } },
       );
-      return json({ error: 'Nothing to grant' }, 400);
-    }
 
+    let summary: GrantSummary[];
     try {
-      await UserModel.updateOne(
-        { _id: userId },
-        {
-          ...(Object.keys(inc).length ? { $inc: inc } : {}),
-          ...(Object.keys(set).length ? { $set: set } : {}),
-          ...(Object.keys(addToSet).length ? { $addToSet: addToSet } : {}),
-        },
-      );
-    } catch (error) {
-      await CampaignUserStateModel.updateOne(
-        { userId, campaignId },
-        { $unset: { [`claims.${claimKey}`]: '' } },
-      );
-      throw error;
-    }
-
-    if (flies > 0) {
-      void logFlyGrant({
-        userId,
+      ({ summary } = await applyGrants(userId, reward.grants, {
         source: 'campaign',
         occurrenceKey: `${campaignId}:${claimKey}`,
         dayKey: dayKey(now),
-        amount: flies,
         meta: { campaignId, elementId: elementId || null },
-      });
+      }));
+    } catch (error) {
+      await releaseClaim();
+      throw error;
+    }
+
+    if (!summary.length) {
+      await releaseClaim();
+      return json({ error: 'Nothing to grant' }, 400);
     }
 
     void recordAnalyticsEvent({

@@ -18,9 +18,21 @@ export async function buildAudience(
 ): Promise<CampaignAudience> {
   await connectMongo();
   const [user, paidCount] = await Promise.all([
-    User.findById(userId).select('email createdAt premiumUntil wardrobe.flies').lean(),
+    User.findById(userId)
+      .select('email createdAt premiumUntil frogName plusSubscription wardrobe.flies')
+      .lean<{
+        email?: string;
+        createdAt?: Date;
+        premiumUntil?: Date;
+        frogName?: string;
+        plusSubscription?: { store?: string; periodType?: string } | null;
+        wardrobe?: { flies?: number };
+      } | null>(),
     FlyPurchaseModel.countDocuments({ userId }),
   ]);
+  const plus = user?.plusSubscription;
+  const paysForPlus =
+    !!plus?.store && plus.store !== 'promotional' && plus.periodType !== 'trial';
 
   const createdAt = user?.createdAt ? new Date(user.createdAt) : new Date();
   const daysSinceSignup = Math.max(
@@ -32,9 +44,10 @@ export async function buildAudience(
     userId,
     platform: normalizePlatform(platformHint),
     balance: Number(user?.wardrobe?.flies ?? 0),
-    hasPaid: paidCount > 0,
+    hasPaid: paidCount > 0 || paysForPlus,
     isPlus: !!user?.premiumUntil && new Date(user.premiumUntil) > new Date(),
     daysSinceSignup,
     isAdmin: isAdminEmail(user?.email ?? null),
+    frogName: user?.frogName || '',
   };
 }

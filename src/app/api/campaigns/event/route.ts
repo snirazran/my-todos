@@ -41,8 +41,9 @@ export async function POST(req: NextRequest) {
       // resets by being rewritten rather than by a sweep.
       const existing = await CampaignUserStateModel.findOne(
         { userId: decoded.uid, campaignId },
-        { dayKey: 1 },
+        { dayKey: 1, firstShownAt: 1 },
       ).lean();
+      if (!existing?.firstShownAt) set.firstShownAt = now;
       if (existing?.dayKey === today) {
         inc.dayCount = 1;
       } else {

@@ -3,7 +3,9 @@
 import { Capacitor } from '@capacitor/core';
 import { auth } from '@/lib/firebase';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
-import { FLY_PACKS, getFlyPack, type FlyPackId } from '@/lib/flyPacks';
+import { FLY_PACKS, getFlyPack, getFlyPackForProduct, type FlyPackId } from '@/lib/flyPacks';
+import { parseProductRef, type ProductRef } from '@/lib/campaigns/productRef';
+import type { PriceQuote } from '@/lib/campaigns/tokens';
 import { markNegativeMoment } from '@/lib/rateApp';
 import { formatTrialPeriod, parseTrialPeriod, type TrialPeriod } from '@/lib/plusPaywall';
 
@@ -294,22 +296,116 @@ export async function purchaseFlyPack(packId: FlyPackId): Promise<PurchaseOutcom
   }
 }
 
-/**
- * Buy any store product by its identifier, whether or not the fly shop sells
- * it — the offer-only SKUs a campaign exists to sell.
- *
- * On a device the store is asked for the product directly, so a product that
- * belongs to no RevenueCat offering still works. On the web there is no such
- * escape hatch: web billing only sells packages, so every offering is searched
- * and an unknown identifier is a real error rather than a silent no-op.
- */
+export type ProductDiscount = { appleOfferId?: string; googleOfferId?: string };
+
+type NativePurchases = Awaited<ReturnType<typeof getNativePurchases>>['Purchases'];
+type NativeProduct = import('@revenuecat/purchases-capacitor').PurchasesStoreProduct;
+type NativePackage = import('@revenuecat/purchases-capacitor').PurchasesPackage;
+type WebPackage = import('@revenuecat/purchases-js').Package;
+
+function packForRef(ref: ProductRef | null) {
+  if (!ref) return undefined;
+  if (ref.kind === 'pack') return getFlyPack(ref.packId);
+  if (ref.kind === 'store') return getFlyPackForProduct(ref.productId);
+  return undefined;
+}
+
+function googleOption(product: NativeProduct, offerId: string) {
+  return (product.subscriptionOptions ?? []).find(
+    (option) =>
+      option.id === offerId || option.id.endsWith(`:${offerId}`) || option.tags.includes(offerId),
+  );
+}
+
+async function applePromotion(Purchases: NativePurchases, product: NativeProduct, offerId: string) {
+  const discount = (product.discounts ?? []).find((item) => item.identifier === offerId);
+  if (!discount) return null;
+  const signed = await Purchases.getPromotionalOffer({ product, discount }).catch(() => undefined);
+  return signed ? { discount, signed } : null;
+}
+
+async function purchaseNativePackage(
+  Purchases: NativePurchases,
+  pkg: NativePackage,
+  discount?: ProductDiscount,
+) {
+  const platform = Capacitor.getPlatform();
+  if (platform === 'ios' && discount?.appleOfferId) {
+    const promotion = await applePromotion(Purchases, pkg.product, discount.appleOfferId);
+    if (promotion) {
+      return Purchases.purchaseDiscountedPackage({ aPackage: pkg, discount: promotion.signed });
+    }
+  }
+  if (platform === 'android' && discount?.googleOfferId) {
+    const option = googleOption(pkg.product, discount.googleOfferId);
+    if (option) return Purchases.purchaseSubscriptionOption({ subscriptionOption: option });
+  }
+  return Purchases.purchasePackage({ aPackage: pkg });
+}
+
+async function nativePackageFor(Purchases: NativePurchases, ref: ProductRef) {
+  const offerings = await Purchases.getOfferings();
+  if (ref.kind === 'package') {
+    return (
+      offerings.all?.[ref.offeringId]?.availablePackages.find(
+        (entry) => entry.identifier === ref.packageId,
+      ) ?? null
+    );
+  }
+  const pack = packForRef(ref);
+  if (pack) {
+    return (
+      offerings.current?.availablePackages.find(
+        (entry) => entry.identifier === pack.packageId || entry.product.identifier === pack.productId,
+      ) ?? null
+    );
+  }
+  if (ref.kind !== 'store') return null;
+  return (
+    Object.values(offerings.all ?? {})
+      .flatMap((offering) => offering.availablePackages)
+      .find((entry) => entry.product.identifier === ref.productId) ?? null
+  );
+}
+
+async function webPackageFor(
+  purchases: Awaited<ReturnType<typeof getWebPurchases>>,
+  ref: ProductRef,
+): Promise<WebPackage | null> {
+  const offerings = await purchases.getOfferings();
+  if (ref.kind === 'package') {
+    return (
+      offerings.all?.[ref.offeringId]?.availablePackages.find(
+        (entry) => entry.identifier === ref.packageId,
+      ) ?? null
+    );
+  }
+  const pack = packForRef(ref);
+  const candidates = [
+    ...(offerings.current ? [offerings.current] : []),
+    ...Object.values(offerings.all ?? {}),
+  ].flatMap((offering) => offering.availablePackages);
+  if (pack) return candidates.find((entry) => entry.identifier === pack.packageId) ?? null;
+  if (ref.kind !== 'store') return null;
+  return (
+    candidates.find(
+      (entry) =>
+        entry.identifier === ref.productId || entry.webBillingProduct.identifier === ref.productId,
+    ) ?? null
+  );
+}
+
 export async function purchaseStoreProduct(
-  productId: string,
+  productRef: string,
   placement = 'campaign',
+  discount?: ProductDiscount,
 ): Promise<PurchaseOutcome> {
   const uid = requireUid();
-  const id = productId.trim();
+  const id = productRef.trim();
   if (!id) throw new Error('No product id');
+  const ref = parseProductRef(id);
+  const pack = packForRef(ref);
+  if (pack) return purchaseFlyPack(pack.id);
   const store = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
 
   trackAnalyticsEvent('store_product_purchase_started', {
@@ -325,26 +421,35 @@ export async function purchaseStoreProduct(
         '@revenuecat/purchases-capacitor'
       );
 
+      const pkg = ref ? await nativePackageFor(Purchases, ref) : null;
+      if (ref?.kind === 'package' && !pkg) {
+        throw new Error(`RevenueCat package "${id}" is not available on this device`);
+      }
+
       // A consumable and a subscription are fetched differently on Android, and
       // asking for the wrong category returns nothing rather than an error.
-      let product = (
-        await Purchases.getProducts({
-          productIdentifiers: [id],
-          type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
-        })
-      ).products[0];
-      if (!product) {
+      let product: NativeProduct | undefined;
+      if (!pkg) {
         product = (
           await Purchases.getProducts({
             productIdentifiers: [id],
-            type: PRODUCT_CATEGORY.SUBSCRIPTION,
+            type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
           })
         ).products[0];
+        if (!product) {
+          product = (
+            await Purchases.getProducts({
+              productIdentifiers: [id],
+              type: PRODUCT_CATEGORY.SUBSCRIPTION,
+            })
+          ).products[0];
+        }
+        if (!product) throw new Error(`The store does not offer "${id}"`);
       }
-      if (!product) throw new Error(`The store does not offer "${id}"`);
 
       try {
-        await Purchases.purchaseStoreProduct({ product });
+        if (pkg) await purchaseNativePackage(Purchases, pkg, discount);
+        else if (product) await Purchases.purchaseStoreProduct({ product });
       } catch (error: any) {
         if (
           error?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
@@ -362,17 +467,7 @@ export async function purchaseStoreProduct(
     } else {
       const purchases = await getWebPurchases(uid);
       const { ErrorCode, PurchasesError } = await import('@revenuecat/purchases-js');
-      const offerings = await purchases.getOfferings();
-      const candidates = [
-        ...(offerings.current ? [offerings.current] : []),
-        ...Object.values(offerings.all ?? {}),
-      ];
-      const pkg = candidates
-        .flatMap((offering) => offering.availablePackages)
-        .find(
-          (entry) =>
-            entry.identifier === id || entry.webBillingProduct.identifier === id,
-        );
+      const pkg = ref ? await webPackageFor(purchases, ref) : null;
       if (!pkg) throw new Error(`No web package sells "${id}"`);
       try {
         await purchases.purchase({
@@ -477,6 +572,159 @@ export async function getFlyPackPrices(): Promise<Partial<Record<FlyPackId, stri
     if (pkg) prices[pack.id] = pkg.webBillingProduct.price.formattedPrice;
   }
   return prices;
+}
+
+function periodLabel(iso: string | null | undefined): string | undefined {
+  const match = /^P(\d+)([DWMY])$/.exec(iso ?? '');
+  if (!match) return undefined;
+  const count = Number(match[1]);
+  const unit = { D: 'day', W: 'week', M: 'month', Y: 'year' }[match[2] as 'D' | 'W' | 'M' | 'Y'];
+  if (unit === 'day' && count === 7) return 'week';
+  if (unit === 'month' && count === 12) return 'year';
+  return count === 1 ? unit : `${count} ${unit}s`;
+}
+
+function discounted(
+  base: PriceQuote,
+  formatted: string,
+  amount: number,
+  period: string | undefined,
+): PriceQuote {
+  if (!(amount < base.amount)) return { ...base, period };
+  return {
+    formatted,
+    amount,
+    currency: base.currency,
+    regularFormatted: base.formatted,
+    regularAmount: base.amount,
+    period,
+  };
+}
+
+async function nativeQuote(
+  Purchases: NativePurchases,
+  product: NativeProduct,
+  discount: ProductDiscount | undefined,
+): Promise<PriceQuote> {
+  const base: PriceQuote = {
+    formatted: product.priceString,
+    amount: product.price,
+    currency: product.currencyCode,
+  };
+  const subscription = !!product.subscriptionPeriod || !!product.defaultOption;
+  if (!subscription) return base;
+  const period = periodLabel(product.subscriptionPeriod ?? product.defaultOption?.billingPeriod?.iso8601);
+
+  if (Capacitor.getPlatform() === 'ios') {
+    if (discount?.appleOfferId) {
+      const promotion = await applePromotion(Purchases, product, discount.appleOfferId);
+      if (promotion) {
+        return discounted(base, promotion.discount.priceString, promotion.discount.price, period);
+      }
+    }
+    const intro = product.introPrice;
+    if (intro && intro.price > 0) {
+      const { INTRO_ELIGIBILITY_STATUS } = await import('@revenuecat/purchases-capacitor');
+      const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility({
+        productIdentifiers: [product.identifier],
+      }).catch(() => null);
+      if (
+        eligibility?.[product.identifier]?.status ===
+        INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+      ) {
+        return discounted(base, intro.priceString, intro.price, period);
+      }
+    }
+    return { ...base, period };
+  }
+
+  const option =
+    (discount?.googleOfferId ? googleOption(product, discount.googleOfferId) : undefined) ??
+    product.defaultOption;
+  const full = option?.fullPricePhase?.price;
+  const regular: PriceQuote = full
+    ? { formatted: full.formatted, amount: full.amountMicros / 1_000_000, currency: full.currencyCode }
+    : base;
+  const intro = option?.introPhase?.price;
+  return intro
+    ? discounted(regular, intro.formatted, intro.amountMicros / 1_000_000, period)
+    : { ...regular, period };
+}
+
+function webQuote(pkg: WebPackage): PriceQuote {
+  const product = pkg.webBillingProduct;
+  const base: PriceQuote = {
+    formatted: product.price.formattedPrice,
+    amount: product.price.amountMicros / 1_000_000,
+    currency: product.price.currency,
+  };
+  if (!product.period && !product.normalPeriodDuration) return base;
+  const period = periodLabel(product.normalPeriodDuration);
+  const intro = product.introPricePhase?.price;
+  return intro
+    ? discounted(base, intro.formattedPrice, intro.amountMicros / 1_000_000, period)
+    : { ...base, period };
+}
+
+const QUOTE_TTL_MS = 10 * 60_000;
+const quoteCache: Record<string, { at: number; quote: PriceQuote | null }> = {};
+
+export async function getPricesForRefs(
+  refs: string[],
+  discounts: Record<string, ProductDiscount> = {},
+): Promise<Record<string, PriceQuote>> {
+  const uid = requireUid();
+  const quotes: Record<string, PriceQuote> = {};
+  const wanted = refs.filter((ref, index) => !!ref && refs.indexOf(ref) === index);
+  const keyOf = (ref: string) =>
+    `${uid}|${ref}|${discounts[ref]?.appleOfferId ?? ''}|${discounts[ref]?.googleOfferId ?? ''}`;
+
+  const missing = wanted.filter((ref) => {
+    const hit = quoteCache[keyOf(ref)];
+    if (!hit || Date.now() - hit.at > QUOTE_TTL_MS) return true;
+    if (hit.quote) quotes[ref] = hit.quote;
+    return false;
+  });
+  if (!missing.length) return quotes;
+
+  const remember = (ref: string, quote: PriceQuote | null) => {
+    quoteCache[keyOf(ref)] = { at: Date.now(), quote };
+    if (quote) quotes[ref] = quote;
+  };
+
+  if (Capacitor.isNativePlatform()) {
+    const { Purchases } = await getNativePurchases(uid);
+    const { PRODUCT_CATEGORY } = await import('@revenuecat/purchases-capacitor');
+    await Promise.all(
+      missing.map(async (raw) => {
+        const ref = parseProductRef(raw);
+        if (!ref) return remember(raw, null);
+        let product: NativeProduct | undefined = (await nativePackageFor(Purchases, ref))?.product;
+        if (!product && ref.kind === 'store') {
+          for (const type of [PRODUCT_CATEGORY.NON_SUBSCRIPTION, PRODUCT_CATEGORY.SUBSCRIPTION]) {
+            if (product) break;
+            product = (
+              await Purchases.getProducts({ productIdentifiers: [ref.productId], type }).catch(() => ({
+                products: [] as NativeProduct[],
+              }))
+            ).products[0];
+          }
+        }
+        remember(raw, product ? await nativeQuote(Purchases, product, discounts[raw]) : null);
+      }),
+    );
+    return quotes;
+  }
+
+  const purchases = await getWebPurchases(uid);
+  await Promise.all(
+    missing.map(async (raw) => {
+      const ref = parseProductRef(raw);
+      const pkg = ref ? await webPackageFor(purchases, ref) : null;
+      remember(raw, pkg ? webQuote(pkg) : null);
+    }),
+  );
+  return quotes;
 }
 
 export type PlusPriceInfo = {

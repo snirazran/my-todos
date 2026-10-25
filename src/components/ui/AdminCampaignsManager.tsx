@@ -46,7 +46,25 @@ import { reviewCampaign, type ReviewNote } from '@/lib/campaigns/review';
 import { ActionPicker, type ActionEnv } from '@/components/ui/admin/campaigns/ActionPicker';
 import { RiveStudio } from '@/components/ui/admin/campaigns/RiveStudio';
 import type { RewardCatalogEntry } from '@/components/ui/admin/campaigns/RewardEditor';
-import type { StoreProductRow } from '@/components/ui/admin/campaigns/StoreProductPicker';
+import {
+  StoreProductPicker,
+  type OfferEnv,
+} from '@/components/ui/admin/campaigns/StoreProductPicker';
+import { CAMPAIGN_STARTERS } from '@/components/ui/admin/campaigns/starters';
+import { TokenChips, appendToken } from '@/components/ui/admin/campaigns/TokenChips';
+import { CampaignTokensContext } from '@/components/campaigns/CampaignTokens';
+import {
+  campaignProductRefs,
+  type CampaignTokenValues,
+  type PriceQuote,
+} from '@/lib/campaigns/tokens';
+import { parseProductRef } from '@/lib/campaigns/productRef';
+import { getFlyPack } from '@/lib/flyPacks';
+import type {
+  OfferProductInput,
+  OfferProductRow,
+  OfferProductsResponse,
+} from '@/lib/campaigns/offerProducts';
 import {
   EmptyState,
   Field,
@@ -186,6 +204,7 @@ const toPayload = (row: CampaignRow): CampaignPayload => ({
   offer: row.offer,
   canvas: row.canvas,
   assets: row.assets,
+  startAt: row.startAt,
   endAt: row.endAt,
   triggers: row.triggers,
   delayMs: row.caps.delayMs,
@@ -213,6 +232,43 @@ const normalise = (item: Partial<CampaignRow>): CampaignRow => ({
   },
   assets: item.assets ?? [],
 });
+
+const usd = (amount: number): PriceQuote => ({
+  formatted: `$${amount.toFixed(2)}`,
+  amount,
+  currency: 'USD',
+});
+
+function samplePrice(ref: string, products: OfferProductRow[], compared: boolean): PriceQuote {
+  const parsed = parseProductRef(ref);
+  const pack = parsed?.kind === 'pack' ? getFlyPack(parsed.packId) : undefined;
+  if (pack) return usd(pack.priceUsd);
+  if (compared) return usd(9.99);
+  if (products.find((row) => row.ref === ref)?.kind === 'subscription') {
+    return { ...usd(29.99), regularFormatted: '$59.99', regularAmount: 59.99, period: 'year' };
+  }
+  return usd(4.99);
+}
+
+function scheduleState(row: CampaignRow): { label: string; className: string } | null {
+  const now = Date.now();
+  if (row.startAt && new Date(row.startAt).getTime() > now) {
+    return {
+      label: `from ${new Date(row.startAt).toLocaleDateString()}`,
+      className: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+    };
+  }
+  if (row.endAt && new Date(row.endAt).getTime() <= now) {
+    return { label: 'ended', className: 'bg-red-500/10 text-red-500' };
+  }
+  if (row.endAt) {
+    return {
+      label: `until ${new Date(row.endAt).toLocaleDateString()}`,
+      className: 'bg-muted text-muted-foreground',
+    };
+  }
+  return null;
+}
 
 export function AdminCampaignsManager() {
   const [rows, setRows] = useState<CampaignRow[]>([]);
@@ -247,8 +303,11 @@ export function AdminCampaignsManager() {
   const [explaining, setExplaining] = useState(false);
 
   const [library, setLibrary] = useState<RiveLibraryFile[]>([]);
-  const [products, setProducts] = useState<StoreProductRow[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+  const [offerData, setOfferData] = useState<OfferProductsResponse | null>(null);
+  const [offersLoading, setOffersLoading] = useState(true);
+  const [livePrices, setLivePrices] = useState<Record<string, PriceQuote>>({});
+  const askedPrices = useRef<string[]>([]);
+  const [starterOpen, setStarterOpen] = useState(false);
   const [catalog, setCatalog] = useState<RewardCatalogEntry[]>([]);
 
   // Keyed by file: the canvas preview and the right-hand preview both load
@@ -298,20 +357,22 @@ export function AdminCampaignsManager() {
     void load();
   }, [load]);
 
-  const loadProducts = useCallback(async () => {
-    setProductsLoading(true);
+  const loadProducts = useCallback(async (fresh = false) => {
+    setOffersLoading(true);
     try {
-      const res = await fetch('/api/admin/campaigns/store-products', {
-        credentials: 'include',
-      });
+      const res = await fetch(
+        `/api/admin/campaigns/store-products${fresh ? '?fresh=1' : ''}`,
+        { credentials: 'include' },
+      );
       const data = await res.json();
-      setProducts(data.products ?? []);
+      if (res.ok) setOfferData(data);
+      else toast('error', data.error ?? 'Could not load store products');
     } catch {
-      setProducts([]);
+      toast('error', 'Could not load store products');
     } finally {
-      setProductsLoading(false);
+      setOffersLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void loadProducts();
@@ -420,9 +481,9 @@ export function AdminCampaignsManager() {
     });
   }, []);
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (): Promise<CampaignRow | null> => {
     const current = draft;
-    if (!current || saving) return;
+    if (!current || saving) return null;
     setSaving(true);
     try {
       const res = await fetch('/api/admin/campaigns', {
@@ -435,7 +496,7 @@ export function AdminCampaignsManager() {
       if (!res.ok) {
         toast('error', data.error ?? 'Save failed');
         if (Array.isArray(data.blockers) && data.blockers.length) setTab('launch');
-        return;
+        return null;
       }
       await load();
       const next = normalise({
@@ -448,8 +509,10 @@ export function AdminCampaignsManager() {
       setPast([]);
       setFuture([]);
       toast('ok', current.id ? 'Saved.' : `Created "${next.name}".`);
+      return next;
     } catch (error) {
       toast('error', error instanceof Error ? error.message : 'Save failed');
+      return null;
     } finally {
       setSaving(false);
     }
@@ -517,18 +580,21 @@ export function AdminCampaignsManager() {
   };
 
   const upload = async (file: File, kind: 'background' | 'asset' | 'rive') => {
-    if (!draft?.id) {
-      toast('error', 'Save the campaign first, then add art.');
-      return;
-    }
-    if (dirty) {
-      toast('error', 'Save your changes first — an upload reloads the campaign.');
-      return;
+    if (!draft) return;
+    let id = draft.id;
+    if (!id || dirty) {
+      if (!draft.name.trim()) {
+        toast('error', 'Name the campaign first — uploading saves it.');
+        return;
+      }
+      const stored = await save();
+      if (!stored) return;
+      id = stored.id;
     }
     setUploading(kind);
     try {
       const form = new FormData();
-      form.append('id', draft.id);
+      form.append('id', id);
       form.append('kind', kind);
       form.append('file', file);
       const res = await fetch('/api/admin/campaigns/upload', {
@@ -640,53 +706,55 @@ export function AdminCampaignsManager() {
     }
   };
 
-  const registerProduct = useCallback(
-    async (product: {
-      productId: string;
-      label: string;
-      store: StoreProductRow['store'];
-      kind: StoreProductRow['kind'];
-      priceHint: string;
-    }) => {
+  const saveProduct = useCallback(
+    async (input: OfferProductInput) => {
       const res = await fetch('/api/admin/campaigns/store-products', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(product),
+        body: JSON.stringify(input),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast('error', data.error ?? 'Could not register that product');
-        return;
+        toast('error', data.error ?? 'Could not save that product');
+        return null;
       }
       await loadProducts();
-      toast('ok', `${product.productId} is now pickable.`);
+      toast('ok', `"${input.label}" is ready to use.`);
+      return typeof data.ref === 'string' ? data.ref : null;
     },
     [loadProducts, toast],
   );
 
   const archiveProduct = useCallback(
-    async (productId: string) => {
+    async (ref: string) => {
       await fetch('/api/admin/campaigns/store-products', {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ ref }),
       });
       await loadProducts();
     },
     [loadProducts],
   );
 
-  const actionEnv: ActionEnv = useMemo(
+  const offerEnv: OfferEnv = useMemo(
     () => ({
-      products,
-      productsLoading,
-      catalog,
-      registerProduct,
-      archiveProduct,
+      products: offerData?.products ?? [],
+      catalog: offerData?.catalog ?? null,
+      loading: offersLoading,
+      rewardCatalog: catalog,
+      refresh: () => loadProducts(true),
+      save: saveProduct,
+      archive: archiveProduct,
     }),
-    [archiveProduct, catalog, products, productsLoading, registerProduct],
+    [archiveProduct, catalog, loadProducts, offerData, offersLoading, saveProduct],
+  );
+
+  const actionEnv: ActionEnv = useMemo(
+    () => ({ offers: offerEnv, catalog }),
+    [catalog, offerEnv],
   );
 
   const onRiveContents = useCallback((next: RiveContents) => {
@@ -755,7 +823,34 @@ export function AdminCampaignsManager() {
     );
 
   const preview = useMemo(() => toPayload(draft ?? blank()), [draft]);
-  const notes = useMemo(() => (draft ? reviewCampaign(draft) : []), [draft]);
+  const notes = useMemo(
+    () => (draft ? reviewCampaign(draft, { products: offerData?.products }) : []),
+    [draft, offerData],
+  );
+
+  const previewRefs = useMemo(() => campaignProductRefs(preview).quoted, [preview]);
+  const previewRefKey = previewRefs.join('|');
+
+  useEffect(() => {
+    const wanted = previewRefKey ? previewRefKey.split('|') : [];
+    const missing = wanted.filter((ref) => !askedPrices.current.includes(ref));
+    if (!missing.length) return;
+    askedPrices.current = [...askedPrices.current, ...missing];
+    import('@/lib/purchases')
+      .then(({ getPricesForRefs }) => getPricesForRefs(missing))
+      .then((quotes) => setLivePrices((current) => ({ ...current, ...quotes })))
+      .catch(() => {});
+  }, [previewRefKey]);
+
+  const previewTokens = useMemo<CampaignTokenValues>(() => {
+    const prices: Record<string, PriceQuote> = {};
+    for (const ref of previewRefs) {
+      prices[ref] =
+        livePrices[ref] ??
+        samplePrice(ref, offerData?.products ?? [], ref === preview.offer.compareRef);
+    }
+    return { prices, frog: 'Ribbit', flies: '1,250' };
+  }, [livePrices, offerData, preview.offer.compareRef, previewRefs]);
   const errors = notes.filter((note) => note.level === 'error');
 
   const filtered = useMemo(() => {
@@ -779,7 +874,15 @@ export function AdminCampaignsManager() {
       setPane('edit');
       return;
     }
-    setTab(/rollout|audience|account|Flies/.test(note.message) ? 'audience' : 'rules');
+    if (/Offer & prices|\{price\}|\{was_price\}|price by hand|RevenueCat|isn't sold|artwork/.test(note.message)) {
+      setTab('design');
+      panels.openPanel(
+        /artwork/.test(note.message) ? 'artwork' : /by hand/.test(note.message) ? 'copy' : 'offer',
+      );
+      setPane('edit');
+      return;
+    }
+    setTab(/rollout|audience|account|flies|plus/i.test(note.message) ? 'audience' : 'rules');
   };
 
   return (
@@ -856,14 +959,27 @@ export function AdminCampaignsManager() {
               <Eye className="h-4 w-4" />
               Preview
             </button>
-            <button
-              type="button"
-              onClick={() => openDraft(blank())}
-              className="flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground"
-            >
-              <Plus className="h-4 w-4" />
-              New
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setStarterOpen((open) => !open)}
+                aria-expanded={starterOpen}
+                aria-haspopup="menu"
+                className="flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground"
+              >
+                <Plus className="h-4 w-4" />
+                New
+              </button>
+              {starterOpen ? (
+                <StarterMenu
+                  onPick={(row) => {
+                    setStarterOpen(false);
+                    openDraft(row);
+                  }}
+                  onClose={() => setStarterOpen(false)}
+                />
+              ) : null}
+            </div>
           </div>
 
           {/* On a phone the three panes are one at a time; there is no width to
@@ -993,6 +1109,19 @@ export function AdminCampaignsManager() {
                         >
                           {row.status}
                         </span>
+                        {(() => {
+                          const schedule = scheduleState(row);
+                          return schedule ? (
+                            <span
+                              className={cn(
+                                'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black',
+                                schedule.className,
+                              )}
+                            >
+                              {schedule.label}
+                            </span>
+                          ) : null;
+                        })()}
                         {row.targeting.rollout < 100 ? (
                           <span className="shrink-0 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-black text-sky-600 dark:text-sky-400">
                             {row.targeting.rollout}%
@@ -1060,20 +1189,38 @@ export function AdminCampaignsManager() {
 
           <main className={cn('min-w-0', pane === 'edit' ? 'block' : 'hidden', 'lg:block')}>
             {!draft ? (
-              <EmptyState
-                icon={<Wand2 className="h-8 w-8" />}
-                title="Pick a campaign, or start a new one"
-                body="Everything about one popup lives here: its artwork, what its buttons do, when it fires, and who it reaches."
-                action={
+              <div className="space-y-3">
+                <EmptyState
+                  icon={<Wand2 className="h-8 w-8" />}
+                  title="Pick a campaign, or start a new one"
+                  body="Everything about one popup lives here: its artwork, what its buttons do, when it fires, and who it reaches."
+                />
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {CAMPAIGN_STARTERS.map((starter) => (
+                    <button
+                      key={starter.key}
+                      type="button"
+                      onClick={() => openDraft(starter.build(blank()))}
+                      className="rounded-2xl bg-card p-3 text-left ring-1 ring-border transition-all hover:ring-foreground/20"
+                    >
+                      <span className="block text-[13px] font-black">{starter.label}</span>
+                      <span className="mt-0.5 block text-[11px] font-medium leading-snug text-muted-foreground">
+                        {starter.description}
+                      </span>
+                    </button>
+                  ))}
                   <button
                     type="button"
                     onClick={() => openDraft(blank())}
-                    className="mt-1 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground"
+                    className="rounded-2xl border border-dashed border-border p-3 text-left transition-colors hover:border-foreground/30"
                   >
-                    New campaign
+                    <span className="block text-[13px] font-black">Blank</span>
+                    <span className="mt-0.5 block text-[11px] font-medium leading-snug text-muted-foreground">
+                      An empty canvas, for artwork you already have.
+                    </span>
                   </button>
-                }
-              />
+                </div>
+              </div>
             ) : (
               <div className="space-y-3 rounded-2xl bg-card p-3 ring-1 ring-border sm:p-4">
                 <div className="flex items-start gap-2">
@@ -1136,6 +1283,7 @@ export function AdminCampaignsManager() {
                 </p>
 
                 {tab === 'design' ? (
+                  <CampaignTokensContext.Provider value={previewTokens}>
                   <DesignTab
                     draft={draft}
                     preview={preview}
@@ -1159,6 +1307,7 @@ export function AdminCampaignsManager() {
                     onSignal={onRiveSignal}
                     onRiveContents={onRiveContents}
                   />
+                  </CampaignTokensContext.Provider>
                 ) : null}
 
                 {tab === 'rules' ? <RulesTab draft={draft} panels={panels} onPatch={patch} /> : null}
@@ -1247,19 +1396,22 @@ export function AdminCampaignsManager() {
                 </div>
               </div>
 
-              <CampaignPreview
-                row={draft}
-                dark={dark}
-                surface={surface}
-                selectedElementId={selectedElementId}
-                onSelectElement={setSelectedElementId}
-                onSignal={onRiveSignal}
-                onContents={onRiveContents}
-              />
+              <CampaignTokensContext.Provider value={previewTokens}>
+                <CampaignPreview
+                  row={draft}
+                  dark={dark}
+                  surface={surface}
+                  selectedElementId={selectedElementId}
+                  onSelectElement={setSelectedElementId}
+                  onSignal={onRiveSignal}
+                  onContents={onRiveContents}
+                />
+              </CampaignTokensContext.Provider>
 
               <p className="mt-2 text-[10px] font-medium leading-snug text-muted-foreground">
                 Buttons here describe what they would do instead of doing it — nothing is
-                charged, granted or navigated from the preview.
+                charged, granted or navigated from the preview. Prices are live web prices where
+                the store has them, samples otherwise; the frog is called Ribbit.
               </p>
 
               {signalLog.length ? (
@@ -1299,6 +1451,57 @@ export function AdminCampaignsManager() {
         ))}
       </div>
     </div>
+  );
+}
+
+function StarterMenu({
+  onPick,
+  onClose,
+}: {
+  onPick: (row: CampaignRow) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const options = [
+    ...CAMPAIGN_STARTERS.map((starter) => ({
+      key: starter.key,
+      label: starter.label,
+      description: starter.description,
+      build: () => starter.build(blank()),
+    })),
+    { key: 'blank', label: 'Blank', description: 'An empty canvas.', build: blank },
+  ];
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden />
+      <div
+        role="menu"
+        className="absolute right-0 top-11 z-50 w-72 space-y-0.5 rounded-2xl bg-popover p-1.5 shadow-xl ring-1 ring-border"
+      >
+        {options.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            role="menuitem"
+            onClick={() => onPick(option.build())}
+            className="block w-full rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-muted"
+          >
+            <span className="block text-xs font-black">{option.label}</span>
+            <span className="block text-[11px] font-medium leading-snug text-muted-foreground">
+              {option.description}
+            </span>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -1365,6 +1568,13 @@ function IconButton({
 
 type PanelApi = ReturnType<typeof usePanels>;
 
+const COPY_FIELD_NAMES = {
+  eyebrow: 'eyebrow',
+  headline: 'headline',
+  body: 'body',
+  ctaLabel: 'button label',
+} as const;
+
 function DesignTab({
   draft,
   preview,
@@ -1412,6 +1622,9 @@ function DesignTab({
 }) {
   const isCanvas = draft.template === 'canvas';
   const hasRiveElement = draft.canvas.elements.some((element) => element.type === 'rive');
+  const [copyField, setCopyField] = useState<'eyebrow' | 'headline' | 'body' | 'ctaLabel'>(
+    'headline',
+  );
 
   return (
     <div className="space-y-2.5">
@@ -1455,7 +1668,7 @@ function DesignTab({
       >
         <CanvasAssets
           campaign={preview}
-          canUpload={!!draft.id}
+          canUpload={!!draft.id || !!draft.name.trim()}
           canvas={isCanvas}
           uploading={uploading}
           onUpload={onUpload}
@@ -1505,7 +1718,7 @@ function DesignTab({
             library={library}
             actionEnv={actionEnv}
             onUploadRive={onPickRiveUpload}
-            canUpload={!!draft.id}
+            canUpload={!!draft.id || !!draft.name.trim()}
             dark={dark}
           />
         </Panel>
@@ -1518,20 +1731,25 @@ function DesignTab({
         >
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Field label="Eyebrow">
-              <TextInput
-                value={draft.copy.eyebrow}
-                onChange={(eyebrow) => onPatch({ copy: { ...draft.copy, eyebrow } })}
-              />
+              <div onFocusCapture={() => setCopyField('eyebrow')}>
+                <TextInput
+                  value={draft.copy.eyebrow}
+                  onChange={(eyebrow) => onPatch({ copy: { ...draft.copy, eyebrow } })}
+                />
+              </div>
             </Field>
             <Field label="Headline">
-              <TextInput
-                value={draft.copy.headline}
-                onChange={(headline) => onPatch({ copy: { ...draft.copy, headline } })}
-              />
+              <div onFocusCapture={() => setCopyField('headline')}>
+                <TextInput
+                  value={draft.copy.headline}
+                  onChange={(headline) => onPatch({ copy: { ...draft.copy, headline } })}
+                />
+              </div>
             </Field>
           </div>
           <Field label="Body">
             <textarea
+              onFocus={() => setCopyField('body')}
               value={draft.copy.body}
               onChange={(event) =>
                 onPatch({ copy: { ...draft.copy, body: event.target.value } })
@@ -1542,10 +1760,12 @@ function DesignTab({
           </Field>
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Field label="Button label">
-              <TextInput
-                value={draft.copy.ctaLabel}
-                onChange={(ctaLabel) => onPatch({ copy: { ...draft.copy, ctaLabel } })}
-              />
+              <div onFocusCapture={() => setCopyField('ctaLabel')}>
+                <TextInput
+                  value={draft.copy.ctaLabel}
+                  onChange={(ctaLabel) => onPatch({ copy: { ...draft.copy, ctaLabel } })}
+                />
+              </div>
             </Field>
             <Field label="Dismiss label">
               <TextInput
@@ -1556,6 +1776,18 @@ function DesignTab({
               />
             </Field>
           </div>
+          <Field
+            label={`Fill-in words → ${COPY_FIELD_NAMES[copyField]}`}
+            hint="Words in braces fill in live for each person. Tap one to add it to the field you last typed in."
+          >
+            <TokenChips
+              onInsert={(token) =>
+                onPatch({
+                  copy: { ...draft.copy, [copyField]: appendToken(draft.copy[copyField], token) },
+                })
+              }
+            />
+          </Field>
 
           <ActionPicker
             config={draft.cta}
@@ -1583,7 +1815,7 @@ function DesignTab({
               }
               library={library}
               assets={draft.assets.filter((asset) => asset.kind === 'rive')}
-              canUpload={!!draft.id}
+              canUpload={!!draft.id || !!draft.name.trim()}
               onUploadRive={onPickRiveUpload}
               onPatch={(partial) => {
                 onPatchRive(partial);
@@ -1595,6 +1827,56 @@ function DesignTab({
           </Panel>
         </Panel>
       )}
+
+      <Panel
+        title="Offer & prices"
+        subtitle={
+          actionEnv.offers.products.find(
+            (row) =>
+              row.ref ===
+              (draft.offer.productId || (draft.offer.packId ? `pack:${draft.offer.packId}` : '')),
+          )?.label ?? 'Nothing picked'
+        }
+        open={panels.isOpen('offer')}
+        onToggle={() => panels.toggle('offer')}
+      >
+        <p className="text-[11px] font-medium leading-snug text-muted-foreground">
+          Never type a price. Write <span className="font-mono">{'{price}'}</span> and each person
+          sees the live store price in their own currency; if their price can&apos;t load, the
+          popup quietly doesn&apos;t show to them rather than showing a blank.
+        </p>
+        <Field
+          label="What this popup sells"
+          help="What {price} quotes in text that isn't on a buy button, and what a buy button charges for when it doesn't name its own product."
+        >
+          <StoreProductPicker
+            value={draft.offer.productId || (draft.offer.packId ? `pack:${draft.offer.packId}` : '')}
+            env={actionEnv.offers}
+            allowNone
+            onChange={(productId) => {
+              const parsed = parseProductRef(productId);
+              onPatch({
+                offer: {
+                  ...draft.offer,
+                  productId,
+                  packId: parsed?.kind === 'pack' ? parsed.packId : '',
+                },
+              });
+            }}
+          />
+        </Field>
+        <Field
+          label="Compare against"
+          help="Fills {was_price} and {save} — e.g. the same flies at their usual price. A discounted Plus subscription is compared with its own regular price, so it needs nothing here."
+        >
+          <StoreProductPicker
+            value={draft.offer.compareRef ?? ''}
+            env={actionEnv.offers}
+            allowNone
+            onChange={(compareRef) => onPatch({ offer: { ...draft.offer, compareRef } })}
+          />
+        </Field>
+      </Panel>
 
       {hasRiveElement || draft.art === 'rive' ? (
         <Panel
@@ -1682,7 +1964,7 @@ function DesignTab({
                     path: button.path,
                     packId: button.packId,
                     productId: button.productId,
-                    reward: draft.cta.reward,
+                    reward: button.action === 'cta' ? draft.cta.reward : button.reward,
                   }}
                   env={actionEnv}
                   label="Firing it does"

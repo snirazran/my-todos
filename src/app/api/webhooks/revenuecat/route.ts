@@ -5,8 +5,15 @@ import type { AnalyticsEventName, AnalyticsPlatform } from '@/lib/analytics/even
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
-import { getFlyPackForProduct } from '@/lib/flyPacks';
-import StoreProductModel from '@/lib/models/StoreProduct';
+import { FLY_PACKS, getFlyPackForProduct } from '@/lib/flyPacks';
+import StoreProductModel, {
+  storeProductGrants,
+  type StoreProductDoc,
+} from '@/lib/models/StoreProduct';
+import { packagesForStoreProduct } from '@/lib/revenuecatCatalog';
+import { packageRef } from '@/lib/campaigns/productRef';
+import { applyGrants } from '@/lib/campaigns/grants';
+import type { CampaignRewardGrant } from '@/lib/campaigns/types';
 import { sendAdConversion } from '@/lib/adpixels/server';
 import { applyRevenueCatAttributes } from '@/lib/attribution/server';
 
@@ -32,40 +39,115 @@ function revenueCatPlatform(store: unknown): AnalyticsPlatform {
   return 'unknown';
 }
 
-/**
- * What a bought product is worth in flies.
- *
- * The shop's own packs are compiled in, but a campaign can also sell an
- * offer-only product registered by an admin — and that has to grant too, or
- * the popup charges real money and hands back nothing.
- */
-async function resolvePurchase(productId: string) {
-  const pack = getFlyPackForProduct(productId);
-  if (pack) return { id: pack.id, flies: pack.amount };
+type ResolvedPurchase = {
+  id: string;
+  kind: 'pack' | 'bundle';
+  subscription: boolean;
+  grants: CampaignRewardGrant[];
+  flies: number;
+};
 
-  await connectMongo();
-  const registered = await StoreProductModel.findOne({ productId })
-    .select('productId flies')
-    .lean();
-  if (!registered?.flies) return null;
-  return { id: registered.productId, flies: registered.flies };
+const fliesIn = (grants: CampaignRewardGrant[]) =>
+  grants.reduce((sum, grant) => (grant.kind === 'flies' ? sum + Math.floor(grant.amount) : sum), 0);
+
+function packPurchase(pack: { id: string; amount: number }): ResolvedPurchase {
+  return {
+    id: pack.id,
+    kind: 'pack',
+    subscription: false,
+    grants: [{ kind: 'flies', amount: pack.amount }],
+    flies: pack.amount,
+  };
 }
 
-async function grantFlyPackPurchase(userId: string, event: any) {
-  if (event?.type !== 'NON_RENEWING_PURCHASE') return null;
-  if (typeof event?.id !== 'string') return null;
-  const pack = await resolvePurchase(String(event?.product_id ?? ''));
-  if (!pack) return null;
+function bundlePurchase(product: StoreProductDoc): ResolvedPurchase | null {
+  const grants = storeProductGrants(product);
+  if (!grants.length) return null;
+  return {
+    id: product.productId,
+    kind: 'bundle',
+    subscription: product.kind === 'subscription',
+    grants,
+    flies: fliesIn(grants),
+  };
+}
+
+function pickRegistered(candidates: StoreProductDoc[], presentedOffering: string | null) {
+  if (presentedOffering) {
+    const exact = candidates.find((item) => item.offeringId === presentedOffering);
+    if (exact) return exact;
+  }
+  const legacy = candidates.find((item) => !item.offeringId);
+  if (legacy) return legacy;
+  return !presentedOffering && candidates.length === 1 ? candidates[0] : null;
+}
+
+async function resolvePurchase(
+  storeProductId: string,
+  presentedOffering: string | null,
+): Promise<ResolvedPurchase | null> {
+  if (!storeProductId) return null;
+  const pack = getFlyPackForProduct(storeProductId);
+  if (pack) return packPurchase(pack);
+
+  await connectMongo();
+  const direct = await StoreProductModel.find({
+    $or: [{ productId: storeProductId }, { storeIds: storeProductId }],
+  }).lean<StoreProductDoc[]>();
+  const registered = pickRegistered(direct, presentedOffering);
+  if (registered) return bundlePurchase(registered);
+  if (direct.length) return null;
+
+  const packages = await packagesForStoreProduct(storeProductId);
+  if (!packages.length) return null;
+  const viaPack = FLY_PACKS.find((item) => packages.some((pkg) => pkg.packageId === item.packageId));
+  if (viaPack) return packPurchase(viaPack);
+
+  const linked = await StoreProductModel.find({
+    productId: { $in: packages.map((pkg) => packageRef(pkg.offeringId, pkg.packageId)) },
+  }).lean<StoreProductDoc[]>();
+  const match = pickRegistered(linked, presentedOffering);
+  return match ? bundlePurchase(match) : null;
+}
+
+function grantMoment(event: any, purchase: ResolvedPurchase): string | null {
+  if (!purchase.subscription) {
+    return event?.type === 'NON_RENEWING_PURCHASE' && typeof event?.id === 'string'
+      ? event.id
+      : null;
+  }
+  const original = typeof event?.original_transaction_id === 'string'
+    ? event.original_transaction_id
+    : null;
+  if (!original) return null;
+  const firstPaid =
+    (event?.type === 'INITIAL_PURCHASE' && event?.period_type !== 'TRIAL') ||
+    (event?.type === 'RENEWAL' && event?.is_trial_conversion === true);
+  return firstPaid ? `bundle:${purchase.id}:${original}` : null;
+}
+
+async function grantStorePurchase(userId: string, event: any): Promise<ResolvedPurchase | null> {
+  const storeProductId = String(event?.product_id ?? '');
+  const presented =
+    typeof event?.presented_offering_id === 'string' && event.presented_offering_id
+      ? event.presented_offering_id
+      : null;
+  const purchase = await resolvePurchase(storeProductId, presented);
+  if (!purchase) return null;
+  const eventId = grantMoment(event, purchase);
+  if (!eventId) return null;
 
   await connectMongo();
   try {
     await FlyPurchaseModel.create({
-      eventId: event.id,
+      eventId,
       transactionId: typeof event?.transaction_id === 'string' ? event.transaction_id : undefined,
       userId,
-      packId: pack.id,
-      productId: String(event.product_id),
-      flies: pack.flies,
+      packId: purchase.id,
+      productId: storeProductId,
+      flies: purchase.flies,
+      kind: purchase.kind,
+      grants: purchase.kind === 'bundle' ? purchase.grants : undefined,
       revenueUsd: Number.isFinite(Number(event?.price)) ? Number(event.price) : undefined,
       store: typeof event?.store === 'string' ? event.store : undefined,
       environment: typeof event?.environment === 'string' ? event.environment : undefined,
@@ -75,20 +157,23 @@ async function grantFlyPackPurchase(userId: string, event: any) {
       grantedAt: new Date(),
     });
   } catch (error: any) {
-    if (error?.code === 11000) return pack;
+    if (error?.code === 11000) return purchase;
     throw error;
   }
 
-  const grant = await UserModel.updateOne(
-    { _id: userId },
-    { $inc: { 'wardrobe.flies': pack.flies } },
-  );
-  if (grant.modifiedCount !== 1) {
-    await FlyPurchaseModel.deleteOne({ eventId: event.id });
-    throw new Error('Fly-pack user not found');
+  try {
+    await applyGrants(userId, purchase.grants, {
+      source: 'purchase',
+      occurrenceKey: `revenuecat:${eventId}`,
+      dayKey: new Date().toISOString().slice(0, 10),
+      meta: { productId: storeProductId, packId: purchase.id, kind: purchase.kind },
+    });
+  } catch (error) {
+    await FlyPurchaseModel.deleteOne({ eventId });
+    throw error;
   }
 
-  return pack;
+  return purchase;
 }
 
 const WEB_STORES = new Set(['RC_BILLING', 'STRIPE', 'PADDLE']);
@@ -166,8 +251,8 @@ export async function POST(req: NextRequest) {
 
   try {
     await syncPremiumFromRevenueCat(userId);
-    const flyPack = await grantFlyPackPurchase(userId, event);
-    const name = flyPack ? 'fly_pack_purchase_completed' : revenueCatEventName(event);
+    const delivered = await grantStorePurchase(userId, event);
+    const name = delivered?.kind === 'pack' ? 'fly_pack_purchase_completed' : revenueCatEventName(event);
     if (name) {
       const price = Number(event?.price);
       const tax = Number(event?.tax_percentage);
@@ -197,8 +282,8 @@ export async function POST(req: NextRequest) {
           reason: event?.cancel_reason ?? event?.expiration_reason,
           is_trial_conversion: event?.is_trial_conversion,
           renewal_number: event?.renewal_number,
-          pack_id: flyPack?.id,
-          fly_amount: flyPack?.flies,
+          pack_id: delivered?.id,
+          fly_amount: delivered?.flies,
           price_usd: Number.isFinite(price) ? price : undefined,
           placement:
             name === 'subscription_started' && typeof paywallPlacement === 'string'
@@ -206,7 +291,7 @@ export async function POST(req: NextRequest) {
               : undefined,
         },
       });
-      if (flyPack) {
+      if (delivered?.flies) {
         await recordAnalyticsEvent({
           userId,
           name: 'fly_earned',
@@ -218,9 +303,9 @@ export async function POST(req: NextRequest) {
             : new Date(),
           properties: {
             source: 'real_money_pack',
-            fly_amount: flyPack.flies,
+            fly_amount: delivered.flies,
             is_premium: false,
-            pack_id: flyPack.id,
+            pack_id: delivered.id,
             environment: event?.environment,
           },
         });
@@ -229,7 +314,7 @@ export async function POST(req: NextRequest) {
     await applyRevenueCatAttributes(userId, event?.subscriber_attributes).catch((error) => {
       console.error('RevenueCat attribution apply failed:', error);
     });
-    await reportAdConversion(userId, event, flyPack?.id).catch((error) => {
+    await reportAdConversion(userId, event, delivered?.id).catch((error) => {
       console.error('Ad conversion report failed:', error);
     });
   } catch (error) {

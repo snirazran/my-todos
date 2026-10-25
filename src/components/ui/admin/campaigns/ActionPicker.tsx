@@ -17,7 +17,7 @@ import {
 } from '@/lib/campaigns/types';
 import { Field, Select, TextInput } from './primitives';
 import { RewardEditor, type RewardCatalogEntry } from './RewardEditor';
-import { StoreProductPicker, type StoreProductRow } from './StoreProductPicker';
+import { StoreProductPicker, type OfferEnv } from './StoreProductPicker';
 
 export type ActionConfig = {
   action: CtaAction;
@@ -28,17 +28,8 @@ export type ActionConfig = {
 };
 
 export type ActionEnv = {
-  products: StoreProductRow[];
-  productsLoading: boolean;
+  offers: OfferEnv;
   catalog: RewardCatalogEntry[];
-  registerProduct: (product: {
-    productId: string;
-    label: string;
-    store: StoreProductRow['store'];
-    kind: StoreProductRow['kind'];
-    priceHint: string;
-  }) => Promise<void>;
-  archiveProduct: (productId: string) => Promise<void>;
 };
 
 /**
@@ -154,14 +145,14 @@ export function ActionPicker({
           ) : null}
 
           {need === 'product' ? (
-            <Field label="Charge for" help="Any product id the stores know about.">
+            <Field
+              label="Charge for"
+              help="A RevenueCat package: one pick covers the App Store, Google Play and the web."
+            >
               <StoreProductPicker
                 value={config.productId ?? ''}
-                products={env.products}
-                loading={env.productsLoading}
+                env={env.offers}
                 onChange={(productId) => onChange({ productId })}
-                onRegister={env.registerProduct}
-                onArchive={env.archiveProduct}
               />
             </Field>
           ) : null}

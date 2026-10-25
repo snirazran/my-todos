@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CampaignRiveArt, type RiveContents, type RiveSignal } from './CampaignRiveArt';
+import { fillRiveInputs, useTokenFill } from './CampaignTokens';
 import {
   isClickableElement,
   type CampaignElement,
@@ -211,6 +212,7 @@ function ElementView({
         : 'center';
 
   const clickable = isClickableElement(element.type);
+  const fill = useTokenFill(campaign, element.action ? element : null);
 
   const select = (event: React.MouseEvent) => {
     if (!editing || !onSelect) return false;
@@ -259,7 +261,7 @@ function ElementView({
             stateMachine={element.stateMachine}
             fit={element.fit ?? 'contain'}
             buttons={campaign.rive.buttons}
-            inputs={element.inputs}
+            inputs={fillRiveInputs(element.inputs, fill)}
             tickers={element.tickers}
             onSignal={onSignal}
             onContents={onRiveContents}
@@ -272,21 +274,22 @@ function ElementView({
           <TimerText
             campaign={campaign}
             element={element}
+            template={fill(element.text || '{time}')}
             style={textStyle}
             editing={editing}
             onExpire={onExpire}
           />
         );
       case 'discount':
-        return <DiscountText element={element} style={textStyle} />;
+        return <DiscountText element={element} text={fill(element.text)} style={textStyle} />;
       case 'close':
         return element.text ? (
-          <span style={textStyle}>{element.text}</span>
+          <span style={textStyle}>{fill(element.text)}</span>
         ) : (
           <X style={{ width: '60%', height: '60%', color: element.color || '#fff' }} />
         );
       default:
-        return <span style={textStyle}>{element.text}</span>;
+        return <span style={textStyle}>{fill(element.text)}</span>;
     }
   };
 
@@ -295,7 +298,7 @@ function ElementView({
       style={{ ...box, ...surface }}
       onClick={clickable || editing ? activate : undefined}
       role={clickable && !editing ? 'button' : undefined}
-      aria-label={clickable && !editing ? element.label || element.text : undefined}
+      aria-label={clickable && !editing ? element.label || fill(element.text) : undefined}
       className={cn(
         'flex items-center overflow-hidden',
         clickable && !editing && 'cursor-pointer transition-transform active:scale-[0.97]',
@@ -322,15 +325,17 @@ function Missing({ label }: { label: string }) {
 
 function DiscountText({
   element,
+  text,
   style,
 }: {
   element: CampaignElement;
+  text: string;
   style: React.CSSProperties;
 }) {
   const discountStyle = element.discountStyle ?? 'strike';
   return (
     <span className="relative inline-block" style={style}>
-      {element.text}
+      {text}
       {discountStyle === 'strike' ? (
         <span
           className="pointer-events-none absolute left-0 top-1/2 h-[0.09em] w-full -translate-y-1/2"
@@ -350,12 +355,14 @@ function DiscountText({
 function TimerText({
   campaign,
   element,
+  template,
   style,
   editing,
   onExpire,
 }: {
   campaign: CampaignPayload;
   element: CampaignElement;
+  template: string;
   style: React.CSSProperties;
   editing: boolean;
   onExpire: (mode: 'hide' | 'close') => void;
@@ -370,10 +377,16 @@ function TimerText({
       return campaign.endAt ? new Date(campaign.endAt).getTime() : 0;
     }
     if (typeof window === 'undefined') return 0;
-    const started = editing ? previewStart : timerStartedAt(campaign.id, element.id);
+    const firstShown = campaign.firstShownAt ? new Date(campaign.firstShownAt).getTime() : 0;
+    const started = editing
+      ? previewStart
+      : firstShown > 0
+        ? firstShown
+        : timerStartedAt(campaign.id, element.id);
     return started + (element.timerMinutes ?? 30) * 60_000;
   }, [
     campaign.endAt,
+    campaign.firstShownAt,
     campaign.id,
     editing,
     element.id,
@@ -404,7 +417,6 @@ function TimerText({
   }
 
   const time = formatRemaining(Math.max(0, remaining), element.timerFormat ?? 'hms');
-  const template = element.text || '{time}';
 
   return <span style={style}>{template.replace('{time}', time)}</span>;
 }

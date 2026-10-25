@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
+import type { CampaignRewardGrant } from '@/lib/campaigns/types';
 
 export interface FlyPurchaseDoc {
   eventId: string;
@@ -7,6 +8,8 @@ export interface FlyPurchaseDoc {
   packId: string;
   productId: string;
   flies: number;
+  kind?: 'pack' | 'bundle';
+  grants?: CampaignRewardGrant[];
   revenueUsd?: number;
   store?: string;
   environment?: string;
@@ -22,6 +25,8 @@ const FlyPurchaseSchema = new Schema<FlyPurchaseDoc>(
     packId: { type: String, required: true },
     productId: { type: String, required: true },
     flies: { type: Number, required: true },
+    kind: { type: String, enum: ['pack', 'bundle'], default: 'pack' },
+    grants: { type: [Schema.Types.Mixed], default: undefined },
     revenueUsd: { type: Number, default: undefined },
     store: { type: String, default: undefined },
     environment: { type: String, default: undefined },

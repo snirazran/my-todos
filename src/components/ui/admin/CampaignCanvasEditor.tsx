@@ -27,6 +27,7 @@ import {
   type RiveSignal,
 } from '@/components/campaigns/CampaignRiveArt';
 import { ActionPicker, type ActionEnv } from './campaigns/ActionPicker';
+import { TokenChips, appendToken } from './campaigns/TokenChips';
 import { RiveStudio } from './campaigns/RiveStudio';
 import type { RiveLibraryFile } from './campaigns/types';
 import {
@@ -862,11 +863,11 @@ function Inspector({
       {isText ? (
         <>
           <Field
-            label={element.type === 'timer' ? 'Text' : 'Text'}
+            label="Text"
             hint={
               element.type === 'timer'
                 ? '{time} is replaced by the countdown.'
-                : undefined
+                : 'Words in braces fill in live for each person — tap one to add it.'
             }
           >
             <TextInput
@@ -875,6 +876,10 @@ function Inspector({
               placeholder={element.type === 'timer' ? 'Ends in {time}' : 'Your text'}
             />
           </Field>
+          <TokenChips
+            timer={element.type === 'timer'}
+            onInsert={(token) => onPatch({ text: appendToken(element.text, token) })}
+          />
 
           <div className="grid grid-cols-2 gap-2">
             <Slider
@@ -1181,7 +1186,7 @@ export function CanvasAssets({
     <div className="space-y-3">
       {!canUpload ? (
         <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-          Save the campaign first — artwork is stored against its id.
+          Name the campaign first — uploading saves it, since artwork is stored against its id.
         </p>
       ) : null}
 

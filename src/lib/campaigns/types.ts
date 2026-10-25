@@ -143,15 +143,25 @@ export const TIER_LABELS: Record<CampaignTier, string> = {
 export const TIER_SYSTEM_HELP =
   'When two campaigns want the same moment, the higher tier always wins — no matter what priority either one is set to. Priority only breaks ties inside the same tier. Pick the tier by what the message is, not by how much you want it seen.';
 
+export type TierBudget = 'ambient' | 'moment' | 'unlimited';
+
+export const TIER_BUDGET: Record<CampaignTier, TierBudget> = {
+  critical: 'unlimited',
+  moment_offer: 'moment',
+  timed_offer: 'ambient',
+  announcement: 'ambient',
+  nudge: 'ambient',
+};
+
 export const TIER_HELP: Record<CampaignTier, string> = {
   critical:
-    'Something the user has to deal with: a failed payment, an expiring subscription, an account problem. Beats everything else.',
+    'Something the user has to deal with: a failed payment, an expiring subscription, an account problem. Beats everything else and is never held back by the one-popup-per-session rule.',
   moment_offer:
-    "An offer that only makes sense right now — they're short on flies, or just left the shop. Beats anything scheduled.",
+    "An offer that only makes sense right now — they're short on flies, or just left the shop. Beats anything scheduled, and has its own once-per-session slot, so an announcement earlier in the session can't block it.",
   timed_offer:
-    'A sale or seasonal offer with an end date. Loses to a moment-of-need offer, because that one is answering a question the user just asked.',
+    'A sale or seasonal offer with an end date. Loses to a moment-of-need offer, because that one is answering a question the user just asked. Shares the one-takeover-per-session slot.',
   announcement:
-    'News: a new feature, a policy change, a season starting. Nothing to buy, so it yields to any offer.',
+    'News: a new feature, a policy change, a season starting. Nothing to buy, so it yields to any offer. Shares the one-takeover-per-session slot.',
   nudge:
     'Evergreen encouragement with no deadline. Lowest tier on purpose — it should only appear when nothing better wants the slot.',
 };
@@ -187,7 +197,7 @@ export const CTA_HELP: Record<CtaAction, string> = {
   buy_pack:
     "Raises the store's own payment sheet on the spot — no shop in between. The fastest path from an offer to a paid purchase, and the reason a popup like this converts.",
   buy_product:
-    'Same one-tap checkout, but for any product id set up in App Store Connect / Play / RevenueCat — including offer-only products that never appear in the shop.',
+    'Same one-tap checkout for an offer product or bundle — a RevenueCat package that sells the App Store, Play and Paddle version of it, so one button works on every platform.',
   claim_reward:
     'Grants flies, cosmetics, backgrounds or Plus days. The server decides what is actually given and will only ever grant it once, so a re-tap or a replayed request cannot double up.',
   navigate: 'Closes the popup and goes to a page in the app.',
@@ -302,9 +312,13 @@ export type CampaignRiveButton = {
   packId?: string;
   /** Store product id for `buy_product`. */
   productId?: string;
+  reward?: CampaignReward;
   /** Whether firing this signal also closes the popup. */
   closes: boolean;
 };
+
+export const riveButtonElementId = (signal: string) =>
+  `rive-${signal.trim().replace(/[^\w-]+/g, '_').slice(0, 34)}`;
 
 /**
  * The two places a value can be written in a .riv file. Modern files expose
@@ -585,6 +599,7 @@ export type CampaignOffer = {
   productId?: string;
   /** Copy-only badge, e.g. "+100% extra". Grants stay server-authoritative. */
   bonusLabel?: string;
+  compareRef?: string;
 };
 
 export type CampaignTriggerRule = {
@@ -652,9 +667,14 @@ export type CampaignPayload = {
   assets: CampaignAssetRef[];
   triggers: CampaignTriggerRule[];
   delayMs: number;
+  startAt: string | null;
   /** Deadline for timers set to count down to the schedule. */
   endAt: string | null;
+  firstShownAt?: string | null;
+  products?: Record<string, CampaignProductInfo>;
 };
+
+export type CampaignProductInfo = { appleOfferId?: string; googleOfferId?: string };
 
 export type TriggerContext = {
   /** Flies the user is short by, for `insufficient_flies`. */
@@ -772,7 +792,7 @@ export function createElement(type: ElementType, z: number): CampaignElement {
     case 'discount':
       return {
         ...base,
-        text: '600',
+        text: '{was_price}',
         y: 55,
         w: 30,
         x: 35,

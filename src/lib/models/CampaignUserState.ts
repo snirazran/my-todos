@@ -20,6 +20,7 @@ export type CampaignUserStateDoc = {
   /** Impressions on the user's current local day, for the per-day cap. */
   dayKey?: string;
   dayCount?: number;
+  firstShownAt?: Date | null;
   lastShownAt?: Date | null;
   convertedAt?: Date | null;
   createdAt: Date;
@@ -38,6 +39,7 @@ const CampaignUserStateSchema = new Schema<CampaignUserStateDoc>(
     claims: { type: Schema.Types.Mixed, default: {} },
     dayKey: { type: String, default: '' },
     dayCount: { type: Number, default: 0 },
+    firstShownAt: { type: Date, default: null },
     lastShownAt: { type: Date, default: null },
     convertedAt: { type: Date, default: null },
   },

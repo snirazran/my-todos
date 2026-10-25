@@ -205,6 +205,7 @@ const RiveButtonSchema = new Schema<CampaignRiveButton>(
     path: { type: String, default: '' },
     packId: { type: String, default: '' },
     productId: { type: String, default: '' },
+    reward: { type: RewardSchema, default: () => ({ grants: [], limit: 'once' }) },
     closes: { type: Boolean, default: true },
   },
   { _id: false },
@@ -235,6 +236,7 @@ const CampaignSchema = new Schema<CampaignDoc>(
       packId: { type: String, default: '' },
       productId: { type: String, default: '' },
       bonusLabel: { type: String, default: '' },
+      compareRef: { type: String, default: '' },
     },
     art: { type: String, enum: [...CAMPAIGN_ART_KINDS], default: 'image' },
     rive: {

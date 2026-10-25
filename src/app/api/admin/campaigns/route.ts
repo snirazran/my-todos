@@ -103,6 +103,7 @@ function sanitize(body: Record<string, unknown>) {
       packId: str(offer.packId, 40),
       productId: str(offer.productId, 120),
       bonusLabel: str(offer.bonusLabel, 40),
+      compareRef: str(offer.compareRef, 120),
     },
     art: oneOf<CampaignArtKind>(body.art, CAMPAIGN_ART_KINDS, 'image'),
     canvas: sanitizeCanvas(canvas),
@@ -127,6 +128,7 @@ function sanitize(body: Record<string, unknown>) {
             path: str(button.path, 200),
             packId: str(button.packId, 40),
             productId: str(button.productId, 120),
+            reward: sanitizeReward(button.reward),
             closes: button.closes !== false,
           },
         ];
@@ -300,6 +302,20 @@ export async function POST(req: NextRequest) {
         copyAsset(source.riveFile, 'riv'),
       ]);
 
+      const assets = (
+        await Promise.all(
+          (source.assets ?? []).map(async (asset) => {
+            const destPath = `campaigns/${id}/assets/${asset.storagePath.split('/').pop()}`;
+            try {
+              await bucket.file(asset.storagePath).copy(bucket.file(destPath));
+              return { ...asset, storagePath: destPath };
+            } catch {
+              return null;
+            }
+          }),
+        )
+      ).filter((asset): asset is NonNullable<typeof asset> => !!asset);
+
       const {
         _id: _ignoredId,
         createdAt: _createdAt,
@@ -316,6 +332,7 @@ export async function POST(req: NextRequest) {
         status: 'draft',
         imageFile,
         riveFile,
+        assets,
         imageVersion: imageFile ? 1 : 0,
         riveVersion: riveFile ? 1 : 0,
       });
@@ -382,7 +399,7 @@ export async function DELETE(req: NextRequest) {
     if (!campaign) return json({ error: 'Campaign not found' }, 404);
 
     const bucket = getAdminStorage();
-    for (const file of [campaign.imageFile, campaign.riveFile]) {
+    for (const file of [campaign.imageFile, campaign.riveFile, ...(campaign.assets ?? [])]) {
       if (!file?.storagePath) continue;
       await bucket.file(file.storagePath).delete({ ignoreNotFound: true }).catch(() => {});
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,11 +14,22 @@ import {
   emitCampaignTrigger,
   markCampaignConverted,
   setCampaignBusy,
+  setCampaignPreparer,
   useCampaignStore,
 } from '@/lib/campaigns/orchestrator';
-import type { FlyPackId } from '@/lib/flyPacks';
+import { getFlyPack, getFlyPackForProduct } from '@/lib/flyPacks';
+import { parseProductRef } from '@/lib/campaigns/productRef';
+import {
+  EMPTY_TOKEN_VALUES,
+  campaignProductRefs,
+  hasBlankPrice,
+  pricedTexts,
+  type CampaignTokenValues,
+  type PriceQuote,
+} from '@/lib/campaigns/tokens';
 import {
   isBlockingTemplate,
+  riveButtonElementId,
   type CampaignElement,
   type CampaignPayload,
   type CtaAction,
@@ -26,7 +37,13 @@ import {
 import { resolveRiveSignal } from '@/lib/campaigns/riveSignals';
 import { NudgeBannerCard } from './CampaignSurfaces';
 import { CampaignModal } from './CampaignModal';
+import { CampaignTokensContext } from './CampaignTokens';
 import type { RiveSignal } from './CampaignRiveArt';
+
+type CampaignsResponse = {
+  campaigns: CampaignPayload[];
+  viewer: { frogName: string; flies: number } | null;
+};
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
 
@@ -35,6 +52,8 @@ const platformHint = () =>
     ?.getPlatform?.() ?? 'web';
 
 const LAST_VISIT_KEY = 'frogress.campaigns.lastVisit';
+const NEW_SESSION_AFTER_MS = 30 * 60_000;
+const ART_WAIT_MS = 3_000;
 
 /** Actions that own their own closing, because they can still fail or be
  *  cancelled after the tap. */
@@ -57,6 +76,42 @@ const markVisited = () => {
     /* best effort */
   }
 };
+
+const loadImage = (url: string) =>
+  new Promise<void>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = url;
+  });
+
+function preloadArt(campaign: CampaignPayload) {
+  const assetUrl = (id?: string) => campaign.assets.find((asset) => asset.id === id)?.url ?? '';
+  const images = [
+    campaign.art === 'rive' ? '' : campaign.imageUrl,
+    ...campaign.canvas.elements
+      .filter((element) => element.type === 'image')
+      .map((element) => assetUrl(element.assetId)),
+  ].filter(Boolean);
+  const rives = [
+    campaign.art === 'rive' ? campaign.riveUrl : '',
+    ...campaign.canvas.elements
+      .filter((element) => element.type === 'rive')
+      .map((element) => element.libraryPath || assetUrl(element.assetId)),
+  ].filter(Boolean);
+  const all = Promise.all([
+    ...images.map(loadImage),
+    ...rives.map((url) =>
+      fetch(url)
+        .then((res) => res.arrayBuffer())
+        .then(
+          () => undefined,
+          () => undefined,
+        ),
+    ),
+  ]);
+  return Promise.race([all, new Promise((resolve) => window.setTimeout(resolve, ART_WAIT_MS))]);
+}
 
 /**
  * The single mount point for every admin-authored popup.
@@ -88,6 +143,8 @@ export function CampaignHost() {
 
   const [buying, setBuying] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [prices, setPrices] = useState<Record<string, PriceQuote>>({});
+  const [session, setSession] = useState(0);
 
   useEffect(() => {
     if (!purchaseError) return;
@@ -95,7 +152,7 @@ export function CampaignHost() {
     return () => window.clearTimeout(timer);
   }, [purchaseError]);
 
-  const { data } = useSWR<{ campaigns: CampaignPayload[] }>(
+  const { data, mutate: refetch } = useSWR<CampaignsResponse>(
     user ? `/api/campaigns?platform=${platformHint()}` : null,
     fetcher,
     { revalidateOnFocus: false, revalidateOnReconnect: false },
@@ -104,6 +161,57 @@ export function CampaignHost() {
   useEffect(() => {
     if (data?.campaigns) setCampaigns(data.campaigns);
   }, [data, setCampaigns]);
+
+  const viewer = data?.viewer ?? null;
+  const tokenValues = useMemo<CampaignTokenValues>(
+    () => ({
+      prices,
+      frog: viewer?.frogName || 'your frog',
+      flies: viewer ? viewer.flies.toLocaleString() : '',
+    }),
+    [prices, viewer],
+  );
+
+  useEffect(() => {
+    setCampaignPreparer(async (campaign) => {
+      const art = preloadArt(campaign);
+      const { charged, quoted } = campaignProductRefs(campaign);
+      const texts = pricedTexts(campaign);
+      const refs = quoted
+        .concat(texts.map((entry) => entry.priceRef), texts.map((entry) => entry.compareRef))
+        .filter((ref, index, list) => !!ref && list.indexOf(ref) === index);
+      let ready = true;
+      if (refs.length) {
+        const { getPricesForRefs } = await import('@/lib/purchases');
+        const quotes = await getPricesForRefs(refs, campaign.products ?? {});
+        setPrices((current) => ({ ...current, ...quotes }));
+        const values = { ...EMPTY_TOKEN_VALUES, prices: quotes };
+        ready =
+          charged.every((ref) => !!quotes[ref]) &&
+          !texts.some((entry) => hasBlankPrice(entry, values));
+      }
+      await art;
+      return ready;
+    });
+    return () => setCampaignPreparer(null);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (!hiddenAt || Date.now() - hiddenAt < NEW_SESSION_AFTER_MS) return;
+      hiddenAt = 0;
+      useCampaignStore.getState().startNewSession();
+      void refetch().finally(() => setSession((value) => value + 1));
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [refetch, user]);
 
   // Anything the user opened themselves outranks anything we want to say —
   // including any sheet at all, which is what the global sheet count is for.
@@ -137,7 +245,7 @@ export function CampaignHost() {
     markVisited();
     if (days > 0) emitCampaignTrigger('returned_after_absence', { days });
     emitCampaignTrigger('session_start');
-  }, [data]);
+  }, [data, session]);
 
   // A campaign that lost its moment is re-offered the screen the instant the
   // screen is free again — including when the streak flow lifts its hold.
@@ -163,14 +271,28 @@ export function CampaignHost() {
     ) => {
       const id = kind === 'pack' ? options.packId : options.productId;
       if (!id) return;
+      const ref = kind === 'pack' ? null : parseProductRef(id);
+      const pack =
+        kind === 'pack'
+          ? getFlyPack(id)
+          : ref?.kind === 'pack'
+            ? getFlyPack(ref.packId)
+            : ref?.kind === 'store'
+              ? getFlyPackForProduct(ref.productId)
+              : undefined;
+      if (kind === 'pack' && !pack) return;
       reportClick(options.elementId);
       setBuying(true);
       try {
         const { purchaseFlyPack, purchaseStoreProduct } = await import('@/lib/purchases');
-        const outcome =
-          kind === 'pack'
-            ? await purchaseFlyPack(id as FlyPackId)
-            : await purchaseStoreProduct(id, `campaign:${options.campaignId}`);
+        const campaign = useCampaignStore.getState().active;
+        const outcome = pack
+          ? await purchaseFlyPack(pack.id)
+          : await purchaseStoreProduct(
+              id,
+              `campaign:${options.campaignId}`,
+              campaign?.products?.[id],
+            );
 
         if (outcome === 'purchased') {
           markCampaignConverted(options.campaignId);
@@ -178,12 +300,14 @@ export function CampaignHost() {
           // Flies land through the store webhook, so the shop is where the new
           // balance actually appears — and where a "still processing" state is
           // already handled.
-          if (kind === 'pack') openFlyShop(undefined, id);
+          if (pack) openFlyShop(undefined, pack.id);
+          else window.setTimeout(() => void mutate(() => true, undefined, { revalidate: true }), 4000);
           emitCampaignTrigger('purchase_completed');
         }
       } catch (error) {
         setPurchaseError(
-          error instanceof Error && /does not offer|No web package/.test(error.message)
+          error instanceof Error &&
+            /does not offer|No web package|not available on this device/.test(error.message)
             ? 'That offer is not available on this device.'
             : 'The purchase could not be started.',
         );
@@ -322,11 +446,13 @@ export function CampaignHost() {
       if (!resolved) return;
 
       hapticTick();
-      if (resolved.closes && !DEFERS_CLOSE.includes(resolved.action)) close('click');
+      const elementId = riveButtonElementId(resolved.button.signal);
+      if (resolved.closes && !DEFERS_CLOSE.includes(resolved.action)) close('click', elementId);
       runAction(resolved.action, {
         path: resolved.path,
         packId: resolved.packId,
         productId: resolved.productId,
+        elementId,
         campaignId: campaign.id,
       });
     },
@@ -361,7 +487,7 @@ export function CampaignHost() {
 
   if (!isBlockingTemplate(active.template)) {
     return (
-      <>
+      <CampaignTokensContext.Provider value={tokenValues}>
         <AnimatePresence>
           <motion.div
             initial={{ y: 80, opacity: 0 }}
@@ -379,12 +505,12 @@ export function CampaignHost() {
           </motion.div>
         </AnimatePresence>
         {status}
-      </>
+      </CampaignTokensContext.Provider>
     );
   }
 
   return (
-    <>
+    <CampaignTokensContext.Provider value={tokenValues}>
       <CampaignModal
         campaign={active}
         onActivate={runElement}
@@ -392,6 +518,6 @@ export function CampaignHost() {
         onSignal={runSignal}
       />
       {status}
-    </>
+    </CampaignTokensContext.Provider>
   );
 }

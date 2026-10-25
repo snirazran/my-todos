@@ -17,6 +17,7 @@ export type CampaignAudience = {
   isPlus: boolean;
   daysSinceSignup: number;
   isAdmin: boolean;
+  frogName: string;
 };
 
 export type EligibilityVerdict = {
@@ -25,6 +26,11 @@ export type EligibilityVerdict = {
   /** Human-readable reason, surfaced by the admin dry-run. */
   reason: string;
 };
+
+export const personalOfferMinutes = (campaign: Pick<CampaignDoc, 'canvas'>) =>
+  (campaign.canvas?.elements ?? [])
+    .filter((element) => element.type === 'timer' && element.timerMode === 'per_user')
+    .reduce((longest, element) => Math.max(longest, element.timerMinutes ?? 30), 0);
 
 const platformMatches = (target: PlatformTarget, platform: string) => {
   if (target === 'any') return true;
@@ -103,6 +109,13 @@ export function evaluateCampaign(
 
   if (state) {
     if (state.converted) return verdict(false, 'Already converted on this campaign');
+    const windowMinutes = personalOfferMinutes(campaign);
+    if (windowMinutes && state.firstShownAt) {
+      const endsAt = new Date(state.firstShownAt).getTime() + windowMinutes * 60_000;
+      if (now.getTime() >= endsAt) {
+        return verdict(false, 'Their personal countdown has run out');
+      }
+    }
     if (campaign.caps.perUser > 0 && state.impressions >= campaign.caps.perUser) {
       return verdict(false, `Hit the ${campaign.caps.perUser}-impression cap`);
     }
@@ -142,7 +155,10 @@ export const campaignAssetUrl = (
   return `/api/campaign-assets/${encodeURIComponent(campaign.id)}?v=${version ?? 0}${suffix}`;
 };
 
-export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
+export function toCampaignPayload(
+  campaign: CampaignDoc,
+  state?: Pick<CampaignUserStateDoc, 'firstShownAt'> | null,
+): CampaignPayload {
   const rive = { ...DEFAULT_RIVE, ...(campaign.rive ?? {}) };
   const canvas = {
     aspect: campaign.canvas?.aspect || DEFAULT_CANVAS.aspect,
@@ -168,6 +184,7 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
         path: button.path ?? '',
         packId: button.packId ?? '',
         productId: button.productId ?? '',
+        reward: button.reward ?? { grants: [], limit: 'once' },
         closes: button.closes !== false,
       })),
       inputs: rive.inputs ?? [],
@@ -180,7 +197,9 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
       name: asset.name,
       url: `/api/campaign-assets/${encodeURIComponent(campaign.id)}?asset=${encodeURIComponent(asset.id)}&v=${asset.version ?? 1}`,
     })),
+    startAt: campaign.startAt ? new Date(campaign.startAt).toISOString() : null,
     endAt: campaign.endAt ? new Date(campaign.endAt).toISOString() : null,
+    firstShownAt: state?.firstShownAt ? new Date(state.firstShownAt).toISOString() : null,
     delayMs: campaign.caps?.delayMs ?? DEFAULT_CAPS.delayMs,
     copy: {
       eyebrow: campaign.copy?.eyebrow ?? '',
@@ -199,6 +218,7 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
       packId: campaign.offer?.packId ?? '',
       productId: campaign.offer?.productId ?? '',
       bonusLabel: campaign.offer?.bonusLabel ?? '',
+      compareRef: campaign.offer?.compareRef ?? '',
     },
     triggers: campaign.triggers.map((rule) => ({
       event: rule.event,

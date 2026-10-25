@@ -133,6 +133,47 @@ export async function refreshPlusSnapshot(appUserId: string) {
   return next;
 }
 
+export async function grantPlusDays(appUserId: string, days: number): Promise<Date | null> {
+  const wholeDays = Math.floor(days);
+  if (!(wholeDays > 0)) return null;
+  await connectMongo();
+  const user = await UserModel.findById(appUserId)
+    .select('premiumUntil')
+    .lean<{ premiumUntil?: Date | null } | null>();
+  const now = Date.now();
+  const current = user?.premiumUntil ? new Date(user.premiumUntil).getTime() : 0;
+  const until = new Date(Math.max(current, now) + wholeDays * 86_400_000);
+
+  const secretKey = process.env.REVENUECAT_SECRET_API_KEY;
+  if (secretKey) {
+    try {
+      const res = await fetch(
+        `${RC_API_BASE}/subscribers/${encodeURIComponent(appUserId)}/entitlements/${PLUS_ENTITLEMENT_ID}/promotional`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ end_time_ms: until.getTime() }),
+          cache: 'no-store',
+        },
+      );
+      if (!res.ok) throw new Error(`RevenueCat promotional grant failed (${res.status})`);
+      const synced = await syncPremiumFromRevenueCat(appUserId);
+      if (synced && synced >= until) return synced;
+    } catch (error) {
+      console.error('Plus promotional grant failed, writing premiumUntil directly:', error);
+    }
+  }
+
+  await UserModel.updateOne(
+    { _id: appUserId, $or: [{ premiumUntil: null }, { premiumUntil: { $lt: until } }] },
+    { $set: { premiumUntil: until } },
+  );
+  return until;
+}
+
 export async function syncPremiumFromRevenueCat(
   appUserId: string,
 ): Promise<Date | null> {

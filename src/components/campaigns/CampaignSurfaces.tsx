@@ -3,6 +3,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { CampaignRiveArt, type RiveContents, type RiveSignal } from './CampaignRiveArt';
+import { fillRiveInputs, useTokenFill } from './CampaignTokens';
 import type { CampaignPayload } from '@/lib/campaigns/types';
 
 export type SurfaceProps = {
@@ -21,6 +22,7 @@ export function NudgeBannerCard({
   onRiveContents,
 }: SurfaceProps) {
   const useRiveArt = campaign.art === 'rive' && !!campaign.riveUrl;
+  const fill = useTokenFill(campaign, campaign.cta);
   return (
     <div className="flex items-center gap-3 rounded-[20px] bg-popover p-3 shadow-xl ring-1 ring-border">
       {useRiveArt ? (
@@ -31,6 +33,8 @@ export function NudgeBannerCard({
             stateMachine={campaign.rive.stateMachine}
             fit={campaign.rive.fit}
             buttons={campaign.rive.buttons}
+            inputs={fillRiveInputs(campaign.rive.inputs, fill)}
+            tickers={campaign.rive.tickers}
             onSignal={onSignal}
             onContents={onRiveContents}
             className="h-full w-full"
@@ -45,10 +49,10 @@ export function NudgeBannerCard({
         />
       ) : null}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-foreground">{campaign.copy.headline}</p>
+        <p className="truncate text-sm font-black text-foreground">{fill(campaign.copy.headline)}</p>
         {campaign.copy.body ? (
           <p className="truncate text-xs font-semibold text-muted-foreground">
-            {campaign.copy.body}
+            {fill(campaign.copy.body)}
           </p>
         ) : null}
       </div>
@@ -57,7 +61,7 @@ export function NudgeBannerCard({
         onClick={onCta}
         className="shrink-0 rounded-xl bg-[#447d3f] px-3 py-2 text-xs font-black text-white"
       >
-        {campaign.copy.ctaLabel}
+        {fill(campaign.copy.ctaLabel)}
       </button>
       <button
         type="button"

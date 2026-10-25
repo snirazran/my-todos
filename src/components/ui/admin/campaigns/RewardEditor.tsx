@@ -48,10 +48,18 @@ export function RewardEditor({
   reward,
   catalog,
   onChange,
+  title = 'This button gives',
+  kinds = REWARD_KINDS,
+  showLimit = true,
+  emptyText = 'Nothing yet — this button would give the user nothing.',
 }: {
   reward: CampaignReward | undefined;
   catalog: RewardCatalogEntry[];
   onChange: (reward: CampaignReward) => void;
+  title?: string;
+  kinds?: readonly RewardKind[];
+  showLimit?: boolean;
+  emptyText?: string;
 }) {
   const value = reward ?? DEFAULT_REWARD;
   const [picking, setPicking] = useState<RewardKind | null>(null);
@@ -80,7 +88,7 @@ export function RewardEditor({
     <div className="space-y-2.5 rounded-xl bg-background p-3 ring-1 ring-border">
       <p className="flex items-center gap-1.5 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
         <Gift className="h-3.5 w-3.5" />
-        This button gives
+        {title}
       </p>
 
       {value.grants.length ? (
@@ -137,12 +145,12 @@ export function RewardEditor({
         </div>
       ) : (
         <p className="rounded-lg bg-muted/60 px-2.5 py-2 text-[11px] font-bold text-muted-foreground">
-          Nothing yet — this button would give the user nothing.
+          {emptyText}
         </p>
       )}
 
       <div className="flex flex-wrap gap-1.5">
-        {REWARD_KINDS.map((kind) => (
+        {kinds.map((kind) => (
           <button
             key={kind}
             type="button"
@@ -173,28 +181,30 @@ export function RewardEditor({
         />
       ) : null}
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Field
-          label="Can be claimed"
-          help="The server enforces this. A second tap, a replayed request or a reinstall cannot get a second copy."
-        >
-          <Select
-            value={value.limit}
-            options={REWARD_LIMITS.map((limit) => ({
-              value: limit,
-              label: REWARD_LIMIT_LABELS[limit],
-            }))}
-            onChange={(limit) => patch({ limit })}
-          />
-        </Field>
-        <Field label="After claiming, say" help="Left blank, the popup just closes.">
-          <TextInput
-            value={value.successText ?? ''}
-            placeholder="Enjoy your hat!"
-            onChange={(successText) => patch({ successText })}
-          />
-        </Field>
-      </div>
+      {showLimit ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field
+            label="Can be claimed"
+            help="The server enforces this. A second tap, a replayed request or a reinstall cannot get a second copy."
+          >
+            <Select
+              value={value.limit}
+              options={REWARD_LIMITS.map((limit) => ({
+                value: limit,
+                label: REWARD_LIMIT_LABELS[limit],
+              }))}
+              onChange={(limit) => patch({ limit })}
+            />
+          </Field>
+          <Field label="After claiming, say" help="Left blank, the popup just closes.">
+            <TextInput
+              value={value.successText ?? ''}
+              placeholder="Enjoy your hat!"
+              onChange={(successText) => patch({ successText })}
+            />
+          </Field>
+        </div>
+      ) : null}
     </div>
   );
 }

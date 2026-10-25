@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
+import { REWARD_KINDS, type CampaignRewardGrant } from '@/lib/campaigns/types';
 
 export const STORE_PRODUCT_STORES = ['apple', 'google', 'web', 'all'] as const;
 export type StoreProductStore = (typeof STORE_PRODUCT_STORES)[number];
@@ -6,15 +7,6 @@ export type StoreProductStore = (typeof STORE_PRODUCT_STORES)[number];
 export const STORE_PRODUCT_KINDS = ['consumable', 'non_consumable', 'subscription'] as const;
 export type StoreProductKind = (typeof STORE_PRODUCT_KINDS)[number];
 
-/**
- * A product identifier this app can charge for that the fly shop does not
- * sell — the offer-only SKUs a campaign exists to put in front of someone.
- *
- * The shop's own packs are compiled in (`FLY_PACKS`) because they are load
- * bearing; these are registered by an admin, so an offer can be launched
- * without a deploy. Nothing here grants anything: what a purchase is worth is
- * decided by the store webhook, exactly as it is for a shop pack.
- */
 export type StoreProductDoc = {
   productId: string;
   label: string;
@@ -22,17 +14,27 @@ export type StoreProductDoc = {
   kind: StoreProductKind;
   /** Display only — the real price always comes from the store at runtime. */
   priceHint: string;
-  /**
-   * Flies credited when this product is bought. The purchase webhook reads it,
-   * so an offer-only pack grants without a deploy. 0 means this product grants
-   * nothing here — a subscription or something settled elsewhere.
-   */
   flies: number;
+  grants: CampaignRewardGrant[];
+  offeringId: string;
+  packageId: string;
+  storeIds: string[];
+  appleOfferId: string;
+  googleOfferId: string;
   note: string;
   archived: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
+
+const GrantSchema = new Schema<CampaignRewardGrant>(
+  {
+    kind: { type: String, enum: [...REWARD_KINDS], required: true },
+    id: { type: String, default: '' },
+    amount: { type: Number, default: 1, min: 0 },
+  },
+  { _id: false },
+);
 
 const StoreProductSchema = new Schema<StoreProductDoc>(
   {
@@ -42,6 +44,12 @@ const StoreProductSchema = new Schema<StoreProductDoc>(
     kind: { type: String, enum: [...STORE_PRODUCT_KINDS], default: 'consumable' },
     priceHint: { type: String, default: '' },
     flies: { type: Number, default: 0, min: 0 },
+    grants: { type: [GrantSchema], default: [] },
+    offeringId: { type: String, default: '' },
+    packageId: { type: String, default: '' },
+    storeIds: { type: [String], default: [], index: true },
+    appleOfferId: { type: String, default: '' },
+    googleOfferId: { type: String, default: '' },
     note: { type: String, default: '' },
     archived: { type: Boolean, default: false },
   },
@@ -53,3 +61,12 @@ const StoreProductModel: Model<StoreProductDoc> =
   mongoose.model<StoreProductDoc>('StoreProduct', StoreProductSchema);
 
 export default StoreProductModel;
+
+export function storeProductGrants(
+  product: Pick<StoreProductDoc, 'flies' | 'grants'>,
+): CampaignRewardGrant[] {
+  const grants = (product.grants ?? []).filter(
+    (grant) => grant.kind !== 'plus_days' && grant.amount > 0,
+  );
+  return product.flies > 0 ? [{ kind: 'flies', amount: product.flies }, ...grants] : grants;
+}
