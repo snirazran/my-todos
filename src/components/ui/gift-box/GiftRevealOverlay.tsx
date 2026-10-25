@@ -9,6 +9,7 @@ import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { ItemDef } from '@/lib/skins/catalog';
 
 const BOX_OPEN_MS = 1400;
@@ -50,6 +51,7 @@ export function GiftRevealOverlay({
 }) {
   const [phase, setPhase] = useState<'box' | 'opening' | 'reveal'>('box');
   const rarity = RARITY_CONFIG[prize.rarity] ? prize.rarity : 'uncommon';
+  useRegisterOpenSheet(true);
 
   useEffect(() => {
     if (phase === 'opening') {

@@ -9,6 +9,7 @@ import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 
 export function SharedTaskClaimPopup({
   text,
@@ -22,6 +23,7 @@ export function SharedTaskClaimPopup({
   const btnRef = useRef<HTMLButtonElement>(null);
   const bonusFlies = useBuddyBonusFlies();
   const { entered, markEntered } = useEntrance(true);
+  useRegisterOpenSheet(true);
 
   useEffect(() => {
     const rect = btnRef.current?.getBoundingClientRect();

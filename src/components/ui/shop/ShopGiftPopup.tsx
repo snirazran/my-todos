@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useInventory';
 import { hapticCelebrate, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { whenScreenIsFree } from '@/lib/popupGate';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { flyFliesToCounter } from '@/lib/flyFlight';
 import type { ShopGiftStatus } from '@/lib/economy/shopGift';
@@ -70,6 +71,7 @@ export function ShopGiftPopup({
 
   useEffect(() => setMounted(true), []);
   useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  useRegisterOpenSheet(phase !== 'hidden');
 
   const eligible =
     active && !!gift?.available && dismissedDayKey !== gift.dayKey;

@@ -7,6 +7,7 @@ import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { hapticCelebrate } from '@/lib/haptics';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { ItemDef } from '@/lib/skins/catalog';
 
 export function GiftClaimRewardOverlay({
@@ -18,6 +19,7 @@ export function GiftClaimRewardOverlay({
   inviterName: string;
   onClose: () => void;
 }) {
+  useRegisterOpenSheet(true);
   useEffect(() => {
     hapticCelebrate();
   }, []);

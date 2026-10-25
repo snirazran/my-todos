@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/questRewardReveal';
 import { hapticCelebrate } from '@/lib/haptics';
 import type { LeapHopResult } from '@/lib/leap/types';
+import { useUIStore } from '@/lib/uiStore';
 import { hopProgressLine, leagueArt } from './leapCopy';
 import { queueLeapZoneMoment } from './LeapZoneSheet';
 
@@ -120,6 +121,7 @@ export function announceLeapHop(
   }
   const spec = buildLeapHopToast(result);
   if (!spec) return;
+  if (spec.quiet && useUIStore.getState().isFirstRunGuided) return;
   if (spec.celebrate) hapticCelebrate();
   const openGifts = spec.gifts.length
     ? () => {

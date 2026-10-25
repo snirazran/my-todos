@@ -359,6 +359,10 @@ export function useQuestRevealQueueLength() {
   return useStore(revealStore, (state) => state.queue.length + state.flying);
 }
 
+export function useQuestRevealActive() {
+  return useStore(revealStore, (state) => state.queue.length > 0 || !!state.giftOpening);
+}
+
 export function enqueueQuestRewardReveal(
   summary: QuestRewardSummary | undefined,
   options: {
