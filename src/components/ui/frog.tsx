@@ -224,8 +224,19 @@ const Frog = memo(
       if (!rive) return;
       const el = wrapperRef.current;
       if (!el) return;
-      const resize = () =>
-        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
+      const resize = () => {
+        const canvas = el.querySelector('canvas');
+        if (!(canvas instanceof HTMLCanvasElement)) return;
+        const dpr = riveDevicePixelRatio();
+        const width = Math.round(el.clientWidth * dpr);
+        const height = Math.round(el.clientHeight * dpr);
+        if (!width || !height) return;
+        if (canvas.width === width && canvas.height === height) return;
+        canvas.width = width;
+        canvas.height = height;
+        rive.resizeToCanvas();
+        rive.drawFrame();
+      };
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());
