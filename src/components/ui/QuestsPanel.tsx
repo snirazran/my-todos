@@ -860,7 +860,7 @@ function QuestSeasonBanner({
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[calc(5.5rem+env(safe-area-inset-top))] bg-[linear-gradient(to_bottom,rgba(15,23,42,0.28),transparent)]" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)]" />
-        <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-8 md:gap-2">
+        <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-24 md:gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-950/40 py-1 pl-1.5 pr-2.5 text-[12px] font-black tabular-nums leading-none text-white backdrop-blur-sm md:text-[13px]">
             <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
             {timeLeft}

@@ -90,7 +90,11 @@ import {
   readFirstRunPending,
   useFirstRun,
 } from '@/hooks/useFirstRun';
-import { useQuestRevealQueueLength } from '@/components/ui/questRewardReveal';
+import {
+  useFlyOfferHeight,
+  useQuestRevealQueueLength,
+} from '@/components/ui/questRewardReveal';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
@@ -285,6 +289,12 @@ export default function HomeDashboard() {
   }, [taskCinematic, setIsCinematicActive]);
 
   const { showNotification, stackHeight: notificationStackHeight } = useNotification();
+  const flyOfferHeight = useFlyOfferHeight();
+  const flyOfferOverlapsFab = useMediaQuery('(max-width: 767px)');
+  const fabLift = Math.max(
+    notificationStackHeight,
+    flyOfferOverlapsFab ? flyOfferHeight : 0,
+  );
   const { seenIntros, markIntroSeen } = useIntros(!!user);
   const seenIntrosRef = useRef(seenIntros);
   seenIntrosRef.current = seenIntros;
@@ -1505,9 +1515,7 @@ export default function HomeDashboard() {
           {
             '--fab-bottom': 'calc(env(safe-area-inset-bottom) + 92px)',
             '--fab-bottom-md': 'calc(env(safe-area-inset-bottom) + 24px)',
-            translate: `0 ${
-              notificationStackHeight > 0 ? -(notificationStackHeight + 12) : 0
-            }px`,
+            translate: `0 ${fabLift > 0 ? -(fabLift + 12) : 0}px`,
             transition:
               'translate 320ms cubic-bezier(0.22,1,0.36,1), transform 240ms cubic-bezier(0.32,0.72,0,1), opacity 180ms ease',
           } as React.CSSProperties

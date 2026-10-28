@@ -53,7 +53,7 @@ export function AnalyticsProvider() {
   useEffect(() => {
     captureClickIds();
     captureFirstTouch();
-    trackOpen();
+    if (document.visibilityState === 'visible') trackOpen();
     const keepAlive = window.setInterval(() => {
       if (document.visibilityState === 'visible') ensureSession();
     }, 60_000);
@@ -68,8 +68,22 @@ export function AnalyticsProvider() {
   }, []);
 
   useEffect(() => {
-    ensureSession();
-    trackAnalyticsEvent('page_viewed', { page: normalizeAnalyticsPage(pathname) });
+    const page = normalizeAnalyticsPage(pathname);
+    const trackView = () => {
+      ensureSession();
+      trackAnalyticsEvent('page_viewed', { page });
+    };
+    if (document.visibilityState === 'visible') {
+      trackView();
+      return;
+    }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      document.removeEventListener('visibilitychange', onVisible);
+      trackView();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [pathname]);
 
   return null;

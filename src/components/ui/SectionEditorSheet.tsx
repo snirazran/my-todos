@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Tag, Trash2 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
+import { revealInScroller } from '@/lib/revealInScroller';
 
 export type SectionTagOption = { id: string; name: string; color: string };
 
@@ -45,7 +46,17 @@ export function SectionEditorSheet({
   const [tagsOpen, setTagsOpen] = useState(initialTagIds.length > 0);
   const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { inset: keyboardInset } = useKeyboardInset(open);
+  const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
+  const keyboardActive = inputFocused && keyboardInset > 0;
+
+  useEffect(() => {
+    if (!keyboardActive) return;
+    const timer = window.setTimeout(() => {
+      const el = inputRef.current;
+      if (el && document.activeElement === el) revealInScroller(el);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [keyboardActive, keyboardInset, viewportHeight]);
 
   // Cache the mode so the slide-down exit keeps rendering the sheet the user
   // was just looking at, after the parent has cleared its editor state.
@@ -68,7 +79,7 @@ export function SectionEditorSheet({
     setConfirmDelete(false);
     setInputFocused(false);
     const id = window.setTimeout(() => {
-      if (mode === 'create') inputRef.current?.focus();
+      if (mode === 'create') inputRef.current?.focus({ preventScroll: true });
     }, 120);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,13 +108,20 @@ export function SectionEditorSheet({
       open={open}
       onOpenChange={(v) => !v && onClose()}
       zIndex={1500}
-      bottomInset={inputFocused ? keyboardInset : 0}
+      bottomInset={keyboardActive ? keyboardInset : 0}
+      panelStyle={
+        keyboardActive && viewportHeight
+          ? { maxHeight: Math.max(220, viewportHeight - 8) }
+          : undefined
+      }
       className="bg-background ring-1 ring-border/70 sm:max-w-[460px] max-h-[92vh]"
     >
       {({ bindScroll }) => (
         <div
           ref={bindScroll}
-          className="mx-auto min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-1 sm:pb-6"
+          className={`mx-auto min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pt-1 sm:pb-6 ${
+            keyboardActive ? 'pb-4' : 'pb-[calc(env(safe-area-inset-bottom)+24px)]'
+          }`}
         >
           <div className="relative mb-4 flex h-9 items-center justify-center">
             <h2 className="text-[17px] font-black text-foreground">

@@ -95,6 +95,7 @@ type RevealHostState = {
   flyGainToast: FlyGainToast | null;
   interlude: boolean;
   flyOffer: FlyDoubleOffer | null;
+  flyOfferHeight: number;
   flying: number;
 };
 
@@ -117,6 +118,7 @@ const revealStore = createStore<RevealHostState>(() => ({
   flyGainToast: null,
   interlude: false,
   flyOffer: null,
+  flyOfferHeight: 0,
   flying: 0,
 }));
 
@@ -357,6 +359,10 @@ function createFlyRewardItem(amount: number): ItemDef {
 
 export function useQuestRevealQueueLength() {
   return useStore(revealStore, (state) => state.queue.length + state.flying);
+}
+
+export function useFlyOfferHeight() {
+  return useStore(revealStore, (state) => state.flyOfferHeight);
 }
 
 export function useQuestRevealActive() {
@@ -703,6 +709,19 @@ function FlyDoubleOffer() {
     }, wait);
     return () => window.clearTimeout(enter);
   }, [offer, revealBusy, visible]);
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!visible || !el) {
+      revealStore.setState({ flyOfferHeight: 0 });
+      return;
+    }
+    const update = () => revealStore.setState({ flyOfferHeight: el.offsetHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [visible, offer?.id]);
 
   useEffect(() => {
     if (!visible || busy || held) return;

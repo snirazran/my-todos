@@ -279,6 +279,66 @@ export function snapshotToBrief(
   return lines.join('\n');
 }
 
+export function withDeclaredColumnsOnly(snapshot: StatisticsSnapshot): StatisticsSnapshot {
+  return {
+    ...snapshot,
+    sections: snapshot.sections.map((section) => ({
+      ...section,
+      tables: section.tables.map((table) => ({
+        ...table,
+        rows: table.rows.map((row) =>
+          Object.fromEntries(table.columns.map((column) => [column.key, row[column.key] ?? null])),
+        ),
+      })),
+    })),
+  };
+}
+
+export type DailyMetric = {
+  key: string;
+  label: string;
+  chart: string;
+  section: string;
+  format: string;
+};
+
+export type DailyFeed = {
+  meta: StatisticsSnapshot['meta'];
+  metrics: DailyMetric[];
+  days: Array<{ date: string; [metric: string]: string | number }>;
+};
+
+export function snapshotToDays(snapshot: StatisticsSnapshot): DailyFeed {
+  const metrics: DailyMetric[] = [];
+  const byDate = new Map<string, { date: string; [metric: string]: string | number }>();
+
+  for (const section of snapshot.sections) {
+    for (const series of section.series) {
+      for (const line of series.lines) {
+        const key = `${series.key}.${line.key}`;
+        metrics.push({
+          key,
+          label: line.label,
+          chart: series.title,
+          section: section.id,
+          format: line.format ?? 'integer',
+        });
+        for (const point of series.points) {
+          const row = byDate.get(point.date) ?? { date: point.date };
+          row[key] = point[line.key] ?? 0;
+          byDate.set(point.date, row);
+        }
+      }
+    }
+  }
+
+  return {
+    meta: snapshot.meta,
+    metrics,
+    days: Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
 export function exportFilename(
   snapshot: StatisticsSnapshot,
   kind: string,

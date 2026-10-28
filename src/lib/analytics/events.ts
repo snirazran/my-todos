@@ -186,6 +186,8 @@ export const PASSIVE_ANALYTICS_EVENTS: AnalyticsEventName[] = [
   'buddy_duo_week',
   'streak_broken',
   'streak_shield_used',
+  'hunger_started',
+  'wishlist_reached',
 ];
 
 export const PASSIVE_ANALYTICS_EVENT_SET = new Set<string>(PASSIVE_ANALYTICS_EVENTS);
