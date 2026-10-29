@@ -9,6 +9,7 @@ import {
 } from '@/lib/frogSpeech';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { TAP_STREAK_MS } from '@/lib/frogEmotes';
 
 interface FrogSpeechBubbleProps {
   rate: number;
@@ -23,8 +24,6 @@ interface FrogSpeechBubbleProps {
   messageClassName?: string;
   side?: boolean;
 }
-
-const TAP_CHAIN_WINDOW_MS = 20_000;
 
 export function FrogSpeechBubble({
   done,
@@ -104,7 +103,7 @@ export function FrogSpeechBubble({
     if (frogClicked) {
       const now = Date.now();
       tapCountRef.current =
-        now - lastTapAtRef.current < TAP_CHAIN_WINDOW_MS
+        now - lastTapAtRef.current < TAP_STREAK_MS
           ? tapCountRef.current + 1
           : 1;
       lastTapAtRef.current = now;

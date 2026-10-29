@@ -34,7 +34,9 @@ import {
   onFrogReact,
   outranks,
   pickEmote,
+  pokeEmote,
   registerPokeable,
+  TAP_STREAK_MS,
   takeGreeting,
   type FrogEmote,
   type FrogEmoteLoop,
@@ -103,10 +105,6 @@ const PENDING_EMOTE_DELAY_MS = 320;
 const QUEUED_EMOTE_GAP_MS = 120;
 const QUEUED_EMOTE_RETRY_MS = 250;
 const GREET_DELAY_MS = 450;
-const POKE_CHAIN_MS = 1500;
-const POKE_SETTLE_AT = 0.45;
-const POKE_FLUSTERED = 4;
-const POKE_DIZZY = 6;
 const WAKE_SURPRISE_MS = 2500;
 const SLEEP_EXIT_MS = 1350;
 const FIDGET_MIN_MS = 22000;
@@ -725,7 +723,9 @@ const Frog = memo(
       }
       if (ordered && busy) {
         const queued = queuedEmoteRef.current;
-        if (queued && !outranks(name, queued.name)) return false;
+        if (queued && mode !== 'force' && !outranks(name, queued.name)) {
+          return false;
+        }
         if (queued) window.clearTimeout(queued.timer);
         queuedEmoteRef.current = {
           name,
@@ -828,24 +828,13 @@ const Frog = memo(
       return () => window.clearTimeout(t);
     }, [fidget, reduceMotion, paused]);
 
-    const pokeStateRef = useRef({ count: 0, last: 0, calmAt: 0 });
+    const pokeStateRef = useRef({ count: 0, last: 0 });
     const poke = () => {
       const now = performance.now();
       const state = pokeStateRef.current;
-      if (now < state.calmAt) return;
-      state.count = now - state.last < POKE_CHAIN_MS ? state.count + 1 : 1;
+      state.count = now - state.last < TAP_STREAK_MS ? state.count + 1 : 1;
       state.last = now;
       hapticTick();
-      const active = activeEmoteRef.current;
-      if (state.count >= POKE_DIZZY) {
-        const activeLeft = active
-          ? Math.max(0, active.at + EMOTE_MS[active.name] - now)
-          : 0;
-        state.count = 0;
-        state.calmAt = now + activeLeft + EMOTE_MS.dizzy;
-        requestEmote('dizzy', 'force');
-        return;
-      }
       const sinceWake = now - wokeAtRef.current;
       if (sinceWake < WAKE_SURPRISE_MS) {
         wokeAtRef.current = 0;
@@ -855,13 +844,7 @@ const Frog = memo(
         );
         return;
       }
-      if (active && now - active.at < EMOTE_MS[active.name] * POKE_SETTLE_AT) {
-        return;
-      }
-      requestEmote(
-        state.count >= POKE_FLUSTERED ? 'sweat' : pickEmote('poke'),
-        'force',
-      );
+      requestEmote(pokeEmote(state.count), 'force');
     };
     const pokeRef = useRef(poke);
     pokeRef.current = poke;

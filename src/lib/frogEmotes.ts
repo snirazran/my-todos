@@ -69,24 +69,30 @@ export type FrogMoment =
   | 'sent'
   | 'pick'
   | 'poke'
+  | 'pokeTwitchy'
+  | 'pokeHarassed'
+  | 'pokeResigned'
   | 'fidget'
   | 'fidgetHungry';
 
 const MOMENT_POOLS: Record<FrogMoment, readonly FrogEmote[]> = {
-  catch: ['love', 'hop', 'loveHeartbeat'],
-  combo: ['celebrate', 'hop', 'loveHeartbeat'],
+  catch: ['love', 'hop', 'love', 'hop', 'loveShy', 'loveHeartbeat'],
+  combo: ['celebrate', 'hop', 'celebrate'],
   bigCombo: ['tada', 'celebrate'],
   miss: ['sweat', 'dizzy'],
-  taskAdded: ['hop', 'love', 'surprised'],
+  taskAdded: ['hop', 'love', 'loveShy'],
   equip: ['loveShy', 'love', 'hop'],
-  tryOn: ['surprised', 'loveShy', 'hop'],
-  greet: ['hop', 'love', 'loveHeartbeat'],
-  welcomeBack: ['loveBurst', 'surprised'],
-  cheer: ['celebrate', 'hop', 'loveHeartbeat'],
+  tryOn: ['loveShy', 'hop', 'love'],
+  greet: ['hop', 'love', 'hop', 'love', 'loveHeartbeat'],
+  welcomeBack: ['loveBurst', 'celebrate'],
+  cheer: ['celebrate', 'hop'],
   milestone: ['tada', 'loveBurst'],
   sent: ['loveHeartbeat', 'love'],
-  pick: ['hop', 'love', 'loveHeartbeat', 'loveShy'],
-  poke: ['love', 'hop', 'loveShy', 'surprised', 'loveHeartbeat'],
+  pick: ['hop', 'love', 'loveShy'],
+  poke: ['love', 'hop', 'loveShy'],
+  pokeTwitchy: ['surprised', 'sweat', 'surprised'],
+  pokeHarassed: ['dizzy', 'sweat', 'surprised', 'dizzy'],
+  pokeResigned: ['dizzy', 'sweat'],
   fidget: ['hop', 'love', 'loveShy', 'question', 'hop', 'love'],
   fidgetHungry: ['question', 'sweat', 'question'],
 };
@@ -109,9 +115,18 @@ export function catchEmote(combo: number, golden: boolean): FrogEmote {
   return pickEmote('catch');
 }
 
+export const TAP_STREAK_MS = 20_000;
+
+export function pokeEmote(streak: number): FrogEmote {
+  if (streak >= 10) return pickEmote('pokeResigned');
+  if (streak >= 6) return pickEmote('pokeHarassed');
+  if (streak >= 3) return pickEmote('pokeTwitchy');
+  return pickEmote('poke');
+}
+
 const RARITY_EMOTE: Record<Rarity, FrogEmote> = {
   common: 'hop',
-  uncommon: 'loveHeartbeat',
+  uncommon: 'love',
   rare: 'celebrate',
   epic: 'tada',
   legendary: 'loveBurst',

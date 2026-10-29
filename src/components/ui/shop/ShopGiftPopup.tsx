@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Crown, Sparkles, X } from 'lucide-react';
@@ -66,11 +66,33 @@ export function ShopGiftPopup({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [fromTile, setFromTile] = useState(false);
+  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
   const closeTimer = useRef<number>(0);
   const medallionRef = useRef<HTMLDivElement | null>(null);
+  const claimedRef = useRef(false);
+  const contentObserver = useRef<ResizeObserver | null>(null);
+
+  const measureContent = useCallback((el: HTMLDivElement | null) => {
+    contentObserver.current?.disconnect();
+    contentObserver.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      setContentHeight(entries[0].contentRect.height);
+    });
+    observer.observe(el);
+    contentObserver.current = observer;
+  }, []);
 
   useEffect(() => setMounted(true), []);
-  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(closeTimer.current);
+      contentObserver.current?.disconnect();
+      if (claimedRef.current) patchInventoryShopGiftClaimed();
+    },
+    [],
+  );
   useRegisterOpenSheet(phase !== 'hidden');
 
   const eligible =
@@ -91,15 +113,21 @@ export function ShopGiftPopup({
   const close = () => {
     window.clearTimeout(closeTimer.current);
     if (gift) dismissedDayKey = gift.dayKey;
+    if (claimedRef.current) {
+      claimedRef.current = false;
+      patchInventoryShopGiftClaimed();
+    }
     setNotice(null);
+    setContentHeight('auto');
     setPhase('hidden');
   };
 
-  const collect = async () => {
+  const collect = async (tile = false) => {
     if (phase !== 'offer' && phase !== 'hidden') return;
     hapticTick();
     setError(null);
     setNotice(null);
+    setFromTile(tile && phase === 'hidden');
     setPhase('claiming');
     try {
       const res = await fetch('/api/skins/shop-gift', {
@@ -112,8 +140,8 @@ export function ShopGiftPopup({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Claim failed');
 
-      patchInventoryShopGiftClaimed();
       if (!data.granted) {
+        patchInventoryShopGiftClaimed();
         const refusal = REFUSALS[data.reason];
         if (!refusal) {
           close();
@@ -123,6 +151,7 @@ export function ShopGiftPopup({
         setPhase('offer');
         return;
       }
+      claimedRef.current = true;
 
       setReveal({
         amount: data.amount,
@@ -168,7 +197,7 @@ export function ShopGiftPopup({
   };
 
   useEffect(() => {
-    if (claimRequest > 0) void collect();
+    if (claimRequest > 0) void collect(true);
   }, [claimRequest]);
 
   if (!mounted) return null;
@@ -177,6 +206,7 @@ export function ShopGiftPopup({
   const firstGift = !!gift?.first;
   const nextIn = reveal ? hoursUntil(reveal.endsAt) : null;
   const revealed = phase === 'revealed' && !!reveal;
+  const opening = phase === 'claiming' && fromTile;
   const golden = !!reveal?.lucky;
 
   return createPortal(
@@ -271,88 +301,112 @@ export function ShopGiftPopup({
                 </motion.span>
               </div>
 
-              <AnimatePresence mode="wait" initial={false}>
-                {revealed && reveal ? (
-                  <motion.div
-                    key="revealed"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 flex flex-col items-center"
-                  >
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-[40px] font-black leading-none tabular-nums text-foreground">
-                        +<AnimatedNumber value={shownAmount} />
-                      </span>
-                      <span className="text-lg font-black text-muted-foreground">flies</span>
-                    </div>
-                    <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-                      {reveal.lucky && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/25 px-2.5 py-1 text-[12px] font-black text-amber-700 dark:text-amber-300">
-                          <Sparkles className="h-3.5 w-3.5" />
-                          Lucky find ×{reveal.luckyMultiplier}
-                        </span>
-                      )}
-                      {reveal.plus && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-black text-emerald-700 dark:text-emerald-300">
-                          <Crown className="h-3.5 w-3.5" />
-                          Plus ×{reveal.plusMultiplier}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-2 text-[13px] font-bold text-muted-foreground">
-                      {nextIn ? `Next gift in ${nextIn}h` : 'Next gift tomorrow'}
-                    </p>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="offer"
-                    exit={{ opacity: 0, y: -10 }}
-                    className="mt-4 flex w-full flex-col items-center"
-                  >
-                    <p className="text-[13px] font-black uppercase tracking-wider text-[#447d3f] dark:text-emerald-400">
-                      {firstGift ? 'Welcome gift' : 'Daily shop gift'}
-                    </p>
-                    <p className="mt-1 text-[26px] font-black leading-tight tracking-tight text-foreground">
-                      {notice
-                        ? notice.title
-                        : offerAmount > 0
-                          ? `${offerAmount} free flies`
-                          : 'Free flies'}
-                    </p>
-                    <p
-                      className={cn(
-                        'mt-1 text-sm font-semibold',
-                        error ? 'text-rose-500' : 'text-muted-foreground',
-                      )}
-                    >
-                      {notice?.body ??
-                        error ??
-                        (firstGift
-                          ? 'A first-visit bonus. Come back daily for more.'
-                          : 'Waiting for you today.')}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={notice ? close : collect}
-                      disabled={phase === 'claiming'}
-                      className={cn(
-                        'mt-5 h-14 w-full rounded-2xl text-lg font-black tracking-tight text-white transition-[transform,box-shadow] duration-100',
-                        'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40',
-                        '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none',
-                        'disabled:opacity-70',
-                      )}
-                    >
-                      {notice
-                        ? 'Got it'
-                        : phase === 'claiming'
-                          ? 'Opening…'
-                          : offerAmount > 0
-                            ? `Claim ${offerAmount} flies`
-                            : 'Claim'}
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <motion.div
+                initial={false}
+                animate={{ height: contentHeight }}
+                transition={{ type: 'spring', stiffness: 420, damping: 38 }}
+                className="w-full overflow-hidden"
+              >
+                <div ref={measureContent} className="pb-1">
+                  <AnimatePresence mode="wait" initial={false}>
+                    {revealed && reveal ? (
+                      <motion.div
+                        key="revealed"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 flex flex-col items-center"
+                      >
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-[40px] font-black leading-none tabular-nums text-foreground">
+                            +<AnimatedNumber value={shownAmount} />
+                          </span>
+                          <span className="text-lg font-black text-muted-foreground">flies</span>
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                          {reveal.lucky && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/25 px-2.5 py-1 text-[12px] font-black text-amber-700 dark:text-amber-300">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Lucky find ×{reveal.luckyMultiplier}
+                            </span>
+                          )}
+                          {reveal.plus && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-black text-emerald-700 dark:text-emerald-300">
+                              <Crown className="h-3.5 w-3.5" />
+                              Plus ×{reveal.plusMultiplier}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-[13px] font-bold text-muted-foreground">
+                          {nextIn ? `Next gift in ${nextIn}h` : 'Next gift tomorrow'}
+                        </p>
+                      </motion.div>
+                    ) : opening ? (
+                      <motion.div
+                        key="opening"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="mt-4 flex flex-col items-center"
+                      >
+                        <p className="text-[13px] font-black uppercase tracking-wider text-[#447d3f] dark:text-emerald-400">
+                          {firstGift ? 'Welcome gift' : 'Daily shop gift'}
+                        </p>
+                        <p className="mt-1 text-[26px] font-black leading-tight tracking-tight text-foreground">
+                          Opening…
+                        </p>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="offer"
+                        exit={{ opacity: 0, y: -10 }}
+                        className="mt-4 flex w-full flex-col items-center"
+                      >
+                        <p className="text-[13px] font-black uppercase tracking-wider text-[#447d3f] dark:text-emerald-400">
+                          {firstGift ? 'Welcome gift' : 'Daily shop gift'}
+                        </p>
+                        <p className="mt-1 text-[26px] font-black leading-tight tracking-tight text-foreground">
+                          {notice
+                            ? notice.title
+                            : offerAmount > 0
+                              ? `${offerAmount} free flies`
+                              : 'Free flies'}
+                        </p>
+                        <p
+                          className={cn(
+                            'mt-1 text-sm font-semibold',
+                            error ? 'text-rose-500' : 'text-muted-foreground',
+                          )}
+                        >
+                          {notice?.body ??
+                            error ??
+                            (firstGift
+                              ? 'A first-visit bonus. Come back daily for more.'
+                              : 'Waiting for you today.')}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={notice ? close : () => void collect()}
+                          disabled={phase === 'claiming'}
+                          className={cn(
+                            'mt-5 h-14 w-full rounded-2xl text-lg font-black tracking-tight text-white transition-[transform,box-shadow] duration-100',
+                            'bg-[#447d3f] shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40',
+                            '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#2c511a] active:translate-y-1 active:shadow-none',
+                            'disabled:opacity-70',
+                          )}
+                        >
+                          {notice
+                            ? 'Got it'
+                            : phase === 'claiming'
+                              ? 'Opening…'
+                              : offerAmount > 0
+                                ? `Claim ${offerAmount} flies`
+                                : 'Claim'}
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
             </div>
           </div>
         </motion.div>

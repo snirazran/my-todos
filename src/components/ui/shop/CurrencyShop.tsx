@@ -50,7 +50,11 @@ export function CurrencyShop() {
   const focusPackId = useUIStore((s) => s.flyShopFocusPackId);
   const { data: inventoryData } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
-  const remaining = target ? Math.max(0, target.price - balance) : (need ?? 0);
+  const needBaseRef = useRef<number | null>(null);
+  if (!open) needBaseRef.current = null;
+  else if (needBaseRef.current === null && inventoryData) needBaseRef.current = balance;
+  const earnedSinceOpen = needBaseRef.current === null ? 0 : Math.max(0, balance - needBaseRef.current);
+  const remaining = target ? Math.max(0, target.price - balance) : Math.max(0, (need ?? 0) - earnedSinceOpen);
   const [storePrices, setStorePrices] = useState<Partial<Record<FlyPackId, string>>>({});
   const [pricesLoading, setPricesLoading] = useState(true);
   const [priceError, setPriceError] = useState(false);
@@ -73,7 +77,7 @@ export function CurrencyShop() {
   const visiblePacks = focused
     ? [defaultPack, ...availablePacks.filter((pack) => pack.id !== defaultPack.id && pack.amount >= remaining)].slice(0, 2)
     : FLY_PACKS;
-  const goalReached = !!target && !!inventoryData && remaining === 0;
+  const goalReached = (!!target || !!need) && !!inventoryData && remaining === 0;
 
   useEffect(() => {
     sessionRef.current += 1;
@@ -212,10 +216,10 @@ export function CurrencyShop() {
 
           <div className="shrink-0 border-t border-border/60 bg-background px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
             <div aria-live="polite" className="mb-2 min-h-4 text-center text-xs font-semibold">
-              {status ? <span className={status.tone === 'error' ? 'text-destructive' : 'text-primary'}>{status.text}</span> : goalReached ? <span className="text-primary">You have enough for {target.name}</span> : remaining > 0 ? <span className="text-muted-foreground">{selected.amount >= remaining ? <><span className="font-black tabular-nums text-foreground">{(selected.amount - remaining).toLocaleString()}</span> flies left after your item</> : <>{(remaining - selected.amount).toLocaleString()} more still needed with this pack</>}</span> : <span className="text-muted-foreground">One-time purchase</span>}
+              {status ? <span className={status.tone === 'error' ? 'text-destructive' : 'text-primary'}>{status.text}</span> : goalReached ? <span className="text-primary">{target ? <>You have enough for {target.name}</> : 'You have enough flies now'}</span> : remaining > 0 ? <span className="text-muted-foreground">{selected.amount >= remaining ? <><span className="font-black tabular-nums text-foreground">{(selected.amount - remaining).toLocaleString()}</span> flies left after your item</> : <>{(remaining - selected.amount).toLocaleString()} more still needed with this pack</>}</span> : <span className="text-muted-foreground">One-time purchase</span>}
             </div>
             <button type="button" onClick={goalReached ? () => setOpen(false) : () => void buy()} disabled={busy || (!goalReached && !priceFor(selected.id))} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-sm font-black text-primary-foreground shadow-[0_4px_0_0_#2c511a] transition-[transform,opacity] active:translate-y-0.5 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-              {busy ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> {status?.text ?? 'Opening checkout…'}</> : goalReached ? 'Back to your item' : priceFor(selected.id) ? <>Get {selected.amount.toLocaleString()} flies <span className="opacity-60">·</span> {priceFor(selected.id)}</> : pricesLoading ? 'Loading prices…' : 'Packs unavailable'}
+              {busy ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> {status?.text ?? 'Opening checkout…'}</> : goalReached ? (target ? 'Back to your item' : 'Continue') : priceFor(selected.id) ? <>Get {selected.amount.toLocaleString()} flies <span className="opacity-60">·</span> {priceFor(selected.id)}</> : pricesLoading ? 'Loading prices…' : 'Packs unavailable'}
             </button>
           </div>
         </>

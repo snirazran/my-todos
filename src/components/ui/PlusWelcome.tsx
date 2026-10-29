@@ -162,7 +162,6 @@ function WelcomeContent({
                 width={170}
                 height={180}
                 indices={indices}
-                emote="loveOrbit"
                 greet="tada"
                 arrive="hop"
                 onArrived={() => setLanded(true)}

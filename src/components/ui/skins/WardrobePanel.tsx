@@ -1498,12 +1498,21 @@ function WardrobeManagerContent({
                 <WardrobeGridSkeleton />
               ) : (
                 <div className="flex flex-col gap-5 pb-4">
-                  {!isGuest && data.shopGift?.available && (
-                    <ShopGiftTile
-                      gift={data.shopGift}
-                      onClaim={() => setShopGiftClaimRequest((n) => n + 1)}
-                    />
-                  )}
+                  <AnimatePresence initial={false}>
+                    {!isGuest && data.shopGift?.available && (
+                      <motion.div
+                        key="shop-gift-tile"
+                        exit={{ opacity: 0, height: 0, marginBottom: -20 }}
+                        transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <ShopGiftTile
+                          gift={data.shopGift}
+                          onClaim={() => setShopGiftClaimRequest((n) => n + 1)}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   {showTryOnHint && (
                     <p className="-mb-2 flex items-center justify-center gap-1.5 text-[12px] font-bold text-muted-foreground">
                       <Shirt className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
@@ -1726,7 +1735,12 @@ function WardrobeManagerContent({
             balance={balance}
             busy={tryBuying}
             onBuy={() => void buyTriedOn()}
-            onGetFlies={(short) => openFlyShop(short)}
+            onGetFlies={(short) =>
+              openFlyShop(short, undefined, {
+                name: isItem ? tryTarget.item.name : tryTarget.bg.name,
+                price,
+              })
+            }
             onTradeUp={goToTradeUp}
             onClose={clearTryOn}
           />

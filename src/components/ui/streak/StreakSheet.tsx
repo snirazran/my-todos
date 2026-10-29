@@ -1059,7 +1059,7 @@ function CommitStep({
     hapticSelect();
     const longest = Math.max(...view.goalTiers.map((tier) => tier.days));
     frogRef.current?.fireEmote(
-      days >= longest ? 'surprised' : days === lowestTierDays ? 'hop' : 'loveHeartbeat',
+      days >= longest ? 'celebrate' : days === lowestTierDays ? 'hop' : 'love',
     );
   };
   const [error, setError] = useState<string | null>(null);

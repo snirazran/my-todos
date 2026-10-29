@@ -792,12 +792,12 @@ function ActionStages({
   const reduceMotion = useReducedMotion();
   const item = reduceMotion ? STAGE_ITEM_STILL : STAGE_ITEM;
   return (
-    <div className="grid">
+    <div className="grid grid-cols-1">
       <motion.div
         initial={false}
         animate={advanced ? { opacity: 0, scale: reduceMotion ? 1 : 0.96 } : { opacity: 1, scale: 1 }}
         transition={{ duration: 0.16, ease: 'easeOut' }}
-        className={cn('col-start-1 row-start-1 self-start', advanced && 'pointer-events-none')}
+        className={cn('col-start-1 row-start-1 min-w-0 self-start', advanced && 'pointer-events-none')}
       >
         <div inert={advanced} className="flex flex-col gap-1">
           {first}
@@ -810,7 +810,7 @@ function ActionStages({
           hidden: { transition: { staggerChildren: 0.02, staggerDirection: -1 } },
           shown: { transition: { delayChildren: 0.1, staggerChildren: 0.09 } },
         }}
-        className={cn('col-start-1 row-start-1 self-start', !advanced && 'pointer-events-none')}
+        className={cn('col-start-1 row-start-1 min-w-0 self-start', !advanced && 'pointer-events-none')}
       >
         <div inert={!advanced} className="flex flex-col items-center gap-2">
           {second.map((node, index) => (
@@ -1247,7 +1247,7 @@ export const RewardCard = ({
             transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
             className="flex min-h-24 flex-col items-center justify-center p-4 short-screen:min-h-0 short-screen:p-3 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5"
           >
-            <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white short-screen:text-xl">
+            <h3 className="mb-1.5 text-balance text-2xl font-black leading-[1.12] tracking-tight text-center text-slate-800 dark:text-white short-screen:text-xl">
               {prize.name}
             </h3>
             <p className="text-sm font-bold capitalize text-slate-500 dark:text-slate-400">
