@@ -52,6 +52,7 @@ const FrogLiveActivity = registerPlugin<FrogLiveActivityPlugin>('FrogLiveActivit
 
 let signature: string | null = null;
 let iosListenersReady = false;
+let straySwept = false;
 
 function isDocumentForegrounded(): boolean {
   return typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -81,6 +82,21 @@ export async function getCurrentLiveActivityState(): Promise<
     return await FrogLiveActivity.getState();
   } catch {
     return null;
+  }
+}
+
+export async function clearStrayLiveTimer(): Promise<void> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return;
+  if (signature !== null) return;
+  if (straySwept) {
+    const state = await getCurrentLiveActivityState();
+    if (!state?.active || signature !== null) return;
+  }
+  straySwept = true;
+  try {
+    await FrogLiveActivity.end();
+  } catch {
+    void 0;
   }
 }
 

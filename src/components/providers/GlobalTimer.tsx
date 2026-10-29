@@ -18,7 +18,7 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
-import { getCurrentLiveActivityState } from '@/lib/liveTimer';
+import { clearStrayLiveTimer, getCurrentLiveActivityState } from '@/lib/liveTimer';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -484,6 +484,7 @@ export function GlobalTimer() {
           store.setAwaitingDone(false);
           store.stopTimer();
           lastSyncedPendingRef.current = useFrogodoroStore.getState().pendingSync;
+          void clearStrayLiveTimer();
           return;
         }
 
@@ -495,6 +496,7 @@ export function GlobalTimer() {
           store.stopTimer();
           lastSyncedPendingRef.current = useFrogodoroStore.getState().pendingSync;
         }
+        void clearStrayLiveTimer();
         return;
       }
 
