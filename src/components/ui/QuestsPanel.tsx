@@ -2025,6 +2025,7 @@ function LockedPlusPreview({
                     } as Partial<Record<WardrobeSlot, number>>
                   }
                   arrive="hop"
+                  greet="hop"
                 />
               </div>
               {rewardCard(rewards[1], 1)}
@@ -2048,6 +2049,7 @@ function LockedPlusPreview({
                     } as Partial<Record<WardrobeSlot, number>>
                   }
                   arrive="hop"
+                  greet="hop"
                 />
               </div>
               <div className={frogOnLeft ? '' : 'order-1'}>

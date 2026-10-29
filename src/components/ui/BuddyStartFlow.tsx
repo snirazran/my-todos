@@ -252,9 +252,11 @@ function BuddyFlowScreen({
   }, [onClose]);
 
   useEffect(() => {
+    if (step === 'friend') frogRef.current?.fireEmote('hop');
+    if (step === 'send') frogRef.current?.fireEmote('love');
     if (step !== 'sent') return;
     hapticSuccess();
-    frogRef.current?.fireEmote('love');
+    frogRef.current?.fireEmote('loveBurst');
     if (reduceMotion) return;
     confetti({
       particleCount: 90,
@@ -711,6 +713,7 @@ function PondHeader({
           height={FROG_H}
           indices={indices}
           arrive="rise"
+          greet="hop"
           onArrived={() => setLanded(true)}
         />
       </div>

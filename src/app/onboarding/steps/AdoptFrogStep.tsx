@@ -23,6 +23,7 @@ import {
   hapticSuccess,
   hapticTick,
 } from '@/lib/haptics';
+import { pickEmote, type FrogEmote } from '@/lib/frogEmotes';
 import type { OnboardingStepProps } from './types';
 import {
   ONBOARDING_SUBTITLE_CLASS,
@@ -211,6 +212,11 @@ export default function AdoptFrogStep({
   const [editing, setEditing] = useState(false);
   const [lift, setLift] = useState(0);
   const [bump, setBump] = useState(0);
+  const [cue, setCue] = useState<FrogPose['cue']>(null);
+  const cueFrog = useCallback(
+    (emote: FrogEmote) => setCue({ emote, id: Date.now() }),
+    [],
+  );
   const [screen, setScreen] = useState<'color' | 'name'>(returning ? 'name' : 'color');
   const [swaps, setSwaps] = useState(0);
   const [skinLine, setSkinLine] = useState<{ id: number; text: string } | null>(null);
@@ -359,9 +365,10 @@ export default function AdoptFrogStep({
       rise: Math.round(frogBox.layoutWidth * FROG_RISE),
       peak: Math.round(Math.min(fromY, 0) - frogBox.layoutWidth * FROG_APEX),
       emote: love ? 'love' : null,
+      cue,
       bump,
     });
-  }, [frogBox, geometry, lift, frogMotion, clipped, love, bump, onFrogPose]);
+  }, [frogBox, geometry, lift, frogMotion, clipped, love, cue, bump, onFrogPose]);
 
   useEffect(() => {
     if (phase !== 'loading' || !geometry) return;
@@ -398,13 +405,14 @@ export default function AdoptFrogStep({
     later(LAND_MS, () => {
       hapticCelebrate();
       setLove(true);
+      cueFrog('tada');
       setPhase('naming');
       const { selections: current, onSelect: select, onGiftOpened: markOpened } = latest.current;
       markOpened();
       if (!current.frogName?.[0]) select('frogName', getRandomName());
     });
     later(SETTLE_MS, () => setFrogMotion('seated'));
-  }, [later, returning]);
+  }, [later, returning, cueFrog]);
 
   const open = () => {
     if (!canTapGift) return;
@@ -419,6 +427,7 @@ export default function AdoptFrogStep({
     hapticSelect();
     onSelect('frogSkin', key);
     setBump((n) => n + 1);
+    cueFrog(pickEmote('tryOn'));
     const lines = SKIN_LINES[key];
     const turn = skinLineTurn.current[key];
     skinLineTurn.current[key] = turn + 1;
@@ -434,6 +443,7 @@ export default function AdoptFrogStep({
   const shuffleName = () => {
     hapticSelect();
     setSpins((n) => n + 1);
+    cueFrog('question');
     if (frogName && !reduceMotion) {
       setGhost({ id: Date.now(), text: frogName });
       inputRef.current?.animate(NAME_IN, {
@@ -460,6 +470,7 @@ export default function AdoptFrogStep({
     setLove(false);
     setSkinLine(null);
     hapticSuccess();
+    cueFrog('loveHeartbeat');
     later(HANDOFF_MS, () => latest.current.onNext());
   };
 

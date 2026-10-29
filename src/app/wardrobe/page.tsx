@@ -10,6 +10,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { DEFAULT_BACKGROUND_IMAGES, useBackgrounds } from '@/hooks/useBackgrounds';
 import { useWardrobeTryOn, WARDROBE_EQUIPPED_EVENT } from '@/lib/wardrobeTryOnStore';
+import { pickEmote } from '@/lib/frogEmotes';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 import { useUIStore } from '@/lib/uiStore';
 import { WardrobePageSkeleton } from '@/components/ui/Skeleton';
@@ -79,8 +80,17 @@ function WardrobePageInner() {
 
   const purchaseBurst = usePurchaseCelebration();
 
+  const tryOnKey = !tryOn
+    ? null
+    : tryOn.kind === 'item'
+      ? `${tryOn.slot}:${tryOn.riveIndex}`
+      : tryOn.id;
   useEffect(() => {
-    const onEquipped = () => frogRef.current?.fireEmote('love');
+    if (tryOnKey) frogRef.current?.fireEmote(pickEmote('tryOn'), { soft: true });
+  }, [tryOnKey]);
+
+  useEffect(() => {
+    const onEquipped = () => frogRef.current?.fireEmote(pickEmote('equip'));
     window.addEventListener(WARDROBE_EQUIPPED_EVENT, onEquipped);
     return () => window.removeEventListener(WARDROBE_EQUIPPED_EVENT, onEquipped);
   }, []);
@@ -114,6 +124,8 @@ function WardrobePageInner() {
                 mouthOpen={frogMouthOpen}
                 indices={stageIndices}
                 paused={false}
+                stage
+                fidget
               />
             </div>
           </div>

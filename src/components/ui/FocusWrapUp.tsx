@@ -66,6 +66,7 @@ const CLOSE_SHIELD_MS = 450;
 const OTHERS_SHOWN = 4;
 const BREAK_IDEA_DELAY_MS = 6500;
 const CHEER_MS = 2600;
+const LONG_FOCUS_SECONDS = 45 * 60;
 const EXPAND_EASE = [0.32, 0.72, 0, 1] as const;
 const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
 const POP = { type: 'spring', stiffness: 420, damping: 22 } as const;
@@ -494,7 +495,7 @@ export function FocusWrapUp({
     setFinishedIds(next);
     if (nowDone) {
       hapticSuccess();
-      frogRef.current?.fireEmote('love');
+      frogRef.current?.fireEmote(isSubject ? 'celebrate' : 'hop');
       setLine(
         isSubject
           ? pickWrapUpLine('subjectDone', task.text)
@@ -825,6 +826,7 @@ export function FocusWrapUp({
                 height={frogHeight}
                 indices={frogIndices}
                 emote={cheering ? 'love' : null}
+                greet={(review?.focusSeconds ?? 0) >= LONG_FOCUS_SECONDS ? 'tada' : 'celebrate'}
                 ignoreIdlePause
                 onDressed={() => setFrogDressed(true)}
               />

@@ -492,6 +492,7 @@ function LoginPageInner() {
               mouthOpen={!!grab}
               mouthOffset={tongueMouthOffset}
               indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+              greet="hop"
             />
           </div>
         </div>

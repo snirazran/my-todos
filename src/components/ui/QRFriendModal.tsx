@@ -207,6 +207,7 @@ function MyCodeView({
             height={isDesktop ? 259 : 169}
             indices={indices}
             arrive="drop"
+            greet="loveHeartbeat"
           />
         </div>
 

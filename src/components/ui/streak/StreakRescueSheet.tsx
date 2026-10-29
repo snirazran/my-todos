@@ -136,7 +136,6 @@ export function StreakRescueSheet({
     }
     if (result.completed) {
       setSaved(result);
-      frogRef.current?.fireEmote('love');
       confetti({
         particleCount: 120,
         spread: 90,
@@ -199,6 +198,7 @@ export function StreakRescueSheet({
                     indices={indices}
                     emote="love"
                     arrive="hop"
+                    greet="tada"
                   />
                   <div className="relative mt-2 flex items-center gap-3">
                     <Flame className="h-16 w-16 fill-yellow-200 text-yellow-100 drop-shadow-[0_3px_10px_rgba(255,200,50,0.55)]" />

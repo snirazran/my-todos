@@ -725,7 +725,9 @@ function RevealStep({
   useEffect(() => {
     if (!readyToPop || popped) return;
     setPopped(true);
-    frogRef.current?.fireEmote('love');
+    frogRef.current?.fireEmote(
+      view.count > 1 && view.count >= view.longestStreak ? 'tada' : 'celebrate',
+    );
     confetti({
       particleCount: 110,
       spread: 90,
@@ -1055,7 +1057,10 @@ function CommitStep({
     setSelectedDays(days);
     setError(null);
     hapticSelect();
-    frogRef.current?.fireEmote('love');
+    const longest = Math.max(...view.goalTiers.map((tier) => tier.days));
+    frogRef.current?.fireEmote(
+      days >= longest ? 'surprised' : days === lowestTierDays ? 'hop' : 'loveHeartbeat',
+    );
   };
   const [error, setError] = useState<string | null>(null);
   const selectedTier =
@@ -1140,6 +1145,7 @@ function CommitStep({
                   height={frogHeight}
                   indices={indices}
                   arrive="hop"
+                  greet="question"
                   onArrived={() => setFrogLanded(true)}
                 />
               </div>

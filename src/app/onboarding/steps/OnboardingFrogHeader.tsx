@@ -1,11 +1,22 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
+import type {
+  FrogEmote,
+  FrogEmoteLoop,
+  FrogHandle,
+  WardrobeSlot,
+} from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -86,15 +97,17 @@ export type FrogPose = {
   fromY: number;
   rise: number;
   peak: number;
-  emote: FrogEmote | null;
+  emote: FrogEmoteLoop | null;
+  cue: { emote: FrogEmote; id: number } | null;
   bump: number;
 };
 
 type StageProps = {
   indices?: Partial<Record<WardrobeSlot, number>>;
-  emote?: FrogEmote | null;
+  emote?: FrogEmoteLoop | null;
   hidden?: boolean;
   pose?: FrogPose | null;
+  frogRef?: RefObject<FrogHandle | null>;
 };
 
 const poseTransition = (motion: FrogPose['motion']) =>
@@ -107,7 +120,14 @@ export function OnboardingFrogStage({
   emote = null,
   hidden = false,
   pose = null,
+  frogRef,
 }: StageProps) {
+  const ownFrogRef = useRef<FrogHandle>(null);
+  const stageFrogRef = frogRef ?? ownFrogRef;
+  const cue = pose?.cue ?? null;
+  useEffect(() => {
+    if (cue) stageFrogRef.current?.fireEmote(cue.emote);
+  }, [cue, stageFrogRef]);
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const frogWidth = isDesktop ? 280 : 230;
   const frogHeight = isDesktop ? 315 : 259;
@@ -157,6 +177,7 @@ export function OnboardingFrogStage({
           }
         >
           <Frog
+            ref={stageFrogRef}
             width={frogWidth}
             height={frogHeight}
             indices={indices}

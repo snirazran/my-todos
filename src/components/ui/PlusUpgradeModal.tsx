@@ -1002,7 +1002,7 @@ function FrogBand({ line, desktop = false }: { line: string; desktop?: boolean }
           <motion.div initial={reduceMotion ? false : { y: depth }} animate={hop} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
             {ready ? (
               <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
-                paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
+                paused={!!reduceMotion} emote={reduceMotion ? null : 'loveOrbit'}
                 ignoreIdlePause onDressed={() => setDressed(true)} />
             ) : null}
             {landedOnce ? (
@@ -1234,7 +1234,7 @@ function TrialPromise({ line }: { line: string }) {
         <motion.div initial={reduceMotion ? false : { y: 110 }} animate={arrive} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2), width: size, height, marginLeft: -size / 2 }}>
           {ready ? (
             <Frog width={size} height={height} indices={look.indices} visualOffsetY={-5}
-              paused={!!reduceMotion} emote={reduceMotion ? null : 'love'}
+              paused={!!reduceMotion} emote={reduceMotion ? null : 'loveOrbit'}
               ignoreIdlePause onDressed={() => setDressed(true)} />
           ) : null}
           {landed ? <PremiumFrogAura show alwaysPlay paused={!!reduceMotion} flySize={40} className="[--premium-fly-top:12%] [--premium-fly-x-max:44px] [--premium-fly-x-min:-58px] [--premium-fly-y-max:18px] [--premium-fly-y-min:0px]" /> : null}

@@ -24,7 +24,8 @@ import {
   type FrogPose,
 } from './steps/OnboardingFrogHeader';
 import { cn } from '@/lib/utils';
-import type { FrogEmote } from '@/components/ui/frog';
+import type { FrogEmote, FrogEmoteLoop, FrogHandle } from '@/components/ui/frog';
+import { pickEmote } from '@/lib/frogEmotes';
 import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
@@ -53,11 +54,20 @@ const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'cr
 
 const CELEBRATION_MS = 3000;
 
-const STEP_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
+const STEP_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmoteLoop>> = {
   humanName: 'love',
   aboutIntro: 'love',
-  age: 'question',
 };
+
+const STEP_ENTRY_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
+  humanName: 'loveShy',
+  aboutIntro: 'hop',
+  age: 'question',
+  notifications: 'question',
+  createAccount: 'loveHeartbeat',
+};
+const STEP_ENTRY_DELAY_MS = 380;
+const FREE_TEXT_ANSWERS = new Set(['humanName', 'frogName', 'frogSkin', 'starterPlan', 'starterPlanChoice']);
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -159,6 +169,18 @@ export default function OnboardingPage() {
   );
 
   const currentId = stepIds[step] ?? stepIds[stepIds.length - 1];
+  const frogRef = useRef<FrogHandle>(null);
+
+  useEffect(() => {
+    const emote = STEP_ENTRY_EMOTES[currentId];
+    if (!emote || celebrating) return;
+    const t = window.setTimeout(() => frogRef.current?.fireEmote(emote), STEP_ENTRY_DELAY_MS);
+    return () => window.clearTimeout(t);
+  }, [currentId, celebrating]);
+
+  useEffect(() => {
+    if (celebrating) frogRef.current?.fireEmote('tada');
+  }, [celebrating]);
 
   useEffect(() => {
     trackAnalyticsEvent('onboarding_step_viewed', {
@@ -198,6 +220,11 @@ export default function OnboardingPage() {
   };
 
   const onSelect = (stepId: string, optionId: string, multiSelect = false) => {
+    const answering =
+      optionId !== '__clear__' &&
+      !FREE_TEXT_ANSWERS.has(stepId) &&
+      !(selections[stepId] ?? []).includes(optionId);
+    if (answering) frogRef.current?.fireEmote(pickEmote('pick'), { soft: multiSelect });
     setSelections((prev) => {
       const existing = prev[stepId] ?? [];
       if (optionId === '__clear__') {
@@ -445,7 +472,8 @@ export default function OnboardingPage() {
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
         <OnboardingFrogStage
           indices={stageIndices}
-          emote={celebrating ? 'love' : (STEP_EMOTES[currentId] ?? null)}
+          frogRef={frogRef}
+          emote={celebrating ? 'loveOrbit' : (STEP_EMOTES[currentId] ?? null)}
           hidden={
             paywallOpen ||
             (!celebrating && ((currentId === 'name' && !frogPose) || currentId === 'plan'))

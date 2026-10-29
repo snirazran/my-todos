@@ -303,6 +303,7 @@ export default function FlyCatchGame({
   const finishGame = useCallback(() => {
     if (phaseRef.current !== 'playing') return;
     setPhase('result');
+    frogRef.current?.fireEmote('celebrate');
     cancelAnimationFrame(rafRef.current);
     const stats = {
       ...statsRef.current,
@@ -357,6 +358,7 @@ export default function FlyCatchGame({
       setRewardAmount(data.reward ?? result.score);
       const verifiedPersonalBest = Boolean(data.personalBest);
       setPersonalBest(verifiedPersonalBest);
+      if (verifiedPersonalBest) frogRef.current?.fireEmote('tada');
       const pending = {
         ...session,
         score: data.reward ?? result.score,
@@ -505,6 +507,7 @@ export default function FlyCatchGame({
 
     setCountdown(3);
     setPhase('countdown');
+    frogRef.current?.fireEmote('hop');
     for (let value = 3; value >= 1; value--) {
       setCountdown(value);
       hapticTick();
@@ -790,6 +793,7 @@ export default function FlyCatchGame({
                     mouthOpen={!!tongue}
                     mouthOffset={FLY_GAME_MOUTH_OFFSET}
                     ignoreIdlePause
+                    pokeable={phase !== 'playing'}
                   />
                   </div>
                   <div data-fly-game-card className={cn('relative z-10 grid h-16 grid-cols-2 items-center rounded-[20px] border border-white/30 bg-card/85 px-3 shadow-lg backdrop-blur-2xl', entering && 'opacity-0')}>

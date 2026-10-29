@@ -209,6 +209,8 @@ export function FrogDisplay({
             indices={indices}
             paused={paused}
             ignoreIdlePause={timerLive}
+            stage
+            fidget
           />
         </div>
 

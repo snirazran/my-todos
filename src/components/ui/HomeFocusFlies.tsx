@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FrogHandle } from '@/components/ui/frog';
+import { pickEmote } from '@/lib/frogEmotes';
 import type { TongueRequest } from '@/hooks/useFrogTongue';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
@@ -215,7 +216,7 @@ export function HomeFocusFlies({
         },
       });
     } else {
-      frogRef.current?.fireEmote('love');
+      frogRef.current?.fireEmote(pickEmote('catch'));
       setSettledCaught(caughtNow);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,7 +243,10 @@ export function HomeFocusFlies({
         key: MISS_KEY,
         completed: false,
         silent: true,
-        onPersist: () => setMissPos(null),
+        onPersist: () => {
+          setMissPos(null);
+          frogRef.current?.fireEmote(pickEmote('miss'), { soft: true });
+        },
       });
     });
     return true;

@@ -234,7 +234,6 @@ export function LeapStageBody({
       () => {
         setLanded(true);
         if (!celebrate || quiet) return;
-        frogRef.current?.fireEmote('love');
         hapticCelebrate();
         if (!reduceMotion) {
           void confetti({
@@ -330,6 +329,7 @@ export function LeapStageBody({
           arrive="hop"
           arriveDelay={180}
           holdArrival={!landed}
+          greet={quiet ? null : celebrate ? (moves ? 'tada' : 'celebrate') : 'loveHeartbeat'}
         />
       </div>
       {landed && (

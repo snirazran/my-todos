@@ -11,11 +11,13 @@ import {
   Layout,
   Fit,
   Alignment,
+  EventType,
   useRive,
   useStateMachineInput,
   useViewModel,
   useViewModelInstance,
   useViewModelInstanceBoolean,
+  useViewModelInstanceEnum,
   useViewModelInstanceNumber,
   useViewModelInstanceTrigger,
 } from '@rive-app/react-canvas-lite';
@@ -25,6 +27,20 @@ import { useSheetEntered } from '@/lib/sheetEntered';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
+import { hapticTick } from '@/lib/haptics';
+import {
+  EMOTE_MS,
+  cutsIn,
+  onFrogReact,
+  outranks,
+  pickEmote,
+  registerPokeable,
+  takeGreeting,
+  type FrogEmote,
+  type FrogEmoteLoop,
+} from '@/lib/frogEmotes';
+
+export type { FrogEmote, FrogEmoteLoop } from '@/lib/frogEmotes';
 
 // Stable layout constant — defined once at module level to prevent useRive from seeing
 // a new object reference on every render, which can cause unnecessary reinitialization.
@@ -70,7 +86,9 @@ const DATA_BINDINGS: Record<WardrobeSlot, string> = {
   hand_item: 'handItem',
 };
 
-export type FrogEmote = 'love' | 'question';
+const EMOTE_BINDING = 'emote';
+const EMOTE_LOOP_BINDING = 'emoteLoop';
+const PLAY_EMOTE_BINDING = 'playEmote';
 
 const EMOTE_BINDINGS = {
   loveOnce: 'emoteLove',
@@ -78,6 +96,24 @@ const EMOTE_BINDINGS = {
   loveRepeat: 'emoteLoveRepeat',
   questionRepeat: 'emoteQuestionRepeat',
 } as const;
+
+const EMOTE_YIELD_AT = 0.7;
+const PENDING_EMOTE_TTL_MS = 6000;
+const PENDING_EMOTE_DELAY_MS = 320;
+const QUEUED_EMOTE_GAP_MS = 120;
+const QUEUED_EMOTE_RETRY_MS = 250;
+const GREET_DELAY_MS = 450;
+const POKE_CHAIN_MS = 1500;
+const POKE_SETTLE_AT = 0.45;
+const POKE_FLUSTERED = 4;
+const POKE_DIZZY = 6;
+const WAKE_SURPRISE_MS = 2500;
+const SLEEP_EXIT_MS = 1350;
+const FIDGET_MIN_MS = 22000;
+const FIDGET_SPAN_MS = 26000;
+const FIDGET_QUIET_MS = 15000;
+
+type EmoteMode = 'queue' | 'force' | 'ambient';
 
 /** Artboard pixel dimensions + anchor (artboard coords) */
 const ARTBOARD_WIDTH = 128;
@@ -120,8 +156,10 @@ export interface FrogHandle {
   hitTest: (clientX: number, clientY: number) => boolean;
   /** Imperatively set a slot to a numeric index (Rive input value) */
   setSlotIndex: (slot: WardrobeSlot, index: number) => void;
-  /** Fire a one-shot emote trigger (plays exactly one run in Rive) */
-  fireEmote: (emote: FrogEmote) => void;
+  /** Play a one-shot emote; a smaller one never cuts off a bigger one.
+   *  `soft` plays only when nothing else is playing. */
+  fireEmote: (emote: FrogEmote, options?: { soft?: boolean }) => boolean;
+  poke: () => void;
 }
 
 interface FrogProps {
@@ -135,8 +173,16 @@ interface FrogProps {
 
   /** Controlled numeric indices per slot (optional) */
   indices?: Partial<Record<WardrobeSlot, number>>;
-  /** Looping emote held on while mounted (emoteLoveRepeat / emoteQuestionRepeat) */
-  emote?: FrogEmote | null;
+  /** Looping emote held on while mounted (emoteLoop) */
+  emote?: FrogEmoteLoop | null;
+  /** One-shot played once the frog has arrived (or is dressed) */
+  greet?: FrogEmote | null;
+  /** React to taps on the painted frog. Paused frogs never react. */
+  pokeable?: boolean;
+  /** Occasional small idle emotes while nobody is interacting with it */
+  fidget?: boolean;
+  /** The page's main frog: greets the user and plays frogReact() moments */
+  stage?: boolean;
   /** Keep animating through the global idle pause — for focus-session frogs
    *  that must stay alive while the user is AFK watching the timer. */
   ignoreIdlePause?: boolean;
@@ -163,6 +209,10 @@ const Frog = memo(
       paused = false,
       indices,
       emote = null,
+      greet = null,
+      pokeable = true,
+      fidget = false,
+      stage = false,
       ignoreIdlePause = false,
       onDressed,
       placeholder = false,
@@ -309,15 +359,45 @@ const Frog = memo(
       BREATHING_BINDING,
       viewModelInstance,
     );
+    const emoteBinding = useViewModelInstanceEnum(
+      EMOTE_BINDING,
+      viewModelInstance,
+    );
+    const emoteLoopBinding = useViewModelInstanceEnum(
+      EMOTE_LOOP_BINDING,
+      viewModelInstance,
+    );
+    const { trigger: triggerPlayEmote } = useViewModelInstanceTrigger(
+      PLAY_EMOTE_BINDING,
+      viewModelInstance,
+    );
 
+    const loopSupported = emoteLoopBinding.value !== null;
+    const setEmoteLoop = emoteLoopBinding.setValue;
+    const loveRepeatReady = loveRepeatBinding.value !== null;
+    const setLoveRepeat = loveRepeatBinding.setValue;
+    const questionRepeatReady = questionRepeatBinding.value !== null;
+    const setQuestionRepeat = questionRepeatBinding.setValue;
     useEffect(() => {
-      if (loveRepeatBinding.value !== null) {
-        loveRepeatBinding.setValue(emote === 'love');
+      if (loopSupported) {
+        setEmoteLoop(emote ?? 'none');
+        return;
       }
-      if (questionRepeatBinding.value !== null) {
-        questionRepeatBinding.setValue(emote === 'question');
+      if (loveRepeatReady) {
+        setLoveRepeat(emote === 'love' || emote === 'loveOrbit');
       }
-    }, [emote, loveRepeatBinding, questionRepeatBinding]);
+      if (questionRepeatReady) {
+        setQuestionRepeat(emote === 'question');
+      }
+    }, [
+      emote,
+      loopSupported,
+      setEmoteLoop,
+      loveRepeatReady,
+      setLoveRepeat,
+      questionRepeatReady,
+      setQuestionRepeat,
+    ]);
 
     // A .riv with the sleeping binding choreographs its own idle (sleep pose,
     // then freeze); older exports fall back to the hook's immediate pause.
@@ -336,6 +416,7 @@ const Frog = memo(
     /* ---- idle sleep: play emote_sleep_entry, freeze on the sleeping pose;
        waking resumes playback and lets emote_sleep_exit run ---- */
     const sleepPausedRef = useRef(false);
+    const wokeAtRef = useRef(0);
     useEffect(() => {
       if (!rive || !sleepSupported || ignoreIdlePause) return;
       if (idle && !paused) {
@@ -349,6 +430,7 @@ const Frog = memo(
       sleepingBinding.setValue(0);
       if (sleepPausedRef.current) {
         sleepPausedRef.current = false;
+        wokeAtRef.current = performance.now();
         rive.play();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -510,34 +592,282 @@ const Frog = memo(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rive, paused, setBoundSlotIndex]);
 
-    /* ---- expose helpers to parent ---- */
-    useImperativeHandle(ref, () => ({
-      getMouthPoint() {
-        const el = wrapperRef.current;
-        if (!el) return { x: 0, y: 0 };
-        const rect = el.getBoundingClientRect();
-        const sx = rect.width / ARTBOARD_WIDTH;
-        const sy = rect.height / ARTBOARD_HEIGHT;
-        const scale = Math.min(sx, sy);
-        const drawW = ARTBOARD_WIDTH * scale;
-        const drawH = ARTBOARD_HEIGHT * scale;
-        const drawLft = rect.left + (rect.width - drawW) / 2;
-        const drawTop = rect.top + (rect.height - drawH) / 2;
+    /* ---- one-shot emotes: enum + playEmote, ranked so small ones never
+       cut off big ones, queued behind whatever the emote layer is playing ---- */
+    const reduceMotion = useReducedMotion();
+    const activeEmoteRef = useRef<{ name: FrogEmote; at: number } | null>(
+      null,
+    );
+    const pendingEmoteRef = useRef<{ name: FrogEmote; at: number } | null>(
+      null,
+    );
+    const queuedEmoteRef = useRef<{
+      name: FrogEmote;
+      at: number;
+      timer: number;
+    } | null>(null);
+    const emoteIdleRef = useRef(true);
+    const mouthOpenRef = useRef(!!mouthOpen);
+    mouthOpenRef.current = !!mouthOpen;
+    const loopHeldRef = useRef(emote);
+    loopHeldRef.current = emote;
 
-        const cx = drawLft + MOUTH_TARGET_X * scale;
-        const cy = drawTop + MOUTH_TARGET_Y * scale + resolvedVisualOffsetY;
-        const ox = mouthOffset?.x ?? 0;
-        const oy = mouthOffset?.y ?? 0;
-        const moodAdj =
-          moodIndexRef.current === HUNGRY_MOOD_INDEX ? MOUTH_HUNGRY_Y_ADJ : 0;
-        return { x: Math.round(cx + ox), y: Math.round(cy + oy + moodAdj) };
-      },
-      getBoxRect() {
-        return (
-          wrapperRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0)
+    const canAnimate = () =>
+      !!rive &&
+      dressedRef.current &&
+      rive.isPlaying &&
+      !(
+        sleepSupported &&
+        !ignoreIdlePause &&
+        useRiveIdlePause.getState().idle
+      );
+
+    const playNow = (name: FrogEmote) => {
+      if (emoteBinding.value !== null) {
+        emoteBinding.setValue(name);
+        triggerPlayEmote();
+      } else if (name === 'question') {
+        triggerEmoteQuestion();
+      } else {
+        triggerEmoteLove();
+      }
+      activeEmoteRef.current = { name, at: performance.now() };
+    };
+
+    const playQueued = () => {
+      const queued = queuedEmoteRef.current;
+      if (!queued) return;
+      window.clearTimeout(queued.timer);
+      if (
+        loopHeldRef.current ||
+        performance.now() - queued.at > PENDING_EMOTE_TTL_MS
+      ) {
+        queuedEmoteRef.current = null;
+        return;
+      }
+      if (!emoteIdleRef.current || !canAnimate()) {
+        queued.timer = window.setTimeout(
+          () => playQueuedRef.current(),
+          QUEUED_EMOTE_RETRY_MS,
         );
+        return;
+      }
+      queuedEmoteRef.current = null;
+      playNow(queued.name);
+    };
+    const playQueuedRef = useRef(playQueued);
+    playQueuedRef.current = playQueued;
+
+    useEffect(
+      () => () => {
+        if (queuedEmoteRef.current) {
+          window.clearTimeout(queuedEmoteRef.current.timer);
+        }
       },
-      hitTest(clientX, clientY) {
+      [],
+    );
+
+    useEffect(() => {
+      if (!rive) return;
+      emoteIdleRef.current = true;
+      let bodyBusy = false;
+      const onStateChange = (event: { data?: unknown }) => {
+        const states = Array.isArray(event.data) ? (event.data as string[]) : [];
+        let emoteState: string | null = null;
+        for (const state of states) {
+          if (state === 'body_anim') {
+            bodyBusy = true;
+          } else if (state === 'emote_idle' && bodyBusy) {
+            bodyBusy = false;
+          } else if (state.indexOf('emote_') === 0) {
+            emoteState = state;
+          }
+        }
+        if (!emoteState) return;
+        emoteIdleRef.current = emoteState === 'emote_idle';
+        const queued = queuedEmoteRef.current;
+        if (!emoteIdleRef.current || !queued) return;
+        window.clearTimeout(queued.timer);
+        queued.timer = window.setTimeout(
+          () => playQueuedRef.current(),
+          QUEUED_EMOTE_GAP_MS,
+        );
+      };
+      rive.on(EventType.StateChange, onStateChange);
+      return () => rive.off(EventType.StateChange, onStateChange);
+    }, [rive]);
+
+    const requestEmote = (name: FrogEmote, mode: EmoteMode = 'queue') => {
+      const now = performance.now();
+      if (!canAnimate()) {
+        if (mode !== 'queue') return false;
+        const pending = pendingEmoteRef.current;
+        if (!pending || outranks(name, pending.name)) {
+          pendingEmoteRef.current = { name, at: now };
+        }
+        return false;
+      }
+      const ordered = emoteBinding.value !== null && !cutsIn(name);
+      if (ordered && loopHeldRef.current) return false;
+      const active = activeEmoteRef.current;
+      const activeLeft = active
+        ? active.at + EMOTE_MS[active.name] - now
+        : 0;
+      const busy = activeLeft > 0 || !emoteIdleRef.current;
+      if (mode === 'ambient' && (busy || mouthOpenRef.current)) return false;
+      if (
+        mode === 'queue' &&
+        active &&
+        activeLeft > EMOTE_MS[active.name] * (1 - EMOTE_YIELD_AT) &&
+        !outranks(name, active.name)
+      ) {
+        return false;
+      }
+      if (ordered && busy) {
+        const queued = queuedEmoteRef.current;
+        if (queued && !outranks(name, queued.name)) return false;
+        if (queued) window.clearTimeout(queued.timer);
+        queuedEmoteRef.current = {
+          name,
+          at: now,
+          timer: window.setTimeout(
+            () => playQueuedRef.current(),
+            Math.max(0, activeLeft) + QUEUED_EMOTE_GAP_MS,
+          ),
+        };
+        return true;
+      }
+      playNow(name);
+      return true;
+    };
+    const requestEmoteRef = useRef(requestEmote);
+    requestEmoteRef.current = requestEmote;
+
+    const flushPendingEmote = React.useCallback(() => {
+      const pending = pendingEmoteRef.current;
+      if (!pending) return;
+      window.setTimeout(() => {
+        if (pendingEmoteRef.current !== pending) return;
+        if (performance.now() - pending.at > PENDING_EMOTE_TTL_MS) {
+          pendingEmoteRef.current = null;
+          return;
+        }
+        if (!requestEmoteRef.current(pending.name, 'force')) return;
+        pendingEmoteRef.current = null;
+      }, PENDING_EMOTE_DELAY_MS);
+    }, []);
+
+    useEffect(() => {
+      if (!rive) return;
+      rive.on(EventType.Play, flushPendingEmote);
+      return () => rive.off(EventType.Play, flushPendingEmote);
+    }, [rive, flushPendingEmote]);
+
+    useEffect(() => {
+      if (dressed && !paused && !idle) flushPendingEmote();
+    }, [dressed, paused, idle, flushPendingEmote]);
+
+    const greetRef = useRef(greet);
+    greetRef.current = greet;
+    const playGreet = React.useCallback(() => {
+      const name = greetRef.current;
+      if (!name) return;
+      window.setTimeout(
+        () => requestEmoteRef.current(name),
+        GREET_DELAY_MS,
+      );
+    }, []);
+
+    useEffect(() => {
+      if (!stage) return;
+      return onFrogReact((name) => requestEmoteRef.current(name));
+    }, [stage]);
+
+    useEffect(() => {
+      if (!stage || !dressed) return;
+      const greetUser = () => {
+        if (document.visibilityState !== 'visible') return;
+        const name = takeGreeting();
+        if (!name) return;
+        window.setTimeout(
+          () => requestEmoteRef.current(name),
+          GREET_DELAY_MS,
+        );
+      };
+      greetUser();
+      document.addEventListener('visibilitychange', greetUser);
+      return () => document.removeEventListener('visibilitychange', greetUser);
+    }, [stage, dressed]);
+
+    useEffect(() => {
+      if (!fidget || reduceMotion || paused) return;
+      let t = 0;
+      const schedule = () => {
+        t = window.setTimeout(() => {
+          const active = activeEmoteRef.current;
+          const quietFor = active
+            ? performance.now() - active.at
+            : Number.POSITIVE_INFINITY;
+          if (
+            quietFor > FIDGET_QUIET_MS &&
+            document.visibilityState === 'visible'
+          ) {
+            requestEmoteRef.current(
+              pickEmote(
+                moodIndexRef.current === HUNGRY_MOOD_INDEX
+                  ? 'fidgetHungry'
+                  : 'fidget',
+              ),
+              'ambient',
+            );
+          }
+          schedule();
+        }, FIDGET_MIN_MS + Math.random() * FIDGET_SPAN_MS);
+      };
+      schedule();
+      return () => window.clearTimeout(t);
+    }, [fidget, reduceMotion, paused]);
+
+    const pokeStateRef = useRef({ count: 0, last: 0, calmAt: 0 });
+    const poke = () => {
+      const now = performance.now();
+      const state = pokeStateRef.current;
+      if (now < state.calmAt) return;
+      state.count = now - state.last < POKE_CHAIN_MS ? state.count + 1 : 1;
+      state.last = now;
+      hapticTick();
+      const active = activeEmoteRef.current;
+      if (state.count >= POKE_DIZZY) {
+        const activeLeft = active
+          ? Math.max(0, active.at + EMOTE_MS[active.name] - now)
+          : 0;
+        state.count = 0;
+        state.calmAt = now + activeLeft + EMOTE_MS.dizzy;
+        requestEmote('dizzy', 'force');
+        return;
+      }
+      const sinceWake = now - wokeAtRef.current;
+      if (sinceWake < WAKE_SURPRISE_MS) {
+        wokeAtRef.current = 0;
+        window.setTimeout(
+          () => requestEmoteRef.current('surprised', 'force'),
+          Math.max(0, SLEEP_EXIT_MS - sinceWake),
+        );
+        return;
+      }
+      if (active && now - active.at < EMOTE_MS[active.name] * POKE_SETTLE_AT) {
+        return;
+      }
+      requestEmote(
+        state.count >= POKE_FLUSTERED ? 'sweat' : pickEmote('poke'),
+        'force',
+      );
+    };
+    const pokeRef = useRef(poke);
+    pokeRef.current = poke;
+
+    const hitTestCanvas = React.useCallback(
+      (clientX: number, clientY: number) => {
         const canvas = wrapperRef.current?.querySelector('canvas');
         if (!canvas) return false;
         const rect = canvas.getBoundingClientRect();
@@ -565,16 +895,58 @@ const Frog = memo(
           return true;
         }
       },
+      [],
+    );
+
+    const pokeEnabled = pokeable && !paused;
+    useEffect(() => {
+      if (!pokeEnabled) return;
+      return registerPokeable({
+        element: () => wrapperRef.current,
+        hitTest: hitTestCanvas,
+        poke: () => pokeRef.current(),
+      });
+    }, [pokeEnabled, hitTestCanvas]);
+
+    /* ---- expose helpers to parent ---- */
+    useImperativeHandle(ref, () => ({
+      getMouthPoint() {
+        const el = wrapperRef.current;
+        if (!el) return { x: 0, y: 0 };
+        const rect = el.getBoundingClientRect();
+        const sx = rect.width / ARTBOARD_WIDTH;
+        const sy = rect.height / ARTBOARD_HEIGHT;
+        const scale = Math.min(sx, sy);
+        const drawW = ARTBOARD_WIDTH * scale;
+        const drawH = ARTBOARD_HEIGHT * scale;
+        const drawLft = rect.left + (rect.width - drawW) / 2;
+        const drawTop = rect.top + (rect.height - drawH) / 2;
+
+        const cx = drawLft + MOUTH_TARGET_X * scale;
+        const cy = drawTop + MOUTH_TARGET_Y * scale + resolvedVisualOffsetY;
+        const ox = mouthOffset?.x ?? 0;
+        const oy = mouthOffset?.y ?? 0;
+        const moodAdj =
+          moodIndexRef.current === HUNGRY_MOOD_INDEX ? MOUTH_HUNGRY_Y_ADJ : 0;
+        return { x: Math.round(cx + ox), y: Math.round(cy + oy + moodAdj) };
+      },
+      getBoxRect() {
+        return (
+          wrapperRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0)
+        );
+      },
+      hitTest: hitTestCanvas,
       setSlotIndex(slot, index) {
         setBoundSlotIndex(slot, index);
       },
-      fireEmote(name) {
-        if (name === 'love') triggerEmoteLove();
-        else triggerEmoteQuestion();
+      fireEmote(name, options) {
+        return requestEmote(name, options?.soft ? 'ambient' : 'queue');
+      },
+      poke() {
+        poke();
       },
     }));
 
-    const reduceMotion = useReducedMotion();
     const arrivedRef = useRef(false);
     const onArrivedRef = useRef(onArrived);
     onArrivedRef.current = onArrived;
@@ -582,7 +954,12 @@ const Frog = memo(
       if (arrivedRef.current) return;
       arrivedRef.current = true;
       onArrivedRef.current?.();
-    }, []);
+      playGreet();
+    }, [playGreet]);
+
+    useEffect(() => {
+      if (!arrive && dressed) playGreet();
+    }, [arrive, dressed, playGreet]);
     const numericBox = typeof width === 'number' && typeof height === 'number';
     const boxScale = numericBox
       ? Math.min(width / ARTBOARD_WIDTH, height / ARTBOARD_HEIGHT)

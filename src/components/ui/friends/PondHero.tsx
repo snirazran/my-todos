@@ -242,8 +242,8 @@ export function PondHero({ indices, paused = false, friends, claimable, claiming
           <FlyCatchSwipeLauncher source="friends" shouldStart={(x, y) => frogRef.current?.hitTest(x, y) !== false}>
             <div ref={frogBoxRef} data-fly-hero className="relative h-[270px] w-[240px]">
               <HomeFocusFlies frogRef={frogRef} frogBoxRef={frogBoxRef} onGrabActive={setMouthOpen} hidden={paused} />
-              <div data-fly-hero-frog className="h-full w-full [&_*]:pointer-events-none"><Frog ref={frogRef} width={240} height={270} indices={indices} visualOffsetY={FROG_SEAT_OFFSET} paused={paused || !!reduceMotion} mouthOpen={mouthOpen} /></div>
-              <button type="button" aria-label="Say hello with your frog" onClick={() => { hapticTick(); if (!reduceMotion) frogRef.current?.fireEmote('love'); }} className="pointer-events-auto absolute bottom-0 left-1/2 h-[190px] w-[150px] -translate-x-1/2 touch-manipulation rounded-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+              <div data-fly-hero-frog className="h-full w-full [&_*]:pointer-events-none"><Frog ref={frogRef} width={240} height={270} indices={indices} visualOffsetY={FROG_SEAT_OFFSET} paused={paused || !!reduceMotion} mouthOpen={mouthOpen} stage fidget /></div>
+              <button type="button" aria-label="Say hello with your frog" onClick={() => frogRef.current?.poke()} className="pointer-events-auto absolute bottom-0 left-1/2 h-[190px] w-[150px] -translate-x-1/2 touch-manipulation rounded-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
               {pin ? <span className="pointer-events-none absolute bottom-[104px] right-[30px] grid h-9 w-9 place-items-center rounded-full border border-amber-400/40 bg-card text-xl shadow-sm">{pin}</span> : null}
             </div>
           </FlyCatchSwipeLauncher>

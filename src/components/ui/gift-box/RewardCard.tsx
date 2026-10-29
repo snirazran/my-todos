@@ -30,6 +30,7 @@ import {
 } from '@/hooks/useBackgrounds';
 import { ItemDef, type Rarity } from '@/lib/skins/catalog';
 import { hapticSelect, hapticTick } from '@/lib/haptics';
+import { rarityEmote } from '@/lib/frogEmotes';
 import {
   canFlyToInventory,
   flyFliesToCounter,
@@ -1226,6 +1227,7 @@ export const RewardCard = ({
                         height={300}
                         paused={paused}
                         arrive="pop"
+                        greet={rarityEmote(prize.rarity)}
                       />
                     )}
                   </motion.div>

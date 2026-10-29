@@ -125,7 +125,7 @@ export default function PlusStep({ frogName, humanName, habitCount, indices, onD
   }, []);
 
   useEffect(() => {
-    if (step !== 'offer') frogRef.current?.fireEmote('love');
+    if (step !== 'offer') frogRef.current?.fireEmote(step === 'trial' ? 'loveHeartbeat' : 'hop');
   }, [step]);
 
   if (!mounted) return null;
@@ -209,7 +209,7 @@ export default function PlusStep({ frogName, humanName, habitCount, indices, onD
                 width={frogWidth}
                 height={frogHeight}
                 indices={indices}
-                emote={reduceMotion ? null : 'love'}
+                emote={reduceMotion ? null : 'loveOrbit'}
                 paused={!!reduceMotion}
               />
             )}

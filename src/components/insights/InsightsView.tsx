@@ -245,7 +245,7 @@ function PondStage({ line, indices }: { line: string; indices?: FrogIndices }) {
     <div className="relative flex flex-col items-center">
       <h1 className="insights-title mt-4 text-center text-[40px] leading-none md:text-[52px]">Your Patterns</h1>
       <div className="pointer-events-none relative z-20 -mt-16 md:-mt-14">
-        <Frog width={240} height={270} indices={indices} />
+        <Frog width={240} height={270} indices={indices} greet="hop" fidget />
         <FrogSpeechBubble rate={0} done={0} total={0} fixedMessage={line} className="!top-[150px]" />
       </div>
     </div>

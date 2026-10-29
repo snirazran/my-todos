@@ -2,6 +2,7 @@ import confetti from 'canvas-confetti';
 import { rarityRank, type Rarity } from '@/lib/skins/catalog';
 import { hapticCelebrate, hapticSuccess } from '@/lib/haptics';
 import { playPurchaseFanfare } from '@/lib/catchSounds';
+import { frogReact, rarityEmote } from '@/lib/frogEmotes';
 
 export const PURCHASE_CELEBRATION_EVENT = 'purchase-celebration';
 
@@ -79,4 +80,5 @@ export function celebratePurchase(
       detail,
     }),
   );
+  frogReact(rarityEmote(detail.rarity));
 }

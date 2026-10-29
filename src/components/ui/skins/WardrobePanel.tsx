@@ -6,6 +6,7 @@ import {
   useInventory,
 } from '@/hooks/useInventory';
 import { hapticTick, hapticImpact, hapticSelect } from '@/lib/haptics';
+import { frogReact } from '@/lib/frogEmotes';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -757,6 +758,7 @@ function WardrobeManagerContent({
     const price = priceOverride ?? item.priceFlies ?? 0;
     if (balance < price) {
       setNotif({ msg: 'Not enough flies!', type: 'error' });
+      frogReact('sweat');
       return false;
     }
 

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { pickEmote } from '@/lib/frogEmotes';
 import Fly from '@/components/ui/fly';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftOutfitPreview } from '@/components/ui/friends/GiftOutfitPreview';
@@ -599,7 +600,7 @@ function PickStep({ ready, config, claimedCount, gift, onSelect, onClose, onOpen
   const nextReward = config.rewards.find((reward) => reward.tier > claimedCount) ?? null;
   return (
     <div role="dialog" aria-modal="true" aria-label="Choose a welcome gift" className="flex h-full min-h-0 flex-col bg-background text-foreground md:max-h-[calc(100dvh-2rem)]">
-      <GiftStage gift={gift} ready={ready} onClose={onClose} />
+      <GiftStage gift={gift} ready={ready} sent={!!sentVia} onClose={onClose} />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
         <p className="text-center text-[13px] font-semibold text-muted-foreground">
           Free for them when they join with your link
@@ -662,7 +663,7 @@ function PondBackdrop() {
   );
 }
 
-function GiftStage({ gift, ready, onClose }: { gift: GiftOption | null; ready: boolean; onClose: () => void }) {
+function GiftStage({ gift, ready, sent, onClose }: { gift: GiftOption | null; ready: boolean; sent: boolean; onClose: () => void }) {
   const reduceMotion = useReducedMotion();
   const roomy = useMediaQuery('(min-width: 380px)');
   const hop = useAnimationControls();
@@ -677,6 +678,10 @@ function GiftStage({ gift, ready, onClose }: { gift: GiftOption | null; ready: b
   const indices = React.useMemo(() => giftPreviewIndices(item), [item]);
 
   useEffect(() => {
+    if (sent) frogRef.current?.fireEmote('loveHeartbeat');
+  }, [sent]);
+
+  useEffect(() => {
     const id = gift?.id ?? null;
     const previous = shownGiftRef.current;
     shownGiftRef.current = id;
@@ -687,7 +692,7 @@ function GiftStage({ gift, ready, onClose }: { gift: GiftOption | null; ready: b
       scaleY: [1, 1.05, 0.94, 1],
       transition: { duration: 0.5, times: [0, 0.38, 0.72, 1], ease: 'easeOut' },
     });
-    frogRef.current?.fireEmote('love');
+    frogRef.current?.fireEmote(pickEmote('pick'));
   }, [gift?.id, hop, reduceMotion]);
 
   return (

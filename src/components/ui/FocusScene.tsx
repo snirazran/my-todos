@@ -10,6 +10,7 @@ import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { sceneFlyCount } from '@/lib/focusFlies';
 import { pickFrogLine } from '@/lib/frogSpeech';
+import { pickEmote } from '@/lib/frogEmotes';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 const FLY_PX = 34;
@@ -204,7 +205,7 @@ export function FocusScene({
     const line = pickFrogLine('catch', { done: caughtNow });
     speakLine(line);
     if (index < 0 || suspended) {
-      frogRef.current?.fireEmote('love');
+      frogRef.current?.fireEmote(pickEmote('catch'));
       launchGain();
       setSettledCaught(caughtNow);
       return;
@@ -259,7 +260,10 @@ export function FocusScene({
           key: 'scene-miss',
           completed: false,
           silent: true,
-          onPersist: () => setMissMode(false),
+          onPersist: () => {
+            setMissMode(false);
+            frogRef.current?.fireEmote(pickEmote('miss'), { soft: true });
+          },
         });
       });
       return true;

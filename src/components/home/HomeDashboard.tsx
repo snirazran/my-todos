@@ -100,6 +100,7 @@ import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
 import { markFreshTasks } from '@/lib/taskEntrance';
+import { frogReact, pickEmote } from '@/lib/frogEmotes';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -129,6 +130,8 @@ const HOME_FILTER_BASE = { showCompleted: false };
 
 const FINALE_STRIP_SWAP_MS = 450;
 const FINALE_TASKS_FALLBACK_MS = 1500;
+const DAY_CLEARED_WINDOW_MS = 8000;
+const DAY_CLEARED_DELAY_MS = 700;
 
 export default function HomeDashboard() {
   const { user, loading } = useAuth();
@@ -548,6 +551,15 @@ export default function HomeDashboard() {
 
   const openTaskCount = data.filter((t) => !t.completed).length;
   const dayCleared = data.length > 0 && openTaskCount === 0;
+  const completedAtRef = useRef(0);
+  const wasClearedRef = useRef(dayCleared);
+  useEffect(() => {
+    const cleared = dayCleared && !wasClearedRef.current;
+    wasClearedRef.current = dayCleared;
+    if (!cleared || Date.now() - completedAtRef.current > DAY_CLEARED_WINDOW_MS) return;
+    const t = window.setTimeout(() => frogRef.current?.fireEmote('tada'), DAY_CLEARED_DELAY_MS);
+    return () => window.clearTimeout(t);
+  }, [dayCleared]);
   const giftDone = doneCount;
   const giftTotal = data.length;
   const flyBalance = user ? flyStatus.balance : 5;
@@ -748,6 +760,7 @@ export default function HomeDashboard() {
       await waitForSheetsClosed();
     }
 
+    completedAtRef.current = Date.now();
     await triggerTongue({
       key: taskId,
       completed,
@@ -1315,6 +1328,7 @@ export default function HomeDashboard() {
           }
 
           markFreshTasks(payload.ids);
+          frogReact(pickEmote(bulkTasks.length >= 3 ? 'cheer' : 'taskAdded'));
           await Promise.all([mutateToday(), mutateBacklog()]);
           void notifyQuestClaims(showNotification);
           showNotification(
@@ -1384,6 +1398,7 @@ export default function HomeDashboard() {
               markFreshTasks(
                 data.ids ?? data.tasks?.map((t: { id?: string }) => t.id),
               );
+              frogReact(pickEmote('taskAdded'));
             }
 
             if (user && data.ok && data.tasks) {

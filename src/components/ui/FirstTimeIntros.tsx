@@ -68,6 +68,7 @@ function FrogPerch({ open }: { open: boolean }) {
           paused={!open}
           visualOffsetY={0}
           arrive="drop"
+          greet="hop"
           onArrived={() => setLanded(true)}
         />
         {landed && (

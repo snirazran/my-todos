@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FrogHandle } from '@/components/ui/frog';
 import { hapticImpact } from '@/lib/haptics';
+import { catchEmote } from '@/lib/frogEmotes';
 import {
   playComboChime,
   playGulp,
@@ -756,7 +757,7 @@ export function useFrogTongue({
         }
 
         if (!grab.silent) {
-          frogRef.current?.fireEmote('love');
+          frogRef.current?.fireEmote(catchEmote(grab.combo, grab.golden));
           playGulp(grab.combo, grab.golden);
           if (grab.combo > 0) {
             window.setTimeout(() => playComboChime(grab.combo), 70);
