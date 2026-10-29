@@ -207,7 +207,6 @@ export default function AdoptFrogStep({
   const [boxCleared, setBoxCleared] = useState(returning);
   const [cardShown, setCardShown] = useState(returning);
   const [clipped, setClipped] = useState(!returning);
-  const [love, setLove] = useState(returning);
   const [pressed, setPressed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [lift, setLift] = useState(0);
@@ -364,11 +363,10 @@ export default function AdoptFrogStep({
       fromY,
       rise: Math.round(frogBox.layoutWidth * FROG_RISE),
       peak: Math.round(Math.min(fromY, 0) - frogBox.layoutWidth * FROG_APEX),
-      emote: love ? 'love' : null,
       cue,
       bump,
     });
-  }, [frogBox, geometry, lift, frogMotion, clipped, love, cue, bump, onFrogPose]);
+  }, [frogBox, geometry, lift, frogMotion, clipped, cue, bump, onFrogPose]);
 
   useEffect(() => {
     if (phase !== 'loading' || !geometry) return;
@@ -404,8 +402,7 @@ export default function AdoptFrogStep({
     later(CARD_AT_MS, () => setCardShown(true));
     later(LAND_MS, () => {
       hapticCelebrate();
-      setLove(true);
-      cueFrog('tada');
+      cueFrog('loveBurst');
       setPhase('naming');
       const { selections: current, onSelect: select, onGiftOpened: markOpened } = latest.current;
       markOpened();
@@ -467,7 +464,6 @@ export default function AdoptFrogStep({
   const confirm = () => {
     if (phase !== 'naming' || !trimmedName) return;
     setPhase('leaving');
-    setLove(false);
     setSkinLine(null);
     hapticSuccess();
     cueFrog('loveHeartbeat');

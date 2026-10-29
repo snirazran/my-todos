@@ -209,7 +209,7 @@ export default function PlusStep({ frogName, humanName, habitCount, indices, onD
                 width={frogWidth}
                 height={frogHeight}
                 indices={indices}
-                emote={reduceMotion ? null : 'loveOrbit'}
+                greet="hop"
                 paused={!!reduceMotion}
               />
             )}

@@ -24,7 +24,7 @@ import {
   type FrogPose,
 } from './steps/OnboardingFrogHeader';
 import { cn } from '@/lib/utils';
-import type { FrogEmote, FrogEmoteLoop, FrogHandle } from '@/components/ui/frog';
+import type { FrogEmote, FrogHandle } from '@/components/ui/frog';
 import { pickEmote } from '@/lib/frogEmotes';
 import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -53,11 +53,6 @@ import {
 const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount', 'plan'] as const;
 
 const CELEBRATION_MS = 3000;
-
-const STEP_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmoteLoop>> = {
-  humanName: 'love',
-  aboutIntro: 'love',
-};
 
 const STEP_ENTRY_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
   humanName: 'loveShy',
@@ -473,7 +468,6 @@ export default function OnboardingPage() {
         <OnboardingFrogStage
           indices={stageIndices}
           frogRef={frogRef}
-          emote={celebrating ? 'loveOrbit' : (STEP_EMOTES[currentId] ?? null)}
           hidden={
             paywallOpen ||
             (!celebrating && ((currentId === 'name' && !frogPose) || currentId === 'plan'))

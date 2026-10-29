@@ -11,12 +11,7 @@ import {
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import type {
-  FrogEmote,
-  FrogEmoteLoop,
-  FrogHandle,
-  WardrobeSlot,
-} from '@/components/ui/frog';
+import type { FrogEmote, FrogHandle, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -97,14 +92,12 @@ export type FrogPose = {
   fromY: number;
   rise: number;
   peak: number;
-  emote: FrogEmoteLoop | null;
   cue: { emote: FrogEmote; id: number } | null;
   bump: number;
 };
 
 type StageProps = {
   indices?: Partial<Record<WardrobeSlot, number>>;
-  emote?: FrogEmoteLoop | null;
   hidden?: boolean;
   pose?: FrogPose | null;
   frogRef?: RefObject<FrogHandle | null>;
@@ -117,7 +110,6 @@ const poseTransition = (motion: FrogPose['motion']) =>
 // transitions instead of remounting (and re-initializing) on every step.
 export function OnboardingFrogStage({
   indices = DEFAULT_FROG_INDICES,
-  emote = null,
   hidden = false,
   pose = null,
   frogRef,
@@ -181,7 +173,6 @@ export function OnboardingFrogStage({
             width={frogWidth}
             height={frogHeight}
             indices={indices}
-            emote={pose ? pose.emote : emote}
             paused={hidden || pose?.motion === 'hidden'}
             placeholder={indices === DEFAULT_FROG_INDICES}
           />
