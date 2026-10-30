@@ -47,6 +47,7 @@
 		FA0100033100AAAA00000003 /* FrogWidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0100013100AAAA00000001 /* FrogWidgetStore.swift */; };
 		FA0100053100AAAA00000005 /* FrogTasksWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0100043100AAAA00000004 /* FrogTasksWidget.swift */; };
 		FA0100073100AAAA00000007 /* FrogWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0100063100AAAA00000006 /* FrogWidgetPlugin.swift */; };
+		FA01000B3100AAAA0000000B /* FrogMetaPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */; };
 		FA0100093100AAAA00000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FA0100083100AAAA00000008 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -118,6 +119,7 @@
 		FA0100013100AAAA00000001 /* FrogWidgetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogWidgetStore.swift; sourceTree = "<group>"; };
 		FA0100043100AAAA00000004 /* FrogTasksWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogTasksWidget.swift; sourceTree = "<group>"; };
 		FA0100063100AAAA00000006 /* FrogWidgetPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogWidgetPlugin.swift; path = App/FrogWidgetPlugin.swift; sourceTree = SOURCE_ROOT; };
+		FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogMetaPlugin.swift; path = App/FrogMetaPlugin.swift; sourceTree = SOURCE_ROOT; };
 		FA0100083100AAAA00000008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -197,6 +199,7 @@
 				60AE54542FE4173C00222D18 /* FrogLiveActivityPlugin.swift */,
 				60AE54562FE41ECA00222D18 /* MainViewController.swift */,
 				FA0100063100AAAA00000006 /* FrogWidgetPlugin.swift */,
+				FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */,
 				FA0100083100AAAA00000008 /* PrivacyInfo.xcprivacy */,
 			);
 			path = App;
@@ -429,6 +432,7 @@
 			files = (
 				FA0100023100AAAA00000002 /* FrogWidgetStore.swift in Sources */,
 				FA0100073100AAAA00000007 /* FrogWidgetPlugin.swift in Sources */,
+				FA01000B3100AAAA0000000B /* FrogMetaPlugin.swift in Sources */,
 				60AE545A2FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */,
 				60AE54722FE4336400222E01 /* FrogWidgetIntents.swift in Sources */,
 				60AE54512FE4161A00222D18 /* FrogTimerAttributes.swift in Sources */,

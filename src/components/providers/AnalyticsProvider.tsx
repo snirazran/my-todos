@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { normalizeAnalyticsPage } from '@/lib/analytics/events';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { captureClickIds } from '@/lib/adpixels/clickIds';
+import { activateMetaApp } from '@/lib/adpixels/metaApp';
 import { captureFirstTouch } from '@/lib/attribution/touch';
 
 const SESSION_KEY = 'frogress.analytics.session';
@@ -53,12 +54,17 @@ export function AnalyticsProvider() {
   useEffect(() => {
     captureClickIds();
     captureFirstTouch();
-    if (document.visibilityState === 'visible') trackOpen();
+    if (document.visibilityState === 'visible') {
+      trackOpen();
+      activateMetaApp();
+    }
     const keepAlive = window.setInterval(() => {
       if (document.visibilityState === 'visible') ensureSession();
     }, 60_000);
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') trackOpen();
+      if (document.visibilityState !== 'visible') return;
+      trackOpen();
+      activateMetaApp();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {

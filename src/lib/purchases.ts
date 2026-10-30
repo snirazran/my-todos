@@ -3,6 +3,7 @@
 import { Capacitor } from '@capacitor/core';
 import { auth } from '@/lib/firebase';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { metaAnonymousId } from '@/lib/adpixels/metaApp';
 import { FLY_PACKS, getFlyPack, getFlyPackForProduct, type FlyPackId } from '@/lib/flyPacks';
 import { parseProductRef, type ProductRef } from '@/lib/campaigns/productRef';
 import type { PriceQuote } from '@/lib/campaigns/tokens';
@@ -41,6 +42,8 @@ async function getNativePurchases(uid: string) {
       await Purchases.collectDeviceIdentifiers();
       const email = auth?.currentUser?.email;
       if (email) await Purchases.setEmail({ email });
+      const fbAnonymousID = await metaAnonymousId();
+      if (fbAnonymousID) await Purchases.setFBAnonymousID({ fbAnonymousID });
     } catch (err) {
       console.error('RevenueCat attribution setup failed', err);
     }

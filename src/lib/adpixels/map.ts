@@ -3,6 +3,13 @@ import type { AnalyticsEventName } from '@/lib/analytics/events';
 type PixelMapping = {
   meta?: string;
   tiktok?: string;
+  metaApp?: string;
+};
+
+const REGISTRATION: PixelMapping = {
+  meta: 'CompleteRegistration',
+  tiktok: 'CompleteRegistration',
+  metaApp: 'fb_mobile_complete_registration',
 };
 
 export const PIXEL_EVENTS: Partial<Record<AnalyticsEventName, PixelMapping>> = {
@@ -10,7 +17,8 @@ export const PIXEL_EVENTS: Partial<Record<AnalyticsEventName, PixelMapping>> = {
   paywall_viewed: { meta: 'ViewContent', tiktok: 'ViewContent' },
   fly_shop_viewed: { meta: 'ViewContent', tiktok: 'ViewContent' },
   home_shop_rail_viewed: { meta: 'ViewContent', tiktok: 'ViewContent' },
-  try_signup_completed: { meta: 'CompleteRegistration', tiktok: 'CompleteRegistration' },
+  account_created: REGISTRATION,
+  guest_account_linked: REGISTRATION,
   purchase_started: { meta: 'InitiateCheckout', tiktok: 'InitiateCheckout' },
   fly_pack_purchase_started: { meta: 'InitiateCheckout', tiktok: 'InitiateCheckout' },
   store_product_purchase_started: { meta: 'InitiateCheckout', tiktok: 'InitiateCheckout' },

@@ -29,6 +29,7 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
+  pod 'FBSDKCoreKit', '~> 18.0'
 end
 
 target 'LiveActivitiesExtension' do

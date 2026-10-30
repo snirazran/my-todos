@@ -138,7 +138,7 @@ function hostMatches(host: string, list: string[]) {
 
 function networkChannel(source: string): AcquisitionChannel | null {
   if (source === 'asa' || /(apple|searchads|search_ads)/.test(source)) return 'apple_ads';
-  if (/(facebook|^fb$|^fb[_-]|instagram|^ig$|meta)/.test(source)) return 'meta_ads';
+  if (/(facebook|^fb$|^fb[_-]|instagram|^ig$|^an$|^msg$|meta)/.test(source)) return 'meta_ads';
   if (/tiktok/.test(source)) return 'tiktok_ads';
   if (/(google|adwords|youtube)/.test(source)) return 'google_ads';
   return null;

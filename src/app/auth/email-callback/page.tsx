@@ -15,6 +15,7 @@ import { establishSessionCookie } from '@/lib/authCookie';
 import { takeEmailLinkIntent } from '@/lib/emailLinkSettings';
 import { clearOnboardingDraft } from '@/lib/onboardingDraft';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { trackRegistration } from '@/lib/adpixels/client';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -47,6 +48,7 @@ export default function EmailCallbackPage() {
       }),
     });
     const data = await res.json().catch(() => ({}));
+    if (data?.isNewUser && !user.isAnonymous) trackRegistration(user.uid);
     const storedRoute = window.localStorage.getItem(POST_LOGIN_ROUTE_KEY);
     window.localStorage.removeItem(POST_LOGIN_ROUTE_KEY);
     const safeRoute =

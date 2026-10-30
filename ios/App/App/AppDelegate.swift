@@ -12,6 +12,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Initialize Firebase so @capacitor-firebase/messaging can mint FCM tokens.
         FirebaseApp.configure()
+        FrogMetaPlugin.start(application, launchOptions: launchOptions)
         FrogLiveActivityPlugin.startActivityObservation()
         installAlarmSounds()
         clearAppBadge(application)

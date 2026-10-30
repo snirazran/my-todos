@@ -2,6 +2,7 @@
 // via fbq, GA via gtag). Safe no-op until those scripts are installed.
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import type { AnalyticsEventName } from '@/lib/analytics/events';
+import { trackCustomPixelEvent } from '@/lib/adpixels/client';
 
 const FIRST_PARTY_GROWTH_EVENTS: Record<string, AnalyticsEventName> = {
   funnel_view: 'try_funnel_viewed',
@@ -36,7 +37,7 @@ export function trackGrowthEvent(
         gift_platform: params?.platform,
       });
     }
-    (window as any).fbq?.('trackCustom', name, params);
+    trackCustomPixelEvent(name, params);
     (window as any).gtag?.('event', name, params);
     if (process.env.NODE_ENV !== 'production') {
       console.debug('[growth]', name, params ?? {});

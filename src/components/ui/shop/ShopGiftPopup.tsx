@@ -77,8 +77,8 @@ export function ShopGiftPopup({
     contentObserver.current?.disconnect();
     contentObserver.current = null;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => {
-      setContentHeight(entries[0].contentRect.height);
+    const observer = new ResizeObserver(() => {
+      setContentHeight(el.offsetHeight);
     });
     observer.observe(el);
     contentObserver.current = observer;
@@ -307,7 +307,7 @@ export function ShopGiftPopup({
                 transition={{ type: 'spring', stiffness: 420, damping: 38 }}
                 className="w-full overflow-hidden"
               >
-                <div ref={measureContent} className="pb-1">
+                <div ref={measureContent} className="flow-root pb-1">
                   <AnimatePresence mode="wait" initial={false}>
                     {revealed && reveal ? (
                       <motion.div

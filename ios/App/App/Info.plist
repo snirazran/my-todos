@@ -43,6 +43,16 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>FacebookAppID</key>
+	<string>2632494967199841</string>
+	<key>FacebookClientToken</key>
+	<string>5e57836b44488948304da79029c05358</string>
+	<key>FacebookDisplayName</key>
+	<string>Frogress</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<false/>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<true/>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Your data will be used to show you more relevant ads.</string>
 	<key>SKAdNetworkItems</key>

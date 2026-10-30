@@ -44,6 +44,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
+import { trackRegistration } from '@/lib/adpixels/client';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
@@ -124,12 +125,14 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
     });
-    return (await res.json().catch(() => ({}))) as {
+    const data = (await res.json().catch(() => ({}))) as {
       isNewUser?: boolean;
       alreadyOnboarded?: boolean;
       name?: string | null;
       frogName?: string | null;
     };
+    if (data.isNewUser && !user.isAnonymous) trackRegistration(user.uid);
+    return data;
   };
 
   // Signing in landed on an account that already exists and already has a frog.

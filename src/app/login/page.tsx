@@ -49,6 +49,7 @@ import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useAuth } from '@/components/auth/AuthContext';
+import { trackRegistration } from '@/lib/adpixels/client';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
@@ -192,6 +193,7 @@ function LoginPageInner() {
       }),
     });
     const data = await res.json().catch(() => ({}));
+    if (data?.isNewUser && !user.isAnonymous) trackRegistration(user.uid);
     return data?.isNewUser ? '/onboarding' : route;
   };
 

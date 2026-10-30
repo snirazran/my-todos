@@ -65,6 +65,7 @@ import {
 import { DEFAULT_BACKGROUND_IMAGES } from '@/hooks/useBackgrounds';
 import { cn, getZonedToday } from '@/lib/utils';
 import { GiftMoment } from './GiftMoment';
+import { trackRegistration } from '@/lib/adpixels/client';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
@@ -379,6 +380,7 @@ export default function TryPage() {
       const fresh = !!data?.isNewUser;
       setIsNewUser(fresh);
       trackGrowthEvent('funnel_signup', { isNewUser: fresh });
+      if (fresh && !current.isAnonymous) trackRegistration(current.uid);
       if (data?.alreadyOnboarded) {
         clearOnboardingDraft();
         if (typeof data.frogName === 'string' && data.frogName.trim()) {
