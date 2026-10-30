@@ -5,6 +5,10 @@ import connectMongo from '@/lib/mongoose';
 import QuestCategoryModel, {
   type QuestCategoryDoc,
 } from '@/lib/models/QuestCategory';
+import {
+  starterAreaPresentation,
+  starterBarrierPrompt,
+} from '@/lib/quests/starterPlanServer';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -38,6 +42,8 @@ export async function GET() {
         accent: c.accent,
         backgroundFrom: c.backgroundFrom,
         backgroundTo: c.backgroundTo,
+        barriers: starterBarrierPrompt(c),
+        support: starterAreaPresentation(c),
       };
     });
 

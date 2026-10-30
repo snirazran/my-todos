@@ -6,9 +6,9 @@ import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
-import { paywallMomentFor } from '@/lib/plusPaywall';
 import { findStarterSkin } from '@/lib/skins/starterSkins';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
+import { isFrogTraitId, startingFrogTraits } from '@/lib/frogTraits';
 
 const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
 const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
@@ -69,6 +69,7 @@ export async function POST(req: Request) {
       usedBefore?: unknown;
       onboardingResponses?: unknown;
       starterSkin?: unknown;
+      frogTrait?: unknown;
     } = {};
     try {
       body = await req.json();
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
         : undefined;
     const onboardingResponses = sanitizeOnboardingResponses(body.onboardingResponses);
     const starterSkinIndex = findStarterSkin(body.starterSkin).riveIndex;
+    const frogTraits = startingFrogTraits(isFrogTraitId(body.frogTrait) ? body.frogTrait : null);
 
     await connectMongo();
 
@@ -123,7 +125,6 @@ export async function POST(req: Request) {
         $set: {
           onboardingCompleted: true,
           'seenIntros.firstRun': false,
-          ...(paywallMomentFor(uid) === 'first_gift' ? { 'seenIntros.firstGiftPaywall': false } : {}),
           frogName,
           ...(humanName ? { name: humanName } : {}),
           ...(ageRange ? { ageRange } : {}),
@@ -132,7 +133,12 @@ export async function POST(req: Request) {
           ...(onboardingResponses ? { onboardingResponses } : {}),
           ...(starterSkin ? { 'wardrobe.equipped.skin': starterSkin } : {}),
         },
-        ...(starterSkin ? { $max: { [`wardrobe.inventory.${starterSkin}`]: 1 } } : {}),
+        $max: {
+          ...Object.fromEntries(
+            Object.entries(frogTraits).map(([id, value]) => [`frogTraits.${id}`, value]),
+          ),
+          ...(starterSkin ? { [`wardrobe.inventory.${starterSkin}`]: 1 } : {}),
+        },
       },
     );
     if (isStatsExcludedFrogName(frogName) && existing.excludeFromStats === undefined) {

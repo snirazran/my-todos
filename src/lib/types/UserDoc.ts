@@ -9,6 +9,7 @@ import type { WishlistPin } from '@/lib/skins/wishlist';
 import type { DealReroll } from '@/lib/skins/dailyDeal';
 import type { SavedLook } from '@/lib/skins/looks';
 import type { FocusProfile } from '@/lib/quests/types';
+import type { FrogTraits } from '@/lib/frogTraits';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
 import type { FocusSubjectKind } from '@/lib/focusSubject';
 import type { OverflowJar } from '@/lib/economy/overflowJar';
@@ -147,6 +148,7 @@ export type UserDoc = {
   aboutGender?: string;
   usedBefore?: string;
   onboardingResponses?: Record<string, string[]>;
+  frogTraits?: FrogTraits;
   email?: string;
   passwordHash?: string;
   phoneNumber?: string;

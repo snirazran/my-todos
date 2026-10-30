@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { cn } from '@/lib/utils';
+import Fly from '@/components/ui/fly';
+import { HOME_CARD_SURFACE } from '@/components/ui/taskSurfaces';
 import type { OnboardingStepProps } from './types';
-import type { StarterPlanItem } from '@/lib/quests/starterPlan';
+import {
+  barrierQuestionId,
+  parseStarterProfile,
+  starterCapacityCap,
+  STARTER_PROFILE_KEYS,
+  type StarterPlanItem,
+  type StarterProfile,
+} from '@/lib/quests/starterPlan';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
-import { hapticSelect } from '@/lib/haptics';
+import { OnboardingFrogHeader, useTypewriter } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 type PlanResponse = {
@@ -29,11 +37,30 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-const planUrl = (areasKey: string) =>
-  `/api/onboarding/starter-plan?areas=${encodeURIComponent(areasKey)}`;
+export function starterPlanParams(selections: Record<string, string[]>) {
+  const areas = selections.focusAreas ?? [];
+  const barriers = areas.flatMap((id) =>
+    (selections[barrierQuestionId(id)] ?? [])
+      .filter((answer) => answer !== 'other')
+      .map((answer) => `${id}:${answer}`),
+  );
+  const profile = parseStarterProfile((key) => selections[key]?.[0]);
+  return { areas, barriers, profile };
+}
 
-export function preloadStarterPlan(areasKey: string) {
-  preload(planUrl(areasKey), fetcher).catch(() => {});
+export function starterPlanUrl(selections: Record<string, string[]>) {
+  const { areas, barriers, profile } = starterPlanParams(selections);
+  const params = new URLSearchParams({ areas: areas.join(',') });
+  if (barriers.length > 0) params.set('barriers', barriers.join(','));
+  STARTER_PROFILE_KEYS.forEach((key) => {
+    const value = profile[key];
+    if (value) params.set(key, value);
+  });
+  return `/api/onboarding/starter-plan?${params.toString()}`;
+}
+
+export function preloadStarterPlan(url: string) {
+  preload(url, fetcher).catch(() => {});
 }
 
 function fill(
@@ -44,13 +71,41 @@ function fill(
   return (template ?? fallback)
     .replace(/\{habits\}/g, vars.n === 1 ? '1 habit' : `${vars.n} habits`)
     .replace(/\{n\}/g, String(vars.n))
+    .replace(/\{name\}'s/g, vars.name ? `${vars.name}'s` : 'Your')
     .replace(/\{name\}/g, vars.name)
     .replace(/\{frog\}/g, vars.frog)
     .replace(/\s*,\s*$/, '')
     .trim();
 }
 
+function frogPlanLine(args: {
+  name: string;
+  profile: StarterProfile;
+  usedBefore?: string;
+  offered: number;
+}) {
+  const you = args.name ? `, ${args.name}` : '';
+  if (starterCapacityCap(args.profile) !== undefined) {
+    return `*Ribbit!* Just ${args.offered === 1 ? '1 goal' : `${args.offered} goals`} to start. We'll keep your list light!`;
+  }
+  if (args.profile.support === 'just-me') {
+    return `*Ribbit!* You've got me now${you}. We'll do this together!`;
+  }
+  if (args.usedBefore === 'starting-fresh') {
+    return `*Ribbit!* Fresh start${you}! Let's make this one stick.`;
+  }
+  return `*Ribbit!* You've got this${you}!`;
+}
+
 const EASE = [0.22, 1, 0.36, 1] as const;
+
+const PLAN_ROW_CLASS = `flex items-center gap-3 pl-4 pr-2 ${HOME_CARD_SURFACE}`;
+
+const planRowSizeClass = (count: number) =>
+  count >= 5 ? 'min-h-[58px] py-1.5' : count === 4 ? 'min-h-[62px] py-2' : 'min-h-[68px] py-2.5';
+
+const PLAN_TOP_CLASS =
+  'pt-[calc(270px+env(safe-area-inset-top))] short:pt-[calc(232px+env(safe-area-inset-top))] md:pt-[264px]';
 
 export default function StarterPlanStep({
   selections,
@@ -60,30 +115,16 @@ export default function StarterPlanStep({
 }: OnboardingStepProps) {
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const humanName = selections.humanName?.[0]?.trim() || '';
-  const focusAreas = useMemo(() => selections.focusAreas ?? [], [selections.focusAreas]);
-  const areasKey = focusAreas.join(',');
+  const { areas: focusAreas, profile } = useMemo(() => starterPlanParams(selections), [selections]);
 
-  const { data, error } = useSWR<PlanResponse>(planUrl(areasKey), fetcher);
+  const { data, error } = useSWR<PlanResponse>(starterPlanUrl(selections), fetcher);
   const items = useMemo(() => data?.items ?? [], [data]);
   const ready = !!data || !!error;
 
-  const [checked, setChecked] = useState<string[] | null>(null);
   const [committed, setCommitted] = useState(false);
   const seenRef = useRef(false);
   const onNextRef = useRef(onNext);
   onNextRef.current = onNext;
-
-  useEffect(() => {
-    if (checked !== null || items.length === 0) return;
-    const returning = selections.starterPlanChoice?.[0];
-    setChecked(
-      returning
-        ? items
-            .filter((item) => (selections.starterPlan ?? []).includes(item.id))
-            .map((item) => item.id)
-        : items.map((item) => item.id),
-    );
-  }, [items, checked, selections.starterPlan, selections.starterPlanChoice]);
 
   useEffect(() => {
     if (seenRef.current || items.length === 0) return;
@@ -91,8 +132,10 @@ export default function StarterPlanStep({
     trackAnalyticsEvent('starter_plan_shown', {
       offered: items.length,
       areas: focusAreas.length,
+      barriers: items.filter((item) => !!item.reason).length,
+      ...(profile.overwhelm ? { plan_load: profile.overwhelm } : {}),
     });
-  }, [items, focusAreas]);
+  }, [items, focusAreas, profile.overwhelm]);
 
   useEffect(() => {
     if (committed) onNextRef.current();
@@ -112,135 +155,100 @@ export default function StarterPlanStep({
     if (ready && items.length === 0) commitRef.current([]);
   }, [ready, items]);
 
-  const selectedIds = checked ?? [];
-  const vars = { n: selectedIds.length, name: humanName, frog: frogName };
-  const headline = fill(data?.copy?.headline, 'Start small', vars);
-  const subheadline = fill(data?.copy?.subheadline, "Tiny daily habits you'll actually keep.", vars);
-  const acceptLabel = fill(data?.copy?.acceptLabel, 'Add {habits}', vars);
-  const declineLabel = fill(data?.copy?.declineLabel, 'Skip for now', vars);
-  const footnote = fill(data?.copy?.footnote, 'Change or remove any of them later.', vars);
-  const loading = checked === null;
-  const busy = saving || committed;
+  const vars = { n: items.length, name: humanName, frog: frogName };
+  const headline = fill(data?.copy?.headline, "{name}'s starter plan", vars);
+  const subheadline = fill(data?.copy?.subheadline, 'Try these easy goals with {frog}!', vars);
+  const acceptLabel = fill(data?.copy?.acceptLabel, "Let's do it!", vars);
+  const loading = items.length === 0;
 
-  const toggle = (id: string) => {
-    hapticSelect();
-    setChecked((prev) => {
-      const current = prev ?? [];
-      return current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
-    });
-  };
+  const frogLine = loading
+    ? ''
+    : frogPlanLine({
+        name: humanName,
+        profile,
+        usedBefore: selections.usedBefore?.[0],
+        offered: items.length,
+      });
+  const typed = useTypewriter(frogLine);
+  const reduceMotion = useReducedMotion();
 
   return (
     <div className="relative flex flex-1 flex-col">
-      <div className="flex w-full flex-col pt-[calc(4.5rem+env(safe-area-inset-top))] md:mx-auto md:max-w-md md:pt-24">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[62dvh] bg-[radial-gradient(120%_62%_at_50%_0%,rgba(108,187,95,0.28),rgba(108,187,95,0.08)_48%,transparent_78%)] dark:bg-[radial-gradient(120%_62%_at_50%_0%,rgba(108,187,95,0.16),rgba(108,187,95,0.05)_48%,transparent_78%)]"
+      />
+      <OnboardingFrogHeader title="" speechBubbleMessage={frogLine} speechTypedChars={typed} />
+
+      <div className={cn('relative z-20 flex w-full flex-col md:mx-auto md:max-w-md', PLAN_TOP_CLASS)}>
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: EASE }}
-          className="text-center"
+          aria-labelledby="starter-plan-title"
+          className="pond-panel relative rounded-[28px] border-2 border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3 pt-6 shadow-[0_4px_0_0_var(--pond-line)]"
         >
-          <h1 className="text-balance text-[28px] font-black leading-[1.15] tracking-tight text-foreground">
+          <span
+            aria-hidden
+            className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent dark:via-white/20"
+          />
+          <h1
+            id="starter-plan-title"
+            className="text-balance px-3 text-center text-[22px] font-black leading-tight tracking-tight text-[color:var(--pond-ink)]"
+          >
             {headline}
           </h1>
-          <p className="mx-auto mt-2 max-w-[19rem] text-balance text-[15px] font-medium leading-snug text-muted-foreground">
+          <p className="mx-auto mt-1 max-w-[19rem] text-balance text-center text-[15px] font-semibold leading-snug text-[color:var(--pond-ink-muted)]">
             {subheadline}
           </p>
-        </motion.div>
 
-        <ul aria-label="Suggested habits" className="mt-7 flex flex-col gap-2.5">
-          {loading
-            ? [0, 1, 2, 3, 4].map((i) => (
-                <li
-                  key={i}
-                  className="flex items-center gap-3.5 rounded-[20px] border-2 border-border/40 px-3.5 py-3"
-                >
-                  <span className="h-12 w-12 shrink-0 animate-pulse rounded-2xl bg-muted" />
-                  <span className="block h-3.5 w-3/5 animate-pulse rounded-full bg-muted" />
-                </li>
-              ))
-            : items.map((item, index) => {
-                const isChecked = selectedIds.includes(item.id);
-                const cue = item.cadence === 'daily' ? null : item.cadenceLabel;
-                return (
+          <ul aria-labelledby="starter-plan-title" className="mt-3.5 flex flex-col gap-2">
+            {loading
+              ? [0, 1, 2, 3].map((i) => (
+                  <li key={i} className={cn(PLAN_ROW_CLASS, planRowSizeClass(4))}>
+                    <span className="block h-3.5 flex-1 animate-pulse rounded-full bg-muted" />
+                    <span className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-muted" />
+                  </li>
+                ))
+              : items.map((item, index) => (
                   <motion.li
                     key={item.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + 0.05 * index, duration: 0.35, ease: EASE }}
+                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={
+                      reduceMotion
+                        ? { duration: 0.2 }
+                        : { delay: 0.25 + 0.09 * index, type: 'spring', stiffness: 420, damping: 26 }
+                    }
+                    className={cn(PLAN_ROW_CLASS, planRowSizeClass(items.length))}
                   >
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={isChecked}
-                      onClick={() => toggle(item.id)}
-                      disabled={busy}
-                      className={cn(
-                        'flex w-full items-center gap-3.5 rounded-[20px] border-2 bg-card px-3.5 py-3 text-left transition-[border-color,box-shadow,transform] duration-200 [-webkit-tap-highlight-color:transparent] active:translate-y-[2px] active:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20',
-                        isChecked
-                          ? 'border-primary/40 shadow-[0_3px_0_0_hsl(var(--primary)/0.22)]'
-                          : 'border-border/60 shadow-[0_3px_0_0_rgba(0,0,0,0.05)]',
-                      )}
+                    <span className="min-w-0 flex-1 text-[17px] font-semibold leading-snug text-foreground">
+                      {item.text}
+                    </span>
+                    <motion.span
+                      aria-hidden
+                      initial={reduceMotion ? false : { opacity: 0, scale: 0.4 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.42 + 0.09 * index, type: 'spring', stiffness: 520, damping: 18 }}
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25"
                     >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-muted/70 text-2xl leading-none transition-[opacity,filter] duration-200',
-                          !isChecked && 'opacity-50 grayscale',
-                        )}
-                      >
-                        {item.emoji || '✨'}
-                      </span>
-                      <span
-                        className={cn(
-                          'min-w-0 flex-1 transition-opacity duration-200',
-                          !isChecked && 'opacity-55',
-                        )}
-                      >
-                        <span className="block text-[15px] font-bold leading-snug text-foreground">
-                          {item.text}
-                        </span>
-                        {cue ? (
-                          <span className="mt-0.5 block text-[13px] font-medium leading-snug text-muted-foreground">
-                            {cue}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-[background-color,border-color,color,transform] duration-200',
-                          isChecked
-                            ? 'scale-100 border-primary bg-primary text-primary-foreground'
-                            : 'scale-95 border-muted-foreground/25 text-transparent',
-                        )}
-                      >
-                        <Check className="h-4 w-4" strokeWidth={3.5} />
-                      </span>
-                    </button>
+                      <Fly size={40} y={-3} interactive={false} />
+                    </motion.span>
                   </motion.li>
-                );
-              })}
-        </ul>
-
-        {!loading && (
-          <p className="mt-4 text-center text-[13px] font-medium text-muted-foreground">
-            {footnote}
-          </p>
-        )}
+                ))}
+          </ul>
+        </motion.section>
       </div>
 
       <div className="flex-1" />
 
       <OnboardingFooter>
         <OnboardingButton
-          onClick={() => commit(selectedIds)}
-          disabled={loading || selectedIds.length === 0 || (committed && !saving)}
+          onClick={() => commit(items.map((item) => item.id))}
+          disabled={loading || (committed && !saving)}
           loading={saving}
         >
           {acceptLabel}
-        </OnboardingButton>
-        <OnboardingButton variant="ghost" onClick={() => commit([])} disabled={busy}>
-          {declineLabel}
         </OnboardingButton>
       </OnboardingFooter>
     </div>

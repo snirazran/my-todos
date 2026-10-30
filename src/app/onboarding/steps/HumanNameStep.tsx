@@ -25,9 +25,8 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
   return (
     <div className="flex-1 flex flex-col relative">
       <OnboardingFrogHeader
-        title={`*RIBBIT* I like the name ${frogName}!`}
-        subtitle="What should I call you?"
-        speechBubbleMessage={`*RIBBIT* I like the name ${frogName}!\nWhat should I call you?`}
+        title="What's your name?"
+        speechBubbleMessage={`*Ribbit ribbit!* Thanks for adopting me. If my name is ${frogName}, what's yours?`}
       />
 
       <motion.div
@@ -51,7 +50,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
             onChange={(event) => setHumanName(event.target.value)}
             className="relative h-16 w-full rounded-3xl border-2 border-border/60 bg-card px-12 text-center text-xl font-black tracking-tight text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.06)] outline-none transition placeholder:font-bold placeholder:text-muted-foreground/40 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
             aria-label="Your name"
-            placeholder="Your first name"
+            placeholder={`Name for ${frogName}'s human…`}
             name="given-name"
             maxLength={40}
             enterKeyHint="next"

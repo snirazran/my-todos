@@ -133,7 +133,7 @@ export default function CelebrationStep({ humanName, frogName, habitCount, ready
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: EASE }}
-          className="flex h-12 items-end justify-center"
+          className="flex justify-center"
         >
           <h1 className={ONBOARDING_TITLE_CLASS}>
             You&apos;re all set{humanName ? `, ${humanName}` : ''}!

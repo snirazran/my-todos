@@ -14,7 +14,71 @@ export type StarterTaskTemplate = {
   emoji?: string;
   moment?: StarterMoment;
   enabled?: boolean;
+  reason?: string;
+  group?: string;
+  movement?: boolean;
+  company?: boolean;
 };
+
+export type StarterBarrier = {
+  id: string;
+  label: string;
+  emoji: string;
+  reason: string;
+  task: StarterTaskTemplate;
+};
+
+export type StarterBarrierSet = {
+  title: string;
+  options: StarterBarrier[];
+};
+
+export type StarterBarrierPrompt = {
+  title: string;
+  options: Array<{ id: string; label: string; emoji: string }>;
+};
+
+export const STARTER_BARRIER_FOLLOW_UPS = 3;
+
+export const STARTER_EASY_WIN_COUNT = 2;
+
+export const STARTER_PROFILE_ANSWERS = {
+  sleep: ['under-5', '5-7', '7-9', 'over-9'],
+  activity: ['on-the-move', 'balanced', 'sitting', 'limited'],
+  overwhelm: ['weekly', 'monthly', 'rarely'],
+  support: ['3-plus', '2', '1', 'just-me'],
+} as const;
+
+export type StarterProfileKey = keyof typeof STARTER_PROFILE_ANSWERS;
+
+export type StarterProfile = {
+  [K in StarterProfileKey]?: (typeof STARTER_PROFILE_ANSWERS)[K][number];
+};
+
+export const STARTER_PROFILE_KEYS = Object.keys(STARTER_PROFILE_ANSWERS) as StarterProfileKey[];
+
+export function parseStarterProfile(read: (key: StarterProfileKey) => unknown): StarterProfile {
+  const profile: Record<string, string> = {};
+  for (const key of STARTER_PROFILE_KEYS) {
+    const value = read(key);
+    if ((STARTER_PROFILE_ANSWERS[key] as readonly unknown[]).includes(value)) {
+      profile[key] = value as string;
+    }
+  }
+  return profile as StarterProfile;
+}
+
+export function starterCapacityCap(profile: StarterProfile): number | undefined {
+  const caps: number[] = [];
+  if (profile.overwhelm === 'weekly') caps.push(3);
+  if (profile.overwhelm === 'monthly') caps.push(4);
+  if (profile.sleep === 'under-5') caps.push(4);
+  return caps.length > 0 ? Math.min(...caps) : undefined;
+}
+
+export const BARRIER_QUESTION_PREFIX = 'barrier:';
+
+export const barrierQuestionId = (categoryId: string) => `${BARRIER_QUESTION_PREFIX}${categoryId}`;
 
 export type StarterPlanItem = {
   id: string;
@@ -28,6 +92,7 @@ export type StarterPlanItem = {
   cadenceLabel: string;
   emoji?: string;
   moment: StarterMoment;
+  reason?: string;
 };
 
 export const STARTER_BASICS_CATEGORY_ID = 'basics';
@@ -49,9 +114,9 @@ export const STARTER_PLAN_DEFAULT_CONFIG: StarterPlanConfig = {
   maxTasks: 5,
   maxPerArea: 3,
   linkTags: true,
-  headline: 'Start small',
-  subheadline: "Tiny daily habits you'll actually keep.",
-  acceptLabel: 'Add {habits}',
+  headline: "{name}'s starter plan",
+  subheadline: 'Try these easy goals with {frog}!',
+  acceptLabel: "Let's do it!",
   declineLabel: 'Skip for now',
   footnote: 'Change or remove any of them later.',
 };
@@ -223,8 +288,10 @@ export function buildStarterPlan(args: {
     shortLabel?: string;
     accent?: string;
     starterTasks?: StarterTaskTemplate[];
+    leadTasks?: StarterTaskTemplate[];
   }>;
   basics?: StarterTaskTemplate[];
+  basicsCount?: number;
   config: StarterPlanConfig;
 }): StarterPlanItem[] {
   const { selectedCategoryIds, categories, config } = args;
@@ -238,11 +305,13 @@ export function buildStarterPlan(args: {
   ) => {
     if (picked.length >= config.maxTasks) return false;
     const key = textKey(template.text);
-    if (seen.has(template.id) || seen.has(key)) return false;
+    const group = template.group ? `group:${template.group}` : null;
+    if (seen.has(template.id) || seen.has(key) || (group && seen.has(group))) return false;
     const days = starterCadenceDays(template.cadence, template.days);
     if (days.length === 0) return false;
     seen.add(template.id);
     seen.add(key);
+    if (group) seen.add(group);
     picked.push({
       id: `${category.id}:${template.id}`,
       categoryId: category.id,
@@ -255,30 +324,36 @@ export function buildStarterPlan(args: {
       cadenceLabel: starterCadenceLabel(template.cadence, template.days),
       emoji: template.emoji,
       moment: template.moment ?? 'day',
+      ...(template.reason ? { reason: template.reason } : {}),
     });
     return true;
   };
 
   const basicsCategory = { id: STARTER_BASICS_CATEGORY_ID, name: 'Easy wins' };
+  let basicsAdded = 0;
   for (const template of args.basics ?? []) {
-    if (template.enabled !== false) add(basicsCategory, template);
+    if (basicsAdded >= (args.basicsCount ?? Infinity)) break;
+    if (template.enabled !== false && add(basicsCategory, template)) basicsAdded += 1;
   }
 
   const pools = selectedCategoryIds
     .map((id) => {
       const category = byId.get(id);
       if (!category) return null;
-      const tasks = (category.starterTasks ?? []).filter(
+      const leads = category.leadTasks ?? [];
+      const tasks = [...leads, ...(category.starterTasks ?? [])].filter(
         (task) => task.enabled !== false,
       );
       if (tasks.length === 0) return null;
-      return { category, tasks, cursor: 0, taken: 0 };
+      return { category, tasks, cursor: 0, taken: 0, led: leads.length > 0 };
     })
-    .filter(Boolean) as Array<{
+    .filter(Boolean)
+    .sort((a, b) => Number(b!.led) - Number(a!.led)) as Array<{
     category: { id: string; name: string; shortLabel?: string; accent?: string };
     tasks: StarterTaskTemplate[];
     cursor: number;
     taken: number;
+    led: boolean;
   }>;
 
   let progressed = true;

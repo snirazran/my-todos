@@ -4,14 +4,16 @@ import dynamic from 'next/dynamic';
 import {
   useEffect,
   useRef,
+  useState,
   type CSSProperties,
   type ReactNode,
   type RefObject,
 } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import type { FrogEmote, FrogHandle, WardrobeSlot } from '@/components/ui/frog';
+import type { FrogEmote, FrogEmoteLoop, FrogHandle, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -27,6 +29,8 @@ export const ONBOARDING_DOCK_POSITION_CLASS =
 const ONBOARDING_DOCK_SURFACE_CLASS =
   'rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]';
 
+const progressEase = (fraction: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, fraction)), 1.5);
+
 export function OnboardingProgressDock({
   done,
   total,
@@ -39,7 +43,7 @@ export function OnboardingProgressDock({
   style?: CSSProperties;
 }) {
   const filled = Math.min(total, done + 1);
-  const pct = total > 0 ? (filled / total) * 100 : 0;
+  const pct = total > 0 ? progressEase(filled / total) * 100 : 0;
   return (
     <div
       className={cn(
@@ -101,6 +105,7 @@ type StageProps = {
   hidden?: boolean;
   pose?: FrogPose | null;
   frogRef?: RefObject<FrogHandle | null>;
+  emote?: FrogEmoteLoop | null;
 };
 
 const poseTransition = (motion: FrogPose['motion']) =>
@@ -113,6 +118,7 @@ export function OnboardingFrogStage({
   hidden = false,
   pose = null,
   frogRef,
+  emote = null,
 }: StageProps) {
   const ownFrogRef = useRef<FrogHandle>(null);
   const stageFrogRef = frogRef ?? ownFrogRef;
@@ -175,11 +181,38 @@ export function OnboardingFrogStage({
             indices={indices}
             paused={hidden || pose?.motion === 'hidden'}
             placeholder={indices === DEFAULT_FROG_INDICES}
+            emote={emote}
           />
         </div>
       </div>
     </div>
   );
+}
+
+const TYPE_DELAY_MS = 350;
+const TYPE_MS_PER_CHAR = 24;
+
+export function useTypewriter(message: string) {
+  const reduceMotion = useReducedMotion();
+  const [typed, setTyped] = useState(0);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setTyped(message.length);
+      return;
+    }
+    setTyped(0);
+    const startAt = performance.now() + TYPE_DELAY_MS;
+    const interval = window.setInterval(() => {
+      const count = Math.floor((performance.now() - startAt) / TYPE_MS_PER_CHAR);
+      if (count <= 0) return;
+      setTyped(Math.min(message.length, count));
+      if (count >= message.length) window.clearInterval(interval);
+    }, TYPE_MS_PER_CHAR);
+    return () => window.clearInterval(interval);
+  }, [message, reduceMotion]);
+
+  return typed;
 }
 
 type Props = {
@@ -195,7 +228,55 @@ export const ONBOARDING_SUBTITLE_CLASS =
   'line-clamp-2 text-balance text-center text-[15px] font-medium leading-5 text-muted-foreground md:text-base';
 
 export const ONBOARDING_HEADER_TOP_CLASS =
-  'top-[calc(346px+env(safe-area-inset-top))] short:top-[calc(298px+env(safe-area-inset-top))] md:top-[338px]';
+  'top-[calc(362px+env(safe-area-inset-top))] short:top-[calc(314px+env(safe-area-inset-top))] md:top-[354px]';
+
+export const ONBOARDING_FLOW_TOP_CLASS =
+  'pt-[calc(362px+env(safe-area-inset-top))] short:pt-[calc(314px+env(safe-area-inset-top))] md:pt-[354px]';
+
+export function OnboardingHeading({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+}) {
+  return (
+    <header className="flex w-full flex-col items-center">
+      {eyebrow ? (
+        <p className="mb-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.14em] text-primary">
+          {eyebrow}
+        </p>
+      ) : null}
+      <h1 className={ONBOARDING_TITLE_CLASS}>{title}</h1>
+      {subtitle ? <p className={cn('mt-2', ONBOARDING_SUBTITLE_CLASS)}>{subtitle}</p> : null}
+    </header>
+  );
+}
+
+export function OnboardingSpeechBubble({
+  message,
+  typedChars,
+}: {
+  message: string;
+  typedChars?: number;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
+      <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
+        <FrogSpeechBubble
+          rate={0}
+          done={0}
+          total={0}
+          fixedMessage={message}
+          typedChars={typedChars}
+          className="!top-[162px] short:!top-[138px] md:!top-[197px]"
+        />
+      </div>
+    </div>
+  );
+}
 
 export function OnboardingFrogHeader({
   title,
@@ -203,31 +284,12 @@ export function OnboardingFrogHeader({
   speechBubbleMessage,
   speechTypedChars,
 }: Props) {
+  if (speechBubbleMessage) {
+    return <OnboardingSpeechBubble message={speechBubbleMessage} typedChars={speechTypedChars} />;
+  }
   return (
-    <>
-      {speechBubbleMessage ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
-          <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
-            <FrogSpeechBubble
-              rate={0}
-              done={0}
-              total={0}
-              fixedMessage={speechBubbleMessage}
-              typedChars={speechTypedChars}
-              className="!top-[162px] short:!top-[138px] md:!top-[197px]"
-            />
-          </div>
-        </div>
-      ) : (
-        <div className={cn('absolute inset-x-0 z-20 px-5 md:px-8', ONBOARDING_HEADER_TOP_CLASS)}>
-          <div className="flex h-12 items-end justify-center">
-            <h1 className={ONBOARDING_TITLE_CLASS}>{title}</h1>
-          </div>
-          <div className="mt-1.5 flex h-10 items-start justify-center">
-            {subtitle ? <p className={ONBOARDING_SUBTITLE_CLASS}>{subtitle}</p> : null}
-          </div>
-        </div>
-      )}
-    </>
+    <div className={cn('absolute inset-x-0 z-20 px-5 md:px-8', ONBOARDING_HEADER_TOP_CLASS)}>
+      <OnboardingHeading title={title} subtitle={subtitle} />
+    </div>
   );
 }

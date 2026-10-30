@@ -9,12 +9,18 @@ import AdoptFrogStep, { KEYBOARD_EASE } from './steps/AdoptFrogStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
+import TraitStep from './steps/TraitStep';
 import ProfileQuestionsStep, {
-  PROFILE_QUESTION_COUNT,
+  PROFILE_PROGRESS_UNITS,
   preloadFocusAreas,
+  useProfileQuestions,
 } from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
-import StarterPlanStep, { preloadStarterPlan } from './steps/StarterPlanStep';
+import StarterPlanStep, {
+  preloadStarterPlan,
+  starterPlanParams,
+  starterPlanUrl,
+} from './steps/StarterPlanStep';
 import CelebrationStep from './steps/CelebrationStep';
 import PlusStep from './steps/PlusStep';
 import { OnboardingTopBar } from './steps/OnboardingTopBar';
@@ -38,8 +44,8 @@ import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
 import { todayTasksKey } from '@/hooks/useTaskData';
 import { preloadBackgrounds } from '@/hooks/useBackgrounds';
 import { markFirstRunPending } from '@/hooks/useFirstRun';
-import { paywallMomentFor } from '@/lib/plusPaywall';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { BARRIER_QUESTION_PREFIX } from '@/lib/quests/starterPlan';
 import { useAutoPopupHold } from '@/lib/popupGate';
 // Answers are drafted before sign-in, so they're persisted locally to survive the
 // email magic-link round trip (which reloads onto a fresh /onboarding). They are
@@ -50,16 +56,50 @@ import {
   saveOnboardingDraft,
 } from '@/lib/onboardingDraft';
 
-const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount', 'plan'] as const;
+const STEP_IDS = [
+  'name',
+  'trait',
+  'humanName',
+  'aboutIntro',
+  'age',
+  'notifications',
+  'createAccount',
+  'plan',
+] as const;
+
+type StepId = (typeof STEP_IDS)[number];
+
+const STEP_UNITS: Record<StepId, number> = {
+  name: 2,
+  trait: 2,
+  humanName: 1,
+  aboutIntro: 1,
+  age: PROFILE_PROGRESS_UNITS,
+  notifications: 1,
+  createAccount: 1,
+  plan: 1,
+};
+
+const STEP_ANALYTICS_INDEX: Record<StepId, number> = {
+  name: 0,
+  trait: 0.5,
+  humanName: 1,
+  aboutIntro: 2,
+  age: 3,
+  notifications: 4,
+  createAccount: 5,
+  plan: 6,
+};
 
 const CELEBRATION_MS = 3000;
 
-const STEP_ENTRY_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
+const STEP_ENTRY_EMOTES: Partial<Record<StepId, FrogEmote>> = {
+  trait: 'question',
   humanName: 'loveShy',
   aboutIntro: 'hop',
-  age: 'question',
   notifications: 'question',
   createAccount: 'loveHeartbeat',
+  plan: 'hop',
 };
 const STEP_ENTRY_DELAY_MS = 380;
 const FREE_TEXT_ANSWERS = new Set(['humanName', 'frogName', 'frogSkin', 'starterPlan', 'starterPlanChoice']);
@@ -180,7 +220,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     trackAnalyticsEvent('onboarding_step_viewed', {
       step: currentId,
-      step_index: STEP_IDS.indexOf(currentId),
+      step_index: STEP_ANALYTICS_INDEX[currentId],
     });
   }, [currentId]);
 
@@ -188,24 +228,47 @@ export default function OnboardingPage() {
     if (currentId === 'humanName') preloadFocusAreas();
   }, [currentId]);
 
-  const focusAreasKey = (selections.focusAreas ?? []).join(',');
+  const starterPlanKey = starterPlanUrl(selections);
   useEffect(() => {
     if (currentId === 'notifications' || currentId === 'createAccount') {
-      preloadStarterPlan(focusAreasKey);
+      preloadStarterPlan(starterPlanKey);
     }
-  }, [currentId, focusAreasKey]);
+  }, [currentId, starterPlanKey]);
 
-  const ageIndex = stepIds.indexOf('age');
+  const { questions: profileQuestions } = useProfileQuestions(selections, currentId !== 'name');
+  const profileQuestion = currentId === 'age' ? profileQuestions[subStep] : undefined;
+  const subScreenName = useMemo(() => {
+    if (currentId === 'trait') return subStep > 0 ? 'gained' : null;
+    if (currentId !== 'age' || subStep === 0 || !profileQuestion) return null;
+    if (!profileQuestion.id.startsWith(BARRIER_QUESTION_PREFIX)) return profileQuestion.id;
+    const barrierNumber = profileQuestions
+      .slice(0, subStep + 1)
+      .filter((q) => q.id.startsWith(BARRIER_QUESTION_PREFIX)).length;
+    return `barrier-${barrierNumber}`;
+  }, [currentId, subStep, profileQuestion, profileQuestions]);
+
+  useEffect(() => {
+    if (!subScreenName) return;
+    trackAnalyticsEvent('onboarding_step_viewed', {
+      step: `${currentId}/${subScreenName}`,
+      step_index: STEP_ANALYTICS_INDEX[currentId] + (currentId === 'trait' ? 0.25 : subStep / 100),
+    });
+  }, [currentId, subScreenName, subStep]);
+
+  useEffect(() => {
+    if (currentId !== 'trait' || subStep === 0) return;
+    const t = window.setTimeout(() => frogRef.current?.fireEmote('celebrate'), 200);
+    return () => window.clearTimeout(t);
+  }, [currentId, subStep]);
+
   const unitsAt = (index: number) =>
-    index +
-    (index > 0 ? 1 : 0) +
-    (ageIndex !== -1 && index > ageIndex ? PROFILE_QUESTION_COUNT - 1 : 0);
+    stepIds.slice(0, index).reduce((sum, id) => sum + STEP_UNITS[id], 0);
   const totalUnits = unitsAt(stepIds.length);
-  const doneUnits = currentId === 'age' ? unitsAt(step) + subStep : unitsAt(step);
-
+  const doneUnits =
+    unitsAt(step) + (currentId === 'age' || currentId === 'trait' ? subStep : 0);
   const goToStep = (next: number, dir: number) => {
     setDirection(dir);
-    setSubStep(stepIds[next] === 'age' && dir < 0 ? PROFILE_QUESTION_COUNT - 1 : 0);
+    setSubStep(stepIds[next] === 'age' && dir < 0 ? profileQuestions.length - 1 : 0);
     setStep(next);
   };
 
@@ -280,20 +343,15 @@ export default function OnboardingPage() {
 
       savePromiseRef.current = saveOnboarding(timezone);
       if (offerPlus) {
-        const uid = auth?.currentUser?.uid;
-        const moment = uid ? paywallMomentFor(uid) : 'onboarding';
-        trackAnalyticsEvent('paywall_moment_assigned', { moment });
-        if (moment === 'onboarding') {
-          setPaywallOpen(true);
-          return;
-        }
+        setPaywallOpen(true);
+        return;
       }
       await finishOnboarding(savePromiseRef.current);
     }
   };
 
   const saveOnboarding = async (timezone: string) => {
-    const focusAreaIds = selections.focusAreas ?? [];
+    const { areas: focusAreaIds, barriers, profile } = starterPlanParams(selections);
     try {
       const starterPlanIds = selections.starterPlan ?? [];
       let starterCategoryTagMap: Array<{ categoryId: string; tagIds: string[] }> = [];
@@ -306,6 +364,8 @@ export default function OnboardingPage() {
             body: JSON.stringify({
               itemIds: starterPlanIds,
               selectedCategoryIds: focusAreaIds,
+              barriers,
+              profile,
               timezone,
             }),
           });
@@ -327,6 +387,7 @@ export default function OnboardingPage() {
             usedBefore: selections.usedBefore?.[0] ?? null,
             onboardingResponses: selections,
             starterSkin: starterSkin.key,
+            frogTrait: selections.frogTrait?.[0] ?? null,
           }),
         }),
         focusAreaIds.length > 0
@@ -403,7 +464,7 @@ export default function OnboardingPage() {
   };
 
   const handleBack = async () => {
-    if (currentId === 'age' && subStep > 0) {
+    if ((currentId === 'age' || currentId === 'trait') && subStep > 0) {
       setDirection(-1);
       setSubStep((s) => s - 1);
       return;
@@ -426,7 +487,7 @@ export default function OnboardingPage() {
       router.replace('/welcome');
       return;
     }
-    goToStep(stepIds[step - 1] === 'aboutIntro' && step >= 2 ? step - 2 : step - 1, -1);
+    goToStep(step - 1, -1);
   };
 
   const stepProps: OnboardingStepProps = {
@@ -449,30 +510,32 @@ export default function OnboardingPage() {
       ref={mainRef}
       className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4"
     >
-      {(currentId !== 'plan' || celebrating) && !paywallOpen && (
+      {!paywallOpen && (
         <>
-          <OnboardingBackground style={backdropLift} />
-          <div
-            aria-hidden
-            style={backdropLift}
-            className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(300px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px]"
-          />
-          <OnboardingProgressDock
-            done={celebrating ? totalUnits : doneUnits}
-            total={totalUnits}
-            className={cn('z-[5]', currentId === 'name' && !celebrating && 'opacity-0')}
-          />
+          {(currentId !== 'plan' || celebrating) && (
+            <>
+              <OnboardingBackground style={backdropLift} />
+              <div
+                aria-hidden
+                style={backdropLift}
+                className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(300px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px]"
+              />
+              <OnboardingProgressDock
+                done={celebrating ? totalUnits : doneUnits}
+                total={totalUnits}
+                className={cn('z-[5]', currentId === 'name' && !celebrating && 'opacity-0')}
+              />
+            </>
+          )}
         </>
       )}
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
         <OnboardingFrogStage
           indices={stageIndices}
           frogRef={frogRef}
-          hidden={
-            paywallOpen ||
-            (!celebrating && ((currentId === 'name' && !frogPose) || currentId === 'plan'))
-          }
+          hidden={paywallOpen || (!celebrating && currentId === 'name' && !frogPose)}
           pose={currentId === 'name' && !celebrating ? frogPose : null}
+          emote={currentId === 'age' && !celebrating && !paywallOpen ? 'question' : null}
         />
         {!celebrating && !paywallOpen && currentId !== 'name' && (
           <OnboardingTopBar onBack={step === 0 && hasAccount ? undefined : handleBack} />
@@ -506,6 +569,9 @@ export default function OnboardingPage() {
                 onFrogPose={setFrogPose}
                 progressTotal={totalUnits}
               />
+            )}
+            {currentId === 'trait' && (
+              <TraitStep {...stepProps} subStep={subStep} onSubStepChange={handleSubStepChange} />
             )}
             {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
             {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}

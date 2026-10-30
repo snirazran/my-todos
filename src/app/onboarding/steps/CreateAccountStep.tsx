@@ -46,7 +46,12 @@ import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
 import { trackRegistration } from '@/lib/adpixels/client';
 import type { OnboardingStepProps } from './types';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import {
+  OnboardingHeading,
+  OnboardingSpeechBubble,
+  ONBOARDING_FLOW_TOP_CLASS,
+  useTypewriter,
+} from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 type Step = 'enter' | 'email-sent';
@@ -58,9 +63,11 @@ type ReturningAccount = {
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
+const SAVE_ME_LINE = '*Ribbit!* Save me so I remember everything you told me!';
+
 const SAVED_HOLD_MS = 650;
-const CARD_FULL_PX = 80;
-const CARD_COMPACT_PX = 64;
+const CARD_FULL_PX = 96;
+const CARD_COMPACT_PX = 76;
 
 type CardSize = 'full' | 'compact' | 'none';
 
@@ -100,6 +107,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     'new-account',
   );
   const [switching, setSwitching] = useState(false);
+  const typedSaveLine = useTypewriter(SAVE_ME_LINE);
 
   useEffect(() => {
     setAppleFirst(Capacitor.getPlatform() === 'ios');
@@ -361,22 +369,24 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
           Skip
         </button>
       ) : null}
-      <OnboardingFrogHeader
-        title={step === 'enter' ? `Don't lose ${frogName}!` : 'Check your inbox'}
-        subtitle={
-          step === 'enter'
-            ? 'Save your progress with a free account.'
-            : sentIntent === 'existing-account'
-              ? 'Tap the link to sign back into your account.'
-              : 'Tap the link to finish. You can keep going meanwhile.'
-        }
-      />
-
-      <div className={cn('relative z-20 flex w-full flex-1 flex-col items-center', ONBOARDING_BODY_CLASS)}>
+      {step === 'enter' ? (
+        <OnboardingSpeechBubble message={SAVE_ME_LINE} typedChars={typedSaveLine} />
+      ) : null}
+      <div className={cn('relative z-20 flex w-full flex-1 flex-col items-center', ONBOARDING_FLOW_TOP_CLASS)}>
+        <OnboardingHeading
+          title={step === 'enter' ? `Don't lose ${frogName}!` : 'Check your inbox'}
+          subtitle={
+            step === 'enter'
+              ? 'Save your progress with a free account.'
+              : sentIntent === 'existing-account'
+                ? 'Tap the link to sign back into your account.'
+                : 'Tap the link to finish. You can keep going meanwhile.'
+          }
+        />
         {step === 'enter' ? (
-          <div ref={roomRef} className="relative w-full flex-1 md:w-80">
+          <div ref={roomRef} className="relative mt-6 w-full flex-1 md:w-80">
             {cardSize !== 'none' ? (
-              <div className="absolute inset-0 flex items-center">
+              <div className="absolute inset-x-0 top-0">
                 <SaveCard
                   frogName={frogName}
                   humanName={humanName}
@@ -391,7 +401,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         {step === 'email-sent' ? (
           <motion.div
             {...swap}
-            className="mt-5 flex w-full max-w-sm items-center gap-3.5 rounded-[20px] border-2 border-border/60 bg-card px-4 py-3.5 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]"
+            className="mt-6 flex w-full max-w-sm items-center gap-3.5 rounded-[20px] border-2 border-border/60 bg-card px-4 py-3.5 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]"
           >
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
               <MailCheck className="h-[22px] w-[22px]" strokeWidth={2.25} />
@@ -412,13 +422,13 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       <OnboardingFooter
         className={
           step === 'enter' && !emailOpen
-            ? 'pb-[calc(1rem+env(safe-area-inset-bottom))]'
+            ? 'pb-[calc(1.25rem+env(safe-area-inset-bottom))]'
             : undefined
         }
       >
         <AnimatePresence mode="wait" initial={false}>
           {step === 'enter' && !emailOpen ? (
-            <motion.div key="providers" {...swap} className="flex w-full flex-col gap-2 md:w-80">
+            <motion.div key="providers" {...swap} className="flex w-full flex-col gap-3 md:w-80">
               {providerButtons}
               <ProviderButton
                 onClick={() => {
@@ -477,7 +487,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         {error ? <ErrorMsg>{error}</ErrorMsg> : null}
 
         {step === 'enter' ? (
-          <p className="mt-0.5 max-w-[23rem] text-balance text-center text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1 max-w-[23rem] text-balance text-center text-[11px] leading-snug text-muted-foreground">
             By continuing, you agree to our{' '}
             <Link href="/terms" className={LEGAL_LINK_CLASS}>
               Terms

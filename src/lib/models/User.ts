@@ -18,6 +18,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    frogTraits: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     email: { type: String, required: false, lowercase: true, index: true, sparse: true },
     passwordHash: { type: String, required: false },
     phoneNumber: { type: String, required: false, index: true, sparse: true },

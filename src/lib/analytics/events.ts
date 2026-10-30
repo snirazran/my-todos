@@ -487,6 +487,8 @@ const ALLOWED_PROPERTY_KEYS = new Set([
   'areas',
   'offered',
   'tasks',
+  'barriers',
+  'plan_load',
   'balance',
   'list_size',
   'price',

@@ -8,8 +8,9 @@ import UserModel from '@/lib/models/User';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { createTasksForUser } from '@/app/api/tasks/route';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import { buildStarterPlanForAreas } from '@/lib/quests/starterPlanServer';
+import { buildStarterPlanForAreas, parseStarterBarriers } from '@/lib/quests/starterPlanServer';
 import {
+  parseStarterProfile,
   pickStarterTagColor,
   STARTER_BASICS_CATEGORY_ID,
   type StarterPlanItem,
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest) {
     const selectedCategoryIds = parseAreas(searchParams.get('areas'));
     const { config, items } = await buildStarterPlanForAreas({
       selectedCategoryIds,
+      barriers: parseStarterBarriers(searchParams.get('barriers')),
+      profile: parseStarterProfile((key) => searchParams.get(key)),
     });
     return NextResponse.json({
       isActive: config.isActive,
@@ -74,6 +77,10 @@ export async function POST(req: NextRequest) {
     const acceptedIds: string[] = Array.isArray(body.itemIds)
       ? body.itemIds.filter((id: unknown) => typeof id === 'string').slice(0, 20)
       : [];
+    const barriers = parseStarterBarriers(body.barriers);
+    const rawProfile: Record<string, unknown> =
+      body.profile && typeof body.profile === 'object' ? body.profile : {};
+    const profile = parseStarterProfile((key) => rawProfile[key]);
 
     await connectMongo();
 
@@ -106,6 +113,8 @@ export async function POST(req: NextRequest) {
 
     const { config, items } = await buildStarterPlanForAreas({
       selectedCategoryIds,
+      barriers,
+      profile,
     });
     const accepted = items.filter((item) => acceptedIds.includes(item.id));
     if (accepted.length === 0) {
@@ -215,6 +224,8 @@ export async function POST(req: NextRequest) {
         tasks: created,
         offered: items.length,
         areas: usedCategoryIds.length,
+        barriers: accepted.filter((item) => !!item.reason).length,
+        ...(profile.overwhelm ? { plan_load: profile.overwhelm } : {}),
       },
     });
 

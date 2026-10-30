@@ -12,14 +12,6 @@ export type PaywallContext = {
 
 export const TRIAL_REMINDER_LEAD_MS = 48 * 60 * 60 * 1000;
 
-export type PaywallMoment = 'onboarding' | 'first_gift';
-
-export function paywallMomentFor(uid: string): PaywallMoment {
-  let hash = 0;
-  for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
-  return hash % 2 === 0 ? 'onboarding' : 'first_gift';
-}
-
 export function skipAdsPlacement(placement: string): string {
   return `skip_ads_${placement}`;
 }

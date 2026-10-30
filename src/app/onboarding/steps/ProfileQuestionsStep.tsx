@@ -2,39 +2,43 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
 import useSWR, { preload } from 'swr';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import type { MacroCategoryDefinition } from '@/lib/quests/types';
-import { OnboardingFrogHeader } from './OnboardingFrogHeader';
+import {
+  barrierQuestionId,
+  STARTER_BARRIER_FOLLOW_UPS,
+  type StarterBarrierPrompt,
+} from '@/lib/quests/starterPlan';
+import { OnboardingHeading, ONBOARDING_FLOW_TOP_CLASS } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 import { hapticSelect } from '@/lib/haptics';
 
 type AboutOption = {
   id: string;
   label: string;
-  description?: string;
   icon?: string;
-  iconImageUrl?: string;
 };
 
-type AboutQuestion = {
+export type ProfileSectionId = 'you' | 'energy' | 'life' | 'areas';
+
+export type ProfileQuestion = {
   id: string;
   title: string;
   subtitle?: string;
-  sectionLabel: string;
+  section: ProfileSectionId;
   multiSelect?: boolean;
   options: AboutOption[];
   plainOption?: { id: string; label: string };
 };
 
-const ABOUT_QUESTIONS: AboutQuestion[] = [
+const ABOUT_QUESTIONS: ProfileQuestion[] = [
   {
     id: 'age',
     title: 'How old are you?',
     subtitle: 'This helps us personalize your experience',
-    sectionLabel: 'About You',
+    section: 'you',
     options: [
       { id: 'under-18', label: 'Under 18' },
       { id: '18-24', label: '18-24' },
@@ -48,7 +52,7 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
   {
     id: 'aboutGender',
     title: "What's your gender?",
-    sectionLabel: 'About You',
+    section: 'you',
     options: [
       { id: 'male', label: 'Male', icon: '💙' },
       { id: 'female', label: 'Female', icon: '💗' },
@@ -59,40 +63,122 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
   {
     id: 'usedBefore',
     title: 'Have you used Frogress before?',
-    sectionLabel: 'About You',
+    section: 'you',
     options: [
       { id: 'first-time', label: 'No, this is my first time!', icon: '🍼' },
       { id: 'starting-fresh', label: "Yes, but I'm starting fresh", icon: '☕' },
+    ],
+  },
+  {
+    id: 'sleep',
+    title: 'How long do you usually sleep at night?',
+    section: 'energy',
+    options: [
+      { id: 'under-5', label: 'Less than 5 hours', icon: '😴' },
+      { id: '5-7', label: '5-7 hours', icon: '🛏️' },
+      { id: '7-9', label: '7-9 hours', icon: '🌙' },
+      { id: 'over-9', label: 'More than 9 hours', icon: '🌞' },
+    ],
+  },
+  {
+    id: 'activity',
+    title: 'How active are you during the day?',
+    section: 'energy',
+    options: [
+      { id: 'on-the-move', label: "I'm on the move most of the day", icon: '🏃' },
+      { id: 'balanced', label: 'I mix sitting with some movement', icon: '🚶' },
+      { id: 'sitting', label: 'I sit a lot and want to move more', icon: '💺' },
+      { id: 'limited', label: 'I have conditions that limit my movement', icon: '🌻' },
+    ],
+  },
+  {
+    id: 'overwhelm',
+    title: 'How often do you feel overwhelmed?',
+    section: 'life',
+    options: [
+      { id: 'weekly', label: 'Several times a week', icon: '😫' },
+      { id: 'monthly', label: 'A few stressful days a month', icon: '😕' },
+      { id: 'rarely', label: 'Rarely, I handle stress pretty well', icon: '😌' },
+    ],
+  },
+  {
+    id: 'support',
+    title: 'How many people can you lean on when things get tough?',
+    section: 'life',
+    options: [
+      { id: '3-plus', label: '3 or more', icon: '🌳' },
+      { id: '2', label: '2', icon: '🌿' },
+      { id: '1', label: '1', icon: '🌱' },
+      { id: 'just-me', label: 'Just me', icon: '🍃' },
     ],
   },
 ];
 
 const FOCUS_AREAS_QUESTION_ID = 'focusAreas';
 
-// The focus areas are the only question with enough options to scroll on a
-// desktop window. Widening past the phone-width column lets the cover art lead
-// without overflowing; the shell behind is plain `bg-background`, so the
-// breakout reads as seamless below the header artwork. The flex parent centers
-// on the cross axis, so an over-wide child stays centred without an offset.
-const FOCUS_AREAS_WIDTH_CLASS = 'md:w-[min(100vw-4rem,56rem)] md:max-w-none';
+const SECTION_LABELS: Record<ProfileSectionId, string> = {
+  you: 'About you',
+  energy: 'Energy & activity',
+  life: "How's life",
+  areas: 'Support areas',
+};
 
-export const PROFILE_QUESTION_COUNT = ABOUT_QUESTIONS.length + 1;
+export const PROFILE_PROGRESS_UNITS = ABOUT_QUESTIONS.length + 1 + STARTER_BARRIER_FOLLOW_UPS;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const FOCUS_AREAS_URL = '/api/onboarding/categories';
 
+type FocusAreaCategory = MacroCategoryDefinition & {
+  barriers?: StarterBarrierPrompt | null;
+  support?: { emoji: string; label: string };
+};
+
+export function useProfileQuestions(selections: Record<string, string[]>, enabled = true) {
+  const { data } = useSWR<{ macroCategories?: FocusAreaCategory[] }>(
+    enabled ? FOCUS_AREAS_URL : null,
+    fetcher,
+  );
+  const categories = useMemo(() => data?.macroCategories ?? [], [data]);
+  const picked = selections[FOCUS_AREAS_QUESTION_ID];
+
+  const questions = useMemo(() => {
+    const focusAreasQuestion: ProfileQuestion = {
+      id: FOCUS_AREAS_QUESTION_ID,
+      title: 'What areas would you like support with?',
+      subtitle: 'Pick as many as you like',
+      section: 'areas',
+      multiSelect: true,
+      options: categories.map((c) => ({
+        id: c.id,
+        label: c.support?.label || c.name,
+        icon: c.support?.emoji || '✨',
+      })),
+    };
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    const followUps = (picked ?? [])
+      .map((id) => byId.get(id))
+      .filter((c): c is FocusAreaCategory & { barriers: StarterBarrierPrompt } => !!c?.barriers)
+      .slice(0, STARTER_BARRIER_FOLLOW_UPS)
+      .map(
+        (c): ProfileQuestion => ({
+          id: barrierQuestionId(c.id),
+          title: c.barriers.title,
+          subtitle: 'Pick all that apply',
+          section: 'areas',
+          multiSelect: true,
+          options: c.barriers.options.map((o) => ({ id: o.id, label: o.label, icon: o.emoji })),
+          plainOption: { id: 'other', label: 'Something else' },
+        }),
+      );
+    return [...ABOUT_QUESTIONS, focusAreasQuestion, ...followUps];
+  }, [categories, picked]);
+
+  return { questions, categories };
+}
+
 export function preloadFocusAreas() {
-  preload(FOCUS_AREAS_URL, fetcher)
-    .then((data: { macroCategories?: MacroCategoryDefinition[] } | null) => {
-      data?.macroCategories?.forEach((category) => {
-        if (!category.coverImageUrl) return;
-        const image = new Image();
-        image.decoding = 'async';
-        image.src = category.coverImageUrl;
-      });
-    })
-    .catch(() => {});
+  preload(FOCUS_AREAS_URL, fetcher).catch(() => {});
 }
 
 type Props = OnboardingStepProps & {
@@ -109,44 +195,17 @@ export default function ProfileQuestionsStep({
   subStep,
   onSubStepChange,
 }: Props) {
-  const questionIndex = subStep;
-
-  const { data: questsData } = useSWR<{ macroCategories?: MacroCategoryDefinition[] }>(
-    FOCUS_AREAS_URL,
-    fetcher,
-  );
-
-  const focusAreaCategories = questsData?.macroCategories ?? [];
-
-  const focusAreasQuestion: AboutQuestion = useMemo(
-    () => ({
-      id: FOCUS_AREAS_QUESTION_ID,
-      title: 'What areas would you like support with?',
-      sectionLabel: 'Areas',
-      multiSelect: true,
-      options: focusAreaCategories.map((c) => ({
-        id: c.id,
-        label: c.name,
-        description: c.onboardingSentence?.trim() || undefined,
-      })),
-    }),
-    [focusAreaCategories],
-  );
-
-  const displayedQuestions = useMemo(
-    () => [...ABOUT_QUESTIONS, focusAreasQuestion],
-    [focusAreasQuestion],
-  );
+  const { questions: displayedQuestions } = useProfileQuestions(selections);
+  const questionIndex = Math.min(subStep, displayedQuestions.length - 1);
   const currentQuestion = displayedQuestions[questionIndex];
-  const isFocusAreas = currentQuestion.id === FOCUS_AREAS_QUESTION_ID;
   const selectedValues = selections[currentQuestion.id] ?? [];
   const selected = selectedValues[0];
+  const plainId = currentQuestion.plainOption?.id;
+  const pickedCount = selectedValues.filter((id) => id !== plainId).length;
   const compactGrid =
     !currentQuestion.multiSelect &&
     currentQuestion.options.length > 4 &&
-    currentQuestion.options.every(
-      (o) => !o.icon && !o.iconImageUrl && !o.description,
-    );
+    currentQuestion.options.every((o) => !o.icon);
 
   const advanceTimerRef = useRef<number | null>(null);
 
@@ -157,259 +216,143 @@ export default function ProfileQuestionsStep({
     };
   }, [questionIndex]);
 
-  const chooseOption = (id: string) => {
-    hapticSelect();
-    if (currentQuestion.multiSelect) {
-      onSelect(currentQuestion.id, id, true);
-      return;
+  const advance = () => {
+    if (questionIndex < displayedQuestions.length - 1) {
+      onSubStepChange(questionIndex + 1);
+    } else {
+      onNext();
     }
+  };
 
-    if (advanceTimerRef.current !== null) return;
-    onSelect(currentQuestion.id, id);
+  const advanceSoon = () => {
     advanceTimerRef.current = window.setTimeout(() => {
       advanceTimerRef.current = null;
-      if (questionIndex < displayedQuestions.length - 1) {
-        onSubStepChange(questionIndex + 1);
-      } else {
-        onNext();
-      }
+      advance();
     }, 240);
   };
 
-  const handleMultiSelectNext = () => {
-    if (selectedValues.length === 0) return;
-    if (questionIndex < displayedQuestions.length - 1) {
-      onSubStepChange(questionIndex + 1);
+  const chooseOption = (id: string) => {
+    hapticSelect();
+    if (currentQuestion.multiSelect) {
+      if (plainId && selectedValues.includes(plainId)) onSelect(currentQuestion.id, '__clear__');
+      onSelect(currentQuestion.id, id, true);
       return;
     }
-    onNext();
+    if (advanceTimerRef.current !== null) return;
+    onSelect(currentQuestion.id, id);
+    advanceSoon();
+  };
+
+  const choosePlainOption = (id: string) => {
+    hapticSelect();
+    if (advanceTimerRef.current !== null) return;
+    onSelect(currentQuestion.id, id);
+    advanceSoon();
+  };
+
+  const handleMultiSelectNext = () => {
+    if (pickedCount === 0) return;
+    advance();
   };
 
   return (
-    <div className="flex-1 flex flex-col">
-      <OnboardingFrogHeader
-        title={currentQuestion.title}
-        subtitle={currentQuestion.subtitle}
-      />
-
-      <div className="relative z-20 flex flex-col pt-[calc(442px+env(safe-area-inset-top))] short:pt-[calc(390px+env(safe-area-inset-top))] md:pt-[436px]">
-      <motion.div
-        key={currentQuestion.id}
-        custom={direction}
-        initial={{ opacity: 0, x: direction * 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: direction * -40 }}
-        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col items-center"
-      >
-        <div
-          className={cn(
-            'flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col pb-6',
-            'mt-1 gap-2.5',
-            isFocusAreas
-              ? FOCUS_AREAS_WIDTH_CLASS
-              : 'md:mx-auto md:w-full md:max-w-md',
-          )}
+    <div className="flex flex-1 flex-col">
+      <div className={cn('relative z-20 flex flex-col', ONBOARDING_FLOW_TOP_CLASS)}>
+        <OnboardingHeading
+          eyebrow={SECTION_LABELS[currentQuestion.section]}
+          title={currentQuestion.title}
+          subtitle={currentQuestion.subtitle}
+        />
+        <motion.div
+          key={currentQuestion.id}
+          custom={direction}
+          initial={{ opacity: 0, x: direction * 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: direction * -40 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col items-center"
         >
-          {isFocusAreas ? (
-            <div
-              className={cn(
-                'grid gap-2.5 md:gap-3',
-                focusAreaCategories.length <= 1
-                  ? 'grid-cols-1'
-                  : focusAreaCategories.length === 2
-                    ? 'grid-cols-2'
-                    : 'grid-cols-3',
-              )}
-            >
-              {focusAreaCategories.map((category, index) => {
-                const isSelected = selectedValues.includes(category.id);
+          <div className="mt-5 flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col gap-2.5 pb-6 md:mx-auto md:w-full md:max-w-md">
+            <div className={compactGrid ? 'grid grid-cols-2 gap-2.5' : 'contents'}>
+              {currentQuestion.options.map((option, optionIndex) => {
+                const isSelected = currentQuestion.multiSelect
+                  ? selectedValues.includes(option.id)
+                  : selected === option.id;
                 return (
-                  <motion.button
-                    key={category.id}
+                  <button
+                    key={option.id}
                     type="button"
                     aria-pressed={isSelected}
-                    onClick={() => chooseOption(category.id)}
+                    onClick={() => chooseOption(option.id)}
                     disabled={saving}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: 0.06 * index,
-                      duration: 0.3,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                    whileTap={{ scale: 0.98 }}
                     className={cn(
-                      'relative block overflow-hidden rounded-3xl border-2 bg-background text-left shadow-sm transition-colors duration-200',
-                      focusAreaCategories.length >= 3
-                        ? 'aspect-[3/4] md:aspect-[16/9]'
-                        : 'aspect-[16/9]',
-                      '[-webkit-tap-highlight-color:transparent]',
+                      'relative rounded-2xl border-2 bg-card text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.06)] transition-all duration-150 [-webkit-tap-highlight-color:transparent] active:translate-y-[2px] active:shadow-none',
+                      option.icon
+                        ? 'flex min-h-[62px] items-center gap-3.5 py-2 pl-4 pr-3 text-left text-[15.5px] font-extrabold leading-snug md:min-h-[56px]'
+                        : 'h-[62px] text-base font-black md:h-[56px]',
+                      compactGrid &&
+                        optionIndex === currentQuestion.options.length - 1 &&
+                        currentQuestion.options.length % 2 === 1 &&
+                        'col-span-2',
                       isSelected
-                        ? 'border-primary ring-4 ring-primary/25'
-                        : 'border-transparent [@media(hover:hover)]:hover:border-white/50',
+                        ? 'border-primary bg-primary/10 text-primary shadow-none'
+                        : 'border-border/60 [@media(hover:hover)]:hover:border-primary/40',
                       saving && 'cursor-not-allowed opacity-70',
                     )}
                   >
-                    <span className="absolute inset-0">
-                      {category.coverImageUrl ? (
-                        <img
-                          src={category.coverImageUrl}
-                          alt=""
-                          className={cn(
-                            'absolute inset-0 h-full w-full object-cover transition-transform duration-300',
-                            isSelected && 'scale-110',
-                          )}
-                        />
-                      ) : (
+                    {option.icon ? (
+                      <>
                         <span
-                          className="absolute inset-0"
-                          style={{
-                            background: `linear-gradient(135deg, ${category.backgroundFrom}, ${category.backgroundTo})`,
-                          }}
-                        />
-                      )}
-                    </span>
-
-                    {/* Scrim: darkens only the slice behind the text so the art stays vivid. */}
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0"
-                      style={{
-                        background:
-                          'linear-gradient(to top, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.26) 20%, rgba(0,0,0,0) 40%)',
-                      }}
-                    />
-
-                    <span className="absolute inset-x-0 bottom-0 z-10 p-2.5 md:p-4">
-                      <span className="block text-sm font-black leading-tight tracking-tight text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.7)] md:text-lg">
-                        {category.name}
-                      </span>
-                    </span>
-
-                    <span
-                      className={cn(
-                        'absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full border-2 transition-all duration-200 md:right-3 md:top-3 md:h-8 md:w-8',
-                        isSelected
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-white/90 bg-white/15 text-transparent shadow-[0_1px_6px_rgba(0,0,0,0.35)] backdrop-blur-sm',
-                      )}
-                      aria-hidden
-                    >
-                      <Check className="h-4 w-4 stroke-[3.5]" />
-                    </span>
-                  </motion.button>
+                          aria-hidden
+                          className="grid h-10 w-10 shrink-0 place-items-center text-[28px] leading-none"
+                        >
+                          {option.icon}
+                        </span>
+                        <span className="flex-1">{option.label}</span>
+                        {currentQuestion.multiSelect && (
+                          <span
+                            aria-hidden
+                            className={cn(
+                              'grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl font-semibold leading-none transition-colors',
+                              isSelected
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground',
+                            )}
+                          >
+                            {isSelected ? '−' : '+'}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      option.label
+                    )}
+                  </button>
                 );
               })}
             </div>
-          ) : (
-            <>
-              <div className={compactGrid ? 'grid grid-cols-2 gap-2.5' : 'contents'}>
-              {currentQuestion.options.map((option, optionIndex) => {
-            const isSelected = currentQuestion.multiSelect
-              ? selectedValues.includes(option.id)
-              : selected === option.id;
-            const hasIcon = !!option.icon || !!option.iconImageUrl;
-            const hasDescription = !!option.description;
-            return (
+            {currentQuestion.plainOption && (
               <button
-                key={option.id}
                 type="button"
-                aria-pressed={isSelected}
-                onClick={() => chooseOption(option.id)}
+                onClick={() => choosePlainOption(currentQuestion.plainOption!.id)}
                 disabled={saving}
                 className={cn(
-                  'relative rounded-2xl border-2 bg-card text-base font-black text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.06)] transition-all duration-150 [-webkit-tap-highlight-color:transparent] active:translate-y-[2px] active:shadow-none',
-                  hasDescription
-                    ? 'flex flex-col items-center justify-center gap-1 px-5 py-4 text-center md:py-3.5'
-                    : 'h-[62px] md:h-[56px]',
-                  !hasDescription && hasIcon && 'flex items-center justify-start gap-4 px-5 text-left',
-                  compactGrid &&
-                    optionIndex === currentQuestion.options.length - 1 &&
-                    currentQuestion.options.length % 2 === 1 &&
-                    'col-span-2',
-                  isSelected
-                    ? 'border-primary bg-primary/10 text-primary shadow-none'
-                    : 'border-border/60 [@media(hover:hover)]:hover:border-primary/40',
+                  'mt-4 h-12 text-base font-black text-muted-foreground transition-colors hover:text-foreground active:scale-[0.98]',
                   saving && 'cursor-not-allowed opacity-70',
                 )}
               >
-                {hasDescription ? (
-                  <>
-                    <span>{option.label}</span>
-                    {option.description ? (
-                      <span
-                        className={cn(
-                          'text-sm font-medium leading-snug',
-                          isSelected ? 'text-primary/75' : 'text-muted-foreground',
-                        )}
-                      >
-                        {option.description}
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    {option.iconImageUrl ? (
-                      <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
-                        <img
-                          src={option.iconImageUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      </span>
-                    ) : option.icon ? (
-                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-3xl leading-none">
-                        {option.icon}
-                      </span>
-                    ) : null}
-                    <span className="flex-1">{option.label}</span>
-                    {currentQuestion.multiSelect && (
-                      <span
-                        className={cn(
-                          'flex h-11 w-11 items-center justify-center rounded-full text-3xl font-medium transition-colors',
-                          isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-                        )}
-                      >
-                        {isSelected ? '−' : '+'}
-                      </span>
-                    )}
-                  </>
-                )}
+                {currentQuestion.plainOption.label}
               </button>
-            );
-          })}
-              </div>
-          {currentQuestion.plainOption && (
-            <button
-              type="button"
-              onClick={() => chooseOption(currentQuestion.plainOption!.id)}
-              disabled={saving}
-              className={cn(
-                'mt-7 h-12 text-base font-black text-muted-foreground transition-colors hover:text-foreground active:scale-[0.98]',
-                saving && 'cursor-not-allowed opacity-70',
-              )}
-            >
-              {currentQuestion.plainOption.label}
-            </button>
-          )}
-            </>
-          )}
-        </div>
-
-      </motion.div>
+            )}
+          </div>
+        </motion.div>
       </div>
 
       {currentQuestion.multiSelect && (
         <>
           <div className="flex-1" />
           <OnboardingFooter>
-            <OnboardingButton
-              onClick={handleMultiSelectNext}
-              disabled={selectedValues.length === 0}
-              loading={saving}
-            >
-              {selectedValues.length > 0 ? `Continue · ${selectedValues.length} picked` : 'Pick at least one'}
+            <OnboardingButton onClick={handleMultiSelectNext} disabled={pickedCount === 0} loading={saving}>
+              {pickedCount > 0 ? `Continue · ${pickedCount} picked` : 'Pick at least one'}
             </OnboardingButton>
           </OnboardingFooter>
         </>
