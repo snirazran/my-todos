@@ -102,10 +102,14 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const PLAN_ROW_CLASS = `flex items-center gap-3 pl-4 pr-2 ${HOME_CARD_SURFACE}`;
 
 const planRowSizeClass = (count: number) =>
-  count >= 5 ? 'min-h-[58px] py-1.5' : count === 4 ? 'min-h-[62px] py-2' : 'min-h-[68px] py-2.5';
+  count >= 5
+    ? 'min-h-[52px] py-1 text-[16px]'
+    : count === 4
+      ? 'min-h-[60px] py-2 text-[17px]'
+      : 'min-h-[66px] py-2.5 text-[17px]';
 
 const PLAN_TOP_CLASS =
-  'pt-[calc(270px+env(safe-area-inset-top))] short:pt-[calc(232px+env(safe-area-inset-top))] md:pt-[264px]';
+  'pt-[calc(222px+env(safe-area-inset-top))] short:pt-[calc(200px+env(safe-area-inset-top))] md:pt-[264px]';
 
 export default function StarterPlanStep({
   selections,
@@ -186,7 +190,7 @@ export default function StarterPlanStep({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: EASE }}
           aria-labelledby="starter-plan-title"
-          className="pond-panel relative rounded-[28px] border-2 border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3 pt-6 shadow-[0_4px_0_0_var(--pond-line)]"
+          className="pond-panel relative rounded-[28px] border-2 border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3 pt-5 shadow-[0_4px_0_0_var(--pond-line)]"
         >
           <span
             aria-hidden
@@ -202,7 +206,7 @@ export default function StarterPlanStep({
             {subheadline}
           </p>
 
-          <ul aria-labelledby="starter-plan-title" className="mt-3.5 flex flex-col gap-2">
+          <ul aria-labelledby="starter-plan-title" className="mt-3 flex flex-col gap-2">
             {loading
               ? [0, 1, 2, 3].map((i) => (
                   <li key={i} className={cn(PLAN_ROW_CLASS, planRowSizeClass(4))}>
@@ -222,7 +226,7 @@ export default function StarterPlanStep({
                     }
                     className={cn(PLAN_ROW_CLASS, planRowSizeClass(items.length))}
                   >
-                    <span className="min-w-0 flex-1 text-[17px] font-semibold leading-snug text-foreground">
+                    <span className="min-w-0 flex-1 font-semibold leading-snug text-foreground">
                       {item.text}
                     </span>
                     <motion.span
@@ -242,7 +246,7 @@ export default function StarterPlanStep({
 
       <div className="flex-1" />
 
-      <OnboardingFooter>
+      <OnboardingFooter className="pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
         <OnboardingButton
           onClick={() => commit(items.map((item) => item.id))}
           disabled={loading || (committed && !saving)}

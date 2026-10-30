@@ -518,7 +518,7 @@ export default function OnboardingPage() {
               <div
                 aria-hidden
                 style={backdropLift}
-                className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(300px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px]"
+                className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(252px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(220px+env(safe-area-inset-top))] md:top-[292px]"
               />
               <OnboardingProgressDock
                 done={celebrating ? totalUnits : doneUnits}

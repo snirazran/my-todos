@@ -114,9 +114,9 @@ const HANDOFF_MS = 300;
 const SKIN_LINE_MS = 2600;
 export const KEYBOARD_EASE = 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)';
 const HEADER_TOP_CLASS =
-  'top-[calc(362px+env(safe-area-inset-top))] short:top-[calc(314px+env(safe-area-inset-top))] md:top-[354px]';
+  'top-[calc(314px+env(safe-area-inset-top))] short:top-[calc(282px+env(safe-area-inset-top))] md:top-[354px]';
 const BODY_TOP_CLASS =
-  'top-[calc(456px+env(safe-area-inset-top))] short:top-[calc(408px+env(safe-area-inset-top))] md:top-[450px]';
+  'top-[calc(408px+env(safe-area-inset-top))] short:top-[calc(376px+env(safe-area-inset-top))] md:top-[450px]';
 
 const NAME_IN: Keyframe[] = [
   { transform: 'translate3d(0, 60%, 0)', opacity: 0 },
@@ -720,7 +720,7 @@ export default function AdoptFrogStep({
 
       {skinLine && !leaving && screen === 'color' && (
         <div
-          className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-[25] flex justify-center md:-top-10"
+          className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-[25] flex justify-center md:-top-10"
           style={liftStyle}
         >
           <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">

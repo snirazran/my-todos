@@ -18,14 +18,14 @@ import type { FrogEmote, FrogEmoteLoop, FrogHandle, WardrobeSlot } from '@/compo
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 export const ONBOARDING_BODY_CLASS =
-  'pt-[calc(440px+env(safe-area-inset-top))] short:pt-[calc(392px+env(safe-area-inset-top))] md:pt-[434px]';
+  'pt-[calc(392px+env(safe-area-inset-top))] short:pt-[calc(360px+env(safe-area-inset-top))] md:pt-[434px]';
 
 // Phone viewports are short enough that a bottom-pinned action lands just below
 // the content. A desktop window is far taller, so cap how far the spacer pushes.
 export const ONBOARDING_FOOTER_SPACER_CLASS = 'flex-[8] md:max-h-40';
 
 export const ONBOARDING_DOCK_POSITION_CLASS =
-  'inset-x-3 top-[calc(286px+env(safe-area-inset-top))] h-14 short:top-[calc(238px+env(safe-area-inset-top))] md:inset-x-0 md:top-[278px] md:mx-auto md:w-full md:max-w-lg lg:max-w-xl';
+  'inset-x-3 top-[calc(238px+env(safe-area-inset-top))] h-14 short:top-[calc(206px+env(safe-area-inset-top))] md:inset-x-0 md:top-[278px] md:mx-auto md:w-full md:max-w-lg lg:max-w-xl';
 const ONBOARDING_DOCK_SURFACE_CLASS =
   'rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]';
 
@@ -138,7 +138,7 @@ export function OnboardingFrogStage({
   return (
     <div
       className={cn(
-        'pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10',
+        'pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-30 flex justify-center md:-top-10',
         hidden && 'opacity-0',
       )}
       style={
@@ -228,10 +228,10 @@ export const ONBOARDING_SUBTITLE_CLASS =
   'line-clamp-2 text-balance text-center text-[15px] font-medium leading-5 text-muted-foreground md:text-base';
 
 export const ONBOARDING_HEADER_TOP_CLASS =
-  'top-[calc(362px+env(safe-area-inset-top))] short:top-[calc(314px+env(safe-area-inset-top))] md:top-[354px]';
+  'top-[calc(314px+env(safe-area-inset-top))] short:top-[calc(282px+env(safe-area-inset-top))] md:top-[354px]';
 
 export const ONBOARDING_FLOW_TOP_CLASS =
-  'pt-[calc(362px+env(safe-area-inset-top))] short:pt-[calc(314px+env(safe-area-inset-top))] md:pt-[354px]';
+  'pt-[calc(314px+env(safe-area-inset-top))] short:pt-[calc(282px+env(safe-area-inset-top))] md:pt-[354px]';
 
 export function OnboardingHeading({
   eyebrow,
@@ -263,7 +263,7 @@ export function OnboardingSpeechBubble({
   typedChars?: number;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
+    <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-30 flex justify-center md:-top-10">
       <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
         <FrogSpeechBubble
           rate={0}

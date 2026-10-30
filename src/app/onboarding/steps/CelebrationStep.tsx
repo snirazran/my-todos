@@ -111,7 +111,7 @@ export default function CelebrationStep({ humanName, frogName, habitCount, ready
 
   return (
     <div className="relative flex flex-1 flex-col">
-      <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
+      <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-30 flex justify-center md:-top-10">
         <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
           <FrogSpeechBubble
             rate={0}
