@@ -9,6 +9,7 @@ import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useWideStage } from '@/hooks/useWideStage';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import { hapticCelebrate } from '@/lib/haptics';
@@ -17,7 +18,6 @@ import { leagueArt } from './leapCopy';
 
 const SLOT_SHIFT = 72;
 const SIDE_SCALE = 0.5;
-const WIDE_QUERY = '(min-width: 1024px)';
 
 const RINGS = [
   { w: 230, h: 58, opacity: 1 },
@@ -402,20 +402,6 @@ export function LeapStageBody({
       )}
     </div>
   );
-}
-
-function useWideStage() {
-  const [wide, setWide] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(WIDE_QUERY).matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia(WIDE_QUERY);
-    const update = () => setWide(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-  return wide;
 }
 
 export function LeapStage({

@@ -13,6 +13,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticCelebrate, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useWideStage } from '@/hooks/useWideStage';
 import { useSettled } from '@/hooks/useSettled';
 import { SheetEnteredContext } from '@/lib/sheetEntered';
 import {
@@ -40,6 +41,10 @@ import { maybeRequestAppRating } from '@/lib/rateApp';
 import { pledgeFrogLine, streakRevealMessage } from '@/lib/streak/revealMessage';
 import { PondBackdrop } from '@/components/ui/PondBackdrop';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
+import {
+  ONBOARDING_DOCK_SURFACE_CLASS,
+  OnboardingSpeechBubble,
+} from '@/app/onboarding/steps/OnboardingFrogHeader';
 import type {
   CheckInResult,
   LoginStreakReward,
@@ -1021,6 +1026,7 @@ function CommitStep({
   indices,
   rewardCatalog,
   isPremium,
+  wide,
   onPicked,
   onSkip,
 }: {
@@ -1028,6 +1034,7 @@ function CommitStep({
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  wide: boolean;
   onPicked: (view: LoginStreakView) => void;
   onSkip: () => void;
 }) {
@@ -1051,7 +1058,7 @@ function CommitStep({
   const frogRef = useRef<FrogHandle>(null);
   const [frogLanded, setFrogLanded] = useState(false);
   const shortScreen = useMediaQuery('(max-height: 800px)');
-  const frogHeight = shortScreen ? 190 : 210;
+  const frogHeight = wide ? 315 : shortScreen ? 190 : 210;
   const frogWidth = Math.round((frogHeight * 128) / 144);
   const choose = (days: number) => {
     setSelectedDays(days);
@@ -1112,6 +1119,281 @@ function CommitStep({
   const rows = selectedTier
     ? pledgePrizeRows(selectedTier.rewards, rewardCatalog, isPremium, false)
     : [];
+  const widestPrizeRows = wide
+    ? Math.max(
+        ...view.goalTiers.map(
+          (tier) => pledgePrizeRows(tier.rewards, rewardCatalog, isPremium, true).length,
+        ),
+      )
+    : 0;
+
+  const frog = (
+    <Frog
+      ref={frogRef}
+      width={frogWidth}
+      height={frogHeight}
+      indices={indices}
+      arrive="hop"
+      greet="question"
+      onArrived={() => setFrogLanded(true)}
+    />
+  );
+
+  const heading = (
+    <>
+        <h2
+          id="streak-goal-heading"
+          className={cn(
+          'text-center font-black tracking-tight text-foreground',
+          wide ? 'text-[32px]' : 'text-[clamp(1.5rem,7vw,1.75rem)]',
+        )}
+        >
+          Make a pledge
+        </h2>
+        <p
+          id="streak-goal-hint"
+          className={cn(
+          'mt-1 text-pretty text-center text-sm font-semibold leading-snug text-muted-foreground',
+          !wide && 'max-w-[30ch]',
+        )}
+        >
+          Get one thing done every day. Keep it up and the prize is yours.
+        </p>
+    </>
+  );
+
+  const tierPanel = (
+    <div className="pond-panel relative z-10 w-full rounded-[24px] border border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3.5 pt-5 shadow-[0_3px_0_0_var(--pond-line)] short-screen:pb-3">
+      <fieldset
+        className="w-full"
+        aria-labelledby="streak-goal-heading"
+        aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
+        disabled={busyDays !== null}
+      >
+        <legend className="sr-only">Pledge length</legend>
+        <div className="grid grid-cols-4 gap-2">
+          {view.goalTiers.map((tier) => {
+            const selected = selectedDays === tier.days;
+            return (
+              <label key={tier.days} className="relative block cursor-pointer">
+                <input
+                  type="radio"
+                  name="streak-goal"
+                  value={tier.days}
+                  checked={selected}
+                  onChange={() => choose(tier.days)}
+                  className="peer sr-only"
+                />
+                {(tier.days === steppingUpTo || tier.days === bestStartDays) && (
+                  <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950 shadow-sm">
+                    {tier.days === steppingUpTo ? 'Next up' : 'Best start'}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    'flex h-[80px] flex-col items-center justify-center rounded-2xl border-2 short-screen:h-[72px] transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
+                    selected
+                      ? 'border-[#447d3f] bg-[#447d3f] text-white shadow-[0_4px_0_0_#2c511a]'
+                      : 'border-[color:var(--pond-chip-line)] bg-[color:var(--pond-chip)] text-[color:var(--pond-ink)] shadow-[0_3px_0_0_var(--pond-chip-line)] hover:bg-[color:var(--pond-chip-hover)]',
+                  )}
+                >
+                  <span className="font-display text-[28px] leading-none tracking-wide short-screen:text-[26px]">
+                    {tier.days}
+                  </span>
+                  <span
+                    className={cn(
+                      'mt-1.5 text-[11px] font-black leading-none',
+                      selected ? 'text-white/90' : 'text-[color:var(--pond-ink-muted)]',
+                    )}
+                  >
+                    {tier.payoutPercent < 100
+                      ? `days · ${tier.payoutPercent}%`
+                      : 'days'}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+    </div>
+  );
+
+  const prizes = (
+    <section className="mt-5 w-full short-screen:mt-4" aria-live="polite">
+      <div className="mb-2 flex h-6 items-center justify-between gap-2 px-1.5">
+        <h3 className="flex items-center gap-1.5 text-[13px] font-black text-amber-800 dark:text-amber-300">
+          <Trophy aria-hidden className="h-4 w-4 text-amber-500" />
+          {selectedDays !== null ? `${pledgeName(selectedDays)} prize` : 'Prizes'}
+        </h3>
+        {selectedDays !== null && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-300">
+            Ends {formatPledgeEnd(selectedDays)}
+          </span>
+        )}
+      </div>
+      <div
+        className={cn(
+          'rounded-[24px] border border-amber-200 bg-[linear-gradient(to_bottom,#fffbeb,#ffffff)] px-3.5 py-1.5 shadow-[0_3px_0_0_rgba(217,119,6,0.14)] dark:border-amber-400/25 dark:bg-[linear-gradient(to_bottom,rgba(251,191,36,0.11),rgba(251,191,36,0.03))] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.3)]',
+          wide && 'flex flex-col justify-center',
+        )}
+        style={wide ? { minHeight: Math.ceil(widestPrizeRows / 2) * 80 + 14 } : undefined}
+      >
+        {selectedDays !== null ? (
+          <>
+            <ul
+            className={cn(
+              'relative',
+              wide
+                ? 'grid grid-cols-2 gap-x-3'
+                : 'flex flex-col divide-y divide-amber-200/70 dark:divide-amber-400/15',
+            )}
+          >
+              <AnimatePresence initial={false} mode="popLayout">
+                {settled
+                  ? rows.map((row) => (
+                      <motion.li
+                        key={row.key}
+                        layout={reduceMotion ? false : 'position'}
+                        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
+                        transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                        className="flex items-center gap-3.5 py-3 short-screen:py-2.5"
+                      >
+                        <span className="grid h-[52px] w-[52px] shrink-0 place-items-center">
+                          {row.tile}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[15px] font-black leading-tight text-foreground">
+                            {row.title}
+                          </span>
+                          {row.note && (
+                            <span className="mt-1 block text-[12.5px] font-semibold leading-snug text-muted-foreground">
+                              {row.note}
+                            </span>
+                          )}
+                        </span>
+                      </motion.li>
+                    ))
+                  : rows.map((row) => (
+                      <li key={row.key} className="h-[76px] short-screen:h-[72px]" aria-hidden />
+                    ))}
+              </AnimatePresence>
+            </ul>
+            {selectedTier && selectedTier.payoutPercent < 100 && (
+              <p className="mb-2 rounded-xl bg-muted px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
+                You&apos;ve kept this pledge before, so its flies pay{' '}
+                {selectedTier.payoutPercent}%. A longer one pays in full.
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="flex min-h-[148px] flex-col items-center justify-center gap-3 py-3 text-center short-screen:min-h-[140px]">
+            {topTier && (
+              <PledgeRewardTiles
+                rewards={topTier.rewards}
+                rewardCatalog={rewardCatalog}
+                isPremium={isPremium}
+                hydrateDelayMs={450}
+                paused
+                still
+              />
+            )}
+            <span>
+              <span className="block text-[15px] font-black leading-tight text-foreground">
+                Longer pledges win bigger prizes
+              </span>
+              <span className="mt-1 block text-[12.5px] font-semibold text-muted-foreground">
+                Pick a length to see yours
+              </span>
+            </span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
+  const actions = (
+    <div className={cn('mx-auto flex w-full flex-col items-center', !wide && 'max-w-sm')}>
+      {error && (
+        <p
+          id="streak-goal-error"
+          role="alert"
+          className="mb-2 text-center text-xs font-bold text-destructive"
+        >
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={busyDays !== null || selectedDays === null}
+        onClick={() => {
+          if (selectedDays !== null) void pickGoal(selectedDays);
+        }}
+        aria-live="polite"
+        className="flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-4 text-base font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-[transform,box-shadow,filter] hover:brightness-110 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-[0_4px_0_0_rgba(0,0,0,0.08)] disabled:ring-0 disabled:hover:brightness-100"
+      >
+        {selectedDays !== null && <Flame className="h-5 w-5 fill-amber-300 text-amber-200" />}
+        {busyDays !== null
+          ? 'Starting…'
+          : selectedDays !== null
+            ? `Pledge ${selectedDays} days`
+            : 'Pick a pledge'}
+      </button>
+      <button
+        type="button"
+        onClick={onSkip}
+        disabled={busyDays !== null}
+        className="mt-1 min-h-11 px-4 text-sm font-bold text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+      >
+        Not now
+      </button>
+    </div>
+  );
+
+  if (wide) {
+    return (
+      <div className="flex min-h-0 flex-1 bg-background">
+        <div className="relative flex w-[42%] shrink-0 items-center justify-center overflow-hidden px-7">
+          <PondBackdrop className="absolute inset-0 h-full w-full" />
+          <div className="pointer-events-none relative flex w-full -translate-y-8 flex-col items-center">
+            <div className="relative z-10 -mb-3.5" style={{ width: frogWidth, height: frogHeight }}>
+              {frog}
+              {frogLanded && (
+                <OnboardingSpeechBubble
+                  key={selectedDays ?? 'ask'}
+                  message={pledgeFrogLine(selectedDays)}
+                  positionClassName="inset-0"
+                />
+              )}
+            </div>
+            <div
+              className={cn(
+                'flex h-14 w-full items-center justify-center',
+                ONBOARDING_DOCK_SURFACE_CLASS,
+              )}
+            >
+              <span className="flex translate-y-[5px] items-center gap-2 text-lg font-black text-foreground">
+                <Flame className="h-5 w-5 fill-amber-300 text-amber-500" />
+                {selectedDays !== null
+                  ? `${pledgeName(selectedDays)} pledge`
+                  : `${view.count}-day streak`}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="no-scrollbar flex min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-8 py-10 short-screen:py-6">
+          <div className="m-auto flex w-full flex-col items-center">
+            {heading}
+            <div className="mt-6 w-full short-screen:mt-4">{tierPanel}</div>
+            {prizes}
+            <div className="mt-5 w-full short-screen:mt-4">{actions}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
@@ -1121,33 +1403,14 @@ function CommitStep({
       >
         <div className="min-h-full bg-[radial-gradient(140%_42%_at_50%_0%,hsl(var(--primary)/0.13),transparent_72%)] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
           <div className="mx-auto flex w-full max-w-sm flex-col items-center">
-            <h2
-              id="streak-goal-heading"
-              className="text-center text-[clamp(1.5rem,7vw,1.75rem)] font-black tracking-tight text-foreground"
-            >
-              Make a pledge
-            </h2>
-            <p
-              id="streak-goal-hint"
-              className="mt-1 max-w-[30ch] text-pretty text-center text-sm font-semibold leading-snug text-muted-foreground"
-            >
-              Get one thing done every day. Keep it up and the prize is yours.
-            </p>
+            {heading}
 
             <div className="relative mt-[80px] w-full short-screen:mt-[74px]">
               <div
                 className="pointer-events-none absolute bottom-[calc(100%-11px)] left-[-22px] z-20"
                 style={{ width: frogWidth, height: frogHeight }}
               >
-                <Frog
-                  ref={frogRef}
-                  width={frogWidth}
-                  height={frogHeight}
-                  indices={indices}
-                  arrive="hop"
-                  greet="question"
-                  onArrived={() => setFrogLanded(true)}
-                />
+                {frog}
               </div>
               {frogLanded && (
                 <FrogSpeechBubble
@@ -1165,181 +1428,16 @@ function CommitStep({
                 />
               )}
 
-              <div className="pond-panel relative z-10 w-full rounded-[24px] border border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3.5 pt-5 shadow-[0_3px_0_0_var(--pond-line)] short-screen:pb-3">
-                <fieldset
-                  className="w-full"
-                  aria-labelledby="streak-goal-heading"
-                  aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
-                  disabled={busyDays !== null}
-                >
-                  <legend className="sr-only">Pledge length</legend>
-                  <div className="grid grid-cols-4 gap-2">
-                    {view.goalTiers.map((tier) => {
-                      const selected = selectedDays === tier.days;
-                      return (
-                        <label key={tier.days} className="relative block cursor-pointer">
-                          <input
-                            type="radio"
-                            name="streak-goal"
-                            value={tier.days}
-                            checked={selected}
-                            onChange={() => choose(tier.days)}
-                            className="peer sr-only"
-                          />
-                          {(tier.days === steppingUpTo || tier.days === bestStartDays) && (
-                            <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950 shadow-sm">
-                              {tier.days === steppingUpTo ? 'Next up' : 'Best start'}
-                            </span>
-                          )}
-                          <span
-                            className={cn(
-                              'flex h-[80px] flex-col items-center justify-center rounded-2xl border-2 short-screen:h-[72px] transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
-                              selected
-                                ? 'border-[#447d3f] bg-[#447d3f] text-white shadow-[0_4px_0_0_#2c511a]'
-                                : 'border-[color:var(--pond-chip-line)] bg-[color:var(--pond-chip)] text-[color:var(--pond-ink)] shadow-[0_3px_0_0_var(--pond-chip-line)] hover:bg-[color:var(--pond-chip-hover)]',
-                            )}
-                          >
-                            <span className="font-display text-[28px] leading-none tracking-wide short-screen:text-[26px]">
-                              {tier.days}
-                            </span>
-                            <span
-                              className={cn(
-                                'mt-1.5 text-[11px] font-black leading-none',
-                                selected ? 'text-white/90' : 'text-[color:var(--pond-ink-muted)]',
-                              )}
-                            >
-                              {tier.payoutPercent < 100
-                                ? `days · ${tier.payoutPercent}%`
-                                : 'days'}
-                            </span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-              </div>
+              {tierPanel}
             </div>
 
-            <section className="mt-5 w-full short-screen:mt-4" aria-live="polite">
-              <div className="mb-2 flex h-6 items-center justify-between gap-2 px-1.5">
-                <h3 className="flex items-center gap-1.5 text-[13px] font-black text-amber-800 dark:text-amber-300">
-                  <Trophy aria-hidden className="h-4 w-4 text-amber-500" />
-                  {selectedDays !== null ? `${pledgeName(selectedDays)} prize` : 'Prizes'}
-                </h3>
-                {selectedDays !== null && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-300">
-                    Ends {formatPledgeEnd(selectedDays)}
-                  </span>
-                )}
-              </div>
-              <div className="rounded-[24px] border border-amber-200 bg-[linear-gradient(to_bottom,#fffbeb,#ffffff)] px-3.5 py-1.5 shadow-[0_3px_0_0_rgba(217,119,6,0.14)] dark:border-amber-400/25 dark:bg-[linear-gradient(to_bottom,rgba(251,191,36,0.11),rgba(251,191,36,0.03))] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
-                {selectedDays !== null ? (
-                  <>
-                    <ul className="relative flex flex-col divide-y divide-amber-200/70 dark:divide-amber-400/15">
-                      <AnimatePresence initial={false} mode="popLayout">
-                        {settled
-                          ? rows.map((row) => (
-                              <motion.li
-                                key={row.key}
-                                layout={reduceMotion ? false : 'position'}
-                                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
-                                transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-                                className="flex items-center gap-3.5 py-3 short-screen:py-2.5"
-                              >
-                                <span className="grid h-[52px] w-[52px] shrink-0 place-items-center">
-                                  {row.tile}
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block text-[15px] font-black leading-tight text-foreground">
-                                    {row.title}
-                                  </span>
-                                  {row.note && (
-                                    <span className="mt-1 block text-[12.5px] font-semibold leading-snug text-muted-foreground">
-                                      {row.note}
-                                    </span>
-                                  )}
-                                </span>
-                              </motion.li>
-                            ))
-                          : rows.map((row) => (
-                              <li key={row.key} className="h-[76px] short-screen:h-[72px]" aria-hidden />
-                            ))}
-                      </AnimatePresence>
-                    </ul>
-                    {selectedTier && selectedTier.payoutPercent < 100 && (
-                      <p className="mb-2 rounded-xl bg-muted px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
-                        You&apos;ve kept this pledge before, so its flies pay{' '}
-                        {selectedTier.payoutPercent}%. A longer one pays in full.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex min-h-[148px] flex-col items-center justify-center gap-3 py-3 text-center short-screen:min-h-[140px]">
-                    {topTier && (
-                      <PledgeRewardTiles
-                        rewards={topTier.rewards}
-                        rewardCatalog={rewardCatalog}
-                        isPremium={isPremium}
-                        hydrateDelayMs={450}
-                        paused
-                        still
-                      />
-                    )}
-                    <span>
-                      <span className="block text-[15px] font-black leading-tight text-foreground">
-                        Longer pledges win bigger prizes
-                      </span>
-                      <span className="mt-1 block text-[12.5px] font-semibold text-muted-foreground">
-                        Pick a length to see yours
-                      </span>
-                    </span>
-                  </div>
-                )}
-              </div>
-            </section>
+            {prizes}
           </div>
         </div>
       </div>
 
       <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
-        <div className="mx-auto flex w-full max-w-sm flex-col items-center">
-          {error && (
-            <p
-              id="streak-goal-error"
-              role="alert"
-              className="mb-2 text-center text-xs font-bold text-destructive"
-            >
-              {error}
-            </p>
-          )}
-          <button
-            type="button"
-            disabled={busyDays !== null || selectedDays === null}
-            onClick={() => {
-              if (selectedDays !== null) void pickGoal(selectedDays);
-            }}
-            aria-live="polite"
-            className="flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-4 text-base font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-[transform,box-shadow,filter] hover:brightness-110 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-[0_4px_0_0_rgba(0,0,0,0.08)] disabled:ring-0 disabled:hover:brightness-100"
-          >
-            {selectedDays !== null && <Flame className="h-5 w-5 fill-amber-300 text-amber-200" />}
-            {busyDays !== null
-              ? 'Starting…'
-              : selectedDays !== null
-                ? `Pledge ${selectedDays} days`
-                : 'Pick a pledge'}
-          </button>
-          <button
-            type="button"
-            onClick={onSkip}
-            disabled={busyDays !== null}
-            className="mt-1 min-h-11 px-4 text-sm font-bold text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
-          >
-            Not now
-          </button>
-        </div>
+        {actions}
       </div>
     </div>
   );
@@ -1594,11 +1692,13 @@ export function StreakSheet({
     [inventoryData?.catalog],
   );
   const { indices } = useWardrobeIndices(open);
+  const wide = useWideStage();
 
   const view = liveView ?? celebration?.view ?? null;
   const hasRewardEvents = !!celebration?.goalEvent;
 
   const [step, setStep] = useState<Step>('home');
+  const wideCommit = wide && step === 'commit';
   const [buyOpen, setBuyOpen] = useState(false);
   const [enteredStep, setEnteredStep] = useState<Step | null>(null);
   const [openSeen, setOpenSeen] = useState(open);
@@ -1715,7 +1815,10 @@ export function StreakSheet({
                   }
                 }}
                 onClick={(event) => event.stopPropagation()}
-                className="relative mx-auto flex h-full w-full transform-gpu flex-col overflow-hidden will-change-transform [backface-visibility:hidden] md:h-auto md:max-h-[min(40rem,calc(100dvh-3rem))] md:w-[min(100%,40rem)] md:rounded-[32px] md:shadow-2xl"
+                className={cn(
+                  'relative mx-auto flex h-full w-full transform-gpu flex-col overflow-hidden will-change-transform [backface-visibility:hidden] md:h-auto md:max-h-[min(40rem,calc(100dvh-3rem))] md:rounded-[32px] md:shadow-2xl',
+                  wideCommit ? 'md:w-[min(100%,60rem)]' : 'md:w-[min(100%,40rem)]',
+                )}
               >
                 <SheetEnteredContext.Provider value={enteredStep === step}>
                 {(step === 'home' || step === 'commit') && (
@@ -1747,6 +1850,7 @@ export function StreakSheet({
                     indices={indices}
                     rewardCatalog={rewardCatalog}
                     isPremium={isPremium}
+                    wide={wideCommit}
                     onPicked={finishCommit}
                     onSkip={finishCommit}
                   />

@@ -132,7 +132,7 @@ const HIT_TEST_TOLERANCE_PX = 10;
 const HIT_TEST_MIN_ALPHA = 8;
 export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_TABLET = { x: -19, y: 18 } as const;
-export const FROG_TONGUE_MOUTH_OFFSET_DESKTOP = { x: -21, y: 26 } as const;
+export const FROG_TONGUE_MOUTH_OFFSET_SPLIT = { x: -20, y: 13 } as const;
 const FEET_Y = 114;
 /* ========================================================================= */
 

@@ -1214,7 +1214,7 @@ body.dragging {
 @keyframes auth-fly-arrive {
   0% {
     opacity: 0;
-    transform: translate3d(62vw, -30px, 0);
+    transform: translate3d(var(--auth-fly-from, 62vw), -30px, 0);
   }
   14% {
     opacity: 1;
@@ -1250,6 +1250,11 @@ body.dragging {
 }
 .auth-fly-drift {
   animation: auth-fly-drift 14s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+}
+@media (min-width: 1024px) {
+  .auth-fly-arrive {
+    --auth-fly-from: -32vw;
+  }
 }
 
 .app-idle .auth-fly-drift {

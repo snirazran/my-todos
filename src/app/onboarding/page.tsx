@@ -137,6 +137,9 @@ export default function OnboardingPage() {
   const savePromiseRef = useRef<Promise<void> | null>(null);
   useAutoPopupHold('onboarding-celebration', celebrating);
   const arrivalCheckedRef = useRef(false);
+  const [arrivedWithAccount, setArrivedWithAccount] = useState(
+    () => !!auth?.currentUser && !auth.currentUser.isAnonymous,
+  );
 
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
@@ -160,6 +163,7 @@ export default function OnboardingPage() {
     if (authLoading || arrivalCheckedRef.current) return;
     arrivalCheckedRef.current = true;
     if (!authUser || authUser.isAnonymous) return;
+    setArrivedWithAccount(true);
     let cancelled = false;
     void (async () => {
       try {
@@ -196,15 +200,10 @@ export default function OnboardingPage() {
         // Hide the "create account" step only once a real (non-anonymous)
         // account exists — e.g. a magic-link returnee. With no account yet
         // (deferred creation) or an anonymous one, keep offering it.
-        if (
-          id === 'createAccount' &&
-          auth?.currentUser &&
-          !auth.currentUser.isAnonymous
-        )
-          return false;
+        if (id === 'createAccount' && arrivedWithAccount) return false;
         return true;
       }),
-    [],
+    [arrivedWithAccount],
   );
 
   const currentId = stepIds[step] ?? stepIds[stepIds.length - 1];

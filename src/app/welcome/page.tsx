@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 import Frog, {
   FROG_TONGUE_MOUTH_OFFSET,
   FROG_TONGUE_MOUTH_OFFSET_TABLET,
-  FROG_TONGUE_MOUTH_OFFSET_DESKTOP,
+  FROG_TONGUE_MOUTH_OFFSET_SPLIT,
   type FrogHandle,
 } from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
@@ -16,6 +16,13 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { DEFAULT_BACKGROUND_IMAGES } from '@/hooks/useBackgrounds';
 import { clearOnboardingDraft } from '@/lib/onboardingDraft';
+import {
+  AUTH_SPLIT_FROG_SIZE,
+  AUTH_SPLIT_MIN_WIDTH,
+  AuthScenePreload,
+  AuthSplitScene,
+  FrogressWordmark,
+} from '@/components/auth/AuthSplitScene';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
@@ -30,9 +37,9 @@ export default function WelcomePage() {
   const [flyArrived, setFlyArrived] = useState(false);
   const [frogReady, setFrogReady] = useState(false);
   const isTablet = useMediaQuery('(min-width: 768px)');
-  const isDesktop = useMediaQuery('(min-width: 1280px)');
-  const tongueMouthOffset = isDesktop
-    ? FROG_TONGUE_MOUTH_OFFSET_DESKTOP
+  const isSplit = useMediaQuery(AUTH_SPLIT_MIN_WIDTH);
+  const tongueMouthOffset = isSplit
+    ? FROG_TONGUE_MOUTH_OFFSET_SPLIT
     : isTablet
       ? FROG_TONGUE_MOUTH_OFFSET_TABLET
       : FROG_TONGUE_MOUTH_OFFSET;
@@ -65,8 +72,8 @@ export default function WelcomePage() {
     if (!frogReady) return;
     router.prefetch('/onboarding');
     const img = new window.Image();
-    if (window.matchMedia('(min-width: 1280px)').matches) {
-      img.src = DEFAULT_BACKGROUND_IMAGES.web;
+    if (window.matchMedia(AUTH_SPLIT_MIN_WIDTH).matches) {
+      img.src = DEFAULT_BACKGROUND_IMAGES.webLarge;
     } else if (window.matchMedia('(min-width: 768px)').matches) {
       img.src = DEFAULT_BACKGROUND_IMAGES.tablet;
     } else {
@@ -93,35 +100,16 @@ export default function WelcomePage() {
   };
 
   return (
-    <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10">
-      <div className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125">
-        <div className="auth-enter-brand" style={{ '--auth-i': 0 } as any}>
-          <svg
-            aria-label="Frogress"
-            role="img"
-            viewBox="0 0 220 34"
-            className="mb-1 h-12 w-[300px] overflow-visible text-foreground"
-          >
-            <path id="welcome-brand-arc" d="M 36 22 Q 110 6 184 22" fill="none" />
-            <text
-              fill="currentColor"
-              fontSize="20"
-              fontWeight="800"
-              textAnchor="middle"
-              style={{
-                fontFamily:
-                  '"Arial Rounded MT Bold", "Avenir Next Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              }}
-            >
-              <textPath href="#welcome-brand-arc" startOffset="50%">
-                Frogress
-              </textPath>
-            </text>
-          </svg>
+    <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10 lg:pl-[calc(50%_+_1.5rem)]">
+      <AuthScenePreload />
+      {isSplit && <AuthSplitScene message="*Ribbit!* Take me home?" />}
+      <div className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 lg:max-w-[26rem] lg:transform-none">
+        <div className="auth-enter-brand lg:hidden" style={{ '--auth-i': 0 } as any}>
+          <FrogressWordmark className="mb-1 h-12 w-[300px] overflow-visible text-foreground" />
         </div>
 
         <p
-          className="auth-enter mb-2 max-w-xs text-center text-[15px] font-medium text-muted-foreground"
+          className="auth-enter mb-2 max-w-xs text-center text-[15px] font-medium text-muted-foreground lg:mb-0 lg:max-w-none lg:text-balance lg:text-[32px] lg:font-black lg:leading-tight lg:tracking-tight lg:text-foreground"
           style={{ '--auth-i': 1 } as any}
         >
           Time{' '}
@@ -130,17 +118,17 @@ export default function WelcomePage() {
         </p>
 
         <div
-          className="auth-enter-frog relative z-10 w-full"
+          className="auth-enter-frog relative z-10 w-full lg:fixed lg:inset-x-0 lg:right-1/2 lg:top-[calc(50vh_-_270px)] lg:w-auto"
           style={{ '--auth-i': 2 } as any}
         >
-          <div className="pointer-events-none relative z-10 flex w-full translate-y-3 flex-col items-center">
+          <div className="pointer-events-none relative z-10 flex w-full translate-y-3 flex-col items-center lg:translate-y-0">
           {!flyCaught && !adoptionSucceeded && (
             <div
               aria-hidden
               className={`absolute left-1/2 z-10 -translate-x-1/2 ${
                 flyArrived ? 'auth-fly-drift' : 'auth-fly-arrive'
               }`}
-              style={{ top: '-6%', '--auth-i': 8 } as any}
+              style={{ top: isSplit ? '14%' : '-6%', '--auth-i': 8 } as any}
               onAnimationEnd={(e) => {
                 if (e.target !== e.currentTarget) return;
                 if (e.animationName !== 'auth-fly-arrive') return;
@@ -165,13 +153,14 @@ export default function WelcomePage() {
               placeholder
               greet="hop"
               onDressed={() => setFrogReady(true)}
+              {...(isSplit ? AUTH_SPLIT_FROG_SIZE : null)}
             />
           </div>
           </div>
         </div>
 
         <div
-          className="auth-enter relative z-0 w-full space-y-3"
+          className="auth-enter relative z-0 w-full space-y-3 lg:mt-10"
           style={{ '--auth-i': 3 } as any}
         >
           <button
@@ -193,27 +182,6 @@ export default function WelcomePage() {
             I already have a frog
           </Link>
         </div>
-
-        <p
-          className="auth-enter mt-5 max-w-[17rem] text-center text-xs leading-relaxed text-muted-foreground"
-          style={{ '--auth-i': 4 } as any}
-        >
-          By adopting a frog, you agree to our{' '}
-          <Link
-            href="/terms"
-            className="font-semibold text-foreground/80 underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/70"
-          >
-            Terms
-          </Link>{' '}
-          and{' '}
-          <Link
-            href="/privacy"
-            className="font-semibold text-foreground/80 underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/70"
-          >
-            Privacy Policy
-          </Link>
-          .
-        </p>
       </div>
 
       {grab && (

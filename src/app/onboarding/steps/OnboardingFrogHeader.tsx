@@ -43,7 +43,7 @@ export const ONBOARDING_FOOTER_SPACER_CLASS = 'flex-[8] md:max-h-40 lg:max-h-10'
 
 export const ONBOARDING_DOCK_POSITION_CLASS =
   'inset-x-3 top-[calc(238px+env(safe-area-inset-top))] h-14 short:top-[calc(206px+env(safe-area-inset-top))] md:inset-x-0 md:top-[261px] md:mx-auto md:w-full md:max-w-lg lg:right-1/2 lg:top-[calc(50vh_+_31px)] lg:w-auto lg:max-w-[26rem]';
-const ONBOARDING_DOCK_SURFACE_CLASS =
+export const ONBOARDING_DOCK_SURFACE_CLASS =
   'rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]';
 
 const progressEase = (fraction: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, fraction)), 1.5);
@@ -53,11 +53,13 @@ export function OnboardingProgressDock({
   total,
   className,
   style,
+  children,
 }: {
   done: number;
   total: number;
   className?: string;
   style?: CSSProperties;
+  children?: ReactNode;
 }) {
   const filled = Math.min(total, done + 1);
   const pct = total > 0 ? progressEase(filled / total) * 100 : 0;
@@ -72,7 +74,8 @@ export function OnboardingProgressDock({
       style={style}
     >
       <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20" />
-      <div className="flex h-full items-center px-5">
+      <div className="flex h-full items-center justify-center px-5">
+        {children}
         {total > 0 && (
           <div
             role="progressbar"

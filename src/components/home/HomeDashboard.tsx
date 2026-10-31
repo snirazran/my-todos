@@ -1003,7 +1003,7 @@ export default function HomeDashboard() {
 
           <div
             data-fly-sheet
-            className="relative z-20 -mx-3 -mt-12 flex flex-col gap-2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pb-8 md:pt-5 xl:px-10"
+            className="relative z-20 -mx-3 -mt-12 flex min-h-[12rem] flex-col gap-2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pb-8 md:pt-5 xl:px-10"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div
