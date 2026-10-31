@@ -7,10 +7,19 @@ import {
 } from '@/hooks/useBackgrounds';
 import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { useOnboardingBackgroundStore } from '@/lib/onboardingBackgroundStore';
+import { cn } from '@/lib/utils';
 
 // Renders the randomized onboarding background (chosen in OnboardingFrogHeader and
 // shared via the store). Falls back to the default background until one is rolled.
-export function OnboardingBackground({ style }: { style?: CSSProperties }) {
+export function OnboardingBackground({
+  style,
+  wide = false,
+  className,
+}: {
+  style?: CSSProperties;
+  wide?: boolean;
+  className?: string;
+}) {
   const { data } = useBackgrounds();
   const backgroundId = useOnboardingBackgroundStore((s) => s.backgroundId);
 
@@ -31,10 +40,14 @@ export function OnboardingBackground({ style }: { style?: CSSProperties }) {
       key={background?.id ?? 'default-bg'}
       aria-hidden
       style={style ? { ...backgroundFadeMaskStyle, ...style } : backgroundFadeMaskStyle}
-      className="pointer-events-none absolute left-0 right-0 -top-12 -z-10 block h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden animate-in fade-in duration-500 short:-top-8 md:top-0 md:h-[480px]"
+      className={cn(
+        'pointer-events-none absolute left-0 right-0 -top-12 -z-10 block h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden animate-in fade-in duration-500 short:-top-8 md:top-0 md:h-[480px] lg:fixed lg:bottom-0 lg:h-auto lg:w-auto lg:![-webkit-mask-image:none] lg:![mask-image:none]',
+        wide ? 'lg:right-0' : 'lg:right-1/2',
+        className,
+      )}
     >
       {images.webLarge && (
-        <source media="(min-width: 1920px)" srcSet={images.webLarge} />
+        <source media="(min-width: 1024px)" srcSet={images.webLarge} />
       )}
       {images.web && <source media="(min-width: 1280px)" srcSet={images.web} />}
       {images.tablet && (

@@ -59,6 +59,7 @@ import { detectMobileOS, PLAY_STORE_URL, type MobileOS } from '@/lib/appStores';
 import { trackGrowthEvent } from '@/lib/growthTrack';
 import {
   clearOnboardingDraft,
+  keepOnboardingDraftForReturn,
   loadOnboardingDraft,
   saveOnboardingDraft,
 } from '@/lib/onboardingDraft';
@@ -343,6 +344,7 @@ export default function TryPage() {
     if (!clean) return;
     setFrogName(clean);
     saveOnboardingDraft({ ...loadOnboardingDraft(), frogName: [clean] });
+    keepOnboardingDraftForReturn();
     setSpeech(`${clean}!\nI love it 💚`);
     setScene('keep');
   };

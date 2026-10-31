@@ -15,6 +15,7 @@ import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { DEFAULT_BACKGROUND_IMAGES } from '@/hooks/useBackgrounds';
+import { clearOnboardingDraft } from '@/lib/onboardingDraft';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
@@ -81,6 +82,7 @@ export default function WelcomePage() {
       onPersist: async () => {
         try {
           setAdoptionSucceeded(true);
+          clearOnboardingDraft();
           router.push('/onboarding');
         } catch (err: any) {
           showNotification(err?.message || 'Could not start your frog');

@@ -5,7 +5,13 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
+import {
+  OnboardingFrogHeader,
+  OnboardingHeading,
+  ONBOARDING_BODY_CLASS,
+  ONBOARDING_FOOTER_SPACER_CLASS,
+  ONBOARDING_SPLIT_STEP_CLASS,
+} from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 export default function HumanNameStep({ selections, onSelect, onNext, saving, direction }: OnboardingStepProps) {
@@ -23,7 +29,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
   };
 
   return (
-    <div className="flex-1 flex flex-col relative">
+    <div className={cn('flex-1 flex flex-col relative', ONBOARDING_SPLIT_STEP_CLASS)}>
       <OnboardingFrogHeader
         title="What's your name?"
         speechBubbleMessage={`*Ribbit ribbit!* Thanks for adopting me. If my name is ${frogName}, what's yours?`}
@@ -37,8 +43,14 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
       >
+        <div className="mb-6 hidden w-full lg:block">
+          <OnboardingHeading
+            title="What's your name?"
+            subtitle={`So ${frogName} knows what to call you.`}
+          />
+        </div>
         <form
-          className="relative -mt-[88px] w-full md:max-w-md"
+          className="relative -mt-[88px] w-full md:max-w-md lg:mt-0"
           onSubmit={(event) => {
             event.preventDefault();
             if (canContinue && !saving) onNext();

@@ -9,6 +9,7 @@ import {
   ONBOARDING_BODY_CLASS,
   ONBOARDING_FOOTER_SPACER_CLASS,
   ONBOARDING_HEADER_TOP_CLASS,
+  ONBOARDING_SPLIT_STEP_CLASS,
   useTypewriter,
 } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
@@ -20,7 +21,7 @@ export default function AboutIntroStep({ selections, onNext, saving }: Onboardin
   const typed = useTypewriter(message);
 
   return (
-    <div className="relative flex flex-1 flex-col">
+    <div className={cn('relative flex flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS)}>
       <OnboardingFrogHeader title="" speechBubbleMessage={message} speechTypedChars={typed} />
 
       <motion.div

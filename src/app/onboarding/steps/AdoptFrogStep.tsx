@@ -26,6 +26,7 @@ import {
 import { pickEmote, type FrogEmote } from '@/lib/frogEmotes';
 import type { OnboardingStepProps } from './types';
 import {
+  ONBOARDING_FROG_POSITION_CLASS,
   ONBOARDING_SUBTITLE_CLASS,
   ONBOARDING_TITLE_CLASS,
   OnboardingProgressDock,
@@ -114,9 +115,14 @@ const HANDOFF_MS = 300;
 const SKIN_LINE_MS = 2600;
 export const KEYBOARD_EASE = 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)';
 const HEADER_TOP_CLASS =
-  'top-[calc(314px+env(safe-area-inset-top))] short:top-[calc(282px+env(safe-area-inset-top))] md:top-[354px]';
+  'top-[calc(314px+env(safe-area-inset-top))] short:top-[calc(282px+env(safe-area-inset-top))] md:top-[354px] lg:left-1/2 lg:top-[max(5rem,calc(50vh_-_144px))]';
 const BODY_TOP_CLASS =
-  'top-[calc(408px+env(safe-area-inset-top))] short:top-[calc(376px+env(safe-area-inset-top))] md:top-[450px]';
+  'top-[calc(408px+env(safe-area-inset-top))] short:top-[calc(376px+env(safe-area-inset-top))] md:top-[450px] lg:left-1/2 lg:w-auto lg:top-[calc(max(5rem,calc(50vh_-_144px))_+_96px)]';
+const CTA_SPLIT_CLASS = {
+  color: 'lg:left-1/2 lg:bottom-auto lg:top-[calc(max(5rem,calc(50vh_-_144px))_+_220px)] lg:pb-0',
+  name: 'lg:left-1/2 lg:bottom-auto lg:top-[calc(max(5rem,calc(50vh_-_144px))_+_172px)] lg:pb-0',
+};
+const GIFT_CTA_WIDE_CLASS = 'lg:bottom-auto lg:top-[calc(50vh_+_164px)] lg:pb-0';
 
 const NAME_IN: Keyframe[] = [
   { transform: 'translate3d(0, 60%, 0)', opacity: 0 },
@@ -288,9 +294,12 @@ export default function AdoptFrogStep({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(anchor);
+    const stage = anchor.parentElement;
+    stage?.addEventListener('transitionend', measure);
     window.addEventListener('resize', measure);
     return () => {
       observer.disconnect();
+      stage?.removeEventListener('transitionend', measure);
       window.removeEventListener('resize', measure);
     };
   }, []);
@@ -499,7 +508,13 @@ export default function AdoptFrogStep({
   const spotTop = frogBox ? frogBox.top + FROG_CENTER * frogBox.width : 0;
 
   return (
-    <div ref={rootRef} className="adopt-scene fixed inset-0 z-[29] overflow-hidden">
+    <div
+      ref={rootRef}
+      className={cn(
+        'adopt-scene fixed inset-0 z-[29] overflow-hidden',
+        !returning && swaps === 0 && 'lg:[--adopt-split-delay:250ms]',
+      )}
+    >
       {canTapGift && (
         <div
           aria-hidden
@@ -518,7 +533,10 @@ export default function AdoptFrogStep({
           type="button"
           onClick={phase === 'naming' && screen === 'name' ? () => showScreen('color') : onBack}
           aria-label="Back"
-          className="absolute left-3 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition animate-in fade-in hover:bg-background"
+          className={cn(
+            'absolute left-3 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition animate-in fade-in hover:bg-background lg:top-6',
+            named ? 'lg:left-[calc(50%_+_max(3rem,calc((50%_-_30rem)/2)))]' : 'lg:left-6',
+          )}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -543,7 +561,7 @@ export default function AdoptFrogStep({
       )}
 
       {!boxCleared && geometry && (
-        <div className="absolute inset-x-0 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] top-0 z-10 flex flex-col items-center justify-center px-5 pt-[calc(3rem+env(safe-area-inset-top))]">
+        <div className="absolute inset-x-0 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] top-0 z-10 flex flex-col items-center justify-center px-5 pt-[calc(3rem+env(safe-area-inset-top))] lg:bottom-auto lg:top-[calc(50vh_-_228px)] lg:justify-start lg:pt-0">
           <div
             ref={stageRef}
             aria-hidden
@@ -653,7 +671,7 @@ export default function AdoptFrogStep({
 
           <div
             className={cn(
-              'mt-4 text-center',
+              'mt-4 text-center lg:absolute lg:inset-x-0 lg:bottom-[calc(100%_-_57px)] lg:mt-0',
               showGiftCopy ? (phase === 'loading' ? 'opacity-0' : 'adopt-rise') : 'adopt-fade-out',
             )}
             style={{ '--adopt-delay': '120ms' } as CSSProperties}
@@ -691,7 +709,10 @@ export default function AdoptFrogStep({
         <OnboardingProgressDock
           done={named && screen === 'name' ? 1 : 0}
           total={progressTotal}
-          className={cardShown ? (returning ? undefined : 'adopt-card-in') : 'opacity-0'}
+          className={cn(
+            cardShown ? (returning ? undefined : 'adopt-card-in') : 'opacity-0',
+            !named && 'lg:right-0',
+          )}
         />
         <div
           key={screen}
@@ -720,7 +741,7 @@ export default function AdoptFrogStep({
 
       {skinLine && !leaving && screen === 'color' && (
         <div
-          className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-[25] flex justify-center md:-top-10"
+          className={cn('pointer-events-none absolute z-[25] flex justify-center', ONBOARDING_FROG_POSITION_CLASS)}
           style={liftStyle}
         >
           <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
@@ -867,6 +888,7 @@ export default function AdoptFrogStep({
           'absolute inset-x-0 bottom-0 z-[35] px-5 pt-3 md:pb-10',
           inset > 0 ? 'pb-3' : 'pb-[calc(1.75rem+env(safe-area-inset-bottom))]',
           !canTapGift && !named && 'pointer-events-none',
+          named ? CTA_SPLIT_CLASS[screen] : GIFT_CTA_WIDE_CLASS,
         )}
         style={{
           transform: inset > 0 ? `translate3d(0, ${-inset}px, 0)` : undefined,

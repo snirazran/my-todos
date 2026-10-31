@@ -37,7 +37,7 @@ import {
   setEmailLinkIntent,
 } from '@/lib/emailLinkSettings';
 import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup';
-import { clearOnboardingDraft } from '@/lib/onboardingDraft';
+import { clearOnboardingDraft, keepOnboardingDraftForReturn } from '@/lib/onboardingDraft';
 import { hapticSuccess } from '@/lib/haptics';
 import { findStarterSkin } from '@/lib/skins/starterSkins';
 import { Input } from '@/components/ui/input';
@@ -50,6 +50,7 @@ import {
   OnboardingHeading,
   OnboardingSpeechBubble,
   ONBOARDING_FLOW_TOP_CLASS,
+  ONBOARDING_SPLIT_STEP_CLASS,
   useTypewriter,
 } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
@@ -245,6 +246,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       createEmailLinkSettings(`${origin}/auth/email-callback`),
     );
     window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, address);
+    keepOnboardingDraftForReturn();
     setEmailLinkIntent(intent);
     setSentIntent(intent);
     setStep('email-sent');
@@ -358,13 +360,13 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   };
 
   return (
-    <div className="relative flex w-full flex-1 flex-col">
+    <div className={cn('relative flex w-full flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS)}>
       {step === 'enter' && !emailOpen ? (
         <button
           type="button"
           onClick={() => setSkipAsk(true)}
           disabled={busy}
-          className="absolute right-3 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex h-10 items-center rounded-full bg-background/90 px-4 text-[14px] font-black text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition animate-in fade-in duration-300 hover:bg-background disabled:opacity-60"
+          className="absolute right-3 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex h-10 items-center lg:right-[max(3rem,calc((50%_-_30rem)/2))] lg:top-6 rounded-full bg-background/90 px-4 text-[14px] font-black text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition animate-in fade-in duration-300 hover:bg-background disabled:opacity-60"
         >
           Skip
         </button>
@@ -372,7 +374,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       {step === 'enter' ? (
         <OnboardingSpeechBubble message={SAVE_ME_LINE} typedChars={typedSaveLine} />
       ) : null}
-      <div className={cn('relative z-20 flex w-full flex-1 flex-col items-center', ONBOARDING_FLOW_TOP_CLASS)}>
+      <div className={cn('relative z-20 flex w-full flex-1 flex-col items-center lg:flex-none', ONBOARDING_FLOW_TOP_CLASS)}>
         <OnboardingHeading
           title={step === 'enter' ? `Don't lose ${frogName}!` : 'Check your inbox'}
           subtitle={
@@ -384,7 +386,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
           }
         />
         {step === 'enter' ? (
-          <div ref={roomRef} className="relative mt-6 w-full flex-1 md:w-80">
+          <div ref={roomRef} className="relative mt-6 w-full flex-1 md:w-80 lg:h-28 lg:flex-none">
             {cardSize !== 'none' ? (
               <div className="absolute inset-x-0 top-0">
                 <SaveCard

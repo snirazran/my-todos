@@ -9,7 +9,12 @@ import { preloadRiveAsset, warmRiveRuntime } from '@/lib/riveLoader';
 import { cn } from '@/lib/utils';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
-import { ONBOARDING_HEADER_TOP_CLASS, ONBOARDING_TITLE_CLASS } from './OnboardingFrogHeader';
+import {
+  ONBOARDING_FROG_POSITION_CLASS,
+  ONBOARDING_HEADER_TOP_CLASS,
+  ONBOARDING_SPLIT_STEP_CLASS,
+  ONBOARDING_TITLE_CLASS,
+} from './OnboardingFrogHeader';
 
 const LEAF_COLORS = ['#93df6e', '#6cc04a', '#4f9a45', '#b7ec8f'];
 const SPARK_COLORS = ['#fde68a', '#fbbf24', '#ffffff'];
@@ -110,8 +115,8 @@ export default function CelebrationStep({ humanName, frogName, habitCount, ready
   }, []);
 
   return (
-    <div className="relative flex flex-1 flex-col">
-      <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-30 flex justify-center md:-top-10">
+    <div className={cn('relative flex flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS)}>
+      <div className={cn('pointer-events-none absolute z-30 flex justify-center', ONBOARDING_FROG_POSITION_CLASS)}>
         <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
           <FrogSpeechBubble
             rate={0}

@@ -12,6 +12,7 @@ import {
   ONBOARDING_FLOW_TOP_CLASS,
   ONBOARDING_FOOTER_SPACER_CLASS,
   ONBOARDING_HEADER_TOP_CLASS,
+  ONBOARDING_SPLIT_STEP_CLASS,
   useTypewriter,
 } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
@@ -60,7 +61,7 @@ export default function TraitStep({
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className={cn('flex flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS)}>
       <div className={cn('relative z-20 flex flex-col', ONBOARDING_FLOW_TOP_CLASS)}>
         <OnboardingHeading
           title={`Choose a trait for ${frogName}`}
@@ -148,7 +149,7 @@ function TraitGained({
   }, [reduceMotion]);
 
   return (
-    <div className="relative flex flex-1 flex-col">
+    <div className={cn('relative flex flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS)}>
       <OnboardingFrogHeader title="" speechBubbleMessage={trait.line} speechTypedChars={typed} />
 
       <div className={cn('absolute inset-x-0 z-20 flex justify-center px-5 md:px-8', ONBOARDING_HEADER_TOP_CLASS)}>

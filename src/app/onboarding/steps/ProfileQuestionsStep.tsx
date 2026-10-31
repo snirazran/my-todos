@@ -11,7 +11,7 @@ import {
   STARTER_BARRIER_FOLLOW_UPS,
   type StarterBarrierPrompt,
 } from '@/lib/quests/starterPlan';
-import { OnboardingHeading, ONBOARDING_FLOW_TOP_CLASS } from './OnboardingFrogHeader';
+import { OnboardingHeading, ONBOARDING_FLOW_TOP_CLASS, ONBOARDING_SPLIT_STEP_CLASS } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 import { hapticSelect } from '@/lib/haptics';
 
@@ -256,7 +256,7 @@ export default function ProfileQuestionsStep({
   };
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className={cn('flex flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS)}>
       <div className={cn('relative z-20 flex flex-col', ONBOARDING_FLOW_TOP_CLASS)}>
         <OnboardingHeading
           eyebrow={SECTION_LABELS[currentQuestion.section]}
@@ -349,7 +349,7 @@ export default function ProfileQuestionsStep({
 
       {currentQuestion.multiSelect && (
         <>
-          <div className="flex-1" />
+          <div className="flex-1 lg:max-h-2" />
           <OnboardingFooter>
             <OnboardingButton onClick={handleMultiSelectNext} disabled={pickedCount === 0} loading={saving}>
               {pickedCount > 0 ? `Continue · ${pickedCount} picked` : 'Pick at least one'}

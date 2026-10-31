@@ -1,15 +1,22 @@
 'use client';
 
 import { type ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 type Props = {
   onBack?: () => void;
   rightSlot?: ReactNode;
+  className?: string;
 };
 
-export function OnboardingTopBar({ onBack, rightSlot }: Props) {
+export function OnboardingTopBar({ onBack, rightSlot, className }: Props) {
   return (
-    <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex items-center justify-between gap-3 px-3 animate-in fade-in duration-300">
+    <div
+      className={cn(
+        'absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex items-center justify-between gap-3 px-3 animate-in fade-in duration-300',
+        className,
+      )}
+    >
       {onBack ? (
         <button
           type="button"

@@ -9,7 +9,7 @@ const MAX_WIDTH: Record<string, number> = {
   mobile: 1536,
   tablet: 2560,
   web: 3840,
-  webLarge: 5120,
+  webLarge: 10240,
 };
 
 function extFromContentType(contentType: string): string {

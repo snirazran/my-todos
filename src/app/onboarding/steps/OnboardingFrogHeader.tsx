@@ -18,14 +18,31 @@ import type { FrogEmote, FrogEmoteLoop, FrogHandle, WardrobeSlot } from '@/compo
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 export const ONBOARDING_BODY_CLASS =
-  'pt-[calc(392px+env(safe-area-inset-top))] short:pt-[calc(360px+env(safe-area-inset-top))] md:pt-[434px]';
+  'pt-[calc(392px+env(safe-area-inset-top))] short:pt-[calc(360px+env(safe-area-inset-top))] md:pt-[434px] lg:pt-0';
+
+export const ONBOARDING_FROG_POSITION_CLASS =
+  'inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] md:-top-10 lg:right-1/2 lg:top-[calc(50vh_-_270px)]';
+
+export const ONBOARDING_FROG_WIDE_POSITION_CLASS =
+  'inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] md:-top-10 lg:top-[calc(50vh_-_270px)]';
+
+const GLIDE = '500ms cubic-bezier(0.32, 0.72, 0, 1)';
+export const SCENE_GLIDE_TRANSITION = `top ${GLIDE}, left ${GLIDE}, right ${GLIDE}`;
+
+export const ONBOARDING_SPLIT_CONTAINER_CLASS =
+  'lg:max-w-none lg:pl-[calc(50%_+_max(3rem,calc((50%_-_30rem)/2)))] lg:pr-[max(3rem,calc((50%_-_30rem)/2))]';
+
+export const ONBOARDING_SPLIT_BAR_CLASS =
+  'lg:left-[calc(50%_+_max(3rem,calc((50%_-_30rem)/2)))] lg:right-[max(3rem,calc((50%_-_30rem)/2))] lg:top-6 lg:px-0';
+
+export const ONBOARDING_SPLIT_STEP_CLASS = 'lg:static lg:justify-center lg:py-24';
 
 // Phone viewports are short enough that a bottom-pinned action lands just below
 // the content. A desktop window is far taller, so cap how far the spacer pushes.
-export const ONBOARDING_FOOTER_SPACER_CLASS = 'flex-[8] md:max-h-40';
+export const ONBOARDING_FOOTER_SPACER_CLASS = 'flex-[8] md:max-h-40 lg:max-h-10';
 
 export const ONBOARDING_DOCK_POSITION_CLASS =
-  'inset-x-3 top-[calc(238px+env(safe-area-inset-top))] h-14 short:top-[calc(206px+env(safe-area-inset-top))] md:inset-x-0 md:top-[278px] md:mx-auto md:w-full md:max-w-lg lg:max-w-xl';
+  'inset-x-3 top-[calc(238px+env(safe-area-inset-top))] h-14 short:top-[calc(206px+env(safe-area-inset-top))] md:inset-x-0 md:top-[261px] md:mx-auto md:w-full md:max-w-lg lg:right-1/2 lg:top-[calc(50vh_+_31px)] lg:w-auto lg:max-w-[26rem]';
 const ONBOARDING_DOCK_SURFACE_CLASS =
   'rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]';
 
@@ -47,7 +64,7 @@ export function OnboardingProgressDock({
   return (
     <div
       className={cn(
-        'pointer-events-none absolute',
+        'pointer-events-none absolute lg:[transition:right_500ms_cubic-bezier(0.32,0.72,0,1)]',
         ONBOARDING_DOCK_POSITION_CLASS,
         ONBOARDING_DOCK_SURFACE_CLASS,
         className,
@@ -106,10 +123,13 @@ type StageProps = {
   pose?: FrogPose | null;
   frogRef?: RefObject<FrogHandle | null>;
   emote?: FrogEmoteLoop | null;
+  positionClassName?: string;
 };
 
 const poseTransition = (motion: FrogPose['motion']) =>
-  motion === 'seated' ? 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)' : undefined;
+  motion === 'seated'
+    ? `transform 280ms cubic-bezier(0.32, 0.72, 0, 1), ${SCENE_GLIDE_TRANSITION}`
+    : undefined;
 
 // Rendered once at the page level so the Rive canvas survives step
 // transitions instead of remounting (and re-initializing) on every step.
@@ -119,6 +139,7 @@ export function OnboardingFrogStage({
   pose = null,
   frogRef,
   emote = null,
+  positionClassName = ONBOARDING_FROG_POSITION_CLASS,
 }: StageProps) {
   const ownFrogRef = useRef<FrogHandle>(null);
   const stageFrogRef = frogRef ?? ownFrogRef;
@@ -138,7 +159,8 @@ export function OnboardingFrogStage({
   return (
     <div
       className={cn(
-        'pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-30 flex justify-center md:-top-10',
+        'pointer-events-none absolute z-30 flex justify-center lg:transition-[top,left,right] lg:duration-500 lg:ease-[cubic-bezier(0.32,0.72,0,1)]',
+        positionClassName,
         hidden && 'opacity-0',
       )}
       style={
@@ -220,6 +242,7 @@ type Props = {
   subtitle?: ReactNode;
   speechBubbleMessage?: string;
   speechTypedChars?: number;
+  bubblePositionClassName?: string;
 };
 
 export const ONBOARDING_TITLE_CLASS =
@@ -228,10 +251,10 @@ export const ONBOARDING_SUBTITLE_CLASS =
   'line-clamp-2 text-balance text-center text-[15px] font-medium leading-5 text-muted-foreground md:text-base';
 
 export const ONBOARDING_HEADER_TOP_CLASS =
-  'top-[calc(314px+env(safe-area-inset-top))] short:top-[calc(282px+env(safe-area-inset-top))] md:top-[354px]';
+  'top-[calc(314px+env(safe-area-inset-top))] short:top-[calc(282px+env(safe-area-inset-top))] md:top-[354px] lg:static';
 
 export const ONBOARDING_FLOW_TOP_CLASS =
-  'pt-[calc(314px+env(safe-area-inset-top))] short:pt-[calc(282px+env(safe-area-inset-top))] md:pt-[354px]';
+  'pt-[calc(314px+env(safe-area-inset-top))] short:pt-[calc(282px+env(safe-area-inset-top))] md:pt-[354px] lg:pt-0';
 
 export function OnboardingHeading({
   eyebrow,
@@ -258,12 +281,14 @@ export function OnboardingHeading({
 export function OnboardingSpeechBubble({
   message,
   typedChars,
+  positionClassName = ONBOARDING_FROG_POSITION_CLASS,
 }: {
   message: string;
   typedChars?: number;
+  positionClassName?: string;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)-27px)] short:top-[calc(env(safe-area-inset-top)-11px)] z-30 flex justify-center md:-top-10">
+    <div className={cn('pointer-events-none absolute z-30 flex justify-center', positionClassName)}>
       <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
         <FrogSpeechBubble
           rate={0}
@@ -283,9 +308,16 @@ export function OnboardingFrogHeader({
   subtitle,
   speechBubbleMessage,
   speechTypedChars,
+  bubblePositionClassName,
 }: Props) {
   if (speechBubbleMessage) {
-    return <OnboardingSpeechBubble message={speechBubbleMessage} typedChars={speechTypedChars} />;
+    return (
+      <OnboardingSpeechBubble
+        message={speechBubbleMessage}
+        typedChars={speechTypedChars}
+        positionClassName={bubblePositionClassName}
+      />
+    );
   }
   return (
     <div className={cn('absolute inset-x-0 z-20 px-5 md:px-8', ONBOARDING_HEADER_TOP_CLASS)}>

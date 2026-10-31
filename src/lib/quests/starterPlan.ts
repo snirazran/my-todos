@@ -299,6 +299,12 @@ export function buildStarterPlan(args: {
   const picked: StarterPlanItem[] = [];
   const seen = new Set<string>();
 
+  const usable = (template: StarterTaskTemplate) =>
+    !seen.has(template.id) &&
+    !seen.has(textKey(template.text)) &&
+    !(template.group && seen.has(`group:${template.group}`)) &&
+    starterCadenceDays(template.cadence, template.days).length > 0;
+
   const add = (
     category: { id: string; name: string; shortLabel?: string; accent?: string },
     template: StarterTaskTemplate,
@@ -306,11 +312,12 @@ export function buildStarterPlan(args: {
     if (picked.length >= config.maxTasks) return false;
     const key = textKey(template.text);
     const group = template.group ? `group:${template.group}` : null;
-    if (seen.has(template.id) || seen.has(key) || (group && seen.has(group))) return false;
+    const moment = `moment:${template.moment ?? 'day'}`;
+    if (!usable(template) || seen.has(moment)) return false;
     const days = starterCadenceDays(template.cadence, template.days);
-    if (days.length === 0) return false;
     seen.add(template.id);
     seen.add(key);
+    seen.add(moment);
     if (group) seen.add(group);
     picked.push({
       id: `${category.id}:${template.id}`,
@@ -329,46 +336,83 @@ export function buildStarterPlan(args: {
     return true;
   };
 
-  const basicsCategory = { id: STARTER_BASICS_CATEGORY_ID, name: 'Easy wins' };
-  let basicsAdded = 0;
-  for (const template of args.basics ?? []) {
-    if (basicsAdded >= (args.basicsCount ?? Infinity)) break;
-    if (template.enabled !== false && add(basicsCategory, template)) basicsAdded += 1;
-  }
-
   const pools = selectedCategoryIds
     .map((id) => {
       const category = byId.get(id);
       if (!category) return null;
-      const leads = category.leadTasks ?? [];
-      const tasks = [...leads, ...(category.starterTasks ?? [])].filter(
-        (task) => task.enabled !== false,
-      );
+      const leads = (category.leadTasks ?? []).filter((task) => task.enabled !== false);
+      const tasks = [
+        ...leads,
+        ...(category.starterTasks ?? []).filter((task) => task.enabled !== false),
+      ];
       if (tasks.length === 0) return null;
-      return { category, tasks, cursor: 0, taken: 0, led: leads.length > 0 };
+      return { category, tasks, cursor: 0, taken: 0, leads: leads.length };
     })
     .filter(Boolean)
-    .sort((a, b) => Number(b!.led) - Number(a!.led)) as Array<{
+    .sort((a, b) => Number(b!.leads > 0) - Number(a!.leads > 0)) as Array<{
     category: { id: string; name: string; shortLabel?: string; accent?: string };
     tasks: StarterTaskTemplate[];
     cursor: number;
     taken: number;
-    led: boolean;
+    leads: number;
   }>;
+
+  const takeNext = (pool: (typeof pools)[number], end: number) => {
+    while (pool.cursor < end) {
+      const template = pool.tasks[pool.cursor++];
+      if (add(pool.category, template)) {
+        pool.taken += 1;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const basicsCategory = { id: STARTER_BASICS_CATEGORY_ID, name: 'Easy wins' };
+  const easyWins = (args.basics ?? []).filter((task) => task.enabled !== false);
+  let basicsAdded = 0;
+  const addEasyWins = (limit: number) => {
+    for (const template of easyWins) {
+      if (basicsAdded >= limit) break;
+      if (add(basicsCategory, template)) basicsAdded += 1;
+    }
+  };
+
+  const coverUntouchedAreas = () => {
+    const owners = new Map<StarterMoment, { pool: (typeof pools)[number]; index: number }>();
+    const claim = (pool: (typeof pools)[number], tried: Set<StarterMoment>): boolean => {
+      for (let index = pool.cursor; index < pool.tasks.length; index++) {
+        const template = pool.tasks[index];
+        const moment = template.moment ?? 'day';
+        if (tried.has(moment) || seen.has(`moment:${moment}`) || !usable(template)) continue;
+        tried.add(moment);
+        const owner = owners.get(moment);
+        if (!owner || claim(owner.pool, tried)) {
+          owners.set(moment, { pool, index });
+          return true;
+        }
+      }
+      return false;
+    };
+    const untouched = pools.filter((pool) => pool.taken === 0);
+    for (const pool of untouched) claim(pool, new Set());
+    for (const pool of untouched) {
+      const owned = Array.from(owners.values()).find((owner) => owner.pool === pool);
+      if (owned ? add(pool.category, pool.tasks[owned.index]) : false) pool.taken += 1;
+    }
+  };
+
+  for (const pool of pools) takeNext(pool, pool.leads);
+  addEasyWins(Math.min(1, args.basicsCount ?? Infinity));
+  coverUntouchedAreas();
+  addEasyWins(args.basicsCount ?? Infinity);
 
   let progressed = true;
   while (progressed && picked.length < config.maxTasks) {
     progressed = false;
     for (const pool of pools) {
       if (pool.taken >= config.maxPerArea) continue;
-      while (pool.cursor < pool.tasks.length) {
-        const template = pool.tasks[pool.cursor++];
-        if (add(pool.category, template)) {
-          pool.taken += 1;
-          progressed = true;
-          break;
-        }
-      }
+      if (takeNext(pool, pool.tasks.length)) progressed = true;
     }
   }
 

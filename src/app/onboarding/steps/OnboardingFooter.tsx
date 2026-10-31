@@ -94,7 +94,7 @@ export function OnboardingFooter({ children, hint, className }: FooterProps) {
           'sticky bottom-0 z-30 -mx-5 mt-3 flex flex-col items-center gap-2 bg-background px-5 pt-3 md:mx-0 md:px-0',
           keyboardOpen
             ? 'pb-3'
-            : 'pb-[calc(1.75rem+env(safe-area-inset-bottom))] md:pb-10',
+            : 'pb-[calc(1.75rem+env(safe-area-inset-bottom))] md:pb-10 lg:pb-0',
           className,
         )}
       >

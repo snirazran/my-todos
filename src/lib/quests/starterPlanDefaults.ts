@@ -11,14 +11,14 @@ export const STARTER_BASICS: StarterTaskTemplate[] = [
     emoji: '💧',
     text: 'Drink a glass of water',
     cadence: 'daily',
-    moment: 'wake',
+    moment: 'morning',
   },
   {
     id: 'make-your-bed',
     emoji: '🛏️',
     text: 'Make your bed',
     cadence: 'daily',
-    moment: 'morning',
+    moment: 'wake',
   },
 ];
 
@@ -157,14 +157,16 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
     },
     {
       id: 'walk-after-meal',
+      group: 'walk',
       movement: true,
       emoji: '🚶',
-      text: 'Walk for 5 minutes',
+      text: 'Take a 5-minute walk after dinner',
       cadence: 'daily',
       moment: 'evening',
     },
     {
       id: 'ten-squats',
+      group: 'squats',
       movement: true,
       emoji: '🦵',
       text: 'Do 10 squats',
@@ -172,10 +174,11 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       moment: 'morning',
     },
     {
-      id: 'take-the-stairs',
+      id: 'walk-after-lunch',
+      group: 'walk',
       movement: true,
-      emoji: '🪜',
-      text: 'Take the stairs once',
+      emoji: '🚶',
+      text: 'Take a 5-minute walk after lunch',
       cadence: 'daily',
       moment: 'day',
     },
@@ -227,19 +230,19 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       moment: 'day',
     },
     {
+      id: 'reply-friend',
+      emoji: '↩️',
+      text: 'Reply to one message from a friend',
+      cadence: 'daily',
+      moment: 'evening',
+    },
+    {
       id: 'hug-someone',
       company: true,
       emoji: '🤗',
       text: 'Hug someone you love',
       cadence: 'daily',
       moment: 'morning',
-    },
-    {
-      id: 'small-chat',
-      emoji: '👋',
-      text: 'Have a quick chat with someone you pass',
-      cadence: 'daily',
-      moment: 'day',
     },
   ],
   home: [
@@ -416,12 +419,12 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
   mindfulness: {
     title: 'What makes it hard to slow down?',
     options: [
-      barrier('rushing', '🏃', "I'm always rushing", 'For rushed mornings', {
-        id: 'b-breaths-before-up',
+      barrier('rushing', '🏃', "I'm always rushing", 'For rushed days', {
+        id: 'b-breaths-first-task',
         group: 'breathing',
         emoji: '🌬️',
-        text: 'Take 3 slow breaths before you get up',
-        moment: 'wake',
+        text: 'Take 3 slow breaths before your first task',
+        moment: 'morning',
       }),
       barrier('busy-mind', '🌀', "My mind won't switch off", 'For a busy mind', {
         id: 'b-brain-dump',
@@ -447,10 +450,11 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
     title: 'What gets in the way of moving more?',
     options: [
       barrier('no-time', '⏰', "I don't have time", 'For busy days', {
-        id: 'b-walk-and-talk',
+        id: 'b-walk-after-lunch',
+        group: 'walk',
         movement: true,
         emoji: '🚶',
-        text: 'Walk during one phone call',
+        text: 'Take a 5-minute walk after lunch',
         moment: 'day',
       }),
       barrier('low-energy', '🔋', "I'm low on energy", 'For low-energy days', {
@@ -470,6 +474,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       }),
       barrier('no-plan', '🤷', "I don't know where to start", 'No plan needed', {
         id: 'b-brush-squats',
+        group: 'squats',
         movement: true,
         emoji: '🦵',
         text: 'Do 5 squats after brushing your teeth',
@@ -510,9 +515,9 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
     title: 'What makes staying close to people hard?',
     options: [
       barrier('drift', '🌊', 'I lose touch with people', 'For people you miss', {
-        id: 'b-send-photo',
-        emoji: '📸',
-        text: 'Send a photo to someone you miss',
+        id: 'b-message-someone',
+        emoji: '💌',
+        text: "Message someone you haven't talked to in a while",
         moment: 'day',
       }),
       barrier('busy', '⏰', "I'm too busy", 'For busy days', {
@@ -609,16 +614,16 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
         moment: 'morning',
       }),
       barrier('no-ideas', '🤷', "I don't know what to make", 'For when ideas run dry', {
-        id: 'b-save-recipe',
-        emoji: '📖',
-        text: "Save one recipe you'd like to try",
-        moment: 'day',
+        id: 'b-decide-dinner',
+        emoji: '🍳',
+        text: "Decide tomorrow's dinner",
+        moment: 'evening',
       }),
       barrier('cost', '💸', 'Healthy food feels pricey', 'Easy on your wallet', {
-        id: 'b-pack-snack',
+        id: 'b-snack-from-home',
         emoji: '🥜',
-        text: 'Pack a snack from home for tomorrow',
-        moment: 'evening',
+        text: 'Make one snack at home instead of buying it',
+        moment: 'day',
       }),
     ],
   },

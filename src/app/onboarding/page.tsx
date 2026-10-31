@@ -27,6 +27,10 @@ import { OnboardingTopBar } from './steps/OnboardingTopBar';
 import {
   OnboardingFrogStage,
   OnboardingProgressDock,
+  ONBOARDING_FROG_WIDE_POSITION_CLASS,
+  ONBOARDING_SPLIT_BAR_CLASS,
+  ONBOARDING_SPLIT_CONTAINER_CLASS,
+  SCENE_GLIDE_TRANSITION,
   type FrogPose,
 } from './steps/OnboardingFrogHeader';
 import { cn } from '@/lib/utils';
@@ -52,8 +56,8 @@ import { useAutoPopupHold } from '@/lib/popupGate';
 // dropped the moment the flow lands on an account that already finished onboarding.
 import {
   clearOnboardingDraft,
-  loadOnboardingDraft,
   saveOnboardingDraft,
+  takeOnboardingDraft,
 } from '@/lib/onboardingDraft';
 
 const STEP_IDS = [
@@ -139,7 +143,7 @@ export default function OnboardingPage() {
   }, [step, subStep]);
 
   useLayoutEffect(() => {
-    const draft = loadOnboardingDraft();
+    const draft = takeOnboardingDraft();
     if (Object.keys(draft).length) setSelections((prev) => ({ ...draft, ...prev }));
   }, []);
 
@@ -484,6 +488,7 @@ export default function OnboardingPage() {
         } catch {}
       }
       await clearSessionCookie();
+      clearOnboardingDraft();
       router.replace('/welcome');
       return;
     }
@@ -499,46 +504,58 @@ export default function OnboardingPage() {
     direction,
   };
 
+  const split = !paywallOpen && (celebrating || currentId !== 'name' || giftOpened);
+  const planScreen = currentId === 'plan' && !celebrating;
   const nameLift = currentId === 'name' && !celebrating ? (frogPose?.lift ?? 0) : 0;
   const backdropLift: CSSProperties = {
     transform: nameLift ? `translate3d(0, ${-nameLift}px, 0)` : undefined,
-    transition: KEYBOARD_EASE,
+    transition: `${KEYBOARD_EASE}, ${SCENE_GLIDE_TRANSITION}`,
   };
 
   return (
     <main
       ref={mainRef}
-      className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4"
+      className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4 lg:px-0 lg:pt-0"
     >
       {!paywallOpen && (
         <>
-          {(currentId !== 'plan' || celebrating) && (
-            <>
-              <OnboardingBackground style={backdropLift} />
-              <div
-                aria-hidden
-                style={backdropLift}
-                className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(252px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(220px+env(safe-area-inset-top))] md:top-[292px]"
-              />
-              <OnboardingProgressDock
-                done={celebrating ? totalUnits : doneUnits}
-                total={totalUnits}
-                className={cn('z-[5]', currentId === 'name' && !celebrating && 'opacity-0')}
-              />
-            </>
-          )}
+          <OnboardingBackground style={backdropLift} wide={!split} />
+          <div
+            aria-hidden
+            style={backdropLift}
+            className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(252px+env(safe-area-inset-top))] z-[4] bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_44px)] short:top-[calc(220px+env(safe-area-inset-top))] md:top-[292px] lg:hidden"
+          />
+          <OnboardingProgressDock
+            done={celebrating ? totalUnits : doneUnits}
+            total={totalUnits}
+            className={cn(
+              'z-[5] transition-opacity duration-300',
+              currentId === 'name' && !celebrating && 'opacity-0',
+              planScreen && 'opacity-0 lg:opacity-100',
+            )}
+          />
         </>
       )}
-      <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
+      <div
+        className={cn(
+          'relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl',
+          split && ONBOARDING_SPLIT_CONTAINER_CLASS,
+        )}
+        style={{ minHeight: '100%' }}
+      >
         <OnboardingFrogStage
           indices={stageIndices}
           frogRef={frogRef}
           hidden={paywallOpen || (!celebrating && currentId === 'name' && !frogPose)}
           pose={currentId === 'name' && !celebrating ? frogPose : null}
           emote={currentId === 'age' && !celebrating && !paywallOpen ? 'question' : null}
+          positionClassName={split ? undefined : ONBOARDING_FROG_WIDE_POSITION_CLASS}
         />
         {!celebrating && !paywallOpen && currentId !== 'name' && (
-          <OnboardingTopBar onBack={step === 0 && hasAccount ? undefined : handleBack} />
+          <OnboardingTopBar
+            onBack={step === 0 && hasAccount ? undefined : handleBack}
+            className={split ? ONBOARDING_SPLIT_BAR_CLASS : undefined}
+          />
         )}
         {celebrating ? (
           <CelebrationStep
