@@ -67,15 +67,15 @@ type PaywallSession = {
   planChanged: boolean;
   closeMethod: CloseMethod | null;
   outcome: 'purchased' | 'restored' | null;
-  step: Step;
+  step: string;
 };
 
 const PAYWALL_VARIANT = 'trial_steps_v1';
 
-const APPLE_EULA_URL =
+export const APPLE_EULA_URL =
   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
-const TERMS_URL = 'https://frogress.com/terms';
-const PRIVACY_URL = 'https://frogress.com/privacy';
+export const TERMS_URL = 'https://frogress.com/terms';
+export const PRIVACY_URL = 'https://frogress.com/privacy';
 
 
 const desktopQuery = '(min-width: 768px)';
@@ -96,7 +96,11 @@ function useIsDesktop() {
 
 const PREMIUM_CONFIRM_LATE_MS = 10 * 60 * 1000;
 
-let cachedPricing: { uid: string; prices: Partial<Record<PlanId, PlusPriceInfo>> } | null = null;
+let cachedPricing: {
+  uid: string;
+  offering?: string;
+  prices: Partial<Record<PlanId, PlusPriceInfo>>;
+} | null = null;
 
 async function refreshPremiumState() {
   await mutate(() => true);
@@ -137,6 +141,8 @@ export type PlusPaywallArgs = {
   onStartTrial?: (plan: PlanId) => void | Promise<void>;
   placement?: string;
   frogName?: string;
+  offering?: string;
+  variant?: string;
 };
 
 export function usePlusPaywall({
@@ -145,6 +151,8 @@ export function usePlusPaywall({
   onStartTrial,
   placement = 'unknown',
   frogName,
+  offering,
+  variant = PAYWALL_VARIANT,
 }: PlusPaywallArgs) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -174,11 +182,15 @@ export function usePlusPaywall({
   pricesLoadedRef.current = !!(pricing?.yearly || pricing?.monthly);
   const paywallProps = () => ({
     placement,
-    variant: PAYWALL_VARIANT,
+    variant,
     paywall_session: sessionRef.current?.id,
   });
   const markClose = (method: CloseMethod) => {
     if (sessionRef.current) sessionRef.current.closeMethod = method;
+  };
+  const markStep = (next: string) => {
+    if (sessionRef.current) sessionRef.current.step = next;
+    trackAnalyticsEvent('paywall_step_viewed', { ...paywallProps(), step: next });
   };
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
@@ -209,10 +221,14 @@ export function usePlusPaywall({
     let cancelled = false;
     setPricingFailed(false);
     const uid = auth?.currentUser?.uid;
-    setPricing(uid && cachedPricing?.uid === uid ? cachedPricing.prices : null);
-    getPlusPricing()
+    setPricing(
+      uid && cachedPricing?.uid === uid && cachedPricing.offering === offering
+        ? cachedPricing.prices
+        : null,
+    );
+    getPlusPricing(offering)
       .then((prices) => {
-        if (uid && (prices.yearly || prices.monthly)) cachedPricing = { uid, prices };
+        if (uid && (prices.yearly || prices.monthly)) cachedPricing = { uid, offering, prices };
         if (cancelled) return;
         setPricing(prices);
         setPricingFailed(!prices.yearly && !prices.monthly);
@@ -234,7 +250,7 @@ export function usePlusPaywall({
     return () => {
       cancelled = true;
     };
-  }, [open, pricingAttempt]);
+  }, [open, pricingAttempt, offering]);
 
   useEffect(() => {
     if (!open) return;
@@ -258,12 +274,12 @@ export function usePlusPaywall({
       step: 'offer',
     };
     sessionRef.current = session;
-    trackAnalyticsEvent('paywall_viewed', { placement, variant: PAYWALL_VARIANT, paywall_session: session.id });
+    trackAnalyticsEvent('paywall_viewed', { placement, variant, paywall_session: session.id });
     return () => {
       if (session.outcome) return;
       trackAnalyticsEvent('paywall_dismissed', {
         placement,
-        variant: PAYWALL_VARIANT,
+        variant,
         paywall_session: session.id,
         step: session.step,
         seconds_elapsed: Math.round((Date.now() - session.openedAt) / 1000),
@@ -276,7 +292,7 @@ export function usePlusPaywall({
         prices_loaded: pricesLoadedRef.current,
       });
     };
-  }, [open, placement]);
+  }, [open, placement, variant]);
 
   const selectPlan = (next: PlanId) => {
     if (next === plan) return;
@@ -361,7 +377,7 @@ export function usePlusPaywall({
     setPurchaseError(null);
     setPurchasing(true);
     try {
-      const outcome = await purchasePlus(plan, placement, session?.id);
+      const outcome = await purchasePlus(plan, placement, session?.id, offering);
       if (session) {
         session.sheetResult = outcome;
         if (outcome === 'purchased') session.outcome = 'purchased';
@@ -448,8 +464,8 @@ export function usePlusPaywall({
     setStepDirection(steps.indexOf(next) >= stepIndex ? 1 : -1);
     setStep(next);
     scrollRef.current?.scrollTo({ top: 0 });
-    if (sessionRef.current) sessionRef.current.step = next;
-    if (next !== 'offer') trackAnalyticsEvent('paywall_step_viewed', { ...paywallProps(), step: next });
+    if (next !== 'offer') markStep(next);
+    else if (sessionRef.current) sessionRef.current.step = next;
   };
   const showBack = view === 'compare' || step !== 'offer';
   const goBack = () => {
@@ -512,6 +528,7 @@ export function usePlusPaywall({
     ctaLabel,
     ctaContent,
     caption,
+    markStep,
   };
 }
 

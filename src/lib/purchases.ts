@@ -118,12 +118,14 @@ async function purchasePlusNative(
   plan: PlusPlan,
   placement: string,
   onSheet: () => void,
+  offeringId?: string,
 ): Promise<PlusPurchaseResult> {
   const { Purchases } = await getNativePurchases(uid);
   const { PURCHASES_ERROR_CODE } = await import('@revenuecat/purchases-capacitor');
   const offerings = await Purchases.getOfferings();
-  const offering = offerings.current;
-  const pkg = plan === 'yearly' ? offering?.annual : offering?.monthly;
+  const requested = offeringId ? offerings.all?.[offeringId] : undefined;
+  const pkg = (plan === 'yearly' ? requested?.annual : requested?.monthly)
+    ?? (plan === 'yearly' ? offerings.current?.annual : offerings.current?.monthly);
   if (!pkg) throw new Error(`No ${plan} package available`);
   await Purchases.setAttributes({ paywall_placement: placement }).catch(() => {});
   onSheet();
@@ -149,12 +151,14 @@ async function purchasePlusWeb(
   plan: PlusPlan,
   placement: string,
   onSheet: () => void,
+  offeringId?: string,
 ): Promise<PlusPurchaseResult> {
   const purchases = await getWebPurchases(uid);
   const { ErrorCode, PurchasesError } = await import('@revenuecat/purchases-js');
   const offerings = await purchases.getOfferings();
-  const offering = offerings.current;
-  const pkg = plan === 'yearly' ? offering?.annual : offering?.monthly;
+  const requested = offeringId ? offerings.all?.[offeringId] : undefined;
+  const pkg = (plan === 'yearly' ? requested?.annual : requested?.monthly)
+    ?? (plan === 'yearly' ? offerings.current?.annual : offerings.current?.monthly);
   if (!pkg) throw new Error(`No ${plan} package available`);
   await purchases.setAttributes({ paywall_placement: placement }).catch(() => {});
   onSheet();
@@ -182,6 +186,7 @@ export async function purchasePlus(
   plan: PlusPlan,
   placement = 'unknown',
   paywallSession?: string,
+  offeringId?: string,
 ): Promise<PurchaseOutcome> {
   const uid = requireUid();
   const store = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
@@ -193,8 +198,8 @@ export async function purchasePlus(
   trackAnalyticsEvent('purchase_started', context);
   try {
     const result = Capacitor.isNativePlatform()
-      ? await purchasePlusNative(uid, plan, placement, onSheet)
-      : await purchasePlusWeb(uid, plan, placement, onSheet);
+      ? await purchasePlusNative(uid, plan, placement, onSheet, offeringId)
+      : await purchasePlusWeb(uid, plan, placement, onSheet, offeringId);
     trackAnalyticsEvent(
       result.outcome === 'purchased' ? 'purchase_completed' : 'purchase_cancelled',
       { ...context, environment: result.environment },
@@ -572,7 +577,7 @@ export async function getFlyPackPrices(): Promise<Partial<Record<FlyPackId, stri
     const pkg = offerings.current?.availablePackages.find(
       (entry) => entry.identifier === pack.packageId || entry.webBillingProduct.identifier === pack.productId,
     );
-    if (pkg) prices[pack.id] = pkg.webBillingProduct.price.formattedPrice;
+    if (pkg) prices[pack.id] = webPrice(pkg.webBillingProduct.price);
   }
   return prices;
 }
@@ -657,7 +662,7 @@ async function nativeQuote(
 function webQuote(pkg: WebPackage): PriceQuote {
   const product = pkg.webBillingProduct;
   const base: PriceQuote = {
-    formatted: product.price.formattedPrice,
+    formatted: webPrice(product.price),
     amount: product.price.amountMicros / 1_000_000,
     currency: product.price.currency,
   };
@@ -665,7 +670,7 @@ function webQuote(pkg: WebPackage): PriceQuote {
   const period = periodLabel(product.normalPeriodDuration);
   const intro = product.introPricePhase?.price;
   return intro
-    ? discounted(base, intro.formattedPrice, intro.amountMicros / 1_000_000, period)
+    ? discounted(base, webPrice(intro), intro.amountMicros / 1_000_000, period)
     : { ...base, period };
 }
 
@@ -740,11 +745,16 @@ export type PlusPriceInfo = {
   trialPeriod: TrialPeriod | null;
   /** A paid introductory phase can follow a free trial. Checkout shows its terms. */
   hasIntroPrice: boolean;
+  regular: { priceString: string; amount: number } | null;
 };
 
-function formatMoney(amount: number, currency: string): string {
+function webPrice(price: { amountMicros: number; currency: string }) {
+  return formatMoney(price.amountMicros / 1_000_000, price.currency, 'en-US');
+}
+
+function formatMoney(amount: number, currency: string, locale?: string): string {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
       amount,
     );
   } catch {
@@ -757,7 +767,7 @@ function formatMoney(amount: number, currency: string): string {
  * hardcoded figure: outside the US the store charges something else entirely,
  * and a price the checkout sheet contradicts is an App Review rejection.
  */
-export async function getPlusPricing(): Promise<
+export async function getPlusPricing(offeringId?: string): Promise<
   Partial<Record<PlusPlan, PlusPriceInfo>>
 > {
   const uid = requireUid();
@@ -765,8 +775,15 @@ export async function getPlusPricing(): Promise<
 
   if (Capacitor.isNativePlatform()) {
     const { Purchases } = await getNativePurchases(uid);
-    const offering = (await Purchases.getOfferings()).current;
-    const packages = [offering?.annual, offering?.monthly].filter((pkg) => !!pkg);
+    const offerings = await Purchases.getOfferings();
+    const current = offerings.current;
+    const requested = offeringId ? offerings.all?.[offeringId] : undefined;
+    const offered = requested?.identifier === current?.identifier ? undefined : requested;
+    const plans = [
+      ['yearly', offered?.annual ?? current?.annual, offered?.annual ? current?.annual : undefined],
+      ['monthly', offered?.monthly ?? current?.monthly, offered?.monthly ? current?.monthly : undefined],
+    ] as const;
+    const packages = plans.map(([, pkg]) => pkg).filter((pkg) => !!pkg);
     const { INTRO_ELIGIBILITY_STATUS } = await import('@revenuecat/purchases-capacitor');
     // Unknown eligibility must not be presented as a guaranteed free trial.
     const eligibility = Capacitor.getPlatform() === 'ios'
@@ -774,10 +791,7 @@ export async function getPlusPricing(): Promise<
           productIdentifiers: packages.map((pkg) => pkg.product.identifier),
         }).catch(() => ({} as Awaited<ReturnType<typeof Purchases.checkTrialOrIntroductoryPriceEligibility>>))
       : null;
-    for (const [plan, pkg] of [
-      ['yearly', offering?.annual],
-      ['monthly', offering?.monthly],
-    ] as const) {
+    for (const [plan, pkg, base] of plans) {
       if (!pkg) continue;
       const intro = pkg.product.introPrice;
       const eligible = eligibility?.[pkg.product.identifier]?.status ===
@@ -791,6 +805,7 @@ export async function getPlusPricing(): Promise<
         : freePhase
           ? parseTrialPeriod(freePhase.billingPeriod.iso8601, freePhase.billingCycleCount || 1)
           : null;
+      const regular = base?.product;
       prices[plan] = {
         priceString: pkg.product.priceString,
         amount: pkg.product.price,
@@ -805,16 +820,22 @@ export async function getPlusPricing(): Promise<
         hasIntroPrice: Capacitor.getPlatform() === 'ios'
           ? eligible && !!intro && intro.price > 0
           : !!option?.introPhase,
+        regular: regular && regular.price > pkg.product.price
+          ? { priceString: regular.priceString, amount: regular.price }
+          : null,
       };
     }
     return prices;
   }
 
   const purchases = await getWebPurchases(uid);
-  const offering = (await purchases.getOfferings()).current;
-  for (const [plan, pkg] of [
-    ['yearly', offering?.annual],
-    ['monthly', offering?.monthly],
+  const offerings = await purchases.getOfferings();
+  const current = offerings.current;
+  const requested = offeringId ? offerings.all?.[offeringId] : undefined;
+  const offered = requested?.identifier === current?.identifier ? undefined : requested;
+  for (const [plan, pkg, base] of [
+    ['yearly', offered?.annual ?? current?.annual, offered?.annual ? current?.annual : undefined],
+    ['monthly', offered?.monthly ?? current?.monthly, offered?.monthly ? current?.monthly : undefined],
   ] as const) {
     if (!pkg) continue;
     const price = pkg.webBillingProduct.price;
@@ -824,15 +845,20 @@ export async function getPlusPricing(): Promise<
     const trial = option?.trial
       ? parseTrialPeriod(option.trial.periodDuration, option.trial.cycleCount || 1)
       : null;
+    const regular = base?.webBillingProduct.price;
+    const regularAmount = regular ? regular.amountMicros / 1_000_000 : 0;
     prices[plan] = {
-      priceString: price.formattedPrice,
+      priceString: formatMoney(amount, price.currency, 'en-US'),
       amount,
       currency: price.currency,
       pricePerMonthString:
-        plan === 'yearly' ? formatMoney(amount / 12, price.currency) : null,
+        plan === 'yearly' ? formatMoney(amount / 12, price.currency, 'en-US') : null,
       trialDuration: formatTrialPeriod(trial),
       trialPeriod: trial,
       hasIntroPrice: !!option?.introPrice,
+      regular: regular && regular.currency === price.currency && regularAmount > amount
+        ? { priceString: formatMoney(regularAmount, regular.currency, 'en-US'), amount: regularAmount }
+        : null,
     };
   }
   return prices;

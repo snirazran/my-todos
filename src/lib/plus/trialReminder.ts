@@ -6,7 +6,7 @@ import {
 import { sendPlusPush } from '@/lib/plus/push';
 import { TRIAL_ENDING_LEAD_MS, trialEndingAt } from '@/lib/plus/trialEnding';
 import { readPlusEarned } from '@/lib/plus/earned';
-import { TRIAL_REMINDER_LEAD_MS } from '@/lib/plusPaywall';
+import { TRIAL_REMINDER_LEAD_MS, trialReminderPush } from '@/lib/plusPaywall';
 
 const QUIET_START_HOUR = 21;
 const QUIET_END_HOUR = 9;
@@ -114,8 +114,7 @@ export async function runPlusTrialReminders() {
     const when = hoursLeft <= 24 ? 'tomorrow' : 'in 2 days';
     await sendPlusPush(user._id, {
       type: 'plus_trial_reminder',
-      title: `Your Plus trial ends ${when}`,
-      body: `Plus renews on ${dateIn(sub.expiresAt, tz)}. Staying? Do nothing. Leaving? Cancel before then in Settings → Frogress Plus.`,
+      ...trialReminderPush(when, dateIn(sub.expiresAt, tz)),
     });
     await UserModel.updateOne(
       { _id: user._id },

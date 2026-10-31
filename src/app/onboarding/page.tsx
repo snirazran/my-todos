@@ -504,7 +504,7 @@ export default function OnboardingPage() {
     direction,
   };
 
-  const split = !paywallOpen && (celebrating || currentId !== 'name' || giftOpened);
+  const split = paywallOpen || celebrating || currentId !== 'name' || giftOpened;
   const planScreen = currentId === 'plan' && !celebrating;
   const nameLift = currentId === 'name' && !celebrating ? (frogPose?.lift ?? 0) : 0;
   const backdropLift: CSSProperties = {
@@ -517,9 +517,13 @@ export default function OnboardingPage() {
       ref={mainRef}
       className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4 lg:px-0 lg:pt-0"
     >
+      <OnboardingBackground
+        style={backdropLift}
+        wide={!split}
+        className={paywallOpen ? 'hidden lg:block' : undefined}
+      />
       {!paywallOpen && (
         <>
-          <OnboardingBackground style={backdropLift} wide={!split} />
           <div
             aria-hidden
             style={backdropLift}
@@ -567,8 +571,6 @@ export default function OnboardingPage() {
         ) : paywallOpen ? (
           <PlusStep
             frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
-            humanName={selections.humanName?.[0]?.trim() || null}
-            habitCount={selections.starterPlan?.length ?? 0}
             indices={stageIndices}
             onDone={() => {
               setPaywallOpen(false);

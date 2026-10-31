@@ -12,6 +12,15 @@ export type PaywallContext = {
 
 export const TRIAL_REMINDER_LEAD_MS = 48 * 60 * 60 * 1000;
 
+export const ONBOARDING_PLUS_OFFERING = 'onboarding_welcome';
+
+export function trialReminderPush(when: string, renewDate: string) {
+  return {
+    title: `Your free trial ends ${when}`,
+    body: `As promised, a heads-up: Plus renews on ${renewDate}. Staying? Do nothing. Leaving? Cancel before then in Settings → Frogress Plus.`,
+  };
+}
+
 export function skipAdsPlacement(placement: string): string {
   return `skip_ads_${placement}`;
 }
