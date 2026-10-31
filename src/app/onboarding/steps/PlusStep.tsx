@@ -3,17 +3,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, Check, Crown } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import Frog, { type FrogEmote, type FrogHandle } from '@/components/ui/frog';
 import { Icon } from '@/components/ui/Icon';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
-import {
-  APPLE_EULA_URL,
-  PRIVACY_URL,
-  PlusAccountPrompt,
-  TERMS_URL,
-  usePlusPaywall,
-} from '@/components/ui/PlusUpgradeModal';
+import { PlusAccountPrompt, usePlusPaywall } from '@/components/ui/PlusUpgradeModal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import type { PlusPriceInfo } from '@/lib/purchases';
@@ -37,6 +30,8 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LEAD_DAYS = Math.round(TRIAL_REMINDER_LEAD_MS / DAY_MS);
 const SEAT_LIFT = 72;
+const SWAP_OUT_MS = 150;
+const SWAP_SETTLE_MS = 50;
 
 const PAGE_EMOTE: Record<Page, FrogEmote> = {
   free: 'loveBurst',
@@ -355,7 +350,6 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
     linkGuestAccount,
     continueWithEmail,
     startPurchase,
-    restorePurchases,
     selected,
     paywallContext,
     pricesPending,
@@ -376,6 +370,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
   const [start] = useState(() => new Date());
   const [page, setPage] = useState<Page>('free');
   const [direction, setDirection] = useState(1);
+  const [swapping, setSwapping] = useState(false);
   const firstPage = useRef(true);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -424,23 +419,36 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
   const period = plan === 'yearly' ? 'year' : 'month';
   const trialDuration = selected?.trialDuration ?? null;
   const pricesReady = !pricesPending;
-  const look = useMemo(() => pageLook(page, catalog, indices), [page, catalog, indices]);
   const frogHidden = checkout && !desktop;
+  const lookPage = frogHidden ? pages[Math.max(0, index - 1)] : page;
+  const look = useMemo(() => pageLook(lookPage, catalog, indices), [lookPage, catalog, indices]);
+  const swapFade = cn('transition-opacity ease-out', swapping ? 'opacity-0 duration-150' : 'duration-300');
 
   useEffect(() => {
     if (firstPage.current) {
       firstPage.current = false;
       return;
     }
-    frogRef.current?.fireEmote(PAGE_EMOTE[page]);
+    if (!frogHidden) frogRef.current?.fireEmote(PAGE_EMOTE[page]);
   }, [page]);
 
   if (!mounted) return null;
 
   const go = (next: Page, dir: number) => {
-    setDirection(dir);
-    setPage(next);
-    markStep(next);
+    const commit = () => {
+      setDirection(dir);
+      setPage(next);
+      markStep(next);
+    };
+    if (reduceMotion || (!checkout && next !== 'checkout')) {
+      commit();
+      return;
+    }
+    setSwapping(true);
+    window.setTimeout(() => {
+      commit();
+      window.setTimeout(() => setSwapping(false), SWAP_SETTLE_MS);
+    }, SWAP_OUT_MS);
   };
   const advance = () => {
     if (!checkout) {
@@ -588,11 +596,8 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
     return <PlusBar />;
   })();
 
-  const isNative = Capacitor.isNativePlatform();
-  const isIos = Capacitor.getPlatform() === 'ios';
-
   return (
-    <div className={cn('relative isolate flex w-full flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS, 'lg:short-screen:py-8')}>
+    <div className={cn('relative isolate flex w-full flex-1 flex-col', ONBOARDING_SPLIT_STEP_CLASS, 'lg:short-screen:py-8', swapping && 'pointer-events-none')}>
       <OnboardingTopBar
         onBack={index > 0 && !purchasing ? () => go(pages[index - 1], -1) : undefined}
         className={ONBOARDING_SPLIT_BAR_CLASS}
@@ -602,9 +607,10 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
         className={cn(
           'flex w-full flex-col pt-[calc(4.5rem+env(safe-area-inset-top))] short:pt-[calc(3rem+env(safe-area-inset-top))] md:mx-auto md:max-w-md md:pt-24 lg:pt-0',
           !checkout && 'min-h-[calc(12.5rem+env(safe-area-inset-top))] short:min-h-[calc(10.25rem+env(safe-area-inset-top))] md:min-h-[14rem] lg:min-h-0',
+          swapFade,
         )}
       >
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence key={checkout ? 'checkout' : 'offer'} mode="wait" initial={false}>
           {pricesReady ? (
             <motion.div
               key={page}
@@ -631,14 +637,9 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
       </div>
 
       {checkout && pricesReady ? (
-        <motion.div
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.32, ease: EASE }}
-          className="mx-auto mt-7 w-full max-w-md short:mt-5 lg:mt-9 lg:short-screen:mt-5"
-        >
+        <div className={cn('mx-auto mt-7 w-full max-w-md short:mt-5 lg:mt-9 lg:short-screen:mt-5', swapFade)}>
           {checkoutDetails}
-        </motion.div>
+        </div>
       ) : null}
 
       <div
@@ -646,6 +647,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
         className={cn(
           'relative w-full flex-1 md:mx-auto md:max-w-md lg:static lg:min-h-0 lg:flex-none',
           !checkout && 'min-h-[15rem] short:min-h-[13rem]',
+          !desktop && swapFade,
         )}
       >
         <div
@@ -664,7 +666,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
             <div
               aria-hidden
               className={cn(
-                'pointer-events-none absolute bottom-[calc(100%-11px)] left-1/2 z-20 transition-opacity duration-300 lg:bottom-[calc(100%-14px)]',
+                'pointer-events-none absolute bottom-[calc(100%-11px)] left-1/2 z-20 lg:bottom-[calc(100%-14px)]',
                 frogHidden && 'opacity-0',
               )}
               style={{ width: frogWidth, height: frogHeight, marginLeft: -frogWidth / 2 }}
@@ -686,7 +688,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
                 className="[--premium-fly-top:34%] [--premium-fly-x-max:78px] [--premium-fly-x-min:-118px] [--premium-fly-y-max:14px] [--premium-fly-y-min:-16px] lg:[--premium-fly-x-max:112px] lg:[--premium-fly-x-min:-164px] lg:[--premium-fly-y-max:18px] lg:[--premium-fly-y-min:-22px]"
               />
             </div>
-            <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence key={frogHidden ? 'hidden' : 'stage'} mode="popLayout" initial={false}>
               <motion.div
                 key={page}
                 {...slide}
@@ -704,7 +706,12 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
         </div>
       </div>
 
-      <OnboardingFooter className="gap-1.5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] short:gap-1 short:pb-3 md:bg-transparent md:pb-10 lg:static lg:mt-8 lg:pb-0 lg:short-screen:mt-3 md:[&>span:first-child]:hidden">
+      <OnboardingFooter
+        className={cn(
+          'gap-1.5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] short:gap-1 short:pb-3 md:bg-transparent md:pb-10 lg:static lg:mt-8 lg:pb-0 lg:short-screen:mt-3 md:[&>span:first-child]:hidden',
+          swapFade,
+        )}
+      >
         {purchaseError ? (
           <p role="alert" className="text-center text-[13px] font-bold text-destructive">
             {purchaseError}
@@ -721,7 +728,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
           </p>
         ) : null}
         {checkout ? (
-          <p aria-live="polite" className="mb-1 max-w-[22rem] text-balance text-center text-[14px] font-semibold leading-snug text-muted-foreground">
+          <p aria-live="polite" className="mb-2.5 max-w-[22rem] text-center text-[14px] font-semibold leading-snug text-muted-foreground short:mb-1 lg:mb-1.5 lg:short-screen:mb-0.5">
             {!selected ? (
               pricingFailed ? 'Store prices are unavailable right now.' : 'Checking your store’s prices…'
             ) : selected.hasIntroPrice ? (
@@ -729,14 +736,16 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
             ) : (
               <>
                 {trialDuration ? `Frogress Plus is free for ${trialDuration}, then ` : 'Frogress Plus is '}
-                <span className={cn('font-black', selected.regular ? 'text-amber-600 dark:text-amber-400' : 'text-foreground')}>
-                  {selected.priceString}
+                <span className={trialDuration ? 'block' : undefined}>
+                  <span className={cn('font-black', selected.regular ? 'text-amber-600 dark:text-amber-400' : 'text-foreground')}>
+                    {selected.priceString}
+                  </span>
+                  {selected.regular ? (
+                    <s className="ml-1 font-semibold decoration-[1.5px]">{selected.regular.priceString}</s>
+                  ) : null}{' '}
+                  <span className="font-black text-foreground">per {period}</span>
+                  {save ? <span className="text-foreground"> (save {save}%)</span> : null}
                 </span>
-                {selected.regular ? (
-                  <s className="ml-1 font-semibold decoration-[1.5px]">{selected.regular.priceString}</s>
-                ) : null}{' '}
-                <span className="font-black text-foreground">per {period}</span>
-                {save ? <span className="text-foreground"> (save {save}%)</span> : null}
               </>
             )}
           </p>
@@ -745,7 +754,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
           onClick={advance}
           disabled={(checkout && pricesPending) || (!checkout && !pricesReady)}
           loading={purchasing || pricesPending}
-          className={cn('isolate overflow-hidden', checkout && 'short:h-12')}
+          className={cn('isolate overflow-hidden transition-[transform,box-shadow,filter]', checkout && 'short:h-12')}
         >
           <span
             aria-hidden
@@ -755,43 +764,22 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
         </OnboardingButton>
         {checkout ? (
           <>
-            <OnboardingButton variant="ghost" onClick={skip} disabled={purchasing} className="h-10 short:h-8">
+            <OnboardingButton
+              variant="ghost"
+              onClick={skip}
+              disabled={purchasing}
+              className="mt-2.5 h-10 short:mt-1 short:h-8 lg:mt-1 lg:short-screen:mt-0 lg:short-screen:h-8"
+            >
               {save ? 'Skip this one-time offer' : 'Not now'}
             </OnboardingButton>
             {save ? (
-              <p className="text-center text-[12.5px] font-black text-amber-600 dark:text-amber-400">
+              <p className="mt-1 text-center text-[13px] font-black text-amber-600 short:mt-0 dark:text-amber-400 lg:short-screen:mt-0">
                 Offer expires when you leave this screen
               </p>
             ) : null}
-            <div className="flex flex-wrap items-center justify-center gap-x-3 text-[10.5px] font-medium text-muted-foreground">
-              <span>Renews automatically. Cancel anytime.</span>
-              {isNative ? (
-                <button
-                  type="button"
-                  disabled={purchasing}
-                  onClick={() => void restorePurchases()}
-                  className="min-h-7 rounded-lg underline underline-offset-2 hover:text-foreground"
-                >
-                  Restore
-                </button>
-              ) : null}
-              <a
-                href={isIos ? APPLE_EULA_URL : TERMS_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-7 items-center rounded-lg underline underline-offset-2 hover:text-foreground"
-              >
-                {isIos ? 'Terms of Use' : 'Terms'}
-              </a>
-              <a
-                href={PRIVACY_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-7 items-center rounded-lg underline underline-offset-2 hover:text-foreground"
-              >
-                Privacy
-              </a>
-            </div>
+            <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground short:mt-0.5 lg:mt-1.5 lg:short-screen:mt-0">
+              Renews automatically. Cancel anytime.
+            </p>
           </>
         ) : null}
       </OnboardingFooter>
