@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { normalizeAnalyticsPage } from '@/lib/analytics/events';
 import { trackAdPixels } from '@/lib/adpixels/client';
+import { activateMetaApp } from '@/lib/adpixels/metaApp';
 import {
   needsAdConsent,
   readAdConsent,
@@ -16,9 +17,9 @@ import { whenAutoPopupsAllowed } from '@/lib/popupGate';
 export function AdConsentBanner() {
   const [visible, setVisible] = useState(false);
   const reduceMotion = useReducedMotion();
+  const native = Capacitor.isNativePlatform();
 
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) return;
     if (!needsAdConsent()) return;
     if (readAdConsent() !== null) return;
     // The ask keeps until the streak flow has had its turn — nothing is
@@ -31,6 +32,7 @@ export function AdConsentBanner() {
     setAdConsent(value);
     setVisible(false);
     if (value === 'granted') {
+      activateMetaApp();
       trackAdPixels(
         'page_viewed',
         { page: normalizeAnalyticsPage(window.location.pathname) },
@@ -55,16 +57,17 @@ export function AdConsentBanner() {
         >
           <aside
             role="dialog"
-            aria-label="Cookie preferences"
+            aria-label={native ? 'Ad measurement preferences' : 'Cookie preferences'}
             className="mx-auto flex max-w-3xl flex-col gap-3 rounded-2xl border border-border bg-background/95 p-4 shadow-lg backdrop-blur-xl sm:flex-row sm:items-center sm:gap-4"
           >
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold tracking-tight">
-                Can we use marketing cookies?
+                {native ? 'Can we measure our ads?' : 'Can we use marketing cookies?'}
               </p>
               <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                They help us understand which ads bring people to Frogress. The
-                app works exactly the same either way.
+                {native
+                  ? 'We share app activity with Meta to learn which ads bring people to Frogress. The app works exactly the same either way.'
+                  : 'They help us understand which ads bring people to Frogress. The app works exactly the same either way.'}
               </p>
             </div>
 
