@@ -16,8 +16,6 @@ export type FirstRunPhase =
   | 'hungry'
   | 'yum'
   | 'streak'
-  | 'quest'
-  | 'claiming'
   | 'finale';
 
 export const FIRST_RUN_HOLD = 'first-run';
@@ -47,7 +45,6 @@ export function readFirstRunPending() {
 const STREAK_WAIT_MS = 6000;
 const YUM_MIN_MS = 1900;
 const AFTER_STREAK_MS = 450;
-const MISSING_CLAIM_MS = 8000;
 const FINALE_MAX_MS = 2 * 60_000;
 const AFTER_OWN_TASK_MS = 1200;
 const RELEASE_GRACE_MS = 2500;
@@ -56,16 +53,12 @@ const GUIDED: ReadonlySet<FirstRunPhase> = new Set<FirstRunPhase>([
   'hungry',
   'yum',
   'streak',
-  'quest',
-  'claiming',
 ]);
 
 export const FIRST_RUN_SPEECH: Partial<Record<FirstRunPhase, string>> = {
   hungry: 'I’m so hungry!\nFinish a task to feed me.',
   yum: 'Yum! First task done!',
   streak: 'Yum! First task done!',
-  quest: 'You earned a reward!\nTap Claim to collect it.',
-  claiming: 'You earned a reward!\nTap Claim to collect it.',
   finale: 'What else is on your list?\nTap + to add it.',
 };
 
@@ -73,16 +66,12 @@ export function useFirstRun({
   pending,
   ready,
   starterDone,
-  hasClaim,
-  revealCount,
   taskCount,
   onFinish,
 }: {
   pending: boolean;
   ready: boolean;
   starterDone: boolean;
-  hasClaim: boolean;
-  revealCount: number;
   taskCount: number;
   onFinish: () => void;
 }) {
@@ -102,8 +91,8 @@ export function useFirstRun({
   useEffect(() => {
     if (startedRef.current || !pending || !ready) return;
     startedRef.current = true;
-    setPhase(!starterDone ? 'hungry' : hasClaim ? 'quest' : 'finale');
-  }, [pending, ready, starterDone, hasClaim]);
+    setPhase(!starterDone ? 'hungry' : 'finale');
+  }, [pending, ready, starterDone]);
 
   useEffect(() => {
     if (phase === 'hungry' && starterDone) setPhase('yum');
@@ -121,32 +110,15 @@ export function useFirstRun({
       const timer = window.setTimeout(() => setPhase('streak'), wait);
       return () => window.clearTimeout(timer);
     }
-    const timer = window.setTimeout(() => setPhase('quest'), STREAK_WAIT_MS);
+    const timer = window.setTimeout(() => setPhase('finale'), STREAK_WAIT_MS);
     return () => window.clearTimeout(timer);
   }, [phase, streakHeld]);
 
   useEffect(() => {
     if (phase !== 'streak' || streakHeld || sheetOpen) return;
-    const timer = window.setTimeout(() => setPhase('quest'), AFTER_STREAK_MS);
-    return () => window.clearTimeout(timer);
-  }, [phase, streakHeld, sheetOpen]);
-
-  useEffect(() => {
-    if (phase !== 'quest') return;
-    if (revealCount > 0) {
-      setPhase('claiming');
-      return;
-    }
-    if (hasClaim) return;
-    const timer = window.setTimeout(() => setPhase('finale'), MISSING_CLAIM_MS);
-    return () => window.clearTimeout(timer);
-  }, [phase, revealCount, hasClaim]);
-
-  useEffect(() => {
-    if (phase !== 'claiming' || revealCount > 0 || sheetOpen) return;
     const timer = window.setTimeout(() => setPhase('finale'), AFTER_STREAK_MS);
     return () => window.clearTimeout(timer);
-  }, [phase, revealCount, sheetOpen]);
+  }, [phase, streakHeld, sheetOpen]);
 
   useEffect(() => {
     if (phase !== 'finale') return;

@@ -1,9 +1,4 @@
-import type {
-  BonusRewards,
-  LeapHopResult,
-  LeapView,
-  LeapWeekResult,
-} from '@/lib/leap/types';
+import type { BonusRewards, LeapView, LeapWeekResult } from '@/lib/leap/types';
 import { lineGoal } from '@/lib/leap/targets';
 import { LILY_LADDER_ART } from './LeapRail';
 
@@ -170,28 +165,6 @@ export function leapHint(view: LeapView): string {
 
 const moreHabits = (count: number) => `${count} more habit${count === 1 ? '' : 's'}`;
 
-export function hopProgressLine(result: LeapHopResult): string {
-  const { meter, leagueLabel } = result;
-  const next = result.nextLeagueLabel;
-  if (meter.reached.includes('leap')) {
-    return next
-      ? `Moving up to ${next} on ${weekdayOf(result.weekKey)}`
-      : 'Top prize won this week';
-  }
-  const holdLeft = meter.holdTarget - meter.hops;
-  if (result.league > 0 && meter.holdTarget > 0 && !meter.reached.includes('hold') && holdLeft > 0) {
-    return `${moreHabits(holdLeft)} to stay in ${leagueLabel}`;
-  }
-  const left = meter.target - meter.hops;
-  if (meter.target > 0 && left > 0) {
-    const goal = next ? `to reach ${next}` : 'for the top prize';
-    return meter.hops < left
-      ? `${meter.hops} of ${meter.target} habits ${goal}`
-      : `${moreHabits(left)} ${goal}`;
-  }
-  return `${habitsWord(meter.hops)} this week in ${leagueTitle(leagueLabel)}`;
-}
-
 export function joinFrogLine(view: LeapView): string {
   const { week } = view;
   const next = nextLeagueName(view);
@@ -199,11 +172,6 @@ export function joinFrogLine(view: LeapView): string {
     return `Every habit you finish moves us up. ${leapTarget(view)} by ${weekEndDay(week.weekKey)} and we leap to ${next}!`;
   }
   return `Every habit you finish counts. Our first league week starts ${weekdayOf(week.weekKey)}.`;
-}
-
-export function zoneFrogLine(result: LeapHopResult): string {
-  if (!result.nextLeagueLabel) return 'Top of the pond again. I could get used to this.';
-  return `${habitsWord(result.meter.hops)} this week! I'm already packing for ${result.nextLeagueLabel}.`;
 }
 
 export function resultFrogLine(result: LeapWeekResult): string {

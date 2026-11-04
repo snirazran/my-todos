@@ -12,7 +12,7 @@ import {
   useReducedMotion,
   useTransform,
 } from 'framer-motion';
-import { Check, ChevronsUpDown, Coffee, Play, Plus, Sparkles, X, Zap } from 'lucide-react';
+import { Check, ChevronsUpDown, Coffee, Play, Plus, X, Zap } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
@@ -27,7 +27,6 @@ import { BREAK_PRESETS, FOCUS_PRESETS, useFrogodoroStore } from '@/lib/frogodoro
 import { fliesCaughtFor, priorDayFocusSeconds } from '@/lib/focusFlies';
 import { subjectHeadline, type FocusSubjectKind } from '@/lib/focusSubject';
 import { openingBeat, pickWrapUpLine } from '@/lib/focusWrapUpVoice';
-import type { Claimable, Trackable } from '@/lib/questClaims';
 import { cn } from '@/lib/utils';
 
 export type PendingReview = {
@@ -58,8 +57,6 @@ export type WrapUpScene = {
 
 type ReviewTask = { id: string; text: string; completed: boolean; tags?: string[] };
 
-type QuestHome = { claimables?: Claimable[]; trackables?: Trackable[] };
-
 const Z_INDEX = 10060;
 const WIDE_QUERY = '(min-width: 1024px)';
 const CLOSE_SHIELD_MS = 450;
@@ -70,11 +67,6 @@ const LONG_FOCUS_SECONDS = 45 * 60;
 const EXPAND_EASE = [0.32, 0.72, 0, 1] as const;
 const SOFT_EASE = [0.22, 1, 0.36, 1] as const;
 const POP = { type: 'spring', stiffness: 420, damping: 22 } as const;
-
-function questHomeKey() {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  return `/api/quests?view=home&timezone=${encodeURIComponent(tz)}`;
-}
 
 function focusAmount(seconds: number) {
   if (seconds < 60) {
@@ -411,11 +403,6 @@ export function FocusWrapUp({
     bootstrapFetcher,
     { revalidateOnFocus: false },
   );
-  const { data: questData } = useSWR<QuestHome>(
-    visible ? questHomeKey() : null,
-    bootstrapFetcher,
-    { revalidateOnFocus: false },
-  );
   const sessionFocusSeconds = scene?.sessionFocusSeconds ?? null;
   const { data: inventory } = useInventory(visible && sessionFocusSeconds !== null, true);
 
@@ -443,21 +430,6 @@ export function FocusWrapUp({
       .sort((a, b) => related(a) - related(b));
     return { subjectTask: subject, others: rest };
   }, [taskData?.tasks, review, finishedIds]);
-
-  const focusQuest = useMemo(() => {
-    const quests = (questData?.trackables ?? []).filter(
-      (t) => t.objectiveType === 'focus_minutes' && !t.needsFocusTags && t.target > 0,
-    );
-    quests.sort((a, b) => b.progress / b.target - a.progress / a.target);
-    return quests[0] ?? null;
-  }, [questData?.trackables]);
-  const questReady = useMemo(
-    () =>
-      (questData?.claimables ?? []).some((c) =>
-        (c.objectiveLabel ?? '').startsWith('Focus for'),
-      ),
-    [questData?.claimables],
-  );
 
   const breakFirst = (review?.breakSeconds ?? 0) <= 0;
   const breakIdeaAllowed = visible && breakFirst && !scene?.nextLocked;
@@ -578,14 +550,6 @@ export function FocusWrapUp({
     const hiddenOthers = others.length - visibleOthers.length;
     const tasksLoading = !taskData;
     const showFly = fliesCaught > 0;
-    const questTarget = focusQuest ? Math.max(1, focusQuest.target) : 1;
-    const questTo = focusQuest ? Math.min(1, focusQuest.progress / questTarget) : 0;
-    const questFrom = focusQuest
-      ? Math.min(
-          questTo,
-          Math.max(0, (focusQuest.progress - Math.max(1, Math.floor(review.focusSeconds / 60))) / questTarget),
-        )
-      : 0;
     const rise = (delay: number) =>
       reduceMotion
         ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.2 } }
@@ -708,7 +672,7 @@ export function FocusWrapUp({
           {subtitle}
         </motion.p>
 
-        {(showFly || scene.bonusFly || questReady) && (
+        {(showFly || scene.bonusFly) && (
           <div
             className={cn(
               'flex flex-wrap items-center gap-2',
@@ -736,46 +700,7 @@ export function FocusWrapUp({
                 +1 fly · Deep focus
               </motion.span>
             )}
-            {questReady && (
-              <motion.span
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 1.02 }}
-                className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
-              >
-                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                Quest reward ready!
-              </motion.span>
-            )}
           </div>
-        )}
-
-        {focusQuest && (wide || !compact) && !questReady && (
-          <motion.div
-            {...rise(0.95)}
-            className={cn(
-              'w-full rounded-2xl bg-black/15 px-3.5 py-2.5 text-left',
-              wide ? 'mt-6 max-w-[360px]' : 'mt-3 max-w-[300px]',
-            )}
-          >
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <p className="truncate text-[12px] font-black text-white/90">
-                {focusQuest.objectiveLabel}
-              </p>
-              <p className="shrink-0 text-[12px] font-black tabular-nums text-white">
-                {Math.min(focusQuest.progress, questTarget)}/{questTarget}
-              </p>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-black/25">
-              <motion.div
-                className="h-full w-full rounded-full bg-white"
-                style={{ originX: 0 }}
-                initial={{ scaleX: reduceMotion ? questTo : questFrom }}
-                animate={{ scaleX: questTo }}
-                transition={{ delay: 1.1, duration: 0.9, ease: SOFT_EASE }}
-              />
-            </div>
-          </motion.div>
         )}
       </>
     );

@@ -9,11 +9,11 @@ import { SECTIONS_KEY } from '@/hooks/useSections';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
-import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
+import { syncQuestProgress } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
 import { recordTaskCompleted } from '@/lib/widget/prompt';
-import { announceLeapHop } from '@/components/leap/leapHopToast';
+import { syncLeapHop } from '@/components/leap/syncLeapHop';
 import type { LeapHopResult } from '@/lib/leap/types';
 import { HUNGER_FULL_SNAP_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 
@@ -155,10 +155,6 @@ export function useTaskData({
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
   const { cancelNotification } = useReminderScheduler();
-
-  useEffect(() => {
-    void seedQuestClaims();
-  }, []);
 
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
@@ -391,7 +387,7 @@ export function useTaskData({
 
         if (json.ok) {
           if (nextCompleted && !task.isStarter) recordTaskCompleted();
-          void notifyQuestClaims(showNotification);
+          void syncQuestProgress();
           // Update Fly/Hunger status if returned
           // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)
           if (json.flyStatus || json.hungerStatus) {
@@ -575,7 +571,7 @@ export function useTaskData({
             );
           }
           if (nextCompleted) {
-            announceLeapHop(json.leap as LeapHopResult | undefined, showNotification);
+            syncLeapHop(json.leap as LeapHopResult | undefined);
           }
         } else {
           throw new Error(json.error || 'Failed to toggle');
@@ -664,7 +660,7 @@ export function useTaskData({
             }),
           });
         });
-        void notifyQuestClaims(showNotification);
+        void syncQuestProgress();
       } catch (e) {
         console.error('Move to backlog failed', e);
         // Rollback
@@ -829,7 +825,7 @@ export function useTaskData({
           }),
         });
         cancelNotification(taskId);
-        void notifyQuestClaims(showNotification);
+        void syncQuestProgress();
       } catch (e) {
         console.error('Delete failed', e);
         // Rollback
@@ -910,7 +906,7 @@ export function useTaskData({
           body: JSON.stringify({ taskId, deleteSeries: true, timezone: tz }),
         });
         cancelNotification(taskId);
-        void notifyQuestClaims(showNotification);
+        void syncQuestProgress();
       } catch (e) {
         console.error('Delete series failed', e);
         if (prevToday) mutateToday(prevToday, { revalidate: false });
@@ -1397,7 +1393,7 @@ export function useTaskData({
         const newFlyStatus = json?.flyStatus as FlyStatus | undefined;
         if (newFlyStatus) {
           markFlyEarn();
-          void notifyQuestClaims(showNotification);
+          void syncQuestProgress();
           const nextBalance = newFlyStatus.balance;
           const patch = (curr: any) => {
             if (!curr?.wardrobe) return curr;

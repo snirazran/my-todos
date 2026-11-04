@@ -25,8 +25,8 @@ import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
-import { notifyQuestClaims } from '@/lib/questClaims';
-import { announceLeapHop } from '@/components/leap/leapHopToast';
+import { syncQuestProgress } from '@/lib/questClaims';
+import { syncLeapHop } from '@/components/leap/syncLeapHop';
 import { useLeftTongue } from './LeftTongue';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -338,8 +338,8 @@ export default React.memo(function TaskList({
         .then((r) => r.json().catch(() => ({})))
         .then((json) => {
           refresh();
-        void notifyQuestClaims(showNotification);
-        if (completing) announceLeapHop(json?.leap, showNotification);
+        void syncQuestProgress();
+        if (completing) syncLeapHop(json?.leap);
         if (typeof json?.flyStatus?.balance === 'number') {
           patchInventoryFlies(json.flyStatus.balance);
         }

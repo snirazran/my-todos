@@ -1,4 +1,4 @@
-export type FrogSpeechEvent = 'welcome' | 'tap' | 'catch' | 'quest_ready';
+export type FrogSpeechEvent = 'welcome' | 'tap' | 'catch';
 
 export type FrogFacts = {
   done: number;
@@ -294,22 +294,10 @@ const CATCH_RULES: Rule[] = [
   },
 ];
 
-const QUEST_READY_RULES: Rule[] = [
-  {
-    tier: 1,
-    lines: [
-      'Reward unlocked!\nCheck the quest board 🎁',
-      'You earned something!\nGo claim it.',
-      "Quest complete!\nDon't leave it hanging.",
-    ],
-  },
-];
-
 const RULES: Record<FrogSpeechEvent, Rule[]> = {
   welcome: WELCOME_RULES,
   tap: TAP_RULES,
   catch: CATCH_RULES,
-  quest_ready: QUEST_READY_RULES,
 };
 
 const RECENT_KEY = 'frog-speech:recent';

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
-import { notifyQuestClaims } from '@/lib/questClaims';
+import { syncQuestProgress } from '@/lib/questClaims';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useIntros } from '@/hooks/useIntros';
@@ -84,16 +84,12 @@ import { FlyCounter } from '@/components/ui/FlyCounter';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
-import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import {
   clearFirstRunPending,
   readFirstRunPending,
   useFirstRun,
 } from '@/hooks/useFirstRun';
-import {
-  useFlyOfferHeight,
-  useQuestRevealQueueLength,
-} from '@/components/ui/questRewardReveal';
+import { useFlyOfferHeight } from '@/components/ui/questRewardReveal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
@@ -128,8 +124,6 @@ const demoTasks: Task[] = [
 
 const HOME_FILTER_BASE = { showCompleted: false };
 
-const FINALE_STRIP_SWAP_MS = 450;
-const FINALE_TASKS_FALLBACK_MS = 1500;
 const DAY_CLEARED_WINDOW_MS = 8000;
 const DAY_CLEARED_DELAY_MS = 700;
 
@@ -592,11 +586,9 @@ export default function HomeDashboard() {
     (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
-  const isPremium = !!questsData?.isPremium;
   const questOnboarding = questsData?.onboarding;
 
   const starterTask = user ? tasks.find((t) => t.isStarter) : undefined;
-  const revealQueueLength = useQuestRevealQueueLength();
   const [firstRunFlagged] = useState(readFirstRunPending);
   useEffect(() => {
     if (seenIntros && seenIntros.firstRun !== false) clearFirstRunPending();
@@ -606,8 +598,6 @@ export default function HomeDashboard() {
       !!user && (seenIntros ? seenIntros.firstRun === false : firstRunFlagged),
     ready: !!user && !isLoading && (questsData !== undefined || !!questsError),
     starterDone: !starterTask || !!starterTask.completed,
-    hasClaim: !!questsData?.claimables?.some((c) => c.placement === 'onboarding'),
-    revealCount: revealQueueLength,
     taskCount: tasks.length,
     onFinish: () => {
       clearFirstRunPending();
@@ -615,8 +605,7 @@ export default function HomeDashboard() {
     },
   });
   const guided = firstRun.guided;
-  const earnedChipsVisible =
-    !guided || firstRun.phase === 'quest' || firstRun.phase === 'claiming';
+  const earnedChipsVisible = !guided;
   const flyCounterVisible =
     !guided || (firstRun.phase !== 'hungry' && firstRun.phase !== 'off');
   const [firstRunFlyStart, setFirstRunFlyStart] = useState<number | null>(null);
@@ -635,33 +624,8 @@ export default function HomeDashboard() {
     firstRun.phase === 'yum' && !firstRunFlyShown && firstRunFlyStart !== null
       ? Math.min(firstRunFlyStart, flyBalance)
       : flyBalance;
-  const questIntroHeld =
-    guided && firstRun.phase !== 'quest' && firstRun.phase !== 'claiming';
-  const onboardingClaimPending = !!questsData?.claimables?.some(
-    (c) => c.placement === 'onboarding',
-  );
-  const [finaleTasksReady, setFinaleTasksReady] = useState(false);
-  useEffect(() => {
-    if (firstRun.phase !== 'finale') {
-      setFinaleTasksReady(false);
-      return;
-    }
-    const timer = window.setTimeout(
-      () => setFinaleTasksReady(true),
-      onboardingClaimPending ? FINALE_TASKS_FALLBACK_MS : FINALE_STRIP_SWAP_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [firstRun.phase, onboardingClaimPending]);
-  useEffect(() => {
-    if (firstRun.phase !== 'quest' || onboardingClaimPending) return;
-    void mutateQuests();
-    const retry = window.setTimeout(() => void mutateQuests(), 1500);
-    return () => window.clearTimeout(retry);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstRun.phase, onboardingClaimPending]);
   const taskListHidden =
-    (guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off') ||
-    (firstRun.phase === 'finale' && !finaleTasksReady);
+    guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off';
   const listTasks = useMemo(
     () => (guided ? data.filter((t) => t.isStarter) : data),
     [data, guided],
@@ -970,29 +934,6 @@ export default function HomeDashboard() {
               animateHunger={!!user}
               className="rounded-[19px] md:h-auto md:min-h-12 md:w-[300px] md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
             />
-            {user && (
-              <motion.div
-                className="min-w-0 md:flex-1"
-                initial={firstRun.active ? { opacity: 0, y: -12 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <NextQuestStrip
-                  claimables={questsData?.claimables}
-                  trackables={questsData?.trackables}
-                  catalog={questsData?.claimablesRewardCatalog}
-                  isPremium={isPremium}
-                  introFill={guided}
-                  introHold={questIntroHeld}
-                  loading={questsData === undefined && !questsError}
-                  bellyRatio={
-                    user && hungerStatus.maxHunger > 0
-                      ? hungerStatus.hunger / hungerStatus.maxHunger
-                      : undefined
-                  }
-                />
-              </motion.div>
-            )}
           </StatusDock>
 
           {user && !guided && !isAnyPanelOpen && !cinematic && !taskCinematic && (
@@ -1330,7 +1271,7 @@ export default function HomeDashboard() {
           markFreshTasks(payload.ids);
           frogReact(pickEmote(bulkTasks.length >= 3 ? 'cheer' : 'taskAdded'));
           await Promise.all([mutateToday(), mutateBacklog()]);
-          void notifyQuestClaims(showNotification);
+          void syncQuestProgress();
           showNotification(
             `Added ${bulkTasks.length} ${bulkTasks.length === 1 ? 'task' : 'tasks'}`,
             payload.batchId
@@ -1459,7 +1400,7 @@ export default function HomeDashboard() {
                 { id: guestId, text, completed: false, tags },
               ]);
             }
-            if (user) void notifyQuestClaims(showNotification);
+            if (user) void syncQuestProgress();
           } catch (e) {
             console.error('Failed to add task or refresh state:', e);
           }

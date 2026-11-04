@@ -92,7 +92,7 @@ import { isFocusWrapUp, useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
-import { notifyQuestClaims } from '@/lib/questClaims';
+import { syncQuestProgress } from '@/lib/questClaims';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -3341,7 +3341,7 @@ export default function TaskBoard({
           }
 
           window.dispatchEvent(new Event('board-refresh'));
-          void notifyQuestClaims(showNotification);
+          void syncQuestProgress();
           showNotification(
             `Added ${bulkTasks.length} ${bulkTasks.length === 1 ? 'task' : 'tasks'}`,
             payload.batchId

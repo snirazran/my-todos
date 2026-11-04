@@ -164,35 +164,3 @@ export function LeapWeekReceipt({
     </div>
   );
 }
-
-export function LeapPrizeReceipt({
-  title,
-  flies,
-  gifts,
-  giftColor,
-  paused,
-  caption,
-}: {
-  title: string;
-  flies: number;
-  gifts: number;
-  giftColor: number;
-  paused: boolean;
-  caption?: string;
-}) {
-  return (
-    <div>
-      <PanelEyebrow>{title}</PanelEyebrow>
-      <div className="mt-1.5 space-y-1.5">
-        {flies > 0 && <ReceiptRow label="Flies earned" value={<FlyAmount amount={flies} size={15} />} />}
-        {gifts > 0 && (
-          <ReceiptRow
-            label={gifts === 1 ? 'Gift won' : 'Gifts won'}
-            value={<GiftCount count={gifts} color={giftColor} paused={paused} />}
-          />
-        )}
-      </div>
-      {caption && <p className="mt-2 text-[12.5px] font-bold text-[color:var(--leap-ink-muted)]">{caption}</p>}
-    </div>
-  );
-}

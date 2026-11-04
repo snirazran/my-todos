@@ -1,7 +1,6 @@
 import { LEAP_DEFAULTS } from './defaults';
 import { markTargets, marksMet } from './targets';
 import type {
-  LeapHopResult,
   LeapJoin,
   LeapView,
   LeapWeekOutcome,
@@ -196,88 +195,3 @@ export const LEAP_LAB_RESULTS: Array<{ label: string; result: LeapWeekResult }> 
     weekKey: `lab-${label}`,
   },
 }));
-
-export type LeapLabHopKind =
-  | 'early'
-  | 'hop'
-  | 'stay'
-  | 'comeback'
-  | 'lucky'
-  | 'first'
-  | 'hold'
-  | 'leap'
-  | 'top';
-
-export function labHop(kind: LeapLabHopKind): LeapHopResult {
-  const grant = { fliesGranted: 0, grantedItemIds: [], grantedBackgroundIds: [], shieldsGranted: 0 };
-  const base: LeapHopResult = {
-    hops: 1,
-    hopFlies: 3,
-    comebackFlies: 0,
-    lucky: null,
-    marks: [],
-    fliesGranted: 3,
-    grantedItemIds: [],
-    grantedBackgroundIds: [],
-    shieldsGranted: 0,
-    meter: { hops: 4, target: 9, holdTarget: 6, reached: [] },
-    league: 1,
-    leagueLabel: 'Lily Bud',
-    nextLeagueLabel: 'Lily Bloom',
-    weekKey: '2026-10-12',
-    joined: false,
-    isPremium: false,
-    catalog: {},
-  };
-  const leaf = {
-    league: 0,
-    leagueLabel: 'Lily Leaf',
-    nextLeagueLabel: 'Lily Bud',
-  };
-  switch (kind) {
-    case 'early':
-      return { ...base, ...leaf, meter: { hops: 2, target: 8, holdTarget: 0, reached: [] } };
-    case 'hop':
-      return { ...base, ...leaf, meter: { hops: 5, target: 8, holdTarget: 0, reached: [] } };
-    case 'stay':
-      return base;
-    case 'comeback':
-      return { ...base, comebackFlies: 6 };
-    case 'lucky':
-      return { ...base, lucky: { ...grant, fliesGranted: 13, first: false } };
-    case 'first':
-      return {
-        ...base,
-        league: 0,
-        leagueLabel: 'Lily Leaf',
-        nextLeagueLabel: 'Lily Bud',
-        joined: true,
-        meter: { hops: 1, target: 6, holdTarget: 5, reached: [] },
-        grantedItemIds: ['gift_box_1'],
-        lucky: { ...grant, grantedItemIds: ['gift_box_1'], first: true },
-      };
-    case 'hold':
-      return {
-        ...base,
-        marks: [{ ...grant, fliesGranted: 13, id: 'hold' }],
-        meter: { ...base.meter, hops: 6, reached: ['hold'] },
-      };
-    case 'leap':
-      return {
-        ...base,
-        marks: [{ ...grant, fliesGranted: 31, grantedItemIds: ['gift_box_1'], id: 'leap' }],
-        meter: { ...base.meter, hops: 9, reached: ['hold', 'leap'] },
-      };
-    case 'top':
-      return {
-        ...base,
-        league: 4,
-        leagueLabel: 'Lily Garden',
-        nextLeagueLabel: null,
-        marks: [{ ...grant, fliesGranted: 80, id: 'leap' }],
-        meter: { hops: 17, target: 17, holdTarget: 9, reached: ['hold', 'leap'] },
-      };
-    default:
-      return base;
-  }
-}

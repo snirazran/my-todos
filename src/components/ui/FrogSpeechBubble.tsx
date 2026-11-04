@@ -42,7 +42,6 @@ export function FrogSpeechBubble({
   const [message, setMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
   const prevDoneRef = useRef(done);
-  const prevReadyQuestsRef = useRef(readyQuests);
   const prevCatchingRef = useRef(!!isCatching);
   const prevClickedRef = useRef(clickedAt);
   const lastHandledDoneRef = useRef<number | null>(null);
@@ -96,7 +95,6 @@ export function FrogSpeechBubble({
 
   useEffect(() => {
     const doneIncreased = done > prevDoneRef.current;
-    const readyQuestsChanged = readyQuests !== prevReadyQuestsRef.current;
     const catchingStarted = !!isCatching && !prevCatchingRef.current;
     const frogClicked = clickedAt > prevClickedRef.current;
 
@@ -118,8 +116,6 @@ export function FrogSpeechBubble({
         pickFrogLine('catch', { ...facts, done: effectiveDone, total }),
         4000,
       );
-    } else if (readyQuestsChanged && readyQuests > 0) {
-      speak(pickFrogLine('quest_ready', { ...facts, readyQuests }), 5000);
     } else if (doneIncreased) {
       if (done !== lastHandledDoneRef.current) {
         speak(pickFrogLine('catch', { ...facts, done, total }), 4000);
@@ -129,10 +125,9 @@ export function FrogSpeechBubble({
     }
 
     prevDoneRef.current = done;
-    prevReadyQuestsRef.current = readyQuests;
     prevCatchingRef.current = !!isCatching;
     prevClickedRef.current = clickedAt;
-  }, [clickedAt, done, facts, isCatching, readyQuests, total]);
+  }, [clickedAt, done, facts, isCatching, total]);
 
   useEffect(
     () => () => {

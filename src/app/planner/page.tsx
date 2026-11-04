@@ -6,7 +6,7 @@ import PlannerTour from '@/components/board/tour/PlannerTour';
 import PlannerCalendarNudge from '@/components/board/tour/PlannerCalendarNudge';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
-import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
+import { syncQuestProgress } from '@/lib/questClaims';
 import { PlannerPageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
@@ -63,10 +63,6 @@ export default function ManageTasksPage() {
   );
   const [activeDateKey, setActiveDateKey] = useState<string>(initialDate);
 
-  useEffect(() => {
-    void seedQuestClaims();
-  }, []);
-
   // Prevent parent <main> from scrolling on this page
   useEffect(() => {
     const main = document.querySelector('main');
@@ -93,9 +89,9 @@ export default function ManageTasksPage() {
     }
     questRefreshTimerRef.current = window.setTimeout(() => {
       questRefreshTimerRef.current = null;
-      void notifyQuestClaims(showNotification);
+      void syncQuestProgress();
     }, 600);
-  }, [showNotification]);
+  }, []);
 
   // Guards against out-of-order full refetches: rapid completions fire several
   // overlapping board-refresh GETs, and a slower earlier one must not clobber a

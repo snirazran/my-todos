@@ -54,10 +54,7 @@ import {
 } from './questRewardReveal';
 import type { RatingMoment } from '@/lib/rateApp';
 import { holdAutoPopups, QUEST_CLAIM_HOLD, releaseAutoPopups } from '@/lib/popupGate';
-import {
-  refreshQuestHomeView,
-  takeQuestScrollTarget,
-} from '@/lib/questClaims';
+import { refreshQuestHomeView } from '@/lib/questClaims';
 import { SingleRewardCard } from './daily-reward/RewardCard';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
@@ -344,36 +341,6 @@ export function QuestsPanel({
 
     return () => window.cancelAnimationFrame(frame);
   }, [data, isLoading]);
-
-  const pendingScrollQuestIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (isLoading || !data) return;
-    if (!pendingScrollQuestIdRef.current) {
-      pendingScrollQuestIdRef.current = takeQuestScrollTarget();
-    }
-    const questId = pendingScrollQuestIdRef.current;
-    if (!questId) return;
-
-    const timeout = window.setTimeout(() => {
-      pendingScrollQuestIdRef.current = null;
-      const anchors = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          `[data-quest-anchor~="${CSS.escape(questId)}"]`,
-        ),
-      );
-      for (const el of anchors) {
-        if (el.offsetParent === null) continue;
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.add('quest-anchor-highlight');
-        window.setTimeout(
-          () => el.classList.remove('quest-anchor-highlight'),
-          2000,
-        );
-        break;
-      }
-    }, 450);
-    return () => window.clearTimeout(timeout);
-  }, [isLoading, data]);
 
   const [claimingStreak, setClaimingStreak] = useState(false);
   const [swappingDailies, setSwappingDailies] = useState(false);

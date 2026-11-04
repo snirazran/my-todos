@@ -19,9 +19,8 @@ import { App } from '@capacitor/app';
 import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 import { clearStrayLiveTimer, getCurrentLiveActivityState } from '@/lib/liveTimer';
-import { notifyQuestClaims } from '@/lib/questClaims';
+import { syncQuestProgress } from '@/lib/questClaims';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
-import { useNotification } from '@/components/providers/NotificationProvider';
 import { useAuth } from '@/components/auth/AuthContext';
 import { focusPhaseCatches, priorDayFocusSeconds } from '@/lib/focusFlies';
 import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
@@ -74,8 +73,6 @@ export function GlobalTimer() {
   const registerCompletion = useFrogodoroStore((s) => s.registerCompletion);
   const setAwaitingDone = useFrogodoroStore((s) => s.setAwaitingDone);
   const setPhaseElapsed = useFrogodoroStore((s) => s.setPhaseElapsed);
-
-  const { showNotification } = useNotification();
 
   // Focus-fly economy, app-wide: each catch optimistically bumps the
   // wallet (the counter animates like a task-grab gain on whatever page shows
@@ -136,12 +133,9 @@ export function GlobalTimer() {
         (useFrogodoroStore.getState().lastFocusElapsed ?? 0) / 60,
       ),
     });
-    const t = window.setTimeout(
-      () => void notifyQuestClaims(showNotification),
-      1500,
-    );
+    const t = window.setTimeout(() => void syncQuestProgress(), 1500);
     return () => window.clearTimeout(t);
-  }, [lastCompletionId, lastCompletedPhase, showNotification]);
+  }, [lastCompletionId, lastCompletedPhase]);
 
   const prevIsRunning = useRef(isRunning);
   const clientIdRef = useRef<string | null>(null);
@@ -619,20 +613,12 @@ export function GlobalTimer() {
     const payload = buildTimerPayload();
     if (payload) {
       void publishActiveTimer(payload).then(() => {
-        // A fresh focus start can complete "start a focus timer" objectives
-        // server-side — refresh quest state so the strip reacts right away.
         if (payload.phase === 'focus' && payload.status === 'running') {
-          window.setTimeout(
-            () =>
-              void notifyQuestClaims(showNotification, {
-                progressToast: false,
-              }),
-            900,
-          );
+          window.setTimeout(() => void syncQuestProgress(), 900);
         }
       });
     }
-  }, [authUserId, pendingSync, buildTimerPayload, showNotification]);
+  }, [authUserId, pendingSync, buildTimerPayload]);
 
   // Sync timer state across windows/devices in real time via SSE. A GET resync
   // gates the (authenticated) connection — logged-out users get a 401 and never
@@ -861,15 +847,11 @@ export function GlobalTimer() {
         focusTime: stats.focusTime + unsaved,
         breakTime: stats.breakTime,
       });
-      window.setTimeout(
-        () =>
-          void notifyQuestClaims(showNotification, { progressToast: false }),
-        1200,
-      );
+      window.setTimeout(() => void syncQuestProgress(), 1200);
     }, 15_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, endTime, setPhaseElapsed, showNotification]);
+  }, [isRunning, endTime, setPhaseElapsed]);
 
   // The Main Loop. A self-correcting timeout aligned to the next whole second of
   // the countdown, not a fixed 1000ms interval: interval drift eventually lands

@@ -1,20 +1,13 @@
 'use client';
 
-import { revealSweepClaim } from '@/components/ui/RewardRoll';
-import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { hasRewardQuantityBadge } from '@/lib/quests/rewardQuantity';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
-import { Check, Lightbulb, Play } from 'lucide-react';
+import { Lightbulb, Play } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
-import type { RevealCatalog } from '@/components/ui/questRewardReveal';
-import { useDismissNotification } from '@/components/providers/NotificationProvider';
 import { leapViewKey } from '@/lib/leap/viewKey';
-import { useUIStore } from '@/lib/uiStore';
-import { holdAutoPopups, QUEST_CLAIM_HOLD, releaseAutoPopups } from '@/lib/popupGate';
-import type { RatingMoment } from '@/lib/rateApp';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
@@ -57,56 +50,6 @@ export type Claimable = {
   rewards?: any[];
 };
 
-export function ratingMomentFor(claimable: Claimable): RatingMoment | undefined {
-  if (claimable.kind === 'sweep') return 'clean_sweep';
-  if (claimable.kind === 'season') return 'quest_reward';
-  return undefined;
-}
-
-export function claimRequestFor(
-  claimable: Claimable,
-  timezone: string,
-): { url: string; body: Record<string, unknown> } | null {
-  if (claimable.kind === 'objective' && claimable.questId && claimable.objectiveId) {
-    return {
-      url: '/api/quests/claim-objective',
-      body: {
-        questId: claimable.questId,
-        objectiveId: claimable.objectiveId,
-        timezone,
-      },
-    };
-  }
-  if (claimable.kind === 'season' && claimable.seasonId) {
-    return {
-      url: '/api/quests/season/claim',
-      body: { seasonId: claimable.seasonId, timezone },
-    };
-  }
-  if (claimable.kind === 'sweep') {
-    return { url: '/api/quests/streak/claim', body: { timezone } };
-  }
-  return null;
-}
-
-export function sweepClaimLabels(claimable: Claimable) {
-  const pending = Math.max(1, claimable.sweepPendingRolls ?? 1);
-  const eyebrow =
-    pending > 1
-      ? `${pending} prizes ready`
-      : claimable.sweepMega
-        ? 'Mega prize ready'
-        : claimable.sweepTier === 'golden'
-          ? 'Golden prize ready'
-          : 'Daily prize ready';
-  return {
-    pending,
-    eyebrow,
-    title: pending > 1 ? 'Open your daily quest prizes' : 'Open your daily quest prize',
-    action: pending > 1 ? `Open (${pending})` : 'Open',
-  };
-}
-
 export type Trackable = {
   id: string;
   questId?: string;
@@ -138,59 +81,10 @@ export type Trackable = {
   rewardValue?: number;
 };
 
-type ShowNotification = (
-  content: ReactNode,
-  undoAction?: () => void | Promise<void>,
-  options?: { durationMs?: number },
-) => void;
-
 type HomeData = {
   claimables: Claimable[];
   trackables: Trackable[];
-  catalog: Catalog;
-  isPremium: boolean;
 };
-
-let baseline: Set<string> | null = null;
-let progressBaseline: Map<string, number> | null = null;
-
-/**
- * Claimable IDs are an append-only "already observed" set for this app
- * session. Quest requests can overlap and resolve out of order; replacing the
- * set with each response lets an older/partial response forget rewards, so a
- * later unrelated refresh replays every currently claimable reward toast.
- */
-function observeClaimables(claimables: Claimable[]): Set<string> | null {
-  const previous = baseline ? new Set(baseline) : null;
-  const observed = baseline ?? new Set<string>();
-  for (const claimable of claimables) observed.add(claimable.id);
-  baseline = observed;
-  return previous;
-}
-
-const QUEST_SCROLL_KEY = 'quest-scroll-target';
-
-export function setQuestScrollTarget(questId: string) {
-  try {
-    sessionStorage.setItem(QUEST_SCROLL_KEY, `${questId}|${Date.now()}`);
-  } catch {}
-}
-
-export function takeQuestScrollTarget(): string | null {
-  try {
-    const raw = sessionStorage.getItem(QUEST_SCROLL_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(QUEST_SCROLL_KEY);
-    const sep = raw.lastIndexOf('|');
-    if (sep <= 0) return null;
-    const id = raw.slice(0, sep);
-    const ts = Number(raw.slice(sep + 1));
-    if (!Number.isFinite(ts) || Date.now() - ts > 15000) return null;
-    return id;
-  } catch {
-    return null;
-  }
-}
 
 function currentTimezone(): string {
   return typeof window !== 'undefined'
@@ -214,24 +108,9 @@ async function fetchHome(): Promise<HomeData | null> {
       trackables: Array.isArray(data?.trackables)
         ? (data.trackables as Trackable[])
         : [],
-      catalog: (data?.claimablesRewardCatalog ?? {}) as Catalog,
-      isPremium: !!data?.isPremium,
     };
   } catch {
     return null;
-  }
-}
-
-function toProgressMap(trackables: Trackable[]): Map<string, number> {
-  return new Map(trackables.map((t) => [t.id, t.progress]));
-}
-
-export async function seedQuestClaims(): Promise<void> {
-  if (baseline !== null) return;
-  const data = await fetchHome();
-  if (data) {
-    observeClaimables(data.claimables);
-    progressBaseline = toProgressMap(data.trackables);
   }
 }
 
@@ -243,16 +122,9 @@ function syncLeapUnlock(data: HomeData): void {
   void mutate(leapViewKey());
 }
 
-// Silently re-sync the home-view cache and baselines after quest state
-// changed elsewhere (quests-page claims), so returning to the home strip
-// never flashes the stale pre-claim payload — and never toasts.
 export async function refreshQuestHomeView(): Promise<void> {
   const data = await fetchHome();
-  if (data) {
-    observeClaimables(data.claimables);
-    progressBaseline = toProgressMap(data.trackables);
-    syncLeapUnlock(data);
-  }
+  if (data) syncLeapUnlock(data);
 }
 
 // Keep the full quests-page cache in step with the home view. Without this,
@@ -270,75 +142,9 @@ export function primeQuestsPageCache(): void {
     .catch(() => {});
 }
 
-let questStripOnScreen = false;
-
-export function setQuestStripOnScreen(onScreen: boolean): void {
-  questStripOnScreen = onScreen;
-}
-
-export async function notifyQuestClaims(
-  show: ShowNotification,
-  opts?: {
-    // Recurring background refreshes (live focus ticks) pass false so a toast
-    // doesn't pop every minute; new-claimable toasts still show.
-    progressToast?: boolean;
-  },
-): Promise<void> {
-  const data = await fetchHome();
+export async function syncQuestProgress(): Promise<void> {
+  await fetchHome();
   primeQuestsPageCache();
-  if (!data) return;
-  const prev = observeClaimables(data.claimables);
-  const prevProgress = progressBaseline;
-  progressBaseline = toProgressMap(data.trackables);
-  if (prev === null) return;
-  if (useUIStore.getState().isFirstRunGuided) return;
-  if (questStripOnScreen) return;
-  let claimToastShown = false;
-  for (const c of data.claimables) {
-    if (prev.has(c.id)) continue;
-    claimToastShown = true;
-    show(
-      <ClaimRewardToast
-        claimable={c}
-        catalog={data.catalog}
-        isPremium={data.isPremium}
-      />,
-      undefined,
-      { durationMs: 6000 },
-    );
-  }
-  if (claimToastShown || !prevProgress || opts?.progressToast === false) return;
-  let best: { trackable: Trackable; from: number } | null = null;
-  for (const t of data.trackables) {
-    const from = prevProgress.get(t.id);
-    if (from === undefined || t.progress <= from) continue;
-    if (!best) {
-      best = { trackable: t, from };
-      continue;
-    }
-    const bT = Math.max(1, best.trackable.target);
-    const tT = Math.max(1, t.target);
-    const ratioDiff = t.progress / tT - best.trackable.progress / bT;
-    if (
-      ratioDiff > 0 ||
-      (ratioDiff === 0 &&
-        tT - t.progress < bT - best.trackable.progress)
-    ) {
-      best = { trackable: t, from };
-    }
-  }
-  if (best) {
-    show(
-      <QuestProgressToast
-        trackable={best.trackable}
-        fromProgress={best.from}
-        catalog={data.catalog}
-        isPremium={data.isPremium}
-      />,
-      undefined,
-      { durationMs: 5000 },
-    );
-  }
 }
 
 function rewardQuantityLabel(reward: any): string {
@@ -486,80 +292,6 @@ export function QuestTagPillInline({ tag }: { tag: ObjectiveTagChip }) {
     >
       {tag.name}
     </span>
-  );
-}
-
-export function ObjectiveLabel({
-  label,
-  tags,
-  strikeText = false,
-  maxTags,
-}: {
-  label?: string;
-  tags?: ObjectiveTagChip[];
-  strikeText?: boolean;
-  maxTags?: number;
-}) {
-  const textClass = strikeText ? 'line-through' : undefined;
-  if (!tags?.length) {
-    return <span className={textClass}>{label}</span>;
-  }
-  const shownTags = maxTags ? tags.slice(0, maxTags) : tags;
-  const hiddenCount = tags.length - shownTags.length;
-  const words = (label ?? '').trim().split(/\s+/);
-  const lastWord = words.pop() ?? '';
-  const lead = words.join(' ');
-  const [firstTag, ...restTags] = shownTags;
-  return (
-    <>
-      {lead && <span className={textClass}>{lead} </span>}
-      {lastWord && (
-        <span className={textClass}>
-          {`${lastWord} `}
-        </span>
-      )}
-      <QuestTagPillInline tag={firstTag} />
-      {restTags.map((tag) => (
-        <span key={tag.id} className="ml-1.5">
-          <QuestTagPillInline tag={tag} />
-        </span>
-      ))}
-      {hiddenCount > 0 && (
-        <span className="ml-1 inline-block rounded-full bg-foreground/10 px-1.5 py-0.5 align-middle text-[9px] font-black tabular-nums">
-          +{hiddenCount}
-        </span>
-      )}
-    </>
-  );
-}
-
-export function QuestProgressBar({
-  from,
-  to,
-  className,
-}: {
-  from: number;
-  to: number;
-  className?: string;
-}) {
-  const [ratio, setRatio] = useState(Math.min(Math.max(from, 0), 1));
-  useEffect(() => {
-    const raf = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setRatio(Math.min(Math.max(to, 0), 1))),
-    );
-    return () => cancelAnimationFrame(raf);
-  }, [to]);
-  return (
-    <div
-      className={`h-1.5 w-full overflow-hidden rounded-full bg-muted ${
-        className ?? ''
-      }`}
-    >
-      <div
-        className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-        style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 4 : 0)}%` }}
-      />
-    </div>
   );
 }
 
@@ -799,181 +531,5 @@ export function ObjectiveProgressBar({
         {countLabel}
       </span>
     </div>
-  );
-}
-
-function toastTitle(c: Claimable): string {
-  if (c.kind === 'season') return 'Season reward ready';
-  if (c.kind === 'sweep') return sweepClaimLabels(c).eyebrow;
-  if (c.placement === 'onboarding') return 'Starter quest complete';
-  return 'Daily quest complete';
-}
-
-export function trackableEyebrow(t: {
-  placement: 'daily' | 'onboarding';
-  categoryName?: string;
-}): string {
-  if (t.placement === 'onboarding') return 'Getting started';
-  return 'Daily quest';
-}
-
-function ClaimRewardToast({
-  claimable,
-  catalog,
-  isPremium,
-}: {
-  claimable: Claimable;
-  catalog: Catalog;
-  isPremium: boolean;
-}) {
-  const router = useRouter();
-  const dismissToast = useDismissNotification();
-  const [claiming, setClaiming] = useState(false);
-  const goToQuest = () => {
-    if (claimable.kind === 'objective' && claimable.questId) {
-      setQuestScrollTarget(claimable.questId);
-    }
-    router.push('/quests');
-  };
-  // Claims right here — the global reveal host plays the reward popup on
-  // whichever page the toast was tapped from.
-  const handleClaimPress = async (event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (claiming) return;
-    const timezone = currentTimezone();
-    const request = claimRequestFor(claimable, timezone);
-    if (!request) {
-      goToQuest();
-      return;
-    }
-    setClaiming(true);
-    holdAutoPopups(QUEST_CLAIM_HOLD);
-    try {
-      const res = await fetch(request.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request.body),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      revealSweepClaim(payload.rewardSummary, {
-        catalog: catalog as RevealCatalog,
-        isPremium,
-        showFlyGainPill: window.location.pathname !== '/',
-        moment: ratingMomentFor(claimable),
-      });
-      primeQuestsPageCache();
-      dismissToast?.();
-      await refreshQuestHomeView();
-    } catch {
-      primeQuestsPageCache();
-      await refreshQuestHomeView();
-    } finally {
-      releaseAutoPopups(QUEST_CLAIM_HOLD);
-      setClaiming(false);
-    }
-  };
-  return (
-    <div
-      className="flex w-full min-w-0 cursor-pointer items-center gap-3"
-      onClick={goToQuest}
-    >
-      <QuestRewardTileBadge
-        reward={claimable.reward}
-        rewards={claimable.rewards}
-        catalog={catalog}
-        isPremium={isPremium}
-        light
-      />
-      <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate text-[13px] font-black text-foreground">
-          {toastTitle(claimable)}
-        </span>
-        {claimable.kind === 'objective' ? (
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-lime-300" />
-            <span className="min-w-0 flex-1 truncate">
-              <ObjectiveLabel label={claimable.objectiveLabel} strikeText />
-            </span>
-          </span>
-        ) : claimable.kind === 'sweep' ? (
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-lime-300" />
-            <span className="min-w-0 flex-1 truncate">
-              {sweepClaimLabels(claimable).title}
-            </span>
-          </span>
-        ) : (
-          <span className="mt-0.5 truncate text-[11px] font-bold text-muted-foreground">
-            {claimable.seasonName
-              ? `${claimable.seasonName} · Tier ${claimable.tier}`
-              : `Tier ${claimable.tier}`}
-          </span>
-        )}
-      </div>
-      <button
-        type="button"
-        disabled={claiming}
-        onClick={(event) => void handleClaimPress(event)}
-        className="inline-flex h-9 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 text-[12px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <span className="mr-[-0.15em]">
-          {claiming
-            ? '...'
-            : claimable.kind === 'sweep'
-              ? sweepClaimLabels(claimable).action
-              : 'Claim'}
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function QuestProgressToast({
-  trackable,
-  fromProgress,
-  catalog,
-  isPremium,
-}: {
-  trackable: Trackable;
-  fromProgress: number;
-  catalog: Catalog;
-  isPremium: boolean;
-}) {
-  const router = useRouter();
-  const target = Math.max(1, trackable.target);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (trackable.questId) setQuestScrollTarget(trackable.questId);
-        router.push('/quests');
-      }}
-      className="flex w-full min-w-0 items-center gap-3 text-left"
-    >
-      <QuestRewardTileBadge
-        reward={trackable.reward}
-        rewards={trackable.rewards}
-        catalog={catalog}
-        isPremium={isPremium}
-      />
-      <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="text-[12px] font-black text-muted-foreground">
-          {trackableEyebrow(trackable)}
-        </span>
-        <span className="mt-0.5 block min-w-0 truncate text-[13px] font-black text-foreground">
-          <ObjectiveLabel label={trackable.remainingLabel} />
-        </span>
-        <div className="mt-1.5 flex items-center gap-2">
-          <QuestProgressBar
-            from={fromProgress / target}
-            to={trackable.progress / target}
-          />
-          <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
-            {Math.min(trackable.progress, target)}/{target}
-          </span>
-        </div>
-      </div>
-    </button>
   );
 }

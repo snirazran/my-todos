@@ -713,7 +713,7 @@ export function DailyChecklistCard({
   }
 
   return (
-    <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
+    <div>
       <QuestSectionHeader
         title="Today’s quests"
         count={allDone ? 'All done' : openCount > 0 ? `${openCount} left` : undefined}
@@ -1912,7 +1912,7 @@ export function SideQuestsCard({
   );
   if (rows.length === 0) return null;
   return (
-    <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
+    <div>
       <QuestSectionHeader
         title={quests.length === 1 ? quests[0].title : 'Side quests'}
         count={`${rows.length} left`}

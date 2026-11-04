@@ -7,16 +7,10 @@ import { warmImage } from '@/lib/imageWarmup';
 import { holdAutoPopups, useAutoPopupHold, whenScreenIsFree } from '@/lib/popupGate';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
-import type { LeapHopResult, LeapJoin, LeapWeekResult } from '@/lib/leap/types';
+import type { LeapJoin, LeapWeekResult } from '@/lib/leap/types';
 import { leagueArt } from './leapCopy';
 import { LeapDaySheet, revealLeapPrizes } from './LeapDaySheet';
 import { LeapJoinSheet, openJoinGifts } from './LeapJoinSheet';
-import {
-  LeapZoneSheet,
-  openZoneGifts,
-  queueLeapZoneMoment,
-  useLeapZoneMoment,
-} from './LeapZoneSheet';
 import { patchLeap, useLeapView } from './useLeapView';
 
 const LEAP_DAY_HOLD = 'leap-day';
@@ -29,14 +23,11 @@ export function LeapHost() {
   const [open, setOpen] = useState(false);
   const [join, setJoin] = useState<LeapJoin | null>(null);
   const [joinOpen, setJoinOpen] = useState(false);
-  const [zone, setZone] = useState<LeapHopResult | null>(null);
-  const [zoneOpen, setZoneOpen] = useState(false);
   const [retry, setRetry] = useState(0);
   const shownRef = useRef<string | null>(null);
   const joinShownRef = useRef(false);
-  const queuedZone = useLeapZoneMoment((state) => state.result);
 
-  const stageOpen = open || joinOpen || zoneOpen;
+  const stageOpen = open || joinOpen;
   const otherSheet = useSheetStore((state) => state.count > 1);
   const revealActive = useQuestRevealActive();
   const cinematic = useUIStore((state) => state.isCinematicActive);
@@ -65,20 +56,6 @@ export function LeapHost() {
   }, [pendingJoin, retry]);
 
   useEffect(() => {
-    if (!queuedZone) return;
-    warmImage(leagueArt(queuedZone.league), 'high');
-    return whenScreenIsFree(
-      () => {
-        holdAutoPopups(LEAP_DAY_HOLD);
-        useLeapZoneMoment.setState({ result: null });
-        setZone(queuedZone);
-        setZoneOpen(true);
-      },
-      { dropAfterMs: 60_000, initialDelayMs: 900 },
-    );
-  }, [queuedZone]);
-
-  useEffect(() => {
     if (!pending || pendingJoin || joinOpen || shownRef.current === pending.weekKey) return;
     return whenScreenIsFree(
       () => {
@@ -97,16 +74,12 @@ export function LeapHost() {
       joinShownRef.current = false;
       setJoinOpen(false);
     }
-    if (zoneOpen && zone) {
-      setZoneOpen(false);
-      queueLeapZoneMoment(zone);
-    }
     if (open) {
       shownRef.current = null;
       setOpen(false);
     }
     setRetry((count) => count + 1);
-  }, [crowded, joinOpen, zoneOpen, zone, open]);
+  }, [crowded, joinOpen, open]);
 
   useEffect(() => {
     if (open || !result) return;
@@ -119,12 +92,6 @@ export function LeapHost() {
     const timer = window.setTimeout(() => setJoin(null), 450);
     return () => window.clearTimeout(timer);
   }, [joinOpen, join]);
-
-  useEffect(() => {
-    if (zoneOpen || !zone) return;
-    const timer = window.setTimeout(() => setZone(null), 450);
-    return () => window.clearTimeout(timer);
-  }, [zoneOpen, zone]);
 
   useAutoPopupHold(LEAP_DAY_HOLD, stageOpen);
 
@@ -140,17 +107,6 @@ export function LeapHost() {
             setJoinOpen(false);
             if (openGift) window.setTimeout(() => openJoinGifts(join, view), REVEAL_AFTER_CLOSE_MS);
             void patchLeap({ joinSeen: true }).then(() => mutate());
-          }}
-        />
-      )}
-      {zone && (
-        <LeapZoneSheet
-          result={zone}
-          view={view}
-          open={zoneOpen}
-          onClose={(openGift) => {
-            setZoneOpen(false);
-            if (openGift) window.setTimeout(() => openZoneGifts(zone), REVEAL_AFTER_CLOSE_MS);
           }}
         />
       )}
