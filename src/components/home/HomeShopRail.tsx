@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Bookmark, ChevronRight, Clock } from 'lucide-react';
+import { Heart, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import Frog from '@/components/ui/frog';
@@ -212,7 +212,7 @@ export function HomeShopRail() {
           <WishlistThumb wishlist={focus.view} />
           <span className="flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="flex min-w-0 items-center gap-1.5">
-              <Bookmark
+              <Heart
                 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70"
                 strokeWidth={3}
                 fill="currentColor"

@@ -4,8 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
-  Bookmark,
-  BookmarkCheck,
+  Heart,
   Check,
   ChevronDown,
   Loader2,
@@ -594,7 +593,7 @@ function WishlistButton({
     >
       {isPinned ? (
         <>
-          <BookmarkCheck className="h-5 w-5" strokeWidth={2.75} />
+          <Heart fill="currentColor" className="h-5 w-5" strokeWidth={2.75} />
           {pinnedLabel}
         </>
       ) : upsell ? (
@@ -604,7 +603,7 @@ function WishlistButton({
         </>
       ) : (
         <>
-          <Bookmark className="h-5 w-5" strokeWidth={2.75} />
+          <Heart className="h-5 w-5" strokeWidth={2.75} />
           {label}
         </>
       )}

@@ -71,7 +71,6 @@ async function drawRarityItem(user: any, rarity: BonusRarity) {
     owns,
     wishlistKeys,
     modifiers,
-    aimed: false,
     exclude: null,
   });
 }

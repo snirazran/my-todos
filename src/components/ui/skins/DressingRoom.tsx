@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, Check, Crown, Loader2, Lock, Sparkles, X } from 'lucide-react';
+import { Heart, Check, Crown, Loader2, Lock, Minus, Sparkles, X } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
+import { FlyAmount, FlyIcon, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
+import { Icon } from '@/components/ui/Icon';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import {
   RARITY_ORDER,
@@ -37,6 +38,15 @@ export const TILE_TONE: Record<Rarity, string> = {
   epic: 'bg-gradient-to-b from-violet-50 to-violet-100 ring-violet-300 dark:from-violet-500/10 dark:to-violet-500/20 dark:ring-violet-400/40',
   legendary:
     'bg-gradient-to-b from-amber-50 via-amber-100 to-orange-100 ring-amber-300 shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_6px_16px_-8px_rgba(245,158,11,0.65)] dark:from-amber-500/15 dark:via-amber-500/20 dark:to-orange-500/20 dark:ring-amber-400/50',
+};
+
+export const CLOSET_TONE: Record<Rarity, string> = {
+  common: 'bg-slate-100 dark:bg-slate-500/15',
+  uncommon: 'bg-emerald-100/70 dark:bg-emerald-500/15',
+  rare: 'bg-sky-100/80 dark:bg-sky-500/15',
+  epic: 'bg-gradient-to-b from-violet-100 to-violet-200/70 dark:from-violet-500/15 dark:to-violet-500/25',
+  legendary:
+    'bg-gradient-to-b from-amber-100 via-amber-100 to-orange-200/70 shadow-[0_6px_16px_-8px_rgba(245,158,11,0.65)] dark:from-amber-500/20 dark:via-amber-500/20 dark:to-orange-500/25',
 };
 
 export const BAR_TONE: Record<Rarity, string> = {
@@ -144,18 +154,20 @@ export function ShelfHeader({
 
 export function TileArt({
   rarity,
+  tone = 'shop',
   className,
   children,
 }: {
   rarity: Rarity;
+  tone?: 'shop' | 'closet';
   className?: string;
   children: ReactNode;
 }) {
   return (
     <span
       className={cn(
-        'closet-tile relative block aspect-square w-full overflow-hidden rounded-2xl ring-1',
-        TILE_TONE[rarity],
+        'closet-tile relative block aspect-square w-full overflow-hidden rounded-2xl',
+        tone === 'closet' ? CLOSET_TONE[rarity] : cn('ring-1', TILE_TONE[rarity]),
         (rarity === 'epic' || rarity === 'legendary') && 'closet-foil',
         rarity === 'legendary' && 'closet-foil-gold',
         className,
@@ -166,9 +178,20 @@ export function TileArt({
   );
 }
 
-export function ItemArt({ item }: { item: Pick<ItemDef, 'slot' | 'riveIndex'> }) {
+export function ItemArt({
+  item,
+  faded = false,
+}: {
+  item: Pick<ItemDef, 'slot' | 'riveIndex'>;
+  faded?: boolean;
+}) {
   return (
-    <span className="absolute inset-0 flex items-end justify-center">
+    <span
+      className={cn(
+        'absolute inset-0 flex items-end justify-center transition-[filter,opacity] duration-300',
+        faded && 'opacity-50 grayscale dark:opacity-40',
+      )}
+    >
       <FrogSnapshot
         className="pointer-events-none shrink-0"
         indices={{ [item.slot as WardrobeSlot]: item.riveIndex }}
@@ -203,19 +226,19 @@ export function TileRail({ children }: { children: ReactNode }) {
   );
 }
 
-type ClosetEntry =
+export type ClosetEntry =
   | { kind: 'item'; item: ItemDef; owned: number; locked: boolean; price: number; dealPrice: number | null }
   | { kind: 'bg'; bg: BackgroundItem; owned: number; locked: boolean; price: number; dealPrice: null };
 
-function entryId(entry: ClosetEntry) {
+export function entryId(entry: ClosetEntry) {
   return entry.kind === 'item' ? entry.item.id : entry.bg.id;
 }
 
-function entryRarity(entry: ClosetEntry): Rarity {
+export function entryRarity(entry: ClosetEntry): Rarity {
   return entry.kind === 'item' ? entry.item.rarity : (entry.bg.rarity as Rarity);
 }
 
-function isEntryEquipped(
+export function isEntryEquipped(
   entry: ClosetEntry,
   equipped: Partial<Record<WardrobeSlot, string | null>>,
   equippedBgId: string | null,
@@ -292,7 +315,7 @@ function ClosetTile({
           <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
         ) : wishlisted && !owned ? (
           <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
-            <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
+            <Heart className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
           </span>
         ) : null}
       </TileArt>
@@ -382,7 +405,7 @@ function VaultTile({
         </span>
         {wishlisted && (
           <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
-            <Bookmark className="h-3 w-3" strokeWidth={3.5} fill="currentColor" />
+            <Heart className="h-3 w-3" strokeWidth={3.5} fill="currentColor" />
           </span>
         )}
       </span>
@@ -399,7 +422,7 @@ function VaultTile({
   );
 }
 
-function buildClosetEntries(
+export function buildClosetEntries(
   slot: ClosetSlot,
   catalog: ItemDef[],
   backgrounds: BackgroundItem[],
@@ -828,15 +851,261 @@ export function CollectionBook({
   );
 }
 
+function WornCheck() {
+  return (
+    <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+      <Check className="h-3 w-3" strokeWidth={4} />
+    </span>
+  );
+}
+
+function NewDot() {
+  return (
+    <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
+  );
+}
+
+function ClosetOwnedTile({
+  entry,
+  equipped,
+  isNew,
+  onTap,
+}: {
+  entry: ClosetEntry;
+  equipped: boolean;
+  isNew: boolean;
+  onTap: () => void;
+}) {
+  const rarity = entryRarity(entry);
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-label={`${entryName(entry)}, ${RARITY_CONFIG[rarity].label}${equipped ? ', wearing' : ''}`}
+      aria-pressed={equipped}
+      className="group block w-full"
+    >
+      <TileArt
+        rarity={rarity}
+        tone="closet"
+        className={cn(
+          'transition-transform duration-150 group-active:scale-95',
+          equipped && 'ring-2 ring-primary',
+        )}
+      >
+        {entry.kind === 'item' ? (
+          <ItemArt item={entry.item} />
+        ) : (
+          <BackgroundArt bg={entry.bg} />
+        )}
+        {entry.owned > 1 && (
+          <span className="absolute left-1 top-1 rounded-md bg-black/55 px-1 text-[10px] font-black leading-[16px] text-white">
+            ×{entry.owned}
+          </span>
+        )}
+        {equipped ? <WornCheck /> : isNew ? <NewDot /> : null}
+      </TileArt>
+    </button>
+  );
+}
+
+export function ClosetEmptyPrompt({
+  icon,
+  line,
+  action,
+}: {
+  icon: ReactNode;
+  line: string;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="flex flex-col items-center px-2 pb-10 pt-10 text-center">
+      <span className="flex h-12 items-center justify-center">{icon}</span>
+      <p className="mt-3 max-w-[30ch] text-[15px] font-extrabold leading-snug text-foreground/75">
+        {line}
+      </p>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          className="mt-5 h-12 w-full max-w-[340px] rounded-2xl bg-card text-[15px] font-black text-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] ring-1 ring-border/70 transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function ClosetFlyIcon() {
+  return <FlyIcon textPx={34} alwaysPlay />;
+}
+
+const BARE_SLOT_NOUN: Partial<Record<ClosetSlot, string>> = {
+  hat: 'hat',
+  body: 'body item',
+  hand_item: 'held item',
+};
+
+export function ClosetGrid({
+  slot,
+  catalog,
+  backgrounds,
+  inventory,
+  bgInventory,
+  equipped,
+  equippedBgId,
+  unseen,
+  leading,
+  empty = null,
+  onTapItem,
+  onTapBackground,
+  onClearSlot,
+  onOpenAlbum,
+}: {
+  slot: ClosetSlot;
+  catalog: ItemDef[];
+  backgrounds: BackgroundItem[];
+  inventory: Record<string, number>;
+  bgInventory: Record<string, number>;
+  equipped: Partial<Record<WardrobeSlot, string | null>>;
+  equippedBgId: string | null;
+  unseen: Set<string>;
+  leading?: ReactNode[];
+  empty?: ReactNode;
+  onTapItem: (item: ItemDef) => void;
+  onTapBackground: (bg: BackgroundItem) => void;
+  onClearSlot: (slot: WardrobeSlot) => void;
+  onOpenAlbum: (slot: ClosetSlot) => void;
+}) {
+  const { gridClass, cols } = useShelfGrid();
+  const freezeKey = `${slot}|${catalog.length > 0}|${backgrounds.length > 0}`;
+  const frozen = useRef<{ key: string; worn: Set<string>; fresh: Set<string> } | null>(null);
+  if (!frozen.current || frozen.current.key !== freezeKey) {
+    const worn = new Set<string>();
+    Object.keys(equipped).forEach((key) => {
+      const id = equipped[key as WardrobeSlot];
+      if (id) worn.add(id);
+    });
+    if (equippedBgId) worn.add(equippedBgId);
+    frozen.current = { key: freezeKey, worn, fresh: new Set<string>() };
+  }
+  const order = frozen.current;
+  unseen.forEach((id) => order.fresh.add(id));
+
+  const { owned, missing } = useMemo(() => {
+    const entries = buildClosetEntries(
+      slot,
+      catalog,
+      backgrounds,
+      inventory,
+      bgInventory,
+      new Map(),
+    );
+    return {
+      owned: entries.filter((entry) => entry.owned > 0),
+      missing: entries.filter((entry) => entry.owned === 0).length,
+    };
+  }, [slot, catalog, backgrounds, inventory, bgInventory]);
+
+  const group = (entry: ClosetEntry) => {
+    const id = entryId(entry);
+    return order.fresh.has(id) ? 0 : order.worn.has(id) ? 1 : 2;
+  };
+  const sorted = owned.slice().sort((a, b) => {
+    const byGroup = group(a) - group(b);
+    if (byGroup) return byGroup;
+    if (group(a) === 1) return entrySlotRank(a) - entrySlotRank(b);
+    return (
+      SHELF_ORDER.indexOf(entryRarity(b)) - SHELF_ORDER.indexOf(entryRarity(a)) ||
+      entrySlotRank(a) - entrySlotRank(b) ||
+      entryName(a).localeCompare(entryName(b))
+    );
+  });
+
+  const lead = leading ?? [];
+  if (!sorted.length && !lead.length) return <>{empty}</>;
+
+  const bareNoun = BARE_SLOT_NOUN[slot];
+  const bareSlot = bareNoun ? (slot as WardrobeSlot) : null;
+  const bare = bareSlot ? !equipped[bareSlot] : false;
+  const filled = (bareSlot ? 1 : 0) + lead.length + sorted.length + (missing > 0 ? 1 : 0);
+  const rows = Math.max(3, Math.ceil(filled / cols));
+  const spare = rows * cols - filled;
+
+  return (
+    <div className={cn(gridClass, 'pb-4')}>
+      {bareSlot && (
+        <button
+          type="button"
+          onClick={() => onClearSlot(bareSlot)}
+          aria-label={`No ${bareNoun}`}
+          aria-pressed={bare}
+          className="group block w-full"
+        >
+          <span
+            className={cn(
+              'relative grid aspect-square w-full place-items-center rounded-2xl bg-muted/70 transition-transform duration-150 group-active:scale-95',
+              bare && 'ring-2 ring-primary',
+            )}
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-foreground/10 text-muted-foreground">
+              <Minus className="h-4 w-4" strokeWidth={3.5} />
+            </span>
+            {bare && <WornCheck />}
+          </span>
+        </button>
+      )}
+      {lead}
+      {sorted.map((entry) => {
+        const id = entryId(entry);
+        return (
+          <ClosetOwnedTile
+            key={`${entry.kind}-${id}`}
+            entry={entry}
+            equipped={isEntryEquipped(entry, equipped, equippedBgId)}
+            isNew={unseen.has(id)}
+            onTap={() =>
+              entry.kind === 'item' ? onTapItem(entry.item) : onTapBackground(entry.bg)
+            }
+          />
+        );
+      })}
+      {Array.from({ length: spare }, (_, index) => (
+        <span
+          key={`spare-${index}`}
+          aria-hidden
+          className="block aspect-square w-full rounded-2xl bg-muted/50"
+        />
+      ))}
+      {missing > 0 && (
+        <button
+          type="button"
+          onClick={() => onOpenAlbum(slot)}
+          aria-label={`${missing} more to find. Open the album`}
+          className="group block w-full"
+        >
+          <span className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-foreground/15 text-muted-foreground transition-[transform,color,border-color] duration-150 group-hover:border-foreground/25 group-hover:text-foreground group-active:scale-95">
+            <Icon name="closetAlbum" className="h-8 w-8" />
+            <span className="text-[15px] font-black tabular-nums leading-none">
+              +{missing}
+            </span>
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 const SLOT_ORDER: ClosetSlot[] = ['skin', 'hat', 'body', 'hand_item', 'background'];
 
-function entrySlotRank(entry: ClosetEntry) {
+export function entrySlotRank(entry: ClosetEntry) {
   return SLOT_ORDER.indexOf(
     entry.kind === 'item' ? (entry.item.slot as ClosetSlot) : 'background',
   );
 }
 
-function entryName(entry: ClosetEntry) {
+export function entryName(entry: ClosetEntry) {
   return entry.kind === 'item' ? entry.item.name : entry.bg.name;
 }
 
@@ -989,6 +1258,58 @@ export function YoursCard({
                 · {RARITY_CONFIG[rarity].label} {collected.owned}/{collected.total}
               </span>
             )}
+          </span>
+        </span>
+        <span className="yours-seal grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white shadow-[0_2px_0_0_#2c511a]">
+          <Check className="h-5 w-5" strokeWidth={3.5} />
+        </span>
+      </button>
+    </div>
+  );
+}
+
+export function SetCompleteCard({
+  rarity,
+  noun,
+  onDone,
+}: {
+  rarity: Rarity;
+  noun: string;
+  onDone: () => void;
+}) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 3600);
+    return () => window.clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <div className="tryon-bar-enter fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[45] mx-auto max-w-md md:bottom-6">
+      <button
+        type="button"
+        onClick={onDone}
+        aria-live="polite"
+        className="flex w-full items-center gap-3 rounded-[22px] bg-card py-2.5 pl-2.5 pr-3 text-left shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/70"
+      >
+        <span
+          className={cn(
+            'relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl',
+            CLOSET_TONE[rarity],
+            (rarity === 'epic' || rarity === 'legendary') && 'closet-foil',
+            rarity === 'legendary' && 'closet-foil-gold',
+          )}
+        >
+          {rarity === 'legendary' ? (
+            <Crown className="h-6 w-6 text-amber-500" strokeWidth={2.5} fill="currentColor" />
+          ) : (
+            <Sparkles className={cn('h-6 w-6', RARITY_CONFIG[rarity].text)} strokeWidth={2.5} />
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[17px] font-black leading-tight text-foreground">
+            Set complete!
+          </span>
+          <span className="mt-0.5 block truncate text-[12px] font-bold leading-none text-muted-foreground">
+            Every {RARITY_CONFIG[rarity].label.toLowerCase()} {noun} is yours
           </span>
         </span>
         <span className="yours-seal grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#447d3f] text-white shadow-[0_2px_0_0_#2c511a]">

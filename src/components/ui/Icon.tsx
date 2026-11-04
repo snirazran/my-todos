@@ -4,7 +4,17 @@ import type { FC, SVGProps } from 'react';
 // there is no per-icon network request and no flash-in on first paint.
 // Original multicolor artwork is preserved.
 import AppleCalendar from '../../../public/icons/AppleCalendar.svg';
+import AutoFill from '../../../public/icons/AutoFill.svg';
 import Clock from '../../../public/icons/clock.svg';
+import ClosetAlbum from '../../../public/icons/ClosetAlbum.svg';
+import ClosetAll from '../../../public/icons/ClosetAll.svg';
+import ClosetBackgrounds from '../../../public/icons/ClosetBackgrounds.svg';
+import ClosetGifts from '../../../public/icons/ClosetGifts.svg';
+import ClosetHats from '../../../public/icons/ClosetHats.svg';
+import ClosetHeld from '../../../public/icons/ClosetHeld.svg';
+import ClosetSaved from '../../../public/icons/ClosetSaved.svg';
+import ClosetSavedEmpty from '../../../public/icons/ClosetSavedEmpty.svg';
+import ClosetSkins from '../../../public/icons/ClosetSkins.svg';
 import Community from '../../../public/icons/Community.svg';
 import Compass from '../../../public/icons/Compass.svg';
 import DarkMode from '../../../public/icons/DarkMode.svg';
@@ -30,7 +40,17 @@ import X2 from '../../../public/icons/x2.svg';
 
 const ICONS = {
   appleCalendar: AppleCalendar,
+  autoFill: AutoFill,
   clock: Clock,
+  closetAlbum: ClosetAlbum,
+  closetAll: ClosetAll,
+  closetBackgrounds: ClosetBackgrounds,
+  closetGifts: ClosetGifts,
+  closetHats: ClosetHats,
+  closetHeld: ClosetHeld,
+  closetSaved: ClosetSaved,
+  closetSavedEmpty: ClosetSavedEmpty,
+  closetSkins: ClosetSkins,
   community: Community,
   compass: Compass,
   darkMode: DarkMode,

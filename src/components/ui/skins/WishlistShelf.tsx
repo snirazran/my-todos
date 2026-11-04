@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence } from 'framer-motion';
-import { Bookmark, ChevronRight } from 'lucide-react';
+import { Heart, ChevronRight } from 'lucide-react';
 import { wishlistBucket, type WishlistEntry } from '@/lib/skins/wishlist';
 import { ShelfHeader, TileRail, shelfActionClass } from './DressingRoom';
 import { WishlistTile } from './WishlistTile';
@@ -29,7 +29,7 @@ export function WishlistShelf({
   return (
     <section aria-label="Your wishlist">
       <ShelfHeader
-        icon={<Bookmark className="h-3.5 w-3.5" strokeWidth={3} fill="currentColor" />}
+        icon={<Heart className="h-3.5 w-3.5" strokeWidth={3} fill="currentColor" />}
         label="Wishlist"
         tone="text-primary"
         meta={

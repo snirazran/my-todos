@@ -3,8 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  Bookmark,
-  BookmarkCheck,
+  Heart,
   ChevronDown,
   ChevronRight,
   Lock,
@@ -735,9 +734,9 @@ export function SkinRotationDialog({
                       )}
                     >
                       {alreadySaved ? (
-                        <BookmarkCheck aria-hidden className="h-4 w-4" />
+                        <Heart fill="currentColor" aria-hidden className="h-4 w-4" />
                       ) : (
-                        <Bookmark aria-hidden className="h-4 w-4" />
+                        <Heart aria-hidden className="h-4 w-4" />
                       )}
                       {alreadySaved ? 'Kept' : looksFull ? 'Looks full' : 'Keep look'}
                     </button>
@@ -1071,7 +1070,13 @@ export function StyleShuffleHeaderButton({
   );
 }
 
-export function StyleShufflePill({ className }: { className?: string }) {
+export function StyleShufflePill({
+  className,
+  iconOnly = false,
+}: {
+  className?: string;
+  iconOnly?: boolean;
+}) {
   const { eligible, loaded } = useShuffleInterval();
   if (!loaded || !eligible) return null;
   return (
@@ -1079,17 +1084,25 @@ export function StyleShufflePill({ className }: { className?: string }) {
       type="button"
       data-hint="wardrobe-shuffle"
       aria-haspopup="dialog"
+      aria-label={iconOnly ? 'Style Shuffle' : undefined}
+      title={iconOnly ? 'Style Shuffle' : undefined}
       onClick={() => {
         hapticTick();
         openStyleShuffle();
       }}
       className={cn(
-        'inline-flex min-h-9 items-center gap-1 rounded-full border border-border/60 bg-background/90 pl-1.5 pr-3 text-xs font-bold text-foreground shadow-sm backdrop-blur-md transition-[background-color,transform] hover:bg-background active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        'border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur-md transition-[background-color,transform] hover:bg-background active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        iconOnly
+          ? 'grid h-11 w-11 place-items-center rounded-full'
+          : 'inline-flex min-h-9 items-center gap-1 rounded-full pl-1.5 pr-3 text-xs font-bold',
         className,
       )}
     >
-      <Icon name="shuffle" className={cn('h-6 w-6', SHUFFLE_ICON_ON_DARK)} />
-      Shuffle
+      <Icon
+        name="shuffle"
+        className={cn(iconOnly ? 'h-7 w-7' : 'h-6 w-6', SHUFFLE_ICON_ON_DARK)}
+      />
+      {!iconOnly && 'Shuffle'}
     </button>
   );
 }

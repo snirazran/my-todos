@@ -20,11 +20,10 @@ import {
 import { cn } from '@/lib/utils';
 import {
   DEFAULT_TRADE_MODIFIERS,
-  quoteTradeFuel,
   type TradeModifiers,
   type TradeRecipe,
 } from '@/lib/skins/tradeModifiers';
-import { RARITY_ORDER, rarityRank, type Rarity } from '@/lib/skins/catalog';
+import { type Rarity } from '@/lib/skins/catalog';
 import {
   DEFAULT_SHOP_SALES,
   SHOP_TIERS,
@@ -267,16 +266,6 @@ export function AdminModifiersManager() {
     }
   };
 
-  const deepestRecipe = config?.recipes.find((recipe) => recipe.fuelRarity) ?? null;
-  const maxWaiverQuote =
-    config &&
-    quoteTradeFuel({
-      modifiers: config,
-      recipe: deepestRecipe,
-      allSpares: true,
-      isPlus: true,
-    });
-
   return (
     <div className="min-h-screen bg-background p-6 md:p-12">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -328,7 +317,7 @@ export function AdminModifiersManager() {
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
                 {view === 'trade'
-                  ? 'Recipe ratios, fuel, aim prices and the draw rules behind every trade-up.'
+                  ? 'Recipe ratios and the draw rules behind every trade-up.'
                   : view === 'shop'
                     ? 'How the daily shelf is composed, which slots get marked down, and who can reroll it.'
                   : view === 'streak'
@@ -389,7 +378,7 @@ export function AdminModifiersManager() {
               icon={<Repeat className="h-5 w-5" />}
               accent="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
               title="Trade modifiers"
-              description="Ratios and fuel per tier, spares and Plus waivers, aim prices, golden trades, draw weighting and wishlist slots."
+              description="Items per trade for each tier, golden trades, the wishlist target and wishlist slots."
               stat={`${config.recipes.length} recipes · golden ${config.goldenTradeChancePercent}%`}
               onClick={() => setView('trade')}
             />
@@ -464,9 +453,9 @@ export function AdminModifiersManager() {
                 <div>
                   <p className="text-lg font-black text-foreground">Recipes</p>
                   <p className="text-sm text-muted-foreground">
-                    Same-tier items in, plus optional fuel from a lower tier.
-                    Trading costs items only — the aim price is the one thing a
-                    trade can charge flies for.
+                    N items of one rarity in, one item of the next rarity out.
+                    Players fill trades with spares (extra copies) first; the
+                    reward is always an item they don't own yet while any remain.
                   </p>
                 </div>
                 <button
@@ -481,14 +470,11 @@ export function AdminModifiersManager() {
               </div>
 
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[620px] border-separate border-spacing-y-2">
+                <table className="w-full min-w-[320px] border-separate border-spacing-y-2">
                   <thead>
                     <tr className="text-left text-[12px] font-black text-muted-foreground">
                       <th className="px-2">Recipe</th>
                       <th className="px-2">Items in</th>
-                      <th className="px-2">Fuel tier</th>
-                      <th className="px-2">Fuel count</th>
-                      <th className="px-2">Aim price</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -497,7 +483,7 @@ export function AdminModifiersManager() {
                         <td className="rounded-l-xl px-3 py-2 text-[13px] font-black text-foreground">
                           {recipe.from} → {recipe.to}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="rounded-r-xl px-2 py-2">
                           <input
                             type="number"
                             min={2}
@@ -511,64 +497,6 @@ export function AdminModifiersManager() {
                             className={cn(inputClass, 'max-w-[90px]')}
                           />
                         </td>
-                        <td className="px-2 py-2">
-                          <select
-                            value={recipe.fuelRarity ?? ''}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              patchRecipe(recipe.from, {
-                                fuelRarity: value ? (value as Rarity) : null,
-                                fuelCount: value
-                                  ? recipe.fuelCount || 1
-                                  : 0,
-                              });
-                            }}
-                            className={cn(inputClass, 'max-w-[130px]')}
-                          >
-                            <option value="">None</option>
-                            {RARITY_ORDER.filter(
-                              (rarity) =>
-                                rarityRank[rarity] < rarityRank[recipe.from],
-                            ).map((rarity) => (
-                              <option key={rarity} value={rarity}>
-                                {rarity}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-2 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            max={12}
-                            disabled={!recipe.fuelRarity}
-                            value={recipe.fuelCount}
-                            onChange={(event) =>
-                              patchRecipe(recipe.from, {
-                                fuelCount: Number(event.target.value),
-                              })
-                            }
-                            className={cn(
-                              inputClass,
-                              'max-w-[90px]',
-                              !recipe.fuelRarity && 'opacity-40',
-                            )}
-                          />
-                        </td>
-                        <td className="rounded-r-xl px-2 py-2">
-                          <input
-                            type="number"
-                            min={0}
-                            max={100000}
-                            value={recipe.aimPriceFlies}
-                            onChange={(event) =>
-                              patchRecipe(recipe.from, {
-                                aimPriceFlies: Number(event.target.value),
-                              })
-                            }
-                            className={cn(inputClass, 'max-w-[120px]')}
-                          />
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -577,72 +505,11 @@ export function AdminModifiersManager() {
             </section>
 
             <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
-              <p className="text-lg font-black text-foreground">Fuel waivers</p>
-              <p className="text-sm text-muted-foreground">
-                Both stack, then the cap trims the total. Waivers only apply to
-                recipes that ask for fuel.
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <NumberField
-                  label="All-spares waiver"
-                  hint="Applies when every main input is an item the player owns 2+ of."
-                  min={0}
-                  max={12}
-                  suffix="items"
-                  value={config.allSparesFuelWaived}
-                  onChange={(allSparesFuelWaived) => patch({ allSparesFuelWaived })}
-                />
-                <NumberField
-                  label="Plus waiver"
-                  hint="For active Plus accounts."
-                  min={0}
-                  max={12}
-                  suffix="items"
-                  value={config.plusFuelWaived}
-                  onChange={(plusFuelWaived) => patch({ plusFuelWaived })}
-                />
-                <NumberField
-                  label="Combined cap"
-                  hint={
-                    maxWaiverQuote && deepestRecipe
-                      ? `${deepestRecipe.from} → ${deepestRecipe.to} bottoms out at ${maxWaiverQuote.count} fuel.`
-                      : undefined
-                  }
-                  min={0}
-                  max={12}
-                  suffix="items"
-                  value={config.maxFuelWaived}
-                  onChange={(maxFuelWaived) => patch({ maxFuelWaived })}
-                />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
-              <p className="text-lg font-black text-foreground">Aim</p>
-              <p className="text-sm text-muted-foreground">
-                The optional pre-trade payment that guarantees the reward is a
-                wishlisted item. Per-tier prices live in the recipe table.
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <NumberField
-                  label="Plus discount"
-                  hint="Cut off the aim price for active Plus accounts."
-                  min={0}
-                  max={100}
-                  suffix="%"
-                  value={config.aimPlusDiscountPercent}
-                  onChange={(aimPlusDiscountPercent) =>
-                    patch({ aimPlusDiscountPercent })
-                  }
-                />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
               <p className="text-lg font-black text-foreground">Output rules</p>
               <p className="text-sm text-muted-foreground">
-                The tier is always guaranteed one step up — these only steer which
-                item comes out, and how often two do.
+                The tier is always one step up and the item is always new to the
+                player while any remain. These steer wishlist hits and how often
+                two items come out.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <NumberField
@@ -667,28 +534,8 @@ export function AdminModifiersManager() {
                   }
                 />
                 <NumberField
-                  label="New-first weighting"
-                  hint="How much an un-owned item outweighs an owned one in the draw."
-                  min={1}
-                  max={20}
-                  suffix="×"
-                  value={config.newFirstWeight}
-                  onChange={(newFirstWeight) => patch({ newFirstWeight })}
-                />
-                <NumberField
-                  label="All-spares weighting"
-                  hint="New-first weighting used when every input is a spare."
-                  min={1}
-                  max={20}
-                  suffix="×"
-                  value={config.allSparesNewFirstWeight}
-                  onChange={(allSparesNewFirstWeight) =>
-                    patch({ allSparesNewFirstWeight })
-                  }
-                />
-                <NumberField
                   label="Wishlist redirect"
-                  hint="Chance the reward is drawn from the player's un-owned wishlisted items of that rarity."
+                  hint="Chance the reward comes from the player's un-owned wishlisted items of that rarity. 100% makes the wishlist a guaranteed target."
                   min={0}
                   max={100}
                   suffix="%"

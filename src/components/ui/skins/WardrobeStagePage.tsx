@@ -29,8 +29,7 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
   const { data } = useInventory(true);
   const isFrogHungry = useIsFrogHungry(true);
   const { data: bgData } = useBackgrounds(true);
-  const lastWardrobeTab = useUIStore((s) => s.lastWardrobeTab);
-  const requestedTab = searchParams.get('tab') || lastWardrobeTab;
+  const requestedTab = searchParams.get('tab');
   const defaultTab = section === 'shop' ? 'shop' : requestedTab === 'trade' ? 'trade' : 'inventory';
   const focusItemId = searchParams.get('item') || null;
   const focusItemKind =
@@ -98,7 +97,11 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
     <FlyCatchSwipeLauncher source="wardrobe" className="shrink-0">
       <div
         data-fly-hero
-        className="relative flex h-[calc(204px+env(safe-area-inset-top))] items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))]"
+        className={`relative flex items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))] ${
+          section === 'wardrobe'
+            ? 'h-[calc(252px+env(safe-area-inset-top))]'
+            : 'h-[calc(204px+env(safe-area-inset-top))]'
+        }`}
       >
         <div
           ref={frogBoxRef}

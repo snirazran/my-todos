@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import {
   requestFrogStamp,
   drawCachedFrogStamp,
@@ -38,7 +38,7 @@ export function FrogSnapshot({
     (typeof height === 'number' ? Math.round(height * 0.17) : 0);
   const indicesKey = useMemo(() => JSON.stringify(indices ?? {}), [indices]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelStamp: (() => void) | null = null;

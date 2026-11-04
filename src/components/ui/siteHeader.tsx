@@ -10,6 +10,10 @@ import {
 } from 'lucide-react';
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { Icon } from '@/components/ui/Icon';
+import {
+  useRouteHistory,
+  WardrobeMobileChrome,
+} from '@/components/ui/skins/WardrobeMobileChrome';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
@@ -64,12 +68,14 @@ import { cn } from '@/lib/utils';
 export default function SiteHeader() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
+  useRouteHistory();
   const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   useEffect(() => setPendingHref(null), [pathname]);
   const {
     isLoadingScreenVisible,
     isWardrobeStuck,
+    wardrobeTab,
     openFlyShop,
     isFirstRunGuided,
   } = useUIStore();
@@ -149,8 +155,9 @@ export default function SiteHeader() {
 
   return (
     <>
-      {isStagePage && <MobileMenuCluster />}
-      {isStagePage &&
+      {pathname === '/shop' && <MobileMenuCluster />}
+      {pathname === '/wardrobe' && <WardrobeMobileChrome />}
+      {pathname === '/shop' &&
         user &&
         flyBalance !== undefined && (
           <MobileHeaderActions disabled={isLoadingScreenVisible}>
@@ -177,6 +184,7 @@ export default function SiteHeader() {
             pathname !== '/insights' &&
             !pathname?.startsWith('/admin') &&
             !(isStagePage && isWardrobeStuck) &&
+            !(pathname === '/wardrobe' && wardrobeTab === 'trade') &&
             'shadow-lg shadow-black/5 dark:shadow-black/20',
         )}
       >

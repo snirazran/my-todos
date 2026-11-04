@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Bookmark, Repeat, ShoppingBag } from 'lucide-react';
+import { Heart, Repeat, ShoppingBag } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { cn } from '@/lib/utils';
@@ -101,7 +101,7 @@ export function WishlistSheet({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 px-5 pb-3 pt-3 sm:px-6 sm:pt-6">
             <div className="flex items-center gap-2 pr-12 sm:pr-14">
-              <Bookmark
+              <Heart
                 className="h-5 w-5 shrink-0 text-primary"
                 strokeWidth={2.75}
                 fill="currentColor"
@@ -132,7 +132,7 @@ export function WishlistSheet({
             {!entries.length ? (
               <div className="flex flex-col items-center rounded-[24px] border border-dashed border-border/60 bg-muted/30 px-6 py-10 text-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Bookmark className="h-7 w-7" strokeWidth={2.5} />
+                  <Heart className="h-7 w-7" strokeWidth={2.5} />
                 </span>
                 <p className="mt-3 text-base font-black text-foreground">
                   Nothing saved yet

@@ -13,7 +13,8 @@ import {
   LOOK_SLOTS,
   SAVED_LOOKS_PLUS,
   maxSavedLooks,
-  autoNameLook,
+  nextOutfitName,
+  LOOK_NAME_MAX,
   isEmptyLook,
   isSavedLook,
   looksMatch,
@@ -128,12 +129,8 @@ export async function POST(req: NextRequest) {
     const byId = buildById(catalog);
     const name =
       typeof body.name === 'string' && body.name.trim()
-        ? body.name.trim().slice(0, 24)
-        : autoNameLook(
-            equipped,
-            byId,
-            looks.map((look) => look.name),
-          );
+        ? body.name.trim().slice(0, LOOK_NAME_MAX)
+        : nextOutfitName(looks.map((look) => look.name));
 
     const look: SavedLook = {
       id: randomUUID(),
@@ -213,17 +210,46 @@ export async function PUT(req: NextRequest) {
 
     set['styleShuffle.previous'] = null;
     await UserModel.updateOne({ _id: userId }, { $set: set });
-    await notifyUserChanged(userId, { eventKind: 'wardrobe-equipped' });
-    await bumpQuestMetric({ userId, metric: 'skin_equipped' });
-    if (backgroundId) {
-      await notifyUserChanged(userId, {
-        eventKind: 'background-equipped',
-        backgroundId,
-      });
-    }
-    await recordAnalyticsEvent({ userId, name: 'look_applied' });
+    await Promise.allSettled([
+      notifyUserChanged(userId, { eventKind: 'wardrobe-equipped' }),
+      bumpQuestMetric({ userId, metric: 'skin_equipped' }),
+      backgroundId
+        ? notifyUserChanged(userId, {
+            eventKind: 'background-equipped',
+            backgroundId,
+          })
+        : null,
+      recordAnalyticsEvent({ userId, name: 'look_applied' }),
+    ]);
 
     return json({ ok: true });
+  } catch {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const userId = await requireUserId();
+
+    let body: { lookId?: unknown; name?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
+    const lookId = typeof body.lookId === 'string' ? body.lookId : '';
+    const name =
+      typeof body.name === 'string' ? body.name.trim().slice(0, LOOK_NAME_MAX) : '';
+    if (!lookId || !name) return json({ error: 'Missing lookId or name' }, 400);
+
+    await connectMongo();
+    const result = await UserModel.updateOne(
+      { _id: userId, 'wardrobe.looks.id': lookId },
+      { $set: { 'wardrobe.looks.$.name': name } },
+    );
+    if (!result.matchedCount) return json({ error: 'Look not found' }, 404);
+    return json({ ok: true, name });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
   }

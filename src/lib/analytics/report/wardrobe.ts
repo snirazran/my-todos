@@ -14,8 +14,8 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
       ),
       groupByProperties(
         { occurredAt: context.window, name: 'skin_traded' },
-        { fromRarity: 'from_rarity', toRarity: 'to_rarity', aimed: 'aimed' },
-        { sums: { fuel: 'fuel_count', aimFlies: 'aim_flies' } },
+        { fromRarity: 'from_rarity', toRarity: 'to_rarity', sparesOnly: 'spares_only' },
+        { sums: { items: 'item_count', lastCopies: 'last_copies' } },
       ),
       groupByProperties(
         { occurredAt: context.window, name: 'item_equipped' },
@@ -167,24 +167,24 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
       {
         key: 'wardrobe.trades',
         title: 'Trade-ups',
-        question: 'Is the duplicate sink working, and are aimed trades worth their fee?',
+        question: 'Is the duplicate sink working, and how often do people trade away their last copy?',
         columns: [
           { key: 'from', label: 'From' },
           { key: 'to', label: 'To' },
-          { key: 'aimed', label: 'Aimed' },
+          { key: 'spares_only', label: 'Spares only' },
           { key: 'trades', label: 'Trades', format: 'integer' },
           { key: 'users', label: 'Traders', format: 'integer' },
-          { key: 'fuel', label: 'Items consumed', format: 'integer' },
-          { key: 'aim_flies', label: 'Aim fees', format: 'integer' },
+          { key: 'items', label: 'Items consumed', format: 'integer' },
+          { key: 'last_copies', label: 'Last copies used', format: 'integer' },
         ],
         rows: tradeRows.map((row) => ({
           from: String(row._id.fromRarity),
           to: String(row._id.toRarity),
-          aimed: row._id.aimed === true ? 'Yes' : 'No',
+          spares_only: row._id.sparesOnly === true ? 'Yes' : row._id.sparesOnly === false ? 'No' : '—',
           trades: row.count,
           users: row.users,
-          fuel: row.fuel,
-          aim_flies: row.aimFlies,
+          items: row.items,
+          last_copies: row.lastCopies,
         })),
       },
       {

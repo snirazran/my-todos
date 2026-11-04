@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Bookmark } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { hapticTick } from '@/lib/haptics';
 
@@ -37,7 +37,7 @@ export function WishlistButton({
           : 'border-border/50 bg-card/50 text-muted-foreground hover:bg-accent/50',
       )}
     >
-      <Bookmark
+      <Heart
         className="h-4 w-4"
         strokeWidth={2.5}
         fill={count > 0 ? 'currentColor' : 'none'}

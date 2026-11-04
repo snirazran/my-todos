@@ -377,7 +377,7 @@ const GUIDES: Record<string, HintGuide> = {
       {
         href: '/wardrobe',
         anchor: 'wardrobe-trade-tab',
-        say: 'Trade same-rarity outfits for a rarer one',
+        say: 'Trade spare copies for a new, rarer item',
       },
     ],
   },

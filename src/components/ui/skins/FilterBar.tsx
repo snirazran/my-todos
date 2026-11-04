@@ -8,6 +8,7 @@ import {
   Shirt,
   Hand,
   Gift,
+  Heart,
   Image as ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,7 +20,8 @@ export type FilterCategory =
   | 'hat'
   | 'body'
   | 'held'
-  | 'background';
+  | 'background'
+  | 'looks';
 
 const CATEGORY_CONFIG: Record<
   FilterCategory,
@@ -32,6 +34,7 @@ const CATEGORY_CONFIG: Record<
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
   held: { label: 'Held', icon: <Hand className="w-5 h-5" /> },
   background: { label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
+  looks: { label: 'Outfits', icon: <Heart className="w-5 h-5" /> },
 };
 
 export interface FilterOption {
@@ -50,6 +53,7 @@ export function FilterBar({
   fallbackBadges,
   fallbackBadgeClassName,
   centerActiveOnMount = true,
+  compact = false,
 }: {
   active: string;
   onChange: (s: any) => void;
@@ -59,6 +63,7 @@ export function FilterBar({
   fallbackBadges?: Partial<Record<string, number>>;
   fallbackBadgeClassName?: string;
   centerActiveOnMount?: boolean;
+  compact?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -195,6 +200,7 @@ export function FilterBar({
 
         {displayOptions.map((opt) => {
           const isActive = active === opt.id;
+          const showLabel = !compact || isActive;
           const badgeCount = badges?.[opt.id] ?? 0;
           const fallbackCount = fallbackBadges?.[opt.id] ?? 0;
 
@@ -213,18 +219,34 @@ export function FilterBar({
                 onChange(opt.id);
               }}
               aria-pressed={isActive}
+              title={showLabel ? undefined : opt.label}
               className={cn(
-                'relative flex h-10 flex-none select-none items-center justify-center gap-1.5 rounded-full border px-3.5 transition-colors duration-150',
+                'relative flex h-10 flex-none select-none items-center justify-center gap-1.5 rounded-full border transition-colors duration-150',
+                showLabel ? 'px-3.5' : 'w-10 px-0',
                 'whitespace-nowrap text-[13px] font-black',
                 isActive
                   ? 'border-primary/40 bg-primary/10 text-primary'
                   : 'border-border/60 bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
               )}
             >
-              <span className="flex shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden>
+              <span
+                className={cn(
+                  'flex shrink-0',
+                  compact ? '[&>svg]:h-6 [&>svg]:w-6' : '[&>svg]:h-4 [&>svg]:w-4',
+                  compact && isActive && 'chip-pop',
+                )}
+                aria-hidden
+              >
                 {opt.icon}
               </span>
-              <span>{opt.label}</span>
+              <span
+                className={cn(
+                  !showLabel && 'sr-only',
+                  compact && isActive && 'chip-label-in',
+                )}
+              >
+                {opt.label}
+              </span>
               {badgeCount > 0 ? (
                 <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm animate-in zoom-in", badgeClassName || "text-white bg-rose-500")}>
                   {badgeCount}

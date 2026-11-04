@@ -22,7 +22,7 @@ export const RARITY_ORDER = [
 ] as const;
 
 /** Smallest recipe on the trade ladder — what "ready to trade" badges count against. */
-export const TRADE_MIN_ITEM_COUNT = 4;
+export const TRADE_MIN_ITEM_COUNT = 3;
 
 /**
  * Rarities the shop only displays. They have a price for book-keeping (deals,

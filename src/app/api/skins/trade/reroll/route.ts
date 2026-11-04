@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
           rewardId: string;
           rewardKind: 'item' | 'background';
           rarity: string;
-          aimed?: boolean;
           used: boolean;
           createdAt: Date | string;
         }
@@ -93,26 +92,17 @@ export async function POST(req: NextRequest) {
     const wishlistKeys = new Set(
       readWishlistPins(user.wardrobe).map((pin) => wishlistPinKey(pin)),
     );
-    const draw = (
-      exclude: { kind: PrizeKind; id: string } | null,
-      aimed: boolean,
-    ) =>
+    const draw = (exclude: { kind: PrizeKind; id: string } | null) =>
       pickTradeReward({
         pool,
         rarity: claim.rarity as Rarity,
         owns,
         wishlistKeys,
         modifiers,
-        aimed,
         exclude: exclude as any,
       });
     const excluded = { kind: claim.rewardKind, id: claim.rewardId };
-    // An aimed trade paid for a wishlist hit, so its reroll stays on the
-    // wishlist — it only swaps which one. It falls back to an open draw when
-    // that was the last un-owned wishlisted item at this tier.
-    const reward = claim.aimed
-      ? (draw(excluded, true) ?? draw(null, true) ?? draw(excluded, false) ?? draw(null, false))
-      : (draw(excluded, false) ?? draw(null, false));
+    const reward = draw(excluded) ?? draw(null);
     if (!reward) {
       await refund();
       return NextResponse.json(

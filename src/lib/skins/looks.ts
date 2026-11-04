@@ -1,5 +1,4 @@
 import type { ItemDef, WardrobeSlot } from './catalog';
-import { rarityRank } from './catalog';
 
 /**
  * Slots are convenience, not power — the one category the economy doc allows
@@ -51,6 +50,15 @@ export function looksMatch(
   return (aBg ?? null) === (bBg ?? null);
 }
 
+export const LOOK_NAME_MAX = 24;
+
+export function nextOutfitName(taken: string[]): string {
+  const used = new Set(taken.map((name) => name.trim().toLowerCase()));
+  let n = 1;
+  while (used.has(`#outfit${n}`)) n += 1;
+  return `#outfit${n}`;
+}
+
 export function isEmptyLook(
   equipped: Partial<Record<WardrobeSlot, string | null>>,
   backgroundId?: string | null,
@@ -58,40 +66,6 @@ export function isEmptyLook(
   return (
     !backgroundId && LOOK_SLOTS.every((slot) => !(equipped[slot] ?? null))
   );
-}
-
-/**
- * Name a look after the piece that defines it — the rarest thing worn — so the
- * saved row reads as "Wizard fit", not "Look 3". Outfits sharing that piece are
- * told apart by the next-rarest one ("Wizard + Sun Hat"), which says what
- * actually differs; numbering is only the last resort.
- */
-export function autoNameLook(
-  equipped: Partial<Record<WardrobeSlot, string | null>>,
-  byId: Record<string, ItemDef>,
-  taken: string[] = [],
-): string {
-  const worn: ItemDef[] = [];
-  for (const slot of LOOK_SLOTS) {
-    const id = equipped[slot];
-    const def = id ? byId[id] : null;
-    if (def) worn.push(def);
-  }
-  worn.sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]);
-
-  const [best, ...rest] = worn;
-  const base = best ? `${best.name} fit` : 'Plain fit';
-  if (!taken.includes(base)) return base;
-
-  for (const def of rest) {
-    const candidate = `${best.name} + ${def.name}`;
-    if (!taken.includes(candidate)) return candidate;
-  }
-  for (let i = 2; i < 50; i++) {
-    const candidate = `${base} ${i}`;
-    if (!taken.includes(candidate)) return candidate;
-  }
-  return base;
 }
 
 export function toLookView(

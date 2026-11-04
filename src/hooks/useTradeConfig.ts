@@ -10,7 +10,7 @@ import {
 export const TRADE_CONFIG_KEY = '/api/skins/trade';
 
 /**
- * Recipe ratios, fuel and modifiers are admin-tunable, so the trade screen
+ * Recipe ratios and modifiers are admin-tunable, so the trade screen
  * quotes them from the server rather than hard-coding a ladder that can drift
  * from what the trade will actually charge.
  */

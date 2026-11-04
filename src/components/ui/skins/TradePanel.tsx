@@ -1,814 +1,580 @@
 'use client';
 
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  useDeferredValue,
-} from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
-  AlertCircle,
-  ArrowRight,
-  Bookmark,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  Crosshair,
-  Repeat,
-  ShoppingBag,
-  Trash2,
-  X,
-  Zap,
-} from 'lucide-react';
-import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
+  generateLinearEasing,
+  motion,
+  spring,
+  supportsLinearEasing,
+  useReducedMotion,
+} from 'framer-motion';
+import { Check, ChevronRight, ChevronsUp, Heart, Shirt, Sparkles, X } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { hapticCelebrate, hapticSelect, hapticTick } from '@/lib/haptics';
 import {
   creditRewardedAd,
-  rewardedAdsAvailable,
   rewardedAdFailureMessage,
+  rewardedAdsAvailable,
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import { BaseSheet } from '@/components/ui/BaseSheet';
-import { cn } from '@/lib/utils';
-import {
-  ItemDef,
-  Rarity,
-  rarityRank,
-  TRADE_MIN_ITEM_COUNT,
-} from '@/lib/skins/catalog';
-import { useTradeConfig } from '@/hooks/useTradeConfig';
-import { useWishlist } from '@/hooks/useWishlist';
-import {
-  quoteAimPrice,
-  quoteTradeFuel,
-  recipeFor,
-} from '@/lib/skins/tradeModifiers';
-import { isAvailableAt } from '@/lib/skins/availability';
-import { FlyAmount } from '@/components/ui/FlyAmount';
-import { Button } from '@/components/ui/button';
-import confetti from 'canvas-confetti';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { Icon as AppIcon } from '@/components/ui/Icon';
-import {
-  BAR_TONE,
-  BackgroundArt,
-  ItemArt,
-  ShelfHeader,
-  TILE_TONE,
-  TileArt,
-  shelfActionClass,
-  useShelfGrid,
-} from './DressingRoom';
-
-// Import from gift-box for the reward UI
-import {
-  RewardCard,
-  SkipAdsLink,
-} from '@/components/ui/gift-box/RewardCard';
+import { RewardCard, SkipAdsLink } from '@/components/ui/gift-box/RewardCard';
+import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
+import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
-import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
-import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useAutoPopupHold } from '@/lib/popupGate';
-
-/* ---------------- Visual Helpers ---------------- */
-const RARITY_CONFIG: Record<
-  ItemDef['rarity'],
-  {
-    border: string;
-    bg: string;
-    text: string;
-    glow: string;
-    label: string;
-    gradient: string;
-    shadow: string;
-    hoverGlow: string;
-  }
-> = {
-  common: {
-    border: 'border-border',
-    bg: 'bg-card',
-    text: 'text-muted-foreground',
-    glow: 'shadow-none',
-    label: 'Common',
-    gradient: 'from-muted/50 to-muted/20',
-    shadow: 'shadow-sm',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.1)]',
-  },
-  uncommon: {
-    border: 'border-emerald-500',
-    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
-    text: 'text-emerald-700 dark:text-emerald-400',
-    glow: 'shadow-emerald-500/10',
-    label: 'Uncommon',
-    gradient:
-      'from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
-    shadow: 'shadow-emerald-500/15',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]',
-  },
-  rare: {
-    border: 'border-sky-500',
-    bg: 'bg-sky-50 dark:bg-sky-950/30',
-    text: 'text-sky-700 dark:text-sky-400',
-    glow: 'shadow-sky-500/10',
-    label: 'Rare',
-    gradient: 'from-sky-100 to-sky-50 dark:from-sky-900/40 dark:to-sky-950/40',
-    shadow: 'shadow-sky-500/15',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(14,165,233,0.5)]',
-  },
-  epic: {
-    border: 'border-violet-500',
-    bg: 'bg-violet-50 dark:bg-violet-950/30',
-    text: 'text-violet-700 dark:text-violet-400',
-    glow: 'shadow-violet-500/15',
-    label: 'Epic',
-    gradient:
-      'from-violet-100 to-violet-50 dark:from-violet-900/40 dark:to-violet-950/40',
-    shadow: 'shadow-violet-500/20',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(139,92,246,0.5)]',
-  },
-  legendary: {
-    border: 'border-amber-500',
-    bg: 'bg-amber-50 dark:bg-amber-950/30',
-    text: 'text-amber-700 dark:text-amber-400',
-    glow: 'shadow-amber-500/20',
-    label: 'Legendary',
-    gradient:
-      'from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/40',
-    shadow: 'shadow-amber-500/25',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(245,158,11,0.5)]',
-  },
-};
-
-import { FilterCategory } from './FilterBar';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { backgroundPreview } from '@/hooks/useBackgroundActions';
-import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
-import { WardrobeEmptyState } from './WardrobeEmptyState';
+import { useTradeConfig } from '@/hooks/useTradeConfig';
+import { Icon } from '@/components/ui/Icon';
+import { warmFrogStamps } from '@/lib/frogStampEngine';
+import { riveDevicePixelRatio } from '@/lib/riveLoader';
+import { useWishlist } from '@/hooks/useWishlist';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
+import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
+import { isAvailableAt } from '@/lib/skins/availability';
+import { rarityRank, type ItemDef, type Rarity, type WardrobeSlot } from '@/lib/skins/catalog';
+import { sparesOf } from '@/lib/skins/tradeModifiers';
+import { cn } from '@/lib/utils';
+import { BackgroundArt, ClosetEmptyPrompt, ClosetFlyIcon, ItemArt, TileArt } from './DressingRoom';
 
-
-const FLIGHT_MS = 300;
-
-type TradeEntry = {
-  uid: string;
+type Entry = {
+  key: string;
   id: string;
   kind: 'item' | 'background';
   rarity: Rarity;
   owned: number;
-  item?: ItemDef;
-  bg?: BackgroundItem;
-};
-
-type Flight = {
-  id: number;
-  slotKey: string;
-  rarity: Rarity;
-  /** Pixels lifted off the card that was tapped, so the ghost needs no render. */
-  image: string | null;
-  cover: boolean;
-  from: DOMRect;
-  to: DOMRect;
-};
-
-type RewardPreview = {
-  key: string;
   name: string;
-  owned: boolean;
-  wishlisted: boolean;
   item?: ItemDef;
   bg?: BackgroundItem;
 };
 
-type TradePanelProps = {
-  inventory: Record<string, number>;
-  catalog: ItemDef[];
-  backgrounds?: BackgroundItem[];
-  backgroundInventory?: Record<string, number>;
-  unseenItems: string[];
-  onTradeSuccess?: () => void;
-  activeFilter?: FilterCategory;
-  paused?: boolean;
-  pageScroll?: boolean;
-  isPremium?: boolean;
-  balance?: number;
-  onGoToShop?: () => void;
-  onGetFlies?: (shortBy: number) => void;
-  onUpgrade?: () => void;
-};
+type Outcome = { fresh: Entry[]; wished: Entry[] };
 
 type TradePrize = ItemDef & { kind?: 'item' | 'background'; imageUrl?: string };
+
+const SLIDE_SHIFT = 36;
+const slideTo = (px: number) => `translateX(${px}px)`;
+
+let slideSpring: { duration: number; easing: string } | null = null;
+const getSlideSpring = () => {
+  if (slideSpring) return slideSpring;
+  const generator = spring({ keyframes: [0, 1], visualDuration: 0.36, bounce: 0.18 });
+  let duration = 0;
+  while (!generator.next(duration).done && duration < 2000) duration += 10;
+  slideSpring = {
+    duration,
+    easing: supportsLinearEasing()
+      ? generateLinearEasing(
+          (progress) => generator.next(progress * duration).value as number,
+          duration,
+        )
+      : 'cubic-bezier(0.22, 1.15, 0.36, 1)',
+  };
+  return slideSpring;
+};
+
+const runSlide = (el: HTMLElement, keyframes: Keyframe[], options: KeyframeAnimationOptions) => {
+  const animation = el.animate(keyframes, { ...options, fill: 'both' });
+  animation.onfinish = () => {
+    try {
+      animation.commitStyles();
+    } catch {}
+    animation.cancel();
+  };
+  return animation;
+};
+
+const PRIMARY_BUTTON =
+  'rounded-2xl bg-[#447d3f] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow,background-color] active:translate-y-0.5 active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none';
+
+const HERO_TINT: Record<Rarity, string> = {
+  common:
+    'from-slate-200 via-slate-100 to-slate-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-900/50',
+  uncommon:
+    'from-emerald-200 via-emerald-100 to-emerald-50 dark:from-emerald-900 dark:via-emerald-950 dark:to-emerald-950/50',
+  rare: 'from-sky-200 via-sky-100 to-sky-50 dark:from-sky-900 dark:via-sky-950 dark:to-sky-950/50',
+  epic: 'from-violet-200 via-violet-100 to-violet-50 dark:from-violet-900 dark:via-violet-950 dark:to-violet-950/50',
+  legendary:
+    'from-amber-200 via-amber-100 to-amber-50 dark:from-amber-900 dark:via-amber-950 dark:to-amber-950/50',
+};
+
+const PRIZE_GLOW: Record<Rarity, string> = {
+  common: 'bg-white/90 dark:bg-slate-400/20',
+  uncommon: 'bg-white/90 dark:bg-emerald-400/25',
+  rare: 'bg-white/90 dark:bg-sky-400/25',
+  epic: 'bg-white/90 dark:bg-violet-400/25',
+  legendary: 'bg-white/90 dark:bg-amber-400/30',
+};
+
+const LADDER_RING: Record<Rarity, string> = {
+  common: 'ring-slate-400 dark:ring-slate-500',
+  uncommon: 'ring-emerald-400',
+  rare: 'ring-sky-400',
+  epic: 'ring-violet-400',
+  legendary: 'ring-amber-400',
+};
+
+function EntryArt({ entry }: { entry: { item?: ItemDef; bg?: BackgroundItem } }) {
+  if (entry.item) return <ItemArt item={entry.item} />;
+  if (entry.bg) return <BackgroundArt bg={entry.bg} />;
+  return null;
+}
+
+function shopLine(balance: number, label: string) {
+  const kind = label.toLowerCase();
+  if (balance <= 0) return `Finish tasks to earn flies for ${kind} items at the Shop!`;
+  const flies = balance === 1 ? '1 fly' : `${balance.toLocaleString()} flies`;
+  return `Spend your ${flies} on ${kind} items at the Shop!`;
+}
+
+function PrizeTile({
+  rarity,
+  outcome,
+  wishlistPercent,
+  charging = false,
+}: {
+  rarity: Rarity;
+  outcome: Outcome;
+  wishlistPercent: number;
+  charging?: boolean;
+}) {
+  const wish = wishlistPercent >= 100 ? outcome.wished[0] : undefined;
+  return (
+    <span className="relative block w-[84px]">
+      <span
+        aria-hidden
+        className={cn(
+          'absolute -inset-6 rounded-full blur-2xl',
+          PRIZE_GLOW[rarity],
+          charging && 'trade-glow',
+        )}
+      />
+      <TileArt
+        rarity={rarity}
+        tone="closet"
+        className={cn(
+          'rounded-[24px] shadow-[0_10px_24px_-10px_rgba(15,23,42,0.35)]',
+          charging && 'trade-charge',
+        )}
+      >
+        {wish ? (
+          <EntryArt entry={wish} />
+        ) : (
+          <span
+            className={cn(
+              'absolute inset-0 grid place-items-center text-[38px] font-black',
+              RARITY_CONFIG[rarity].text,
+            )}
+          >
+            ?
+          </span>
+        )}
+      </TileArt>
+      {wish && (
+        <span className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-background shadow-md">
+          <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
+        </span>
+      )}
+    </span>
+  );
+}
 
 export function TradePanel({
   inventory,
   catalog,
   backgrounds = [],
   backgroundInventory = {},
-  unseenItems,
+  equipped = {},
+  equippedBackgroundId = null,
   onTradeSuccess,
-  activeFilter = 'all',
   paused = false,
-  pageScroll = false,
   isPremium = false,
   balance = 0,
   onGoToShop,
-  onGetFlies,
-  onUpgrade,
-}: TradePanelProps) {
-  // --- State ---
+}: {
+  inventory: Record<string, number>;
+  catalog: ItemDef[];
+  backgrounds?: BackgroundItem[];
+  backgroundInventory?: Record<string, number>;
+  equipped?: Partial<Record<WardrobeSlot, string | null>>;
+  equippedBackgroundId?: string | null;
+  onTradeSuccess?: () => void;
+  paused?: boolean;
+  isPremium?: boolean;
+  balance?: number;
+  onGoToShop?: () => void;
+}) {
   const modifiers = useTradeConfig();
   const { items: wishlistItems } = useWishlist(true);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [fuelIds, setFuelIds] = useState<string[]>([]);
-  const [aimOn, setAimOn] = useState(false);
+  const [chosenFrom, setChosenFrom] = useState<Rarity | null>(null);
+  const [leavingFrom, setLeavingFrom] = useState<Rarity | null>(null);
+  const panelRefs = useRef(new Map<Rarity, HTMLDivElement>());
+  const shownFrom = useRef<Rarity | null>(null);
+  const slideAnimations = useRef<Animation[]>([]);
+  const reduceMotion = useReducedMotion();
+  const [picks, setPicks] = useState<string[]>([]);
   const [isTrading, setIsTrading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [rewardQueue, setRewardQueue] = useState<TradePrize[]>([]);
   const [wasGolden, setWasGolden] = useState(false);
-  const tradeResult = rewardQueue[0] ?? null;
-  useAutoPopupHold('trade-reward', !!tradeResult);
   const [rerollClaimId, setRerollClaimId] = useState<string | null>(null);
   const [rerollBusy, setRerollBusy] = useState(false);
   const [rerollError, setRerollError] = useState<string | null>(null);
   const [showPlusOffer, setShowPlusOffer] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('trade_reroll');
-  const openPlusOffer = (next: string) => {
-    setPlusPlacement(next);
-    setShowPlusOffer(true);
-  };
-  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
-
+  const tradeResult = rewardQueue[0] ?? null;
+  useAutoPopupHold('trade-reward', !!tradeResult);
   useRewardedAdPreload('trade_reroll', !isPremium && !!tradeResult);
-  const [gridInitialSize, setGridInitialSize] = useState(4);
-  const [gridBatchSize, setGridBatchSize] = useState(6);
-  const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
-  const isLarge = useMediaQuery('(min-width: 1024px)');
-  const { gridClass: cardGridClass } = useShelfGrid();
-  // The mobile dock rests as a peek bar so the grid keeps the screen; expanding
-  // raises the full contract stage. Desktop (lg+) is always expanded.
-  const [isContractExpanded, setIsContractExpanded] = useState(false);
-  const [poolOpen, setPoolOpen] = useState(false);
-  const cardRefs = useRef(new Map<string, HTMLElement>());
-  const gridTopRef = useRef<HTMLDivElement | null>(null);
-  const groupRefs = useRef(new Map<Rarity, HTMLElement>());
-  const slotRefs = useRef(new Map<string, HTMLElement>());
-  const dockAnchorRef = useRef<HTMLDivElement | null>(null);
-  const dockRef = useRef<HTMLDivElement | null>(null);
-  const [dockHeight, setDockHeight] = useState(0);
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const flightSeq = useRef(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // --- Derived ---
-  // Unified pool of tradeable entries (items + backgrounds), keyed by `kind:id`.
-  const entryMap = useMemo(() => {
-    const map = new Map<string, TradeEntry>();
-    catalog.forEach((item) => {
+  const ladder = useMemo(
+    () => [...modifiers.recipes].sort((a, b) => rarityRank[a.from] - rarityRank[b.from]),
+    [modifiers.recipes],
+  );
+
+  const entriesByRarity = useMemo(() => {
+    const map = new Map<Rarity, Entry[]>();
+    const add = (entry: Entry) => {
+      const list = map.get(entry.rarity) ?? [];
+      list.push(entry);
+      map.set(entry.rarity, list);
+    };
+    for (const item of catalog) {
       const owned = inventory[item.id] ?? 0;
-      if (owned <= 0) return;
-      if (item.slot === 'container') return;
-      if (!recipeFor(modifiers, item.rarity)) return;
-      const uid = `item:${item.id}`;
-      map.set(uid, { uid, id: item.id, kind: 'item', rarity: item.rarity, owned, item });
-    });
-    backgrounds.forEach((bgItem) => {
-      const owned = backgroundInventory[bgItem.id] ?? 0;
-      if (owned <= 0) return;
-      if (!recipeFor(modifiers, bgItem.rarity)) return;
-      // Granted to everyone, so there's nothing to spend — the server rejects
-      // it too.
-      if (bgItem.id === DEFAULT_BACKGROUND_ID) return;
-      const uid = `background:${bgItem.id}`;
-      map.set(uid, {
-        uid,
-        id: bgItem.id,
-        kind: 'background',
-        rarity: bgItem.rarity,
-        owned,
-        bg: bgItem,
-      });
-    });
-    return map;
-  }, [catalog, inventory, backgrounds, backgroundInventory, modifiers]);
-
-  // Unfiltered, so the empty state can tell "a filter is hiding them" apart
-  // from "you own none".
-  const hasAnySpares = entryMap.size > 0;
-
-  const targetRarity = useMemo(() => {
-    if (selectedIds.length === 0) return null;
-    return entryMap.get(selectedIds[0])?.rarity ?? null;
-  }, [selectedIds, entryMap]);
-
-  const recipe = targetRarity ? recipeFor(modifiers, targetRarity) : null;
-  const slotCount = recipe?.itemCount ?? TRADE_MIN_ITEM_COUNT;
-  const nextRarity: Rarity | null = recipe?.to ?? null;
-
-  // Picking a rarity locks the contract to it, so the grid narrows to what can
-  // still go in rather than leaving the player to scroll past greyed-out cards.
-  const scopeRarities = useMemo(() => {
-    if (!targetRarity) return null;
-    const set = new Set<Rarity>([targetRarity]);
-    if (recipe?.fuelRarity) set.add(recipe.fuelRarity);
-    return set;
-  }, [targetRarity, recipe?.fuelRarity]);
-
-  // Narrowing the grid tears down every off-rarity card (and its canvas) in one
-  // go. Deferred, so the first pick's slot fill and flight render immediately
-  // and the regrid lands a frame later instead of stalling the animation.
-  const gridScope = useDeferredValue(scopeRarities);
-
-  useEffect(() => {
-    setInventoryHasScrolled(false);
-  }, [activeFilter, targetRarity]);
-
-  useEffect(() => {
-    if (selectedIds.length === 0) {
-      setIsContractExpanded(false);
-      setPoolOpen(false);
-    }
-  }, [selectedIds.length]);
-
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 768px)');
-    const update = () => {
-      setGridInitialSize(query.matches ? 10 : 4);
-      setGridBatchSize(query.matches ? 10 : 6);
-    };
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-
-  const availableItems = useMemo(() => {
-    const matchesFilter = (entry: TradeEntry) => {
-      if (activeFilter === 'all') return true;
-      if (activeFilter === 'background') return entry.kind === 'background';
-      if (entry.kind !== 'item' || !entry.item) return false;
-      if (activeFilter === 'skin') return entry.item.slot === 'skin';
-      if (activeFilter === 'body') return entry.item.slot === 'body';
-      if (activeFilter === 'held') return entry.item.slot === 'hand_item';
-      return entry.item.slot === activeFilter;
-    };
-
-    const result = Array.from(entryMap.values()).filter(
-      (entry) =>
-        matchesFilter(entry) && (!gridScope || gridScope.has(entry.rarity)),
-    );
-
-    return result.sort(
-      (a, b) =>
-        rarityRank[a.rarity] - rarityRank[b.rarity] || b.owned - a.owned,
-    );
-  }, [entryMap, gridScope, activeFilter]);
-
-  const availableGrid = useInfiniteScroll(availableItems, {
-    initial: availableItems.length,
-    batch: availableItems.length || 1,
-    resetKey: `${activeFilter}|${availableItems.length}`,
-    rootRef: inventoryScrollRef,
-    enabled: false,
-  });
-
-  useEffect(() => {
-    if (gridInitialSize >= gridBatchSize || !availableGrid.hasMore) return;
-
-    let cancelIdleLoad: (() => void) | undefined;
-    const loadTimer = window.setTimeout(() => {
-      if ('requestIdleCallback' in window) {
-        const idleId = window.requestIdleCallback(
-          () => availableGrid.loadMore(),
-          { timeout: 700 },
-        );
-        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
-      } else {
-        const fallbackTimer = globalThis.setTimeout(
-          availableGrid.loadMore,
-          0,
-        );
-        cancelIdleLoad = () => globalThis.clearTimeout(fallbackTimer);
-      }
-    }, 900);
-
-    return () => {
-      window.clearTimeout(loadTimer);
-      cancelIdleLoad?.();
-    };
-  }, [
-    activeFilter,
-    availableGrid.hasMore,
-    availableGrid.loadMore,
-    gridBatchSize,
-    gridInitialSize,
-    targetRarity,
-  ]);
-
-  const isNearScrollEnd = (node: HTMLElement) =>
-    node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
-  const shouldLoadMoreFromWheel = (node: HTMLElement, deltaY: number) =>
-    deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
-
-  const selectedCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    [...selectedIds, ...fuelIds].forEach(
-      (id) => (counts[id] = (counts[id] || 0) + 1),
-    );
-    return counts;
-  }, [selectedIds, fuelIds]);
-
-  // Every main input has to be a spare — one-of-a-kind items you would regret
-  // burning don't earn the waiver.
-  const allSpares =
-    selectedIds.length > 0 &&
-    Array.from(new Set(selectedIds)).every(
-      (uid) => (entryMap.get(uid)?.owned ?? 0) >= 2,
-    );
-  const fuelQuote = quoteTradeFuel({
-    modifiers,
-    recipe,
-    allSpares,
-    isPlus: isPremium,
-  });
-  const fuelRarity = fuelQuote.count > 0 ? recipe?.fuelRarity ?? null : null;
-  const aimQuote = quoteAimPrice({ modifiers, recipe, isPlus: isPremium });
-  const wishlistHits = recipe
-    ? wishlistItems.filter(
-        (entry) => entry.rarity === recipe.to && !entry.owned,
-      ).length
-    : 0;
-  const canAim = wishlistHits > 0 && aimQuote.price > 0;
-  const aimActive = aimOn && canAim;
-  const canAffordAim = balance >= aimQuote.price;
-
-  const fuelOwned = useMemo(() => {
-    if (!fuelRarity) return 0;
-    let total = 0;
-    entryMap.forEach((entry) => {
-      if (entry.rarity === fuelRarity) total += entry.owned;
-    });
-    return total;
-  }, [entryMap, fuelRarity]);
-
-  // The pool the reward is drawn from, mirrored off `pickTradeReward` so the
-  // preview can't promise something the server would never hand back.
-  const rewardPool = useMemo<RewardPreview[]>(() => {
-    if (!nextRarity) return [];
-    const wishKeys = new Set(
-      wishlistItems.map((entry) => `${entry.kind}:${entry.itemId}`),
-    );
-    const out: RewardPreview[] = [];
-
-    catalog.forEach((item) => {
-      if (item.rarity !== nextRarity) return;
-      if (item.slot === 'container') return;
-      if (!isAvailableAt(item)) return;
-      out.push({
+      if (owned <= 0 || item.slot === 'container') continue;
+      add({
         key: `item:${item.id}`,
+        id: item.id,
+        kind: 'item',
+        rarity: item.rarity,
+        owned,
         name: item.name,
         item,
-        owned: (inventory[item.id] ?? 0) > 0,
-        wishlisted: wishKeys.has(`item:${item.id}`),
       });
-    });
-
-    backgrounds.forEach((background) => {
-      if (background.rarity !== nextRarity) return;
-      if (background.hidden) return;
-      out.push({
-        key: `background:${background.id}`,
-        name: background.name,
-        bg: background,
-        owned: (backgroundInventory[background.id] ?? 0) > 0,
-        wishlisted: wishKeys.has(`background:${background.id}`),
+    }
+    for (const bg of backgrounds) {
+      const owned = backgroundInventory[bg.id] ?? 0;
+      if (owned <= 0 || bg.id === DEFAULT_BACKGROUND_ID) continue;
+      add({
+        key: `background:${bg.id}`,
+        id: bg.id,
+        kind: 'background',
+        rarity: bg.rarity,
+        owned,
+        name: bg.name,
+        bg,
       });
-    });
-
-    return out.sort((a, b) => {
-      if (a.wishlisted !== b.wishlisted) return a.wishlisted ? -1 : 1;
-      if (a.owned !== b.owned) return a.owned ? 1 : -1;
-      return a.name.localeCompare(b.name);
-    });
-  }, [
-    nextRarity,
-    catalog,
-    backgrounds,
-    inventory,
-    backgroundInventory,
-    wishlistItems,
-  ]);
-
-  const newInPool = rewardPool.filter((prize) => !prize.owned).length;
-
-  // Trimming a waiver mid-build can ask for fuel the player already dropped,
-  // so the surplus is released rather than silently counted.
-  useEffect(() => {
-    setFuelIds((prev) =>
-      prev.length > fuelQuote.count ? prev.slice(0, fuelQuote.count) : prev,
-    );
-  }, [fuelQuote.count]);
-
-  useEffect(() => {
-    if (!canAim && aimOn) setAimOn(false);
-  }, [canAim, aimOn]);
-
-  // --- Actions ---
-  // Main inputs fill first, then fuel — so the same tap on the same card means
-  // different things at different stages of the contract.
-  const canTakeAsFuel = (entry: TradeEntry) =>
-    !!fuelRarity &&
-    entry.rarity === fuelRarity &&
-    selectedIds.length === slotCount &&
-    fuelIds.length < fuelQuote.count;
-
-  const canSelect = (entry: TradeEntry) => {
-    if (canTakeAsFuel(entry)) return true;
-    if (selectedIds.length >= slotCount) return false;
-    return !targetRarity || entry.rarity === targetRarity;
-  };
-
-  // The tapped card visibly travels into its slot — without it, items teleport
-  // and the tap reads as "did that register?". While the stage is collapsed the
-  // slots still occupy layout below the fold, so the peek bar's orb stands in
-  // for them; aiming at the hidden slot threw the ghost off-screen.
-  const launchFlight = (entry: TradeEntry, slotKey: string) => {
-    const source = cardRefs.current.get(entry.uid);
-    if (!source) return;
-    const stageOpen = isLarge || isContractExpanded;
-    const to =
-      (stageOpen ? slotRefs.current.get(slotKey)?.getBoundingClientRect() : null) ??
-      dockAnchorRef.current?.getBoundingClientRect();
-    if (!to || to.width === 0) return;
-
-    const id = (flightSeq.current += 1);
-    setFlights((prev) => [
-      ...prev,
-      {
-        id,
-        slotKey,
-        rarity: entry.rarity,
-        image: captureCardPixels(source),
-        cover: entry.kind === 'background',
-        from: source.getBoundingClientRect(),
-        to,
-      },
-    ]);
-    window.setTimeout(
-      () => setFlights((prev) => prev.filter((flight) => flight.id !== id)),
-      FLIGHT_MS + 40,
-    );
-  };
-
-  const handleSelect = (entry: TradeEntry) => {
-    const currentlySelected = selectedCounts[entry.uid] || 0;
-    if (currentlySelected >= entry.owned) return;
-
-    if (canTakeAsFuel(entry)) {
-      if (fuelIds.length + 1 === fuelQuote.count) hapticTick();
-      else hapticSelect();
-      launchFlight(entry, `fuel-${fuelIds.length}`);
-      setFuelIds((prev) => [...prev, entry.uid]);
-      return;
     }
+    map.forEach((list) => list.sort((a, b) => b.owned - a.owned || a.name.localeCompare(b.name)));
+    return map;
+  }, [catalog, inventory, backgrounds, backgroundInventory]);
 
-    if (selectedIds.length >= slotCount) return;
-    if (targetRarity && entry.rarity !== targetRarity) return;
-    if (selectedIds.length + 1 === slotCount) hapticTick();
-    else hapticSelect();
-    launchFlight(entry, `main-${selectedIds.length}`);
-    setSelectedIds((prev) => [...prev, entry.uid]);
-  };
-
-  const handleToggle = (entry: TradeEntry) => {
-    const selected = selectedCounts[entry.uid] || 0;
-    const full = selected >= entry.owned || !canSelect(entry);
-    if (selected === 0 || !full) {
-      handleSelect(entry);
-      return;
-    }
-    hapticSelect();
-    const mainIndex = selectedIds.lastIndexOf(entry.uid);
-    if (mainIndex >= 0) {
-      setSelectedIds((prev) => prev.filter((_, i) => i !== mainIndex));
-      return;
-    }
-    const fuelIndex = fuelIds.lastIndexOf(entry.uid);
-    if (fuelIndex >= 0)
-      setFuelIds((prev) => prev.filter((_, i) => i !== fuelIndex));
-  };
-
-  const handleRemove = (index: number) => {
-    hapticSelect();
-    setSelectedIds((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleRemoveFuel = (index: number) => {
-    hapticSelect();
-    setFuelIds((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleClear = () => {
-    hapticSelect();
-    setSelectedIds([]);
-    setFuelIds([]);
-    setAimOn(false);
-    setError(null);
-  };
-
-  // One tap from "a pile of spares" to "a signed contract". Deep stacks are
-  // spent first so a one-of-a-kind item is only ever burned as a last resort.
-  const buildFillPlan = React.useCallback((forRarity: Rarity | null) => {
-    const remaining = new Map<string, number>();
-    entryMap.forEach((entry) => remaining.set(entry.uid, entry.owned));
-    [...selectedIds, ...fuelIds].forEach((uid) =>
-      remaining.set(uid, (remaining.get(uid) ?? 0) - 1),
-    );
-
-    const take = (rarity: Rarity, need: number) => {
-      if (need <= 0) return [];
-      const pool = Array.from(entryMap.values())
-        .filter(
-          (entry) =>
-            entry.rarity === rarity && (remaining.get(entry.uid) ?? 0) > 0,
-        )
-        .sort(
-          (a, b) =>
-            (remaining.get(b.uid) ?? 0) - (remaining.get(a.uid) ?? 0),
-        );
-      const picked: string[] = [];
-      for (const entry of pool) {
-        while (
-          picked.length < need &&
-          (remaining.get(entry.uid) ?? 0) > 0
-        ) {
-          picked.push(entry.uid);
-          remaining.set(entry.uid, (remaining.get(entry.uid) ?? 0) - 1);
-        }
-        if (picked.length >= need) break;
-      }
-      return picked;
-    };
-
-    const startRarity =
-      forRarity ??
-      targetRarity ??
-      (() => {
-        const copies = new Map<Rarity, number>();
-        entryMap.forEach((entry) =>
-          copies.set(entry.rarity, (copies.get(entry.rarity) ?? 0) + entry.owned),
-        );
-        const ladder = [...modifiers.recipes].sort(
-          (a, b) => rarityRank[a.from] - rarityRank[b.from],
-        );
-        const completable = ladder.find(
-          (candidate) => (copies.get(candidate.from) ?? 0) >= candidate.itemCount,
-        );
-        if (completable) return completable.from;
-        let best: Rarity | null = null;
-        copies.forEach((count, rarity) => {
-          if (count > 0 && (!best || count > (copies.get(best) ?? 0))) best = rarity;
-        });
-        return best;
-      })();
-
-    if (!startRarity) return null;
-    const plannedRecipe = recipeFor(modifiers, startRarity);
-    if (!plannedRecipe) return null;
-
-    const keptMain = targetRarity === startRarity ? selectedIds : [];
-    const mainAdds = take(startRarity, plannedRecipe.itemCount - keptMain.length);
-    const nextSelected = [...keptMain, ...mainAdds];
-    if (mainAdds.length === 0 && nextSelected.length < plannedRecipe.itemCount) {
-      return null;
-    }
-
-    const complete = nextSelected.length === plannedRecipe.itemCount;
-    const spares =
-      complete &&
-      Array.from(new Set(nextSelected)).every(
-        (uid) => (entryMap.get(uid)?.owned ?? 0) >= 2,
+  const readyByRarity = useMemo(() => {
+    const map = new Map<Rarity, number>();
+    for (const step of ladder) {
+      const spares = (entriesByRarity.get(step.from) ?? []).reduce(
+        (sum, entry) => sum + sparesOf(entry.owned),
+        0,
       );
-    const plannedFuel = quoteTradeFuel({
-      modifiers,
-      recipe: plannedRecipe,
-      allSpares: spares,
-      isPlus: isPremium,
+      map.set(step.from, Math.floor(spares / Math.max(1, step.itemCount)));
+    }
+    return map;
+  }, [ladder, entriesByRarity]);
+
+  const warmList = useMemo(() => {
+    const list: Record<string, number>[] = [];
+    entriesByRarity.forEach((entries) => {
+      for (const entry of entries) {
+        if (entry.item) list.push({ [entry.item.slot]: entry.item.riveIndex });
+      }
     });
-    const keptFuel = targetRarity === startRarity ? fuelIds : [];
-    const fuelAdds =
-      complete && plannedRecipe.fuelRarity
-        ? take(plannedRecipe.fuelRarity, plannedFuel.count - keptFuel.length)
-        : [];
+    return list;
+  }, [entriesByRarity]);
 
-    const nextFuel = [...keptFuel, ...fuelAdds];
-    const adds = mainAdds.length + fuelAdds.length;
-    if (adds === 0) return null;
-
-    return {
-      selected: nextSelected,
-      fuel: nextFuel,
-      adds,
-      completes: complete && nextFuel.length === plannedFuel.count,
+  useEffect(() => {
+    if (warmList.length === 0) return;
+    let cancel: (() => void) | null = null;
+    const timer = window.setTimeout(() => {
+      const tile = Math.min(150, (window.innerWidth - 56) / 4);
+      cancel = warmFrogStamps(warmList, Math.round(tile * 1.3 * riveDevicePixelRatio()));
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      cancel?.();
     };
-  }, [entryMap, selectedIds, fuelIds, targetRarity, modifiers, isPremium]);
+  }, [warmList]);
 
-  const quickFillPlan = useMemo(() => buildFillPlan(null), [buildFillPlan]);
+  const [artSeed] = useState(() => Math.random());
 
-  const shelfFillPlans = useMemo(() => {
-    const plans = new Map<Rarity, NonNullable<ReturnType<typeof buildFillPlan>>>();
-    if (targetRarity) return plans;
-    const rarities = new Set<Rarity>();
-    entryMap.forEach((entry) => rarities.add(entry.rarity));
-    rarities.forEach((rarity) => {
-      const plan = buildFillPlan(rarity);
-      if (plan?.completes) plans.set(rarity, plan);
+  const ladderArt = useMemo(() => {
+    const roll = <T,>(list: T[], salt: number): T | undefined => {
+      if (list.length === 0) return undefined;
+      const x = Math.sin((artSeed + 1) * 12_9898 + salt * 78.233) * 43_758.5453;
+      return list[Math.floor((x - Math.floor(x)) * list.length)];
+    };
+    const map = new Map<Rarity, { item: ItemDef; faded: boolean }>();
+    ladder.forEach((step, index) => {
+      const owned = (entriesByRarity.get(step.from) ?? [])
+        .map((entry) => entry.item)
+        .filter((item): item is ItemDef => !!item);
+      const own = roll(owned, index);
+      const sample =
+        own ??
+        roll(
+          catalog.filter(
+            (item) =>
+              item.rarity === step.from &&
+              item.slot !== 'container' &&
+              item.slot !== 'skin' &&
+              isAvailableAt(item),
+          ),
+          index,
+        );
+      if (sample) map.set(step.from, { item: sample, faded: !own });
     });
-    return plans;
-  }, [buildFillPlan, entryMap, targetRarity]);
+    return map;
+  }, [ladder, entriesByRarity, catalog, artSeed]);
 
-  const copiesByRarity = useMemo(() => {
-    const copies = new Map<Rarity, number>();
-    entryMap.forEach((entry) =>
-      copies.set(entry.rarity, (copies.get(entry.rarity) ?? 0) + entry.owned),
+  const defaultFrom =
+    ladder.find((step) => (readyByRarity.get(step.from) ?? 0) > 0)?.from ??
+    ladder.find((step) => (entriesByRarity.get(step.from)?.length ?? 0) > 0)?.from ??
+    ladder[0]?.from ??
+    'common';
+  const activeFrom = chosenFrom ?? defaultFrom;
+  const recipe = ladder.find((step) => step.from === activeFrom) ?? ladder[0];
+  const need = recipe?.itemCount ?? 3;
+  const entries = useMemo(
+    () => entriesByRarity.get(activeFrom) ?? [],
+    [entriesByRarity, activeFrom],
+  );
+
+  useLayoutEffect(() => {
+    const from = shownFrom.current;
+    shownFrom.current = activeFrom;
+    if (!from || from === activeFrom) return;
+    slideAnimations.current.forEach((animation) => {
+      try {
+        animation.commitStyles();
+      } catch {}
+      animation.cancel();
+    });
+    slideAnimations.current = [];
+    const incoming = panelRefs.current.get(activeFrom);
+    const outgoing = panelRefs.current.get(from);
+    if (incoming) {
+      incoming.style.transform = slideTo(0);
+      incoming.style.opacity = '1';
+    }
+    if (!incoming || reduceMotion) {
+      setLeavingFrom(null);
+      return;
+    }
+    const dir = rarityRank[activeFrom] > rarityRank[from] ? 1 : -1;
+    const { duration, easing } = getSlideSpring();
+    slideAnimations.current.push(
+      runSlide(incoming, [{ transform: slideTo(dir * SLIDE_SHIFT) }, { transform: slideTo(0) }], {
+        duration,
+        easing,
+      }),
+      runSlide(incoming, [{ opacity: 0 }, { opacity: 1 }], {
+        duration: 200,
+        delay: 60,
+        easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      }),
     );
-    return copies;
-  }, [entryMap]);
+    if (!outgoing) return;
+    outgoing.style.transform = slideTo(-dir * SLIDE_SHIFT);
+    outgoing.style.opacity = '0';
+    const exitMove = runSlide(
+      outgoing,
+      [{ transform: slideTo(0) }, { transform: slideTo(-dir * SLIDE_SHIFT) }],
+      { duration: 200, easing: 'cubic-bezier(0.3, 0, 1, 1)' },
+    );
+    slideAnimations.current.push(
+      exitMove,
+      runSlide(outgoing, [{ opacity: 1 }, { opacity: 0 }], { duration: 90, easing: 'linear' }),
+    );
+    exitMove.finished
+      .then(() => setLeavingFrom((current) => (current === from ? null : current)))
+      .catch(() => {});
+  }, [activeFrom, reduceMotion]);
 
-  const applyFillPlan = (plan: ReturnType<typeof buildFillPlan>) => {
-    if (!plan) return;
-    hapticTick();
-    setSelectedIds(plan.selected);
-    setFuelIds(plan.fuel);
+  const wishlistKeys = useMemo(
+    () =>
+      new Set(wishlistItems.filter((pin) => !pin.owned).map((pin) => `${pin.kind}:${pin.itemId}`)),
+    [wishlistItems],
+  );
+
+  const outcome = useMemo<Outcome>(() => {
+    if (!recipe) return { fresh: [], wished: [] };
+    const fresh: Entry[] = [];
+    for (const item of catalog) {
+      if (item.rarity !== recipe.to || item.slot === 'container' || !isAvailableAt(item)) continue;
+      if ((inventory[item.id] ?? 0) > 0) continue;
+      fresh.push({
+        key: `item:${item.id}`,
+        id: item.id,
+        kind: 'item',
+        rarity: item.rarity,
+        owned: 0,
+        name: item.name,
+        item,
+      });
+    }
+    for (const bg of backgrounds) {
+      if (bg.rarity !== recipe.to || bg.id === DEFAULT_BACKGROUND_ID) continue;
+      if ((backgroundInventory[bg.id] ?? 0) > 0) continue;
+      fresh.push({
+        key: `background:${bg.id}`,
+        id: bg.id,
+        kind: 'background',
+        rarity: bg.rarity,
+        owned: 0,
+        name: bg.name,
+        bg,
+      });
+    }
+    return {
+      fresh,
+      wished: fresh.filter((entry) => wishlistKeys.has(entry.key)),
+    };
+  }, [recipe, catalog, inventory, backgrounds, backgroundInventory, wishlistKeys]);
+
+  const byKey = useMemo(() => new Map(entries.map((entry) => [entry.key, entry])), [entries]);
+  const pickedCount = (key: string) => picks.filter((pick) => pick === key).length;
+  const full = picks.length >= need;
+  const canAutofill =
+    !full && entries.some((entry) => pickedCount(entry.key) < sparesOf(entry.owned));
+
+  useEffect(() => {
+    setPicks((prev) => {
+      const used = new Map<string, number>();
+      const next = prev.filter((key) => {
+        const entry = byKey.get(key);
+        const count = (used.get(key) ?? 0) + 1;
+        used.set(key, count);
+        return !!entry && count <= entry.owned;
+      });
+      return next.length === prev.length ? prev : next;
+    });
+  }, [byKey]);
+
+  const chooseRarity = (rarity: Rarity) => {
+    if (rarity === activeFrom) return;
+    hapticSelect();
+    setLeavingFrom(activeFrom);
+    setChosenFrom(rarity);
+    setPicks([]);
     setError(null);
   };
 
-  const handleQuickFill = () => applyFillPlan(quickFillPlan);
-
-  const toPick = (uid: string) => {
-    const [kind, ...rest] = uid.split(':');
-    return {
-      id: rest.join(':'),
-      kind: kind === 'background' ? 'background' : 'item',
-    };
-  };
-
-  const handleConfirmTrade = async () => {
-    if (selectedIds.length !== slotCount) return;
-    if (fuelIds.length !== fuelQuote.count) return;
-    if (aimActive && !canAffordAim) {
-      onGetFlies?.(aimQuote.price - balance);
+  const addEntry = (entry: Entry) => {
+    if (full || pickedCount(entry.key) >= entry.owned) {
+      hapticTick();
       return;
     }
+    hapticSelect();
+    setError(null);
+    setPicks((prev) => [...prev, entry.key]);
+  };
+
+  const removeAt = (index: number) => {
+    if (isTrading) return;
+    hapticTick();
+    setPicks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearPicks = () => {
+    if (isTrading) return;
+    hapticTick();
+    setPicks([]);
+    setError(null);
+  };
+
+  const tapEntry = (entry: Entry) => {
+    if (isTrading) return;
+    const count = pickedCount(entry.key);
+    if (count > 0 && (count >= entry.owned || full)) {
+      removeAt(picks.lastIndexOf(entry.key));
+      return;
+    }
+    addEntry(entry);
+  };
+
+  const autofill = () => {
+    hapticSelect();
+    setPicks((prev) => {
+      const next = [...prev];
+      const taken = (key: string) => next.filter((pick) => pick === key).length;
+      for (const entry of [...entries].sort((a, b) => sparesOf(b.owned) - sparesOf(a.owned))) {
+        while (next.length < need && taken(entry.key) < sparesOf(entry.owned)) {
+          next.push(entry.key);
+        }
+        if (next.length >= need) break;
+      }
+      return next;
+    });
+  };
+
+  const isWorn = (entry: Entry) =>
+    entry.kind === 'background'
+      ? equippedBackgroundId === entry.id
+      : Object.values(equipped).includes(entry.id);
+
+  const handleTrade = async () => {
+    if (!recipe || picks.length !== need || isTrading) return;
     setIsTrading(true);
     setError(null);
     try {
-      const res = await fetch('/api/skins/trade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          picks: selectedIds.map(toPick),
-          fuel: fuelIds.map(toPick),
-          aim: aimActive,
+      const [res] = await Promise.all([
+        fetch('/api/skins/trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            picks: picks.map((key) => {
+              const [kind, ...rest] = key.split(':');
+              return { id: rest.join(':'), kind };
+            }),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
         }),
-      });
-      const data = await res.json();
+        new Promise((resolve) => window.setTimeout(resolve, 650)),
+      ]);
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Trade failed');
 
+      setPicks([]);
       setRewardQueue(
-        Array.isArray(data.rewards) && data.rewards.length > 0
-          ? data.rewards
-          : [data.reward],
+        Array.isArray(data.rewards) && data.rewards.length > 0 ? data.rewards : [data.reward],
       );
       setWasGolden(!!data.golden);
       setRerollClaimId(data.rerollClaimId ?? null);
       setRerollError(null);
-      setSelectedIds([]);
-      setFuelIds([]);
-      setAimOn(false);
       hapticCelebrate();
-      if (onTradeSuccess) onTradeSuccess();
-
+      onTradeSuccess?.();
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
         colors: ['#FFD700', '#FFA500', '#FF4500'],
       });
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Trade failed');
     } finally {
       setIsTrading(false);
     }
+  };
+
+  const openPlusOffer = (placement: string) => {
+    setPlusPlacement(placement);
+    setShowPlusOffer(true);
   };
 
   const handleClaimReward = () => {
@@ -825,28 +591,25 @@ export function TradePanel({
       if (!isPremium && !viaPlus) {
         const adResult = await showRewardedAd('trade_reroll');
         if (adResult !== 'rewarded') {
-          if (adResult === 'failed') {
-            setRerollError(rewardedAdFailureMessage());
-          }
+          if (adResult === 'failed') setRerollError(rewardedAdFailureMessage());
           return;
         }
       }
-      const claimId = rerollClaimId;
       const res = await fetch('/api/skins/trade/reroll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId }),
+        body: JSON.stringify({ claimId: rerollClaimId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.granted || !data.reward) {
         if (!isPremium && !viaPlus) creditRewardedAd('trade_reroll');
-        setRerollError(data.error ?? 'Could not reroll — try again.');
+        setRerollError(data.error ?? 'Could not reroll. Try again.');
         return;
       }
       setRerollClaimId(null);
       setRewardQueue([data.reward]);
       hapticCelebrate();
-      if (onTradeSuccess) onTradeSuccess();
+      onTradeSuccess?.();
       confetti({
         particleCount: 80,
         spread: 70,
@@ -859,762 +622,303 @@ export function TradePanel({
     }
   };
 
+  if (!recipe) return null;
+  const to = RARITY_CONFIG[recipe.to];
 
-  const mainFilled = selectedIds.length === slotCount;
-  const fuelFilled = fuelIds.length === fuelQuote.count;
-  const isReady = mainFilled && fuelFilled;
-  const needsFlies = aimActive && !canAffordAim;
-
-  const totalSlots = slotCount + fuelQuote.count;
-  const totalPicked = selectedIds.length + fuelIds.length;
-  const progress = totalSlots > 0 ? totalPicked / totalSlots : 0;
-  const mainLeft = slotCount - selectedIds.length;
-  const fuelLeft = fuelQuote.count - fuelIds.length;
-  const fuelStage = mainFilled && !!fuelRarity && !fuelFilled;
-
-  const primaryCta = (() => {
-    if (isTrading)
-      return {
-        tone: 'trade' as const,
-        disabled: true,
-        onClick: undefined,
-        label: (
-          <span className="inline-flex items-center gap-2">
-            <Sparkles className="w-5 h-5 animate-spin" />
-            Trading
-          </span>
-        ),
-      };
-    if (isReady && needsFlies)
-      return {
-        tone: 'flies' as const,
-        disabled: false,
-        onClick: handleConfirmTrade,
-        label: (
-          <span className="inline-flex items-center justify-center gap-1">
-            Get
-            <FlyAmount amount={aimQuote.price - balance} size={14} />
-            more
-          </span>
-        ),
-      };
-    if (isReady)
-      return {
-        tone: 'trade' as const,
-        disabled: false,
-        onClick: handleConfirmTrade,
-        label: (
-          <span className="inline-flex items-center gap-2">
-            {nextRarity ? `Trade for 1 ${nextRarity}` : 'Trade up'}
-            <ArrowUp size={18} strokeWidth={3} />
-          </span>
-        ),
-      };
-    if (quickFillPlan)
-      return {
-        tone: 'fill' as const,
-        disabled: false,
-        onClick: handleQuickFill,
-        label: (
-          <span className="inline-flex items-center gap-2">
-            <Zap className="w-4 h-4" strokeWidth={3} />
-            Quick fill
-            <span className="tabular-nums opacity-70">
-              +{quickFillPlan.adds}
-            </span>
-          </span>
-        ),
-      };
-    return {
-      tone: 'idle' as const,
-      disabled: true,
-      onClick: undefined,
-      label: !hasAnySpares
-        ? 'Nothing to trade yet'
-        : fuelStage
-          ? `Need ${countOf(fuelLeft, fuelRarity)} more`
-          : targetRarity
-            ? `Need ${countOf(mainLeft, targetRarity)} more`
-            : 'Pick an item to start',
-    };
-  })();
-
-  // What Plus would change about *this* contract, quoted from the same helpers
-  // the trade itself uses — so the pitch can never promise a perk the recipe
-  // doesn't actually grant.
-  const plusPerk = useMemo(() => {
-    if (isPremium || !recipe || !onUpgrade) return null;
-    const withPlus = quoteTradeFuel({
-      modifiers,
-      recipe,
-      allSpares,
-      isPlus: true,
-    });
-    const saved = fuelQuote.count - withPlus.count;
-    if (saved > 0 && recipe.fuelRarity) {
-      return `Plus skips ${countOf(saved, recipe.fuelRarity)} here`;
-    }
-    const plusAim = quoteAimPrice({ modifiers, recipe, isPlus: true });
-    if (canAim && plusAim.price < aimQuote.price) {
-      return `Plus takes ${modifiers.aimPlusDiscountPercent}% off Aim`;
-    }
-    if (modifiers.wishlistSlotsPlus > modifiers.wishlistSlotsFree) {
-      return `With Plus, aim at up to ${modifiers.wishlistSlotsPlus} wishlist picks`;
-    }
-    return null;
-  }, [
-    isPremium,
-    recipe,
-    onUpgrade,
-    modifiers,
-    allSpares,
-    fuelQuote.count,
-    canAim,
-    aimQuote.price,
-  ]);
-
-  const aimTarget = !nextRarity
-    ? ''
-    : wishlistHits === 1
-      ? `your wishlisted ${nextRarity}`
-      : `1 of your ${wishlistHits} wishlisted ${nextRarity}s`;
-
-  const contractHint =
-    isReady && aimActive && nextRarity
-      ? `The reward is locked to your wishlist.`
-      : fuelStage && fuelOwned - fuelIds.length < fuelLeft
-        ? `You're out of spare ${fuelRarity} items for this contract.`
-        : !targetRarity && hasAnySpares
-          ? `Combine ${slotCount} items of one rarity into the tier above.`
-          : null;
-
-  // Narrowing to one rarity shortens the list under the player's feet, so the
-  // old offset can leave them parked past the end of it. Both times the grid
-  // changes what it's asking for, it takes them to the top of that section.
-  const scrollGridTo = (el: HTMLElement | null) => {
-    if (!el) return;
-    const root =
-      scrollableAncestor(el) ?? document.getElementById('main-scroll');
-    if (!root) return;
-    const sticky = document.querySelector<HTMLElement>('[data-wardrobe-sticky]');
-    const offset = (sticky?.getBoundingClientRect().height ?? 0) + 12;
-    const top =
-      root.scrollTop +
-      el.getBoundingClientRect().top -
-      root.getBoundingClientRect().top -
-      offset;
-    root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-  };
-
-  // Always the tier the contract is asking for right now — never the top of
-  // the grid, which sorts the lower-rarity extras *above* the target tier and
-  // so would jump straight past the items still being collected.
-  const scrollToRarity = (rarity: Rarity | null) => {
-    if (!rarity) return;
-    requestAnimationFrame(() =>
-      scrollGridTo(groupRefs.current.get(rarity) ?? gridTopRef.current),
-    );
-  };
-
-  const prevScopeKey = useRef('');
-  useEffect(() => {
-    const key = gridScope ? Array.from(gridScope).join(',') : '';
-    if (key && key !== prevScopeKey.current && !mainFilled) {
-      scrollToRarity(targetRarity);
-    }
-    prevScopeKey.current = key;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gridScope]);
-
-  // Only once the main slots are done does the extras tier become the thing to
-  // find, so the jump waits for that edge rather than firing on the first pick.
-  const needsExtras = mainFilled && !!fuelRarity && !fuelFilled;
-  const prevNeedsExtras = useRef(false);
-  useEffect(() => {
-    if (needsExtras && !prevNeedsExtras.current) scrollToRarity(fuelRarity);
-    prevNeedsExtras.current = needsExtras;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsExtras, fuelRarity]);
-
-  // Scrolling means the player has gone back to browsing, and the open stage
-  // leaves them reading the grid through a slit. Collapsing to the peek bar
-  // hands the screen back — the bar still carries progress, count and the CTA,
-  // and picks keep landing in it.
-  useEffect(() => {
-    if (isLarge || !isContractExpanded) return;
-    const root =
-      (gridTopRef.current && scrollableAncestor(gridTopRef.current)) ??
-      document.getElementById('main-scroll');
-    if (!root) return;
-
-    // `scroll` was the wrong signal: opening the stage repads the grid, and at
-    // the bottom of the list the browser re-clamps scrollTop and fires one —
-    // closing the sheet on the very tap that opened it. Wheel and touch are
-    // real gestures that no reflow can produce.
-    const collapse = () => setIsContractExpanded(false);
-    let touchY = 0;
-    const onTouchStart = (event: TouchEvent) => {
-      touchY = event.touches[0]?.clientY ?? 0;
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      const y = event.touches[0]?.clientY ?? 0;
-      if (Math.abs(y - touchY) > 24) collapse();
-    };
-
-    root.addEventListener('wheel', collapse, { passive: true });
-    root.addEventListener('touchstart', onTouchStart, { passive: true });
-    root.addEventListener('touchmove', onTouchMove, { passive: true });
-    return () => {
-      root.removeEventListener('wheel', collapse);
-      root.removeEventListener('touchstart', onTouchStart);
-      root.removeEventListener('touchmove', onTouchMove);
-    };
-  }, [isLarge, isContractExpanded]);
-
-  // The dock grows a lot when the stage opens, so a fixed bottom padding left
-  // the last rows permanently trapped beneath it. The grid reserves exactly as
-  // much room as the dock currently occupies.
-  useEffect(() => {
-    const node = dockRef.current;
-    if (!node || isLarge) {
-      setDockHeight(0);
-      return;
-    }
-    const observer = new ResizeObserver(([entry]) =>
-      setDockHeight(entry.contentRect.height),
-    );
-    observer.observe(node);
-    setDockHeight(node.getBoundingClientRect().height);
-    return () => observer.disconnect();
-  }, [isLarge, mounted, isContractExpanded]);
-
-  const inFlightSlots = new Set(flights.map((flight) => flight.slotKey));
-
-  const renderContract = (desktopMode: boolean) => {
-    const expanded = desktopMode || isContractExpanded;
-    const liveRefs = desktopMode === isLarge;
-
-    const bindSlot = (key: string) => (el: HTMLButtonElement | null) => {
-      if (!liveRefs) return;
-      if (el) slotRefs.current.set(key, el);
-      else slotRefs.current.delete(key);
-    };
-
-    // Fuel shares the main row's column width — sizing each row by its own
-    // slot count made two fuel slots twice the size of four contract slots.
-    const renderSlotGrid = (
-      uids: string[],
-      count: number,
-      onRemove: (index: number) => void,
-      keyPrefix: string,
-      // What still has to go in here. An empty slot that only shows its index
-      // makes the player read the sentence above to learn what it wants.
-      expects?: Rarity | null,
-    ) => (
-      <div
-        className="grid gap-1.5 lg:gap-2"
-        style={{
-          gridTemplateColumns: `repeat(${Math.max(slotCount, count)}, minmax(0, 1fr))`,
-        }}
-      >
-        {Array.from({ length: count }).map((_, i) => {
-          const uid = uids[i];
-          const entry = uid ? entryMap.get(uid) : null;
-          const slotKey = `${keyPrefix}-${i}`;
-          const arriving = inFlightSlots.has(slotKey);
-          const name =
-            entry?.item?.name ?? entry?.bg?.name ?? `slot ${i + 1}`;
-          const expectConfig = expects ? RARITY_CONFIG[expects] : null;
-
-          return (
-            <button
-              key={`${keyPrefix}-${i}`}
-              ref={bindSlot(`${keyPrefix}-${i}`)}
-              type="button"
-              disabled={!entry}
-              onClick={() => entry && onRemove(i)}
-              aria-label={
-                entry
-                  ? `Remove ${name}`
-                  : expects
-                    ? `Empty slot ${i + 1}, needs a ${expects} item`
-                    : `Empty slot ${i + 1}`
-              }
-              className={cn(
-                'aspect-square rounded-2xl border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
-                !entry && 'border-dashed',
-                !entry &&
-                  (expectConfig
-                    ? cn(expectConfig.border, expectConfig.bg, 'opacity-60')
-                    : 'border-border bg-muted/40'),
-                entry && cn('border-transparent ring-1', TILE_TONE[entry.rarity]),
-              )}
-            >
-              <AnimatePresence>
-                {entry && (
-                  <motion.div
-                    key={`${uid}-${i}`}
-                    initial={{ scale: 0.4, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.4, opacity: 0 }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 480,
-                      damping: 26,
-                      delay: arriving ? FLIGHT_MS / 1000 - 0.06 : 0,
-                    }}
-                    className="absolute inset-0 flex items-center justify-center"
-                  >
-                    {entry.kind === 'background' && entry.bg ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={backgroundPreview(entry.bg)}
-                        alt={entry.bg.name}
-                        className="absolute inset-0 object-cover w-full h-full"
-                      />
-                    ) : entry.item ? (
-                      <FrogSnapshot
-                        indices={{
-                          skin: 0,
-                          hat: 0,
-                          body: 0,
-                          hand_item: 0,
-                          [entry.item.slot]: entry.item.riveIndex,
-                        }}
-                        width="100%"
-                        height="100%"
-                        visualOffsetY={0}
-                        className="pointer-events-none translate-y-[6%]"
-                      />
-                    ) : null}
-                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm">
-                      <X className="h-2.5 w-2.5" strokeWidth={3.5} />
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              {!entry &&
-                (expects ? (
-                  <span
-                    className={cn(
-                      'rounded px-1 py-0.5 text-[11px] font-black tracking-wide',
-                      RARITY_CONFIG[expects].text,
-                    )}
-                  >
-                    {expects}
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-black text-muted-foreground/40">
-                    {i + 1}
-                  </span>
-                ))}
-            </button>
-          );
-        })}
-      </div>
-    );
-
-    const ladder = targetRarity && nextRarity && (
-      <span className="flex items-center gap-1 min-w-0">
-        <span
-          className={`text-[12px] px-2 py-0.5 rounded font-bold ${getRarityBg(targetRarity)}`}
-        >
-          {countOf(slotCount, targetRarity)}
-        </span>
-        {/* Fuel is part of the price, so the ladder says so — reading
-            "epic → legendary" and then being asked for rares is a surprise. */}
-        {fuelRarity && (
-          <>
-            <span className="shrink-0 text-[10px] font-black text-muted-foreground/60">
-              +
-            </span>
-            <span
-              className={`text-[12px] px-2 py-0.5 rounded font-bold ${getRarityBg(fuelRarity)}`}
-            >
-              {countOf(fuelQuote.count, fuelRarity)}
-            </span>
-          </>
+  const actions = (
+    <>
+      {error && <p className="mb-2 text-center text-[13px] font-bold text-red-500">{error}</p>}
+      <div className="flex gap-2.5">
+        {picks.length > 0 && (
+          <button
+            type="button"
+            aria-label="Clear"
+            onClick={clearPicks}
+            className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-card text-muted-foreground shadow-sm ring-1 ring-border/70 transition-transform animate-in zoom-in-75 active:scale-[0.95]"
+          >
+            <X className="h-5 w-5" strokeWidth={3} />
+          </button>
         )}
-        <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
-        <span
-          className={`text-[12px] px-2 py-0.5 rounded font-bold ${getRarityBg(nextRarity)}`}
-        >
-          {nextRarity}
-        </span>
-      </span>
-    );
-
-    const primaryButton = (
-      <Button
-        disabled={primaryCta.disabled}
-        onClick={primaryCta.onClick}
-        className={cn(
-          'relative w-full h-12 lg:h-14 font-black transition-all overflow-hidden text-sm rounded-xl',
-          primaryCta.tone === 'trade' &&
-            !primaryCta.disabled &&
-            'bg-primary text-primary-foreground shadow-[0_4px_0_0_hsl(var(--primary)/0.55)] active:translate-y-0.5 active:shadow-[0_2px_0_0_hsl(var(--primary)/0.55)]',
-          primaryCta.tone === 'flies' &&
-            'bg-amber-400 text-amber-950 shadow-[0_4px_0_0_#b45309] active:translate-y-0.5',
-          primaryCta.tone === 'fill' &&
-            'border border-primary/30 bg-primary/10 text-primary shadow-none hover:bg-primary/15 active:scale-[0.98]',
-          primaryCta.tone === 'idle' && 'bg-muted text-muted-foreground/70',
+        {canAutofill && (
+          <button
+            type="button"
+            aria-label="Auto-fill"
+            onClick={autofill}
+            className={cn(
+              'flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-card text-[14px] font-black text-foreground shadow-sm ring-1 ring-border/70 transition-transform active:scale-[0.97]',
+              picks.length > 0 ? 'w-12' : 'px-4',
+            )}
+          >
+            <Icon name="autoFill" className="h-6 w-6" />
+            {picks.length === 0 && 'Auto-fill'}
+          </button>
         )}
-      >
-        {primaryCta.tone === 'trade' && !primaryCta.disabled && (
-          <span className="absolute top-0 left-0 z-10 block w-1/2 h-full pointer-events-none bg-gradient-to-r from-transparent via-white to-transparent opacity-25 animate-shine" />
-        )}
-        {primaryCta.label}
-      </Button>
-    );
-
-    return (
-      <>
-        {desktopMode ? (
-          <div className="flex items-center justify-between w-full gap-3 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
-            <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black text-foreground min-w-0">
-              Contract
-              {ladder}
-            </h3>
-            <div className="flex items-center gap-2 shrink-0">
-              {totalPicked > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  aria-label="Clear contract"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" strokeWidth={2.5} />
-                </button>
-              )}
-              <SlotCounter picked={totalPicked} total={totalSlots} ready={isReady} />
-            </div>
-          </div>
-        ) : (
-          <div className="flex w-full items-center gap-1 px-3 pt-2.5 pb-2">
-            <button
-              type="button"
-              onClick={() => {
-                hapticSelect();
-                setIsContractExpanded((v) => !v);
-              }}
-              aria-expanded={isContractExpanded}
-              aria-label={expanded ? 'Hide contract' : 'Show contract'}
-              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-            >
-              <div ref={liveRefs ? dockAnchorRef : undefined} className="shrink-0">
-                <PrizeOrb
-                  rarity={nextRarity}
-                  progress={progress}
-                  ready={isReady}
-                  size={40}
-                />
-              </div>
-              <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="flex items-center gap-2 min-w-0">
-                  {ladder ?? (
-                    <span className="text-[13px] font-black text-muted-foreground">
-                      Contract
-                    </span>
-                  )}
-                </span>
-                <ProgressTrack value={progress} ready={isReady} />
-              </span>
-              <SlotCounter picked={totalPicked} total={totalSlots} ready={isReady} />
-              <ChevronDown
-                size={16}
-                className={cn(
-                  'shrink-0 text-muted-foreground transition-transform duration-200',
-                  expanded ? '' : '-rotate-180',
-                )}
-              />
-            </button>
-            {expanded && totalPicked > 0 && (
-              <button
-                type="button"
-                onClick={handleClear}
-                aria-label="Clear contract"
-                className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors active:bg-destructive/10 active:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" strokeWidth={2.5} />
-              </button>
-            )}
-          </div>
-        )}
-
-        {desktopMode && (
-          <div className="w-full px-4 pt-3 shrink-0">
-            <ProgressTrack value={progress} ready={isReady} />
-          </div>
-        )}
-
-        <motion.div
-          initial={false}
-          animate={{ height: expanded ? 'auto' : 0, opacity: expanded ? 1 : 0 }}
-          transition={{ type: 'spring', stiffness: 340, damping: 34 }}
-          className="w-full overflow-hidden"
-        >
-          <div className="w-full max-w-md mx-auto px-3 pt-1 pb-2 lg:px-4 lg:pt-4">
-            {nextRarity && (
-              <button
-                type="button"
-                onClick={() => {
-                  hapticSelect();
-                  setPoolOpen(true);
-                }}
-                disabled={rewardPool.length === 0}
-                className={cn(
-                  'mb-3 flex w-full items-center gap-3 rounded-xl border border-border/60 bg-muted/40 text-left transition-colors active:bg-muted lg:mb-4 lg:flex-col lg:gap-2 lg:p-3',
-                  desktopMode ? 'p-2' : 'px-3 py-2.5',
-                )}
-              >
-                {desktopMode && (
-                  <PrizeOrb
-                    rarity={nextRarity}
-                    progress={progress}
-                    ready={isReady}
-                    size={88}
-                  />
-                )}
-                <RewardSummary
-                  rarity={nextRarity}
-                  total={rewardPool.length}
-                  fresh={newInPool}
-                  wishlisted={wishlistHits}
-                  centered={desktopMode}
-                  showLink={desktopMode}
-                />
-                {!desktopMode && rewardPool.length > 0 && (
-                  <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[12px] font-black text-primary">
-                    See all
-                    <ChevronDown size={14} strokeWidth={3} className="-rotate-90" />
-                  </span>
-                )}
-              </button>
-            )}
-
-            {recipe?.fuelRarity && targetRarity && (
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-[12px] font-black text-muted-foreground">
-                  Needs{' '}
-                  <span className="text-foreground">
-                    {countOf(slotCount, targetRarity)}
-                  </span>
-                  {(fuelQuote.count || fuelQuote.baseCount) > 0 && (
-                    <>
-                      {' + '}
-                      <span className="text-foreground">
-                        {countOf(
-                          fuelQuote.count || fuelQuote.baseCount,
-                          recipe.fuelRarity,
-                        )}
-                      </span>
-                    </>
-                  )}
-                </span>
-                {fuelQuote.waived > 0 && (
-                  <span className="flex flex-wrap items-center justify-end gap-1">
-                    {fuelQuote.allSparesWaived > 0 && (
-                      <WaiverChip>All spares −{fuelQuote.allSparesWaived}</WaiverChip>
-                    )}
-                    {fuelQuote.plusWaived > 0 && (
-                      <WaiverChip>Plus −{fuelQuote.plusWaived}</WaiverChip>
-                    )}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="mb-2 lg:mb-3">
-              {renderSlotGrid(
-              selectedIds,
-              slotCount,
-              handleRemove,
-              'main',
-              targetRarity,
-            )}
-            </div>
-
-            {recipe?.fuelRarity && (
-              <div className="mb-2 lg:mb-3">
-                {fuelQuote.count > 0 ? (
-                  renderSlotGrid(
-                    fuelIds,
-                    fuelQuote.count,
-                    handleRemoveFuel,
-                    'fuel',
-                    recipe.fuelRarity,
-                  )
-                ) : (
-                  <p className="rounded-lg bg-green-500/10 px-2.5 py-1.5 text-[10px] font-bold text-green-700 dark:text-green-400">
-                    All {fuelQuote.baseCount} waived — no extras on this one.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {recipe && wishlistHits > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  hapticSelect();
-                  setAimOn((v) => !v);
-                }}
-                aria-pressed={aimActive}
-                className={cn(
-                  'mb-2 flex w-full items-center gap-2.5 rounded-xl border-2 px-2.5 py-2 text-left transition-colors',
-                  aimActive
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border bg-muted/50',
-                )}
-              >
-                <span
-                  className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
-                    aimActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background text-muted-foreground',
-                  )}
-                >
-                  <Crosshair className="h-4 w-4" strokeWidth={3} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="text-[13px] font-black text-foreground">
-                    Aim
-                  </span>
-                  <span className="text-[10px] font-bold text-muted-foreground">
-                    {aimActive
-                      ? `Guaranteed — you'll get ${aimTarget}`
-                      : `Guarantee ${aimTarget}, instead of a ${modifiers.wishlistRedirectPercent}% chance`}
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  {aimQuote.discountPercent > 0 && (
-                    <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through opacity-60">
-                      {aimQuote.basePrice.toLocaleString()}
-                    </span>
-                  )}
-                  <FlyAmount
-                    amount={aimQuote.price}
-                    size={14}
-                    className={cn(
-                      'font-black',
-                      !aimActive || canAffordAim
-                        ? 'text-foreground'
-                        : 'text-amber-700 dark:text-amber-400',
-                    )}
-                  />
-                </span>
-              </button>
-            )}
-
-            {plusPerk && (
-              <button
-                type="button"
-                onClick={() => {
-                  hapticSelect();
-                  onUpgrade?.();
-                }}
-                className="plus-upgrade-button mx-auto mb-1.5 flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-50 py-1 pl-1.5 pr-2.5 transition-colors hover:bg-amber-100 active:scale-[0.98] dark:border-amber-500/30 dark:bg-amber-950/30"
-              >
-                <AppIcon
-                  name="frogPlus"
-                  label="Plus"
-                  className="h-5 w-5 shrink-0"
-                />
-                <span className="min-w-0 truncate text-[11px] font-black text-amber-800 dark:text-amber-300">
-                  {plusPerk}
-                </span>
-                <ChevronDown
-                  size={12}
-                  strokeWidth={3}
-                  className="-rotate-90 shrink-0 text-amber-700/70 dark:text-amber-300/70"
-                />
-              </button>
-            )}
-
-            {error && (
-              <div className="flex items-center justify-center gap-2 mb-2 text-xs font-bold text-destructive">
-                <AlertCircle size={14} /> {error}
-              </div>
-            )}
-
-          </div>
-        </motion.div>
-
-        <div className="sticky bottom-0 z-10 w-full max-w-md mx-auto shrink-0 bg-card px-3 pb-3 pt-1 lg:px-4 lg:pb-4">
-          {primaryButton}
-          {contractHint && (
-            <p className="mt-1.5 text-center text-[10px] font-bold text-muted-foreground">
-              {contractHint}
-            </p>
+        <button
+          type="button"
+          disabled={!full}
+          aria-busy={isTrading || undefined}
+          onClick={() => void handleTrade()}
+          className={cn(
+            PRIMARY_BUTTON,
+            'relative flex h-12 min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden text-[15px]',
+            isTrading && 'trade-busy pointer-events-none',
           )}
-        </div>
-      </>
-    );
-  };
-
-  // On the wardrobe page the dock lives inside a section that sits *below* the
-  // frog hero in the page's stacking order, so no local z-index can lift it
-  // over the frog. Portalling it to the body puts it in the root context.
-  const dockNode = (
-    <div
-      ref={dockRef}
-      className="tryon-bar-enter lg:hidden fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] md:bottom-6 z-[60] mx-auto flex max-h-[72svh] max-w-md flex-col overflow-y-auto rounded-[22px] bg-card shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45),0_2px_6px_-2px_rgba(15,23,42,0.12)] ring-1 ring-border/70"
-    >
-      {renderContract(false)}
-    </div>
+        >
+          {isTrading ? (
+            <span className="relative flex items-center gap-1.5">
+              Trading
+              <span aria-hidden className="flex items-center gap-[3px] pt-1">
+                {[0, 1, 2].map((dot) => (
+                  <span
+                    key={dot}
+                    className="trade-dot h-[5px] w-[5px] rounded-full bg-white"
+                    style={{ animationDelay: `${dot * 140}ms` }}
+                  />
+                ))}
+              </span>
+            </span>
+          ) : (
+            <span className="truncate">Trade for 1 {to.label}</span>
+          )}
+        </button>
+      </div>
+    </>
   );
-  const contractDock =
-    pageScroll && mounted ? createPortal(dockNode, document.body) : dockNode;
 
-  // --- Render ---
   return (
     <div
       className={cn(
-        'relative flex flex-col w-full bg-background',
-        pageScroll ? '' : 'h-full overflow-y-auto lg:overflow-hidden',
+        'md:pb-10 md:pt-4',
+        entries.length > 0
+          ? 'pb-[calc(156px+env(safe-area-inset-bottom))]'
+          : 'pb-[calc(92px+env(safe-area-inset-bottom))]',
       )}
     >
+      <div className="md:grid md:grid-cols-[300px_minmax(0,1fr)] md:items-start md:gap-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-8">
+        <div className="md:sticky md:top-20">
+          <section
+            className={cn(
+              'relative -mx-4 -mt-2 flex flex-col items-center overflow-hidden rounded-b-[32px] bg-gradient-to-b px-4 pb-5 pt-[calc(env(safe-area-inset-top)+16px)] md:mx-0 md:mt-0 md:rounded-[28px] md:pt-7',
+              HERO_TINT[recipe.to],
+            )}
+          >
+            <PrizeTile
+              rarity={recipe.to}
+              outcome={outcome}
+              wishlistPercent={modifiers.wishlistRedirectPercent}
+              charging={isTrading}
+            />
+            <span
+              className={cn(
+                'relative mt-3.5 rounded-full bg-background/85 px-3 py-1 text-[13px] font-black leading-none shadow-sm',
+                to.text,
+              )}
+            >
+              {outcome.fresh.length > 0 ? `New ${to.label}` : to.label}
+            </span>
+            <ChevronsUp aria-hidden className="my-1.5 h-5 w-5 text-foreground/25" strokeWidth={3} />
+            <div className="flex justify-center gap-2">
+              {Array.from({ length: need }).map((_, index) => {
+                const key = picks[index];
+                const entry = key ? byKey.get(key) : undefined;
+                return entry ? (
+                  <button
+                    key={`${index}:${key}`}
+                    type="button"
+                    aria-label={`Take out ${entry.name}`}
+                    onClick={() => removeAt(index)}
+                    className={cn(
+                      'relative w-[60px] active:scale-95',
+                      isTrading ? 'trade-fuse' : 'animate-in fade-in zoom-in-75',
+                    )}
+                    style={
+                      {
+                        '--fuse-x': `${((need - 1) / 2 - index) * 68}px`,
+                        animationDelay: isTrading ? `${index * 70}ms` : undefined,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <TileArt rarity={recipe.from} tone="closet" className="rounded-2xl shadow-sm">
+                      <EntryArt entry={entry} />
+                    </TileArt>
+                  </button>
+                ) : (
+                  <span
+                    key={index}
+                    className="aspect-square w-[60px] rounded-2xl border-2 border-dashed border-foreground/20 bg-background/55"
+                  />
+                );
+              })}
+            </div>
+          </section>
+
+          <div role="tablist" aria-label="Rarity to trade" className="mt-5 flex items-start">
+            {ladder.map((step, index) => {
+              const active = step.from === activeFrom;
+              const ready = readyByRarity.get(step.from) ?? 0;
+              const art = ladderArt.get(step.from);
+              const config = RARITY_CONFIG[step.from];
+              return (
+                <React.Fragment key={step.from}>
+                  {index > 0 && (
+                    <ChevronRight
+                      aria-hidden
+                      className="mt-[22px] h-4 w-4 shrink-0 text-muted-foreground/40"
+                      strokeWidth={3}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    aria-label={`${config.label}${ready > 0 ? `, ${ready} ready` : ''}`}
+                    onClick={() => chooseRarity(step.from)}
+                    className="flex min-w-0 flex-1 flex-col items-center gap-2 transition-transform active:scale-95"
+                  >
+                    <span
+                      className={cn(
+                        'relative block w-[60px] max-w-full transition-[transform,opacity] duration-200',
+                        active ? '-translate-y-0.5' : 'opacity-60',
+                      )}
+                    >
+                      <TileArt
+                        rarity={step.from}
+                        tone="closet"
+                        className={cn(
+                          'rounded-[18px] ring-2 ring-offset-2 ring-offset-background transition-shadow',
+                          active ? LADDER_RING[step.from] : 'ring-transparent',
+                        )}
+                      >
+                        {art && <ItemArt item={art.item} faded={art.faded} />}
+                      </TileArt>
+                      {ready > 0 && (
+                        <span className="absolute -right-2 -top-2 grid h-5 min-w-[20px] place-items-center rounded-full bg-amber-500 px-1 text-[11px] font-black leading-none text-white shadow-sm ring-2 ring-background">
+                          {ready > 9 ? '9+' : ready}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        'max-w-full truncate text-[12px] font-black leading-none',
+                        active ? config.text : 'text-muted-foreground',
+                      )}
+                    >
+                      {config.label}
+                    </span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {entries.length > 0 && <div className="mt-6 hidden md:block">{actions}</div>}
+        </div>
+
+        <div className="relative mt-5 md:mt-0">
+          {ladder.map((step) => {
+            const list = entriesByRarity.get(step.from) ?? [];
+            const shown = step.from === activeFrom;
+            const leaving = !shown && step.from === leavingFrom;
+            return (
+              <div
+                key={step.from}
+                ref={(node) => {
+                  if (node) panelRefs.current.set(step.from, node);
+                  else panelRefs.current.delete(step.from);
+                }}
+                role="tabpanel"
+                aria-label={RARITY_CONFIG[step.from].label}
+                aria-hidden={!shown || undefined}
+                className={cn(
+                  !shown && 'pointer-events-none absolute inset-x-0 top-0',
+                  !shown && !leaving && 'invisible h-0 overflow-hidden',
+                )}
+              >
+                {list.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-5 xl:grid-cols-6">
+                    {list.map((entry) => {
+                      const count = pickedCount(entry.key);
+                      const left = entry.owned - count;
+                      return (
+                        <button
+                          key={entry.key}
+                          type="button"
+                          aria-pressed={count > 0}
+                          aria-label={`${entry.name}${left > 1 ? `, ${left} left` : ''}`}
+                          onClick={() => tapEntry(entry)}
+                          className="relative transition-transform active:scale-95"
+                        >
+                          <TileArt rarity={step.from} tone="closet">
+                            <EntryArt entry={entry} />
+                            {isWorn(entry) && (
+                              <span className="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-sky-500 text-white shadow-sm">
+                                <Shirt className="h-3 w-3" strokeWidth={3} />
+                              </span>
+                            )}
+                            {count > 0 && (
+                              <span className="absolute inset-0 rounded-2xl bg-[#447d3f]/10 ring-[3px] ring-inset ring-[#447d3f]" />
+                            )}
+                          </TileArt>
+                          {left > 1 && (
+                            <span className="absolute right-1 top-1 rounded-full bg-background/95 px-1.5 text-[11px] font-black leading-[18px] text-foreground shadow-sm">
+                              ×{left}
+                            </span>
+                          )}
+                          {count > 0 && (
+                            <span className="absolute bottom-1 right-1 grid h-6 min-w-[24px] place-items-center rounded-full bg-[#447d3f] px-1 text-[12px] font-black leading-none text-white shadow-sm animate-in zoom-in-50">
+                              {count > 1 ? (
+                                count
+                              ) : (
+                                <Check className="h-3.5 w-3.5" strokeWidth={4} />
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <ClosetEmptyPrompt
+                    icon={<ClosetFlyIcon />}
+                    line={shopLine(balance, RARITY_CONFIG[step.from].label)}
+                    action={onGoToShop ? { label: 'Visit shop', onClick: onGoToShop } : undefined}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {mounted &&
-        flights.length > 0 &&
+        entries.length > 0 &&
         createPortal(
-          <div className="pointer-events-none fixed inset-0 z-[9998]">
-            {flights.map((flight) => (
-              <FlightGhost key={flight.id} flight={flight} />
-            ))}
+          <div
+            data-fly-fade
+            className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-50 bg-background/90 backdrop-blur-lg md:hidden"
+          >
+            <div className="mx-auto max-w-md px-4 pt-2.5">{actions}</div>
           </div>,
           document.body,
         )}
 
-      {/* --- RESULT OVERLAY --- */}
-      {mounted && tradeResult &&
+      {mounted &&
+        tradeResult &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto">
-            {/* Background Backdrop */}
+          <div className="pointer-events-auto fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
             />
-
-            {/* Dynamic God Rays for Reveal */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="absolute inset-0 z-0 flex items-center justify-center"
             >
-              <RotatingRays colorClass={GIFT_RARITY_CONFIG[tradeResult.rarity].rays} />
-              <div
-                className={cn(
-                  'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
-                )}
-              />
+              <RotatingRays colorClass={RARITY_CONFIG[tradeResult.rarity].rays} />
             </motion.div>
-
-            {/* Main Content */}
-            <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+            <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center p-6">
               {wasGolden && (
                 <motion.div
                   initial={{ opacity: 0, y: -10, scale: 0.9 }}
@@ -1623,7 +927,7 @@ export function TradePanel({
                   className="mb-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 px-3.5 py-1.5 text-[13px] font-black text-amber-950 shadow-lg shadow-amber-500/30"
                 >
                   <Sparkles className="h-3.5 w-3.5" strokeWidth={3} />
-                  Golden trade — two items
+                  Lucky trade! Two items
                   {rewardQueue.length > 1 && <span>· 1 of 2</span>}
                 </motion.div>
               )}
@@ -1668,9 +972,8 @@ export function TradePanel({
               />
             </div>
           </div>,
-          document.body
-        )
-      }
+          document.body,
+        )}
 
       <PlusUpgradeModal
         open={showPlusOffer}
@@ -1680,740 +983,6 @@ export function TradePanel({
         }}
         onClose={() => setShowPlusOffer(false)}
       />
-
-      <RewardPoolSheet
-        open={poolOpen}
-        onClose={() => setPoolOpen(false)}
-        rarity={nextRarity}
-        prizes={rewardPool}
-        wishlisted={wishlistHits}
-        redirectPercent={modifiers.wishlistRedirectPercent}
-      />
-
-      {/* --- INVENTORY + CONTRACT SIDEBAR (lg+) --- */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
-      <div
-        ref={inventoryScrollRef}
-        onScroll={(event) => {
-          setInventoryHasScrolled(true);
-          if (
-            availableGrid.hasMore &&
-            isNearScrollEnd(event.currentTarget)
-          ) {
-            availableGrid.loadMore();
-          }
-        }}
-        onWheel={(event) => {
-          setInventoryHasScrolled(true);
-          if (
-            availableGrid.hasMore &&
-            shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
-          ) {
-            availableGrid.loadMore();
-          }
-        }}
-        className={cn(
-          'flex-1 flex flex-col bg-background',
-          pageScroll
-            ? 'pb-[150px] lg:pb-4'
-            : 'lg:min-h-0 lg:overflow-y-auto lg:overscroll-none',
-        )}
-      >
-
-        <div
-          ref={gridTopRef}
-          style={
-            dockHeight > 0 ? { paddingBottom: dockHeight + 36 } : undefined
-          }
-          className={cn(
-            pageScroll ? 'pt-1 pb-52 lg:pb-4' : 'px-4 pb-52 lg:p-4',
-          )}
-        >
-          {targetRarity && (
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleClear}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-black transition-colors',
-                  getRarityBg(targetRarity),
-                  'border-transparent',
-                )}
-              >
-                {targetRarity} contract
-                <X className="h-3 w-3" strokeWidth={3.5} />
-              </button>
-              {fuelRarity && (
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-black',
-                    getRarityBg(fuelRarity),
-                  )}
-                >
-                  + {countOf(fuelQuote.count, fuelRarity)}
-                </span>
-              )}
-            </div>
-          )}
-          {availableItems.length === 0 ? (
-            // Two different causes, two different answers: a filter is hiding
-            // the spares, or there are no spares to begin with. Saying
-            // "empty (or filtered out)" made the player guess which.
-            <WardrobeEmptyState
-              icon={<Repeat className="h-8 w-8" strokeWidth={2.25} />}
-              title={hasAnySpares ? 'Nothing in this filter' : 'No spares yet'}
-              description={
-                hasAnySpares
-                  ? undefined
-                  : `Collect ${TRADE_MIN_ITEM_COUNT} of one rarity to trade up.`
-              }
-              action={
-                hasAnySpares || !onGoToShop
-                  ? undefined
-                  : {
-                      label: 'Browse the shop',
-                      icon: <ShoppingBag className="h-4 w-4" />,
-                      onClick: onGoToShop,
-                    }
-              }
-            />
-          ) : (
-            <>
-              {(() => {
-                const renderTradeEntry = (
-                  entry: (typeof availableGrid.visibleItems)[number],
-                ) => {
-                  const selected = selectedCounts[entry.uid] || 0;
-                  const remaining = entry.owned - selected;
-                  const isDimmed =
-                    selected === 0 && (remaining === 0 || !canSelect(entry));
-
-                  return (
-                    <div
-                      key={entry.uid}
-                      ref={(el) => {
-                        if (el) cardRefs.current.set(entry.uid, el);
-                        else cardRefs.current.delete(entry.uid);
-                      }}
-                      className={cn(
-                        'transition-[opacity,filter] duration-300',
-                        isDimmed && 'opacity-40 grayscale pointer-events-none',
-                      )}
-                    >
-                      <TradeTile
-                        entry={entry}
-                        selected={selected}
-                        isNew={unseenItems.includes(entry.id)}
-                        onTap={() => handleToggle(entry)}
-                      />
-                    </div>
-                  );
-                };
-
-                const groups: {
-                  rarity: Rarity;
-                  entries: typeof availableGrid.visibleItems;
-                }[] = [];
-                for (const entry of availableGrid.visibleItems) {
-                  const last = groups[groups.length - 1];
-                  if (last && last.rarity === entry.rarity)
-                    last.entries.push(entry);
-                  else groups.push({ rarity: entry.rarity, entries: [entry] });
-                }
-
-                const shelfHeader = (rarity: Rarity) => {
-                  const config = RARITY_CONFIG[rarity];
-                  const shelfRecipe = recipeFor(modifiers, rarity);
-                  const arrow = (to: Rarity) => (
-                    <span
-                      className={cn(
-                        'shrink-0 text-[12px] font-black',
-                        RARITY_CONFIG[to].text,
-                      )}
-                    >
-                      → {RARITY_CONFIG[to].label}
-                    </span>
-                  );
-
-                  if (targetRarity === rarity) {
-                    return (
-                      <ShelfHeader
-                        label={config.label}
-                        tone={config.text}
-                        meta={`${selectedIds.length}/${slotCount}`}
-                        progress={selectedIds.length / slotCount}
-                        barTone={mainFilled ? 'bg-primary' : BAR_TONE[rarity]}
-                        action={nextRarity ? arrow(nextRarity) : undefined}
-                      />
-                    );
-                  }
-                  if (targetRarity) {
-                    return (
-                      <ShelfHeader
-                        label={`${config.label} extras`}
-                        tone={config.text}
-                        meta={
-                          fuelQuote.count > 0
-                            ? `${fuelIds.length}/${fuelQuote.count}`
-                            : undefined
-                        }
-                        progress={
-                          fuelQuote.count > 0
-                            ? fuelIds.length / fuelQuote.count
-                            : null
-                        }
-                        barTone={fuelFilled ? 'bg-primary' : BAR_TONE[rarity]}
-                      />
-                    );
-                  }
-
-                  const need = shelfRecipe?.itemCount ?? 0;
-                  const copies = copiesByRarity.get(rarity) ?? 0;
-                  const plan = shelfFillPlans.get(rarity);
-                  return (
-                    <ShelfHeader
-                      label={config.label}
-                      tone={config.text}
-                      meta={need > 0 ? `${Math.min(copies, need)}/${need}` : undefined}
-                      progress={need > 0 ? copies / need : null}
-                      barTone={plan ? 'bg-primary' : BAR_TONE[rarity]}
-                      action={
-                        plan ? (
-                          <button
-                            type="button"
-                            onClick={() => applyFillPlan(plan)}
-                            className={shelfActionClass('primary')}
-                          >
-                            <Zap className="h-3.5 w-3.5" strokeWidth={3} />
-                            Fill
-                          </button>
-                        ) : shelfRecipe ? (
-                          arrow(shelfRecipe.to)
-                        ) : undefined
-                      }
-                    />
-                  );
-                };
-
-                return (
-                  <div className="flex flex-col gap-5 pb-4">
-                    {groups.map((group) => (
-                      <section
-                        key={group.rarity}
-                        ref={(el) => {
-                          if (el) groupRefs.current.set(group.rarity, el);
-                          else groupRefs.current.delete(group.rarity);
-                        }}
-                        aria-label={RARITY_CONFIG[group.rarity].label}
-                      >
-                        {shelfHeader(group.rarity)}
-                        <div className={cardGridClass}>
-                          {group.entries.map(renderTradeEntry)}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                );
-              })()}
-              {availableGrid.hasMore && (
-                <div
-                  ref={availableGrid.sentinelRef}
-                  className="h-8"
-                  aria-hidden="true"
-                />
-              )}
-              {availableGrid.hasMore && <ScrollMoreCue />}
-            </>
-          )}
-        </div>
-      </div>
-
-        <aside className="hidden lg:flex lg:flex-col lg:sticky lg:top-36 lg:max-h-[calc(100svh-11rem)] overflow-y-auto rounded-2xl border border-border/60 bg-card shadow-lg">
-          {renderContract(true)}
-        </aside>
-      </div>
-
-      {/* --- CONTRACT DOCK (mobile/tablet) --- */}
-      {contractDock}
     </div>
   );
-}
-
-const ORB_RING: Record<Rarity, string> = {
-  common: 'stroke-slate-400',
-  uncommon: 'stroke-emerald-500',
-  rare: 'stroke-sky-500',
-  epic: 'stroke-violet-500',
-  legendary: 'stroke-amber-500',
-};
-
-/**
- * Lifts the already-drawn pixels off the tapped card. Re-rendering the item in
- * the ghost meant waiting on a Rive stamp, so the very first pick appeared only
- * after its flight had finished and looked like a stuck sprite.
- */
-function captureCardPixels(source: HTMLElement): string | null {
-  const canvas = source.querySelector('canvas');
-  if (canvas && canvas.width > 0 && canvas.height > 0) {
-    try {
-      return canvas.toDataURL();
-    } catch {
-      return null;
-    }
-  }
-  const img = source.querySelector('img');
-  return img?.currentSrc || img?.src || null;
-}
-
-function FlightGhost({ flight }: { flight: Flight }) {
-  const { from, to, image, rarity, cover } = flight;
-  const size = Math.min(from.width, from.height, 88);
-  const at = (rect: DOMRect) => ({
-    x: rect.left + rect.width / 2 - size / 2,
-    y: rect.top + rect.height / 2 - size / 2,
-  });
-
-  return (
-    <motion.div
-      initial={{ ...at(from), scale: 1, opacity: 1 }}
-      animate={{ ...at(to), scale: 0.5, opacity: 0.9 }}
-      transition={{ duration: FLIGHT_MS / 1000, ease: [0.32, 0.72, 0.3, 1] }}
-      style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }}
-      className={cn(
-        'flex items-center justify-center overflow-hidden rounded-2xl shadow-lg ring-1',
-        TILE_TONE[rarity],
-      )}
-    >
-      {image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={image}
-          alt=""
-          className={cn(
-            'h-full w-full',
-            cover ? 'object-cover' : 'object-contain',
-          )}
-        />
-      )}
-    </motion.div>
-  );
-}
-
-function PrizeOrb({
-  rarity,
-  progress,
-  ready,
-  size,
-}: {
-  rarity: Rarity | null;
-  progress: number;
-  ready: boolean;
-  size: number;
-}) {
-  const stroke = Math.max(3, Math.round(size / 14));
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const config = rarity ? RARITY_CONFIG[rarity] : null;
-
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <motion.div
-        animate={ready ? { scale: [1, 1.07, 1] } : { scale: 1 }}
-        transition={
-          ready
-            ? { duration: 1.7, repeat: Infinity, ease: 'easeInOut' }
-            : { type: 'spring', stiffness: 400, damping: 26 }
-        }
-        style={{ inset: stroke + 1 }}
-        className={cn(
-          'absolute flex items-center justify-center rounded-full bg-gradient-to-b',
-          config ? config.gradient : 'from-muted to-muted/40',
-        )}
-      >
-        <span
-          className={cn(
-            'font-black leading-none',
-            config ? config.text : 'text-muted-foreground/50',
-          )}
-          style={{ fontSize: Math.round(size * 0.4) }}
-        >
-          ?
-        </span>
-      </motion.div>
-      <svg
-        width={size}
-        height={size}
-        className="absolute inset-0 -rotate-90"
-        aria-hidden="true"
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={stroke}
-          className="stroke-border"
-        />
-        <motion.circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          className={cn(
-            ready ? 'stroke-green-500' : rarity ? ORB_RING[rarity] : 'stroke-primary',
-          )}
-          style={{ strokeDasharray: circumference }}
-          initial={false}
-          animate={{
-            strokeDashoffset:
-              circumference * (1 - Math.max(0, Math.min(1, progress))),
-          }}
-          transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-        />
-      </svg>
-    </div>
-  );
-}
-
-function ProgressTrack({ value, ready }: { value: number; ready: boolean }) {
-  return (
-    <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <motion.span
-        initial={false}
-        animate={{ scaleX: Math.max(0, Math.min(1, value)) }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className={cn(
-          'block h-full w-full origin-left rounded-full',
-          ready ? 'bg-green-500' : 'bg-primary',
-        )}
-      />
-    </span>
-  );
-}
-
-function SlotCounter({
-  picked,
-  total,
-  ready,
-}: {
-  picked: number;
-  total: number;
-  ready: boolean;
-}) {
-  return (
-    <motion.div
-      key={picked}
-      initial={{ scale: 1.35 }}
-      animate={{ scale: 1 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-      className={cn(
-        'shrink-0 text-base font-black tabular-nums',
-        ready ? 'text-green-500' : 'text-primary',
-      )}
-    >
-      {picked}
-      <span className="text-muted-foreground/40">/{total}</span>
-    </motion.div>
-  );
-}
-
-function RewardSummary({
-  rarity,
-  total,
-  fresh,
-  wishlisted,
-  centered = false,
-  showLink = true,
-}: {
-  rarity: Rarity;
-  total: number;
-  fresh: number;
-  wishlisted: number;
-  centered?: boolean;
-  showLink?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-w-0 flex-col gap-0.5',
-        centered && 'items-center text-center',
-      )}
-    >
-      <span
-        className={cn(
-          'text-[13px] font-black',
-          RARITY_CONFIG[rarity].text,
-        )}
-      >
-        1 {rarity} reward
-      </span>
-      <span className="text-[10px] font-bold text-muted-foreground">
-        {total} possible
-        {fresh > 0 && ` · ${fresh} new to you`}
-      </span>
-      <span
-        className={cn(
-          'flex items-center gap-1.5',
-          centered && 'justify-center',
-          !showLink && wishlisted === 0 && 'hidden',
-        )}
-      >
-        {showLink && (
-          <span className="text-[12px] font-black text-primary underline underline-offset-2">
-            See them all
-          </span>
-        )}
-        {wishlisted > 0 && (
-          <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-black text-primary">
-            <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
-            {wishlisted}
-          </span>
-        )}
-      </span>
-    </div>
-  );
-}
-
-function TradeTile({
-  entry,
-  selected,
-  isNew,
-  onTap,
-}: {
-  entry: TradeEntry;
-  selected: number;
-  isNew: boolean;
-  onTap: () => void;
-}) {
-  const name = entry.item?.name ?? entry.bg?.name ?? '';
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      aria-pressed={selected > 0}
-      aria-label={`${name}, ${RARITY_CONFIG[entry.rarity].label}, ${entry.owned} owned${selected > 0 ? `, ${selected} added` : ''}`}
-      className="group flex w-full flex-col items-stretch gap-1 text-left"
-    >
-      <TileArt
-        rarity={entry.rarity}
-        className={cn(
-          'transition-transform duration-150 group-active:scale-95',
-          selected > 0 && 'ring-2 ring-primary',
-        )}
-      >
-        {entry.kind === 'item' && entry.item ? (
-          <ItemArt item={entry.item} />
-        ) : entry.bg ? (
-          <BackgroundArt bg={entry.bg} />
-        ) : null}
-        {selected > 0 ? (
-          <motion.span
-            key={selected}
-            initial={{ scale: 0.6 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 520, damping: 22 }}
-            className="absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-black tabular-nums text-primary-foreground shadow-sm"
-          >
-            {selected}
-          </motion.span>
-        ) : isNew ? (
-          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card" />
-        ) : null}
-      </TileArt>
-      <span
-        className={cn(
-          'flex h-5 items-center justify-center text-[12.5px] font-black tabular-nums leading-none',
-          selected > 0 ? 'text-primary' : 'text-muted-foreground/70',
-        )}
-      >
-        {selected > 0 ? `${selected}/${entry.owned} added` : `×${entry.owned}`}
-      </span>
-    </button>
-  );
-}
-
-function RewardPoolTile({ prize }: { prize: RewardPreview }) {
-  const rarity = prize.item?.rarity ?? prize.bg?.rarity ?? 'common';
-
-  return (
-    <div
-      aria-label={`${prize.name}, ${prize.owned ? 'owned' : 'new to you'}`}
-      className={cn('flex flex-col items-stretch gap-1', prize.owned && 'opacity-55')}
-    >
-      <TileArt rarity={rarity}>
-        {prize.bg ? (
-          <BackgroundArt bg={prize.bg} />
-        ) : prize.item ? (
-          <ItemArt item={prize.item} />
-        ) : null}
-        {prize.wishlisted && (
-          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
-            <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
-          </span>
-        )}
-      </TileArt>
-      <span
-        className={cn(
-          'flex h-5 items-center justify-center text-[12.5px] font-black leading-none',
-          prize.owned ? 'text-muted-foreground' : 'text-primary',
-        )}
-      >
-        {prize.owned ? 'Owned' : 'New'}
-      </span>
-    </div>
-  );
-}
-
-function RewardPoolSheet({
-  open,
-  onClose,
-  rarity,
-  prizes,
-  wishlisted,
-  redirectPercent,
-}: {
-  open: boolean;
-  onClose: () => void;
-  rarity: Rarity | null;
-  prizes: RewardPreview[];
-  wishlisted: number;
-  redirectPercent: number;
-}) {
-  const fresh = prizes.filter((prize) => !prize.owned).length;
-
-  return (
-    <BaseSheet
-      open={open && !!rarity}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      className="max-h-[88dvh] select-none sm:max-h-[84dvh] sm:max-w-[560px]"
-      zIndex={1150}
-      closeAriaLabel="Close possible rewards"
-    >
-      {({ bindScroll }) => (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="shrink-0 px-5 pb-3 pt-3 sm:px-6 sm:pt-6">
-            <div className="flex items-center gap-2 pr-12 sm:pr-14">
-              <h2 className="text-lg font-black text-foreground">
-                Possible rewards
-              </h2>
-              {rarity && (
-                <span
-                  className={cn(
-                    'rounded px-2 py-0.5 text-[12px] font-bold',
-                    getRarityBg(rarity),
-                  )}
-                >
-                  {rarity}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs font-bold text-muted-foreground">
-              {prizes.length} in the pool · {fresh} you don&apos;t own
-            </p>
-            {wishlisted > 0 && (
-              <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary">
-                <Bookmark
-                  className="mt-px h-3 w-3 shrink-0"
-                  strokeWidth={3}
-                  fill="currentColor"
-                />
-                <span>
-                  {wishlisted} wishlisted — a free trade lands one{' '}
-                  {redirectPercent}% of the time, or Aim makes it certain.
-                </span>
-              </p>
-            )}
-          </div>
-
-          <div
-            ref={bindScroll}
-            className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-6"
-          >
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {prizes.map((prize) => (
-                <RewardPoolTile key={prize.key} prize={prize} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </BaseSheet>
-  );
-}
-
-function WaiverChip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[11px] font-black text-green-700 dark:text-green-400">
-      {children}
-    </span>
-  );
-}
-
-function ScrollMoreCue() {
-  return (
-    <div className="pointer-events-none sticky bottom-3 z-30 flex justify-center">
-      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[12px] font-black text-muted-foreground shadow-sm backdrop-blur">
-        <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
-        <span>Scroll for more</span>
-      </div>
-    </div>
-  );
-}
-
-// --- Helpers ---
-function scrollableAncestor(el: HTMLElement): HTMLElement | null {
-  let node = el.parentElement;
-  while (node) {
-    const overflowY = getComputedStyle(node).overflowY;
-    if (
-      (overflowY === 'auto' || overflowY === 'scroll') &&
-      node.scrollHeight > node.clientHeight
-    ) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
-}
-
-function countOf(count: number, rarity: Rarity) {
-  return `${count} ${rarity}${count === 1 ? '' : 's'}`;
-}
-
-function getRarityColor(rarity: Rarity) {
-  switch (rarity) {
-    case 'common':
-      return 'text-muted-foreground';
-    case 'uncommon':
-      return 'text-emerald-500';
-    case 'rare':
-      return 'text-sky-500';
-    case 'epic':
-      return 'text-violet-500';
-    case 'legendary':
-      return 'text-amber-500';
-    default:
-      return 'text-muted-foreground';
-  }
-}
-
-function getRarityBg(rarity: Rarity) {
-  switch (rarity) {
-    case 'common':
-      return 'bg-muted text-muted-foreground';
-    case 'uncommon':
-      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-    case 'rare':
-      return 'bg-sky-500/10 text-sky-600 dark:text-sky-400';
-    case 'epic':
-      return 'bg-violet-500/10 text-violet-600 dark:text-violet-400';
-    case 'legendary':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
-    default:
-      return 'bg-muted';
-  }
 }

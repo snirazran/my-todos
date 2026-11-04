@@ -2,7 +2,7 @@
 
 import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Bookmark, Check, Plus, X } from 'lucide-react';
+import { Heart, Check, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
@@ -22,7 +22,10 @@ type LooksProps = {
   onUpgrade: () => void;
 };
 
-export function SavedLooksButton(props: LooksProps) {
+export function SavedLooksButton({
+  iconOnly = false,
+  ...props
+}: LooksProps & { iconOnly?: boolean }) {
   const [open, setOpen] = React.useState(false);
   useRegisterOpenSheet(open);
   const onUpgrade = () => {
@@ -35,10 +38,20 @@ export function SavedLooksButton(props: LooksProps) {
       <Dialog.Trigger asChild>
         <button
           type="button"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 text-xs font-bold text-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          aria-label={iconOnly ? 'Saved looks' : undefined}
+          title={iconOnly ? 'Saved looks' : undefined}
+          className={cn(
+            'border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur-md transition-[background-color,transform] hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+            iconOnly
+              ? 'grid h-11 w-11 place-items-center rounded-full active:scale-95'
+              : 'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold',
+          )}
         >
-          <Bookmark className="h-3.5 w-3.5 text-primary" />
-          Saved looks
+          <Heart
+            className={cn('text-primary', iconOnly ? 'h-5 w-5' : 'h-3.5 w-3.5')}
+            strokeWidth={iconOnly ? 2.5 : 2}
+          />
+          {!iconOnly && 'Saved looks'}
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -100,7 +113,7 @@ export function SaveFitButton({
   if (alreadySaved) {
     return (
       <span className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-black tracking-wide text-muted-foreground">
-        <Bookmark className="h-3 w-3 fill-current" />
+        <Heart className="h-3 w-3 fill-current" />
         Saved
       </span>
     );

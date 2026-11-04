@@ -51,12 +51,10 @@ export function useTradeReadiness(enabled: boolean = true): TradeReadiness {
           skipBackgroundIds: [DEFAULT_BACKGROUND_ID],
         }),
         modifiers,
-        isPlus: !!data?.isPremium,
       }),
     [
       data?.catalog,
       data?.wardrobe?.inventory,
-      data?.isPremium,
       backgrounds?.catalog,
       backgrounds?.inventory,
       modifiers,

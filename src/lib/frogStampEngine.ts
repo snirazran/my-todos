@@ -21,6 +21,7 @@ import { preloadFrogFile } from './riveLoader';
 
 const MASTER_CSS_SIZE = 360;
 const MAX_MASTER_DIM = 512;
+const FRAME_CACHE_PIXEL_BUDGET = 10_000_000;
 const SETTLE_FRAMES = 2;
 const ARTBOARD_WIDTH = 128;
 const ARTBOARD_HEIGHT = 144;
@@ -58,13 +59,17 @@ let fileReady = false;
 let creating = false;
 let current: Job | null = null;
 const frameCache = new Map<string, HTMLCanvasElement>();
+let cachedPixels = 0;
 const frameKey = (indices: FrogStampIndices) => SLOTS.map((slot) => indices[slot] ?? 0).join(':');
 
 /** Copy an existing frame without initializing or advancing Rive. */
 export function drawCachedFrogStamp(target: HTMLCanvasElement, indices: FrogStampIndices): boolean {
-  const source = frameCache.get(frameKey(indices));
+  const key = frameKey(indices);
+  const source = frameCache.get(key);
   const ctx = target.getContext('2d');
   if (!source || !ctx) return false;
+  frameCache.delete(key);
+  frameCache.set(key, source);
   const scale = Math.min(source.width / ARTBOARD_WIDTH, source.height / ARTBOARD_HEIGHT);
   const sw = ARTBOARD_WIDTH * scale, sh = ARTBOARD_HEIGHT * scale;
   const fit = Math.min(target.width / ARTBOARD_WIDTH, target.height / ARTBOARD_HEIGHT);
@@ -100,8 +105,20 @@ function cacheFrame(job: Job) {
   const frame = document.createElement('canvas');
   frame.width = masterCanvas.width; frame.height = masterCanvas.height;
   frame.getContext('2d')?.drawImage(masterCanvas, 0, 0);
-  frameCache.delete(key); frameCache.set(key, frame);
-  if (frameCache.size > 24) frameCache.delete(frameCache.keys().next().value!);
+  if (previous) dropFrame(key, previous);
+  frameCache.set(key, frame);
+  cachedPixels += frame.width * frame.height;
+  while (cachedPixels > FRAME_CACHE_PIXEL_BUDGET && frameCache.size > 1) {
+    const oldest = frameCache.keys().next().value!;
+    dropFrame(oldest, frameCache.get(oldest)!);
+  }
+}
+
+function dropFrame(key: string, frame: HTMLCanvasElement) {
+  cachedPixels -= frame.width * frame.height;
+  frameCache.delete(key);
+  frame.width = 0;
+  frame.height = 0;
 }
 
 function applyIndices(stamper: Rive, indices: FrogStampIndices) {
