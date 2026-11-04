@@ -20,6 +20,7 @@ import {
   useViewModelInstanceEnum,
   useViewModelInstanceNumber,
   useViewModelInstanceTrigger,
+  type RiveFile,
 } from '@rive-app/react-canvas-lite';
 import { useReducedMotion } from 'framer-motion';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
@@ -193,6 +194,7 @@ interface FrogProps {
   arriveDelay?: number;
   holdArrival?: boolean;
   onArrived?: () => void;
+  riveFile?: RiveFile | null;
 }
 
 const Frog = memo(
@@ -218,6 +220,7 @@ const Frog = memo(
       arriveDelay = 0,
       holdArrival = false,
       onArrived,
+      riveFile,
     },
     ref,
   ) {
@@ -254,7 +257,7 @@ const Frog = memo(
 
     const { RiveComponent, rive } = useRive(
       {
-        src: riveUrl || undefined,
+        ...(riveFile ? { riveFile } : { src: riveUrl || undefined }),
         artboard: ARTBOARD_NAME,
         stateMachines: STATE_MACHINE,
         autoplay: true,
@@ -994,7 +997,7 @@ const Frog = memo(
             }}
           />
         )}
-        {riveUrl && live && (
+        {(riveFile || riveUrl) && live && (
           <RiveComponent
             style={{
               width: '100%',

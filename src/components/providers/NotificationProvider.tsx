@@ -19,8 +19,19 @@ import {
   useReducedMotion,
   useTransform,
 } from 'framer-motion';
-import { X, CalendarCheck, FolderOpen, CopyPlus } from 'lucide-react';
+import { X, CalendarCheck, FolderOpen, CopyPlus, Ellipsis, Undo2 } from 'lucide-react';
 import { useSheetStore } from '@/lib/sheetStore';
+
+interface NotificationMenu {
+  title?: string;
+  actionHint?: string;
+}
+
+interface NotificationOptions {
+  durationMs?: number;
+  actionLabel?: string;
+  menu?: NotificationMenu;
+}
 
 interface NotificationItem {
   id: number;
@@ -29,6 +40,7 @@ interface NotificationItem {
   durationMs: number;
   dedupeKey: string;
   actionLabel: string;
+  menu?: NotificationMenu;
 }
 
 function textOf(node: React.ReactNode): string {
@@ -73,7 +85,7 @@ interface NotificationContextType {
   showNotification: (
     content: React.ReactNode,
     undoAction?: () => void | Promise<void>,
-    options?: { durationMs?: number; actionLabel?: string },
+    options?: NotificationOptions,
   ) => void;
   hideNotification: () => void;
   isVisible: boolean;
@@ -130,7 +142,7 @@ function readingTimeMs(text: string, hasAction: boolean): number {
 const STAY_SCALE = 0.5;
 
 export const TOAST_SURFACE_STYLE = {
-  backgroundColor: 'var(--toast-surface, hsl(115 36% 36%))',
+  backgroundColor: 'var(--toast-surface, hsl(115 36% 36% / 0.88))',
   boxShadow:
     '0 0 0 1px rgb(255 255 255 / 0.08), 0 14px 28px -18px rgb(28 64 26 / 0.7)',
   '--foreground': '0 0% 100%',
@@ -183,6 +195,129 @@ function SwipeableToast({
 }
 const SWIPE_DISMISS_PX = 72;
 
+const TOAST_MENU_SURFACE = 'hsl(115 34% 24%)';
+
+const ToastHoldContext = createContext<((held: boolean) => void) | null>(null);
+
+export function useToastHold() {
+  return useContext(ToastHoldContext);
+}
+
+function ToastHoldScope({
+  id,
+  setHold,
+  children,
+}: {
+  id: number;
+  setHold: (id: number, held: boolean) => void;
+  children: React.ReactNode;
+}) {
+  const hold = useCallback((held: boolean) => setHold(id, held), [id, setHold]);
+  return <ToastHoldContext.Provider value={hold}>{children}</ToastHoldContext.Provider>;
+}
+
+function ToastMenu({
+  open,
+  onOpenChange,
+  menu,
+  actionLabel,
+  busy,
+  onAction,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  menu: NotificationMenu;
+  actionLabel: string;
+  busy: boolean;
+  onAction: () => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      onOpenChange(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onOpenChange(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={rootRef} className="relative -my-1 -mr-1 shrink-0">
+      <button
+        type="button"
+        aria-label="More options"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={busy}
+        onClick={() => onOpenChange(!open)}
+        className={`grid h-9 w-9 place-items-center rounded-full text-white transition-[background-color,transform] duration-150 active:scale-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+          open ? 'bg-white/30' : 'bg-white/15 hover:bg-white/20'
+        }`}
+      >
+        <Ellipsis className="h-[18px] w-[18px]" strokeWidth={3} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.86, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 4 }}
+            transition={
+              reduceMotion
+                ? { duration: 0.12 }
+                : { type: 'spring', stiffness: 560, damping: 32, mass: 0.7 }
+            }
+            style={{
+              backgroundColor: TOAST_MENU_SURFACE,
+              transformOrigin: 'bottom right',
+              boxShadow:
+                '0 0 0 1px rgb(255 255 255 / 0.1), 0 18px 40px -14px rgb(0 0 0 / 0.55)',
+            }}
+            className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[232px] rounded-[18px] p-1.5 text-white"
+          >
+            {menu.title && (
+              <p className="truncate px-2.5 pb-1.5 pt-1 text-[12px] font-bold text-white/60">
+                {menu.title}
+              </p>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              autoFocus
+              disabled={busy}
+              onClick={onAction}
+              className="flex w-full items-center gap-2.5 rounded-[13px] px-2 py-2 text-left transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-60 focus-visible:outline-none focus-visible:bg-white/10"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/15">
+                <Undo2 className="h-4 w-4" strokeWidth={2.75} />
+              </span>
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="text-[14px] font-black">{actionLabel}</span>
+                {menu.actionHint && (
+                  <span className="mt-0.5 text-[12px] font-bold text-white/65">
+                    {menu.actionHint}
+                  </span>
+                )}
+              </span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 const ToastPresence = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { toastId: number; reduceMotion: boolean }
@@ -227,6 +362,15 @@ export function NotificationProvider({
 }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [undoingId, setUndoingId] = useState<number | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const [heldIds, setHeldIds] = useState<number[]>([]);
+  const setHold = useCallback((id: number, held: boolean) => {
+    setHeldIds((prev) => {
+      const has = prev.indexOf(id) !== -1;
+      if (held) return has ? prev : [...prev, id];
+      return has ? prev.filter((x) => x !== id) : prev;
+    });
+  }, []);
   const [stackHeight, setStackHeight] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [slotHint, setSlotHint] = useState<React.ReactNode | null>(null);
@@ -275,7 +419,7 @@ export function NotificationProvider({
     (
       content: React.ReactNode,
       undoAction?: () => void | Promise<void>,
-      options?: { durationMs?: number; actionLabel?: string },
+      options?: NotificationOptions,
     ) => {
       const id = Date.now() + Math.random();
       const dedupeKey = textOf(content);
@@ -289,6 +433,7 @@ export function NotificationProvider({
         ),
         dedupeKey,
         actionLabel: options?.actionLabel ?? 'Undo',
+        menu: options?.menu,
       };
       setNotifications((prev) => {
         if (
@@ -312,10 +457,19 @@ export function NotificationProvider({
   const front = deckItems[deckItems.length - 1] ?? null;
   const frontId = front?.id ?? null;
   const undoId = undoItem?.id ?? null;
-  const timerPaused =
-    hovered || pressed || pageHidden || undoingId !== null || stackSuppressed;
-
+  const menuOpen =
+    menuOpenId !== null && notifications.some((n) => n.id === menuOpenId);
   const current = undoItem ?? front;
+  const currentHeld = !!current && heldIds.indexOf(current.id) !== -1;
+  const timerPaused =
+    hovered ||
+    pressed ||
+    pageHidden ||
+    undoingId !== null ||
+    stackSuppressed ||
+    menuOpen ||
+    currentHeld;
+
   const slotEmpty = !current && !slotHint;
   useEffect(() => {
     if (!slotEmpty) return;
@@ -382,6 +536,8 @@ export function NotificationProvider({
         const isMoveToast =
           isSavedTasksToast || isMovedToTodayToast || isDuplicateToast;
         const isUndoing = undoingId === n.id;
+        const hasMenu = !!n.menu && !!n.undoAction;
+        const isMenuOpen = hasMenu && menuOpenId === n.id;
         return (
           <ToastPresence
             key={n.id}
@@ -405,14 +561,16 @@ export function NotificationProvider({
             className="pointer-events-auto absolute inset-x-0 bottom-0"
           >
           <SwipeableToast
-            disabled={isUndoing}
+            disabled={isUndoing || isMenuOpen}
             onDragSettled={() => setPressed(false)}
             onSwipe={(dir) => {
               setSwiped({ id: n.id, dir });
               dismiss(n.id);
             }}
             style={TOAST_SURFACE_STYLE}
-            className="dark relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-[18px] px-3.5 py-2 text-foreground"
+            className={`dark relative flex min-h-12 w-full items-center gap-3 rounded-[18px] text-foreground ${
+              hasMenu ? 'overflow-visible py-2 pl-3 pr-2.5' : 'overflow-hidden px-3.5 py-2'
+            }`}
           >
             {isMoveToast && (
               <span
@@ -430,10 +588,29 @@ export function NotificationProvider({
             )}
             <div className="min-w-0 flex-1 text-sm font-semibold">
               <NotificationBody id={n.id} dismiss={dismiss}>
-                {n.content}
+                <ToastHoldScope id={n.id} setHold={setHold}>
+                  {n.content}
+                </ToastHoldScope>
               </NotificationBody>
             </div>
-            {n.undoAction && (
+            {hasMenu && n.menu && (
+              <ToastMenu
+                open={isMenuOpen}
+                onOpenChange={(open) => setMenuOpenId(open ? n.id : null)}
+                menu={n.menu}
+                actionLabel={n.actionLabel}
+                busy={isUndoing}
+                onAction={() => {
+                  setMenuOpenId(null);
+                  dismiss(n.id);
+                  if (!n.undoAction) return;
+                  Promise.resolve()
+                    .then(n.undoAction)
+                    .catch((error) => console.error('Undo failed', error));
+                }}
+              />
+            )}
+            {n.undoAction && !hasMenu && (
               <button
                 onClick={() => handleUndo(n)}
                 disabled={isUndoing}
@@ -468,15 +645,17 @@ export function NotificationProvider({
                 )}
               </button>
             )}
-            <button
-              onClick={() => dismiss(n.id)}
-              disabled={isUndoing}
-              className={`-my-1.5 -mr-2 ${n.undoAction ? 'hidden md:grid' : 'grid'} h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-50`}
-              aria-label="Dismiss notification"
-            >
-              <X size={16} />
-            </button>
-            {isUndoItem(n) && (
+            {!hasMenu && (
+              <button
+                onClick={() => dismiss(n.id)}
+                disabled={isUndoing}
+                className={`-my-1.5 -mr-2 ${n.undoAction ? 'hidden md:grid' : 'grid'} h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-50`}
+                aria-label="Dismiss notification"
+              >
+                <X size={16} />
+              </button>
+            )}
+            {isUndoItem(n) && !hasMenu && (
               <span
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] origin-left bg-primary/70"

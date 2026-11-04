@@ -87,6 +87,31 @@ export const preloadStoreBundleFile = (): Promise<RiveFile | null> => {
 
 export const getStoreBundleFile = () => storeBundleFile;
 
+let frogFile: RiveFile | null = null;
+let frogFileLoad: Promise<RiveFile | null> | null = null;
+
+export const preloadFrogFile = (): Promise<RiveFile | null> => {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (frogFile) return Promise.resolve(frogFile);
+  frogFileLoad ??= preloadRiveAsset('/frog_idle.riv')
+    .then((url) => {
+      const file = new RiveFile({ src: url });
+      return file.init().then(() => {
+        file.getInstance();
+        frogFile = file;
+        return file;
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      frogFileLoad = null;
+      return null;
+    });
+  return frogFileLoad;
+};
+
+export const getFrogFile = () => frogFile;
+
 export const riveDevicePixelRatio = (cap = 2) => {
   if (typeof window === 'undefined') return 1;
   return Math.min(window.devicePixelRatio || 1, cap);

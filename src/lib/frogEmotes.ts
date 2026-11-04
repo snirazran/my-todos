@@ -73,7 +73,9 @@ export type FrogMoment =
   | 'pokeHarassed'
   | 'pokeResigned'
   | 'fidget'
-  | 'fidgetHungry';
+  | 'fidgetHungry'
+  | 'taskDone'
+  | 'dayCleared';
 
 const MOMENT_POOLS: Record<FrogMoment, readonly FrogEmote[]> = {
   catch: ['love', 'hop', 'love', 'hop', 'loveShy', 'loveHeartbeat'],
@@ -95,6 +97,8 @@ const MOMENT_POOLS: Record<FrogMoment, readonly FrogEmote[]> = {
   pokeResigned: ['dizzy', 'sweat'],
   fidget: ['hop', 'love', 'loveShy', 'question', 'hop', 'love'],
   fidgetHungry: ['question', 'sweat', 'question'],
+  taskDone: ['hop', 'love', 'hop', 'loveShy', 'celebrate'],
+  dayCleared: ['tada', 'celebrate'],
 };
 
 const lastPick: Partial<Record<FrogMoment, FrogEmote>> = {};

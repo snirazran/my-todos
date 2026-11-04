@@ -108,6 +108,12 @@ import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
 import { guideById } from '@/lib/hints/guides';
 import { format } from 'date-fns';
+import { TaskDoneToast, usePreloadDoneToastFrog } from '@/components/ui/TaskDoneToast';
+import { buildDoneMoment, friendlyFirstName } from '@/lib/taskDoneMoments';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+
+const DONE_TOAST_MS = 5600;
+const DONE_TOAST_CELEBRATION_MS = 7600;
 
 interface Task {
   id: string;
@@ -1915,9 +1921,14 @@ export default function TaskList({
   const prevCompletedRef = useRef<Map<string, boolean> | null>(null);
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
+  const { data: profile } = useSWR<{ name?: string | null }>(
+    isGuest ? null : '/api/user',
+    bootstrapFetcher,
+    { revalidateOnFocus: false },
+  );
+  const firstName = friendlyFirstName(profile?.name);
+  usePreloadDoneToastFrog(true);
 
-  // Any completion — checkmark tap, fly catch, detail sheet — surfaces a
-  // transient Undo toast, keyed off the task actually flipping to done.
   useEffect(() => {
     const prev = prevCompletedRef.current;
     prevCompletedRef.current = new Map(tasks.map((t) => [t.id, !!t.completed]));
@@ -1929,11 +1940,17 @@ export default function TaskList({
     emitCampaignTrigger('task_completed');
     if (flipped.isStarter) return;
     const id = flipped.id;
+    const now = new Date();
+    const moment = buildDoneMoment({
+      task: flipped,
+      dayTasks: tasks,
+      tags: userTags,
+      todayKey: format(now, 'yyyy-MM-dd'),
+      now,
+      name: firstName,
+    });
     showNotification(
-      <span className="flex min-w-0 items-center gap-2.5">
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
-        <span className="min-w-0 truncate font-semibold">{flipped.text}</span>
-      </span>,
+      <TaskDoneToast moment={moment} frogEnabled={!isGuest} />,
       () => {
         hapticTick();
         setDelayedCompleted((prev) => {
@@ -1942,6 +1959,10 @@ export default function TaskList({
           return next;
         });
         return toggleRef.current(id, false);
+      },
+      {
+        durationMs: moment.confetti ? DONE_TOAST_CELEBRATION_MS : DONE_TOAST_MS,
+        menu: { title: flipped.text, actionHint: 'Puts it back on your list' },
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

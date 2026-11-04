@@ -5,7 +5,7 @@ import {
   Rive,
   RiveFile,
 } from '@rive-app/react-canvas-lite';
-import { preloadRiveAsset } from './riveLoader';
+import { preloadFrogFile } from './riveLoader';
 
 /**
  * Shared "stamper" for static frog previews (wardrobe/shop/trade grids).
@@ -263,21 +263,11 @@ function ensureEngine() {
     zIndex: '-1',
   });
   document.body.appendChild(masterCanvas);
-  preloadRiveAsset('/frog_idle.riv').then((url) => {
-    const file = new RiveFile({ src: url });
+  preloadFrogFile().then((file) => {
+    if (!file) return;
     riveFile = file;
-    file
-      .init()
-      .then(() => {
-        // Pin one reference so per-stamp instance cleanup() (which decrements
-        // the file's refcount) can never drop it to zero and destroy the file.
-        file.getInstance();
-        fileReady = true;
-        processNext();
-      })
-      .catch((e) => {
-        console.error('[stamp] file load error', e);
-      });
+    fileReady = true;
+    processNext();
   });
 }
 
