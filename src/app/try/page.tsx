@@ -787,7 +787,7 @@ export default function TryPage() {
                         ? `"${task}" is on today's list. Sign in to the app with ${savedWith === 'apple' ? 'Apple' : 'Google'}, do it for real, and ${name} gets the fly.`
                         : `Get the app and sign in with ${savedWith === 'apple' ? 'Apple' : 'Google'}. ${name} will be there, wearing the ${prize.name} skin.`
                       : signedIn
-                        ? `Open the app with this account and the ${prize.name} skin is in your wardrobe.`
+                        ? `Open the app with this account and the ${prize.name} skin is in your closet.`
                         : `${name} is waiting for you in the app.`
                   }
                 />

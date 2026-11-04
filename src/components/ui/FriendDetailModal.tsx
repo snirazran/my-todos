@@ -774,7 +774,7 @@ function ItemPeekSheet({
                     type="button"
                     onClick={() =>
                       router.push(
-                        `/wardrobe?tab=shop&item=${encodeURIComponent(target.id)}&kind=${target.kind === 'bg' ? 'background' : 'item'}`,
+                        `/shop?item=${encodeURIComponent(target.id)}&kind=${target.kind === 'bg' ? 'background' : 'item'}`,
                       )
                     }
                     className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] text-base font-black tracking-tight text-white shadow-[0_4px_0_#2c511a] transition-[background-color,transform,box-shadow,opacity] hover:bg-[#3b6d37] active:translate-y-0.5 active:shadow-none"

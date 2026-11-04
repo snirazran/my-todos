@@ -73,7 +73,7 @@ export function TryOnPill({ className }: { className?: string }) {
     });
     clear();
     router.push(
-      `/wardrobe?tab=shop&item=${encodeURIComponent(offer.itemId)}&kind=item`,
+      `/shop?item=${encodeURIComponent(offer.itemId)}&kind=item`,
     );
   };
 

@@ -96,7 +96,7 @@ export const EXPLORER_QUEST: OnboardingQuestDef = {
       tagMode: 'ignore',
       metricKey: 'skin_acquired',
       helpText:
-        'Open the Wardrobe shop and spend your flies on an outfit or a background.',
+        'Open the Shop and spend your flies on an outfit or a background.',
       rewards: fixedFlies(10),
     },
     {
@@ -108,7 +108,7 @@ export const EXPLORER_QUEST: OnboardingQuestDef = {
       tagMode: 'ignore',
       metricKey: 'trade_completed',
       helpText:
-        'In the Wardrobe, trade four same-rarity skins for one of a higher rarity.',
+        'In your Closet, trade four same-rarity skins for one of a higher rarity.',
       rewards: fixedFlies(15),
     },
     {

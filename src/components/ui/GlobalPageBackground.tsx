@@ -54,6 +54,7 @@ export function GlobalPageBackground() {
   // The wardrobe owns a full-width, sticky backdrop, including try-on previews.
   if (
     pathname === '/wardrobe' ||
+    pathname === '/shop' ||
     isLoadingScreenVisible ||
     shouldWaitForUserBackground
   ) return null;

@@ -38,7 +38,7 @@ export function WishlistGoalCard({
   if (!wishlist || !pricing || !progress) return null;
 
   const config = RARITY_CONFIG[wishlist.rarity];
-  const itemPath = `/wardrobe?tab=shop&item=${encodeURIComponent(wishlist.itemId)}&kind=${wishlist.kind}`;
+  const itemPath = `/shop?item=${encodeURIComponent(wishlist.itemId)}&kind=${wishlist.kind}`;
   // A hair of fill even at the very start: they do have flies, and a bar
   // pinned at literal zero reads as "hopeless" rather than "begun".
   const fill = Math.max(progress.ratio, 0.03);

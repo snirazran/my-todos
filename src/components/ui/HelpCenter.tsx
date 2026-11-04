@@ -128,18 +128,18 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What can I do with duplicate items?',
-        a: 'A duplicate is a spare, and spares are what trade-ups run on. Take them to the Trade tab in your Wardrobe to swap same-rarity spares for one item of a higher rarity — the tab shows how many each trade needs.',
+        a: 'A duplicate is a spare, and spares are what trade-ups run on. Take them to the Trade Up tab in your Closet to swap same-rarity spares for one item of a higher rarity — the tab shows how many each trade needs.',
       },
     ],
   },
   {
     id: 'wardrobe',
-    title: 'Your frog & wardrobe',
+    title: 'Your frog & closet',
     icon: <Shirt className="h-5 w-5" />,
     items: [
       {
         q: 'How do I customize my frog?',
-        a: 'Open the Wardrobe to equip skins, hats, body items, held items, and backgrounds you own.',
+        a: 'Open your Closet to equip skins, hats, body items, held items, and backgrounds you own.',
       },
       {
         q: 'What are gift boxes?',
@@ -155,7 +155,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'Can I trade items?',
-        a: 'Yes — use the Trade tab in the Wardrobe to swap items.',
+        a: 'Yes — use the Trade Up tab in your Closet to swap items.',
       },
       {
         q: 'How do I rename my frog?',

@@ -163,8 +163,8 @@ export function HomeShopRail() {
     trackAnalyticsEvent('home_shop_rail_tapped', { source, item_id: itemId });
     router.push(
       itemId
-        ? `/wardrobe?tab=shop&item=${encodeURIComponent(itemId)}&kind=${kind}`
-        : '/wardrobe?tab=shop',
+        ? `/shop?item=${encodeURIComponent(itemId)}&kind=${kind}`
+        : '/shop',
     );
   };
 

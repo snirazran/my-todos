@@ -352,8 +352,8 @@ const GUIDES: Record<string, HintGuide> = {
     goal: 'Get a new outfit or background',
     beats: [
       {
-        href: '/wardrobe',
-        anchor: 'wardrobe-shop-tab',
+        href: '/shop',
+        anchor: 'shop-deals',
         say: 'Tap any outfit to try it on your frog, then buy the one you love',
       },
     ],

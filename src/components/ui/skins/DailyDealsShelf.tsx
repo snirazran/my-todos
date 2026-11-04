@@ -111,7 +111,7 @@ export function DailyDealsShelf({
   const rerollUnavailable = !isPremium && !adReroll;
 
   return (
-    <section aria-label="Today's deals">
+    <section aria-label="Today's deals" data-hint="shop-deals">
       <ShelfHeader
         icon={<Sparkles className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />}
         label="Today's deals"

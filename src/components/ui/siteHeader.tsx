@@ -123,9 +123,9 @@ export default function SiteHeader() {
       protected: true,
     },
     {
-      href: '/wardrobe',
-      label: 'Wardrobe',
-      iconName: 'wardrobe' as const,
+      href: '/shop',
+      label: 'Shop',
+      iconName: 'store' as const,
       protected: true,
     },
     {
@@ -134,15 +134,23 @@ export default function SiteHeader() {
       iconName: 'community' as const,
       protected: true,
     },
+    {
+      href: '/wardrobe',
+      label: 'Closet',
+      iconName: 'wardrobe' as const,
+      protected: true,
+    },
   ];
+
+  const isStagePage = pathname === '/wardrobe' || pathname === '/shop';
 
   // Desktop keeps a full header. Mobile only gets lightweight home-page controls.
   if (pathname === '/onboarding' || pathname === '/welcome' || pathname === '/try' || pathname === '/fly-catch' || pathname === '/login' || pathname?.startsWith('/auth/')) return null;
 
   return (
     <>
-      {pathname === '/wardrobe' && <MobileMenuCluster />}
-      {pathname === '/wardrobe' &&
+      {isStagePage && <MobileMenuCluster />}
+      {isStagePage &&
         user &&
         flyBalance !== undefined && (
           <MobileHeaderActions disabled={isLoadingScreenVisible}>
@@ -168,7 +176,7 @@ export default function SiteHeader() {
           pathname !== '/planner' &&
             pathname !== '/insights' &&
             !pathname?.startsWith('/admin') &&
-            !(pathname === '/wardrobe' && isWardrobeStuck) &&
+            !(isStagePage && isWardrobeStuck) &&
             'shadow-lg shadow-black/5 dark:shadow-black/20',
         )}
       >
@@ -193,9 +201,9 @@ export default function SiteHeader() {
             const href = item.protected && !user ? '/login' : item.href;
             const isActive = pendingHref ? pendingHref === item.href : pathname === item.href;
             const badge: { count: number; tone: string; gift?: boolean } | null =
-              item.label === 'Wardrobe' && inventoryBadge > 0
+              item.href === '/wardrobe' && inventoryBadge > 0
                 ? { count: inventoryBadge, tone: 'bg-rose-500' }
-                : item.label === 'Wardrobe' && shopGiftReady
+                : item.href === '/shop' && shopGiftReady
                   ? { count: 1, tone: 'bg-amber-500', gift: true }
                   : item.label === 'Quests' && questClaimableCount > 0
                   ? { count: questClaimableCount, tone: 'bg-amber-500' }
@@ -230,7 +238,7 @@ export default function SiteHeader() {
                 ) : null}
                 <span
                   className="relative"
-                  data-inventory-target={item.label === 'Wardrobe' ? '' : undefined}
+                  data-inventory-target={item.href === '/wardrobe' ? '' : undefined}
                 >
                   <Icon
                     name={item.iconName}
@@ -269,9 +277,7 @@ export default function SiteHeader() {
         <div className="flex items-center gap-2.5 shrink-0">
           {user &&
             flyBalance !== undefined &&
-            (pathname === '/' ||
-              pathname === '/wardrobe' ||
-              pathname === '/friends') && (
+            (pathname === '/' || isStagePage || pathname === '/friends') && (
               <StyleShuffleHeaderButton className="hover:bg-muted" />
             )}
 

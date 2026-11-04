@@ -112,15 +112,21 @@ export default function MobileNav() {
       protected: true,
     },
     {
-      href: '/wardrobe',
-      label: 'Wardrobe',
-      iconName: 'wardrobe' as const,
+      href: '/shop',
+      label: 'Shop',
+      iconName: 'store' as const,
       protected: true,
     },
     {
       href: '/friends',
       label: 'Friends',
       iconName: 'community' as const,
+      protected: true,
+    },
+    {
+      href: '/wardrobe',
+      label: 'Closet',
+      iconName: 'wardrobe' as const,
       protected: true,
     },
   ];
@@ -137,16 +143,16 @@ export default function MobileNav() {
           transition: 'transform 500ms cubic-bezier(0.22,1,0.36,1)',
         }}
       >
-        <div className="grid grid-cols-5 h-[76px] py-2.5">
+        <div className="grid grid-cols-6 h-[76px] py-2.5">
           {navItems.map((item) => {
             const target = item.protected && !user ? '/login' : item.href;
             const isActive = (pendingHref ?? pathname) === item.href;
             const isPending = pendingHref === item.href && pathname !== item.href;
 
             const content = (
-              <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
+              <div className={`flex flex-col items-center gap-0.5 px-[clamp(8px,calc(3.6vw-3.5px),12px)] py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
                 <div
-                  data-inventory-target={item.label === 'Wardrobe' ? '' : undefined}
+                  data-inventory-target={item.href === '/wardrobe' ? '' : undefined}
                   className={cn('relative', isPending && 'animate-pulse [animation-delay:250ms]')}
                 >
                   <Icon
@@ -154,11 +160,12 @@ export default function MobileNav() {
                     label={item.label}
                     className={cn('w-9 h-9', item.label === 'Friends' && 'scale-125')}
                   />
-                  {item.label === 'Wardrobe' && inventoryBadge > 0 ? (
+                  {item.href === '/wardrobe' && inventoryBadge > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
                     </span>
-                  ) : item.label === 'Wardrobe' && shopGiftReady ? (
+                  ) : null}
+                  {item.href === '/shop' && shopGiftReady ? (
                     <GiftBadge className="absolute -top-3 -right-3.5 animate-in zoom-in duration-300" />
                   ) : null}
                   {item.label === 'Quests' && questClaimableCount > 0 ? (

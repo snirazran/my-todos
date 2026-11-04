@@ -9,6 +9,7 @@ import { hapticTick, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { frogReact } from '@/lib/frogEmotes';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -51,7 +52,6 @@ import { DailyDealsShelf } from './DailyDealsShelf';
 import { afterAdPlacement } from '@/lib/plusPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { ShopGiftPopup, ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
-import { GiftBadge } from '@/components/ui/GiftBadge';
 import { WishlistButton } from './WishlistButton';
 import { WishlistShelf } from './WishlistShelf';
 import { WishlistSheet } from './WishlistSheet';
@@ -126,8 +126,10 @@ const SLOT_LABEL: Record<WardrobeSlot, string> = {
 };
 
 /* ---------------- Main Panel ---------------- */
-const normalizeTab = (tab: string) =>
-  tab === 'shop' || tab === 'trade' ? tab : 'inventory';
+export type WardrobeSection = 'wardrobe' | 'shop';
+
+const normalizeTab = (tab: string, section: WardrobeSection) =>
+  section === 'shop' ? 'shop' : tab === 'trade' ? 'trade' : 'inventory';
 
 /** The badge is one number for several tiers, so its tooltip names them. */
 function tradeReadyTitle(
@@ -174,6 +176,7 @@ export function WardrobePanel({
 }
 
 export function WardrobePageContent({
+  section = 'wardrobe',
   defaultTab = 'inventory',
   focusItemId = null,
   focusItemKind = 'item',
@@ -181,6 +184,7 @@ export function WardrobePageContent({
   stageBackground,
   onClose,
 }: {
+  section?: WardrobeSection;
   defaultTab?: 'inventory' | 'shop' | 'trade';
   focusItemId?: string | null;
   focusItemKind?: 'item' | 'background';
@@ -192,6 +196,7 @@ export function WardrobePageContent({
     <div className="flex flex-col flex-1">
       <WardrobeManagerContent
         open={true}
+        section={section}
         defaultTab={defaultTab}
         focusItemId={focusItemId}
         focusItemKind={focusItemKind}
@@ -208,6 +213,7 @@ export function WardrobePageContent({
 
 function WardrobeManagerContent({
   open,
+  section = 'wardrobe',
   onClose,
   defaultTab,
   focusItemId = null,
@@ -221,6 +227,7 @@ function WardrobeManagerContent({
   bindScroll,
 }: {
   open: boolean;
+  section?: WardrobeSection;
   onClose: () => void;
   defaultTab: 'inventory' | 'shop' | 'trade';
   focusItemId?: string | null;
@@ -239,10 +246,14 @@ function WardrobeManagerContent({
   const tradeReadiness = useTradeReadiness(!!user);
   const readyTrades = tradeReadiness.trades;
 
-  const [activeTab, setActiveTab] = useState<string>(normalizeTab(defaultTab));
+  const isShop = section === 'shop';
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<string>(
+    normalizeTab(defaultTab, section),
+  );
   useEffect(() => {
-    setActiveTab(normalizeTab(defaultTab));
-  }, [defaultTab]);
+    setActiveTab(normalizeTab(defaultTab, section));
+  }, [defaultTab, section]);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
@@ -282,11 +293,10 @@ function WardrobeManagerContent({
   React.useEffect(() => {
     if (!embedded) return;
     setWardrobeTab(activeTab);
-    setLastWardrobeTab(activeTab);
+    if (!isShop) setLastWardrobeTab(activeTab);
     return () => setWardrobeTab('inventory');
-  }, [embedded, activeTab, setWardrobeTab, setLastWardrobeTab]);
+  }, [embedded, isShop, activeTab, setWardrobeTab, setLastWardrobeTab]);
 
-  const shopGiftReady = activeTab !== 'shop' && !!data?.shopGift?.available;
   const [shopGiftClaimRequest, setShopGiftClaimRequest] = useState(0);
   const tradeTabBadge = activeTab === 'trade' ? 0 : readyTrades;
   const closetTabBadge =
@@ -376,6 +386,7 @@ function WardrobeManagerContent({
 
   // Mark Seen on unmount (covers the dedicated /wardrobe page, where `open` stays true)
   useEffect(() => {
+    if (isShop) return;
     return () => {
       fetch('/api/skins/inventory', {
         method: 'PATCH',
@@ -386,7 +397,7 @@ function WardrobeManagerContent({
         .then(() => mutateInventoryCaches())
         .catch(() => {});
     };
-  }, []);
+  }, [isShop]);
 
   const refreshInventory = () => {
     mutate();
@@ -624,7 +635,20 @@ function WardrobeManagerContent({
   }, [activeTab, clearTryOn]);
   const goToTradeUp = () => {
     clearTryOn();
+    if (isShop) {
+      router.push('/wardrobe?tab=trade');
+      return;
+    }
     setActiveTab('trade');
+    setActiveFilter('all');
+    scrollPageToTop();
+  };
+  const goToShop = () => {
+    clearTryOn();
+    if (!isShop) {
+      router.push('/shop');
+      return;
+    }
     setActiveFilter('all');
     scrollPageToTop();
   };
@@ -1274,70 +1298,57 @@ function WardrobeManagerContent({
                   : 'relative z-10 flex items-center justify-between gap-2 md:gap-4',
               )}
             >
-              <TabsList
-                className={cn(
-                  'p-1 rounded-[18px] border border-border/50 flex items-center gap-1',
-                  embedded
-                    ? 'mx-auto h-12 w-full bg-muted shadow-lg md:translate-y-16'
-                    : cn(
-                        'h-10 md:h-11 flex-1 shadow-sm',
-                        isDesktop
-                          ? 'bg-card/80 backdrop-blur-2xl'
-                          : 'bg-muted/30',
-                      ),
-                )}
-              >
-                <TabsTrigger
-                  value="inventory"
-                  className={tabTriggerClass}
-                  onClick={scrollPageToTop}
-                  data-hint="wardrobe-inventory-tab"
-                >
-                  <AppIcon
-                    name="wardrobe"
-                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
-                  />
-                  <span>Closet</span>
-                  {closetTabBadge > 0 && (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" />
+              {!isShop && (
+                <TabsList
+                  className={cn(
+                    'p-1 rounded-[18px] border border-border/50 flex items-center gap-1',
+                    embedded
+                      ? 'mx-auto h-12 w-full bg-muted shadow-lg md:translate-y-16'
+                      : cn(
+                          'h-10 md:h-11 flex-1 shadow-sm',
+                          isDesktop
+                            ? 'bg-card/80 backdrop-blur-2xl'
+                            : 'bg-muted/30',
+                        ),
                   )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="shop"
-                  className={tabTriggerClass}
-                  onClick={scrollPageToTop}
-                  data-hint="wardrobe-shop-tab"
                 >
-                  <AppIcon
-                    name="store"
-                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
-                  />
-                  <span>Shop</span>
-                  {shopGiftReady && (
-                    <GiftBadge className="-my-1 h-[22px] w-[22px] shrink-0" />
-                  )}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="trade"
-                  className={tabTriggerClass}
-                  onClick={scrollPageToTop}
-                  data-hint="wardrobe-trade-tab"
-                >
-                  <AppIcon
-                    name="trade"
-                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
-                  />
-                  <span>Trade Up</span>
-                  {tradeTabBadge > 0 && (
-                    <span
-                      title={tradeReadyTitle(readyTrades, tradeReadiness.byRarity)}
-                      className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm"
-                    >
-                      {readyTrades > 9 ? '9+' : readyTrades}
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
+                  <TabsTrigger
+                    value="inventory"
+                    className={tabTriggerClass}
+                    onClick={scrollPageToTop}
+                    data-hint="wardrobe-inventory-tab"
+                  >
+                    <AppIcon
+                      name="wardrobe"
+                      className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
+                    />
+                    <span>Closet</span>
+                    {closetTabBadge > 0 && (
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" />
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="trade"
+                    className={tabTriggerClass}
+                    onClick={scrollPageToTop}
+                    data-hint="wardrobe-trade-tab"
+                  >
+                    <AppIcon
+                      name="trade"
+                      className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
+                    />
+                    <span>Trade Up</span>
+                    {tradeTabBadge > 0 && (
+                      <span
+                        title={tradeReadyTitle(readyTrades, tradeReadiness.byRarity)}
+                        className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm"
+                      >
+                        {readyTrades > 9 ? '9+' : readyTrades}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              )}
 
               {!embedded && (
                 <div className="flex items-center gap-2">
@@ -1365,7 +1376,10 @@ function WardrobeManagerContent({
               className={cn(
                 'relative z-10',
                 embedded
-                  ? '-mx-4 mt-3 rounded-t-[24px] border-b border-border/60 bg-background px-4 pb-1.5 pt-3 md:-mx-6 md:mt-20 md:px-6'
+                  ? cn(
+                      '-mx-4 rounded-t-[24px] border-b border-border/60 bg-background px-4 pb-1.5 pt-3 md:-mx-6 md:px-6',
+                      isShop ? 'mt-0 md:mt-16' : 'mt-3 md:mt-20',
+                    )
                   : 'mt-2 w-full min-w-0',
               )}
             >
@@ -1477,7 +1491,7 @@ function WardrobeManagerContent({
                       action={{
                         label: 'Go to the shop',
                         icon: <AppIcon name="store" className="h-4 w-4" />,
-                        onClick: () => setActiveTab('shop'),
+                        onClick: goToShop,
                       }}
                     />,
                   )}
@@ -1602,10 +1616,7 @@ function WardrobeManagerContent({
                   balance={balance}
                   onGetFlies={(shortBy) => openFlyShop(shortBy)}
                   onUpgrade={() => openPlus('trade_perks')}
-                  onGoToShop={() => {
-                    setActiveTab('shop');
-                    scrollPageToTop();
-                  }}
+                  onGoToShop={goToShop}
                 />
               ) : null}
             </TabsContent>
@@ -1668,13 +1679,10 @@ function WardrobeManagerContent({
           if (purchaseItem) await equipItemDirect(purchaseItem);
           else if (purchaseBg) await bg.handleEquip(purchaseBg);
           announceEquip();
-          setActiveTab('inventory');
+          if (!isShop) setActiveTab('inventory');
           scrollPageToTop();
         }}
-        onGoToTrade={() => {
-          setActiveTab('trade');
-          scrollPageToTop();
-        }}
+        onGoToTrade={goToTradeUp}
       />
 
       {justBought && !tryTarget && !purchaseCard && activeTab !== 'trade' && (() => {
@@ -1762,13 +1770,11 @@ function WardrobeManagerContent({
         }
         onGoToShop={() => {
           setWishlistOpen(false);
-          setActiveTab('shop');
-          scrollPageToTop();
+          goToShop();
         }}
         onGoToTrade={() => {
           setWishlistOpen(false);
-          setActiveTab('trade');
-          scrollPageToTop();
+          goToTradeUp();
         }}
       />
 

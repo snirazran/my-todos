@@ -108,10 +108,10 @@ export function ActionPicker({
           ) : null}
 
           {need === 'path' ? (
-            <Field label="Path" hint="An in-app route, e.g. /wardrobe?tab=shop">
+            <Field label="Path" hint="An in-app route, e.g. /shop">
               <TextInput
                 value={config.path ?? ''}
-                placeholder="/wardrobe?tab=shop"
+                placeholder="/shop"
                 invalid={!complete}
                 onChange={(path) => onChange({ path })}
               />

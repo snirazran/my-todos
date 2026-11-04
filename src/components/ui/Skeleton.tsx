@@ -62,27 +62,18 @@ export function HomePageSkeleton() {
     >
       <div className="mx-auto max-w-4xl px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 md:px-6 md:pt-12">
         <div className="h-[226px] md:h-[254px]" />
-        <div className="relative z-10 w-full overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-sm md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
-          <div className="flex flex-col md:flex-row">
-            <div className="flex h-12 items-center gap-3 px-3.5 md:w-[300px] md:shrink-0">
-              <Skeleton className="h-3.5 w-[104px] shrink-0 rounded-full" />
-              <div className="flex flex-1 gap-1">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="h-3.5 flex-1 rounded-full" />
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 border-t border-border/50 px-3 py-2.5 md:flex-1 md:border-l md:border-t-0">
-              <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <Skeleton className="h-4 w-2/3 rounded-md" />
-                <Skeleton className="h-2.5 w-full rounded-full" />
-              </div>
+        <div className="relative z-10 w-full overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-sm md:mx-auto md:w-[300px]">
+          <div className="flex h-12 items-center gap-3 px-3.5">
+            <Skeleton className="h-3.5 w-12 shrink-0 rounded-full" />
+            <div className="flex flex-1 gap-1">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-3.5 flex-1 rounded-full" />
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="relative -mx-3 -mt-10 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-3 pt-14 md:mx-auto md:mt-4 md:w-full md:max-w-2xl md:bg-none md:px-8 md:pt-5">
+        <div className="relative -mx-3 -mt-10 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-4 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pt-5 xl:px-10">
           <div className="mb-2 flex min-h-9 items-center justify-between pl-5 pr-3 md:pl-8 md:pr-5">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-20 rounded-full" />
@@ -435,21 +426,23 @@ export function WardrobeGridSkeleton({
   );
 }
 
-export function WardrobePageSkeleton() {
+export function WardrobePageSkeleton({ tabs = 2 }: { tabs?: number }) {
   return (
     <SkeletonShell
-      label="Loading wardrobe"
+      label={tabs > 0 ? 'Loading wardrobe' : 'Loading shop'}
       className="relative flex min-h-[100dvh] flex-col overflow-x-clip md:min-h-[calc(100vh-4rem)]"
     >
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 md:px-6">
         <div className="h-[calc(204px+env(safe-area-inset-top))] shrink-0 md:h-[calc(222px+env(safe-area-inset-top))]" />
 
         <div className="mt-20 flex flex-col gap-4 md:mt-24">
-          <div className="flex gap-2">
-            <Skeleton className="h-10 flex-1 rounded-2xl" />
-            <Skeleton className="h-10 flex-1 rounded-2xl" />
-            <Skeleton className="h-10 flex-1 rounded-2xl" />
-          </div>
+          {tabs > 0 && (
+            <div className="flex gap-2">
+              {Array.from({ length: tabs }).map((_, i) => (
+                <Skeleton key={i} className="h-10 flex-1 rounded-2xl" />
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2 overflow-hidden">
             <div className="flex min-w-0 flex-1 gap-2 overflow-hidden">
               {['w-16', 'w-20', 'w-[4.5rem]', 'w-[4.5rem]', 'w-20'].map(

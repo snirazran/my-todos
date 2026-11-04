@@ -186,7 +186,7 @@ export async function runWishlistDealAlerts(): Promise<{
         fullPrice: deal.priceFlies.toLocaleString(),
       }),
       type: 'wishlist_deal',
-      path: `/wardrobe?tab=shop&item=${encodeURIComponent(pin.itemId)}&kind=item`,
+      path: `/shop?item=${encodeURIComponent(pin.itemId)}&kind=item`,
     });
 
     if (ok) {

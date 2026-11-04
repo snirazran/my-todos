@@ -665,7 +665,7 @@ export function SkinRotationDialog({
                   type="button"
                   onClick={() => {
                     onClose();
-                    router.push('/wardrobe?tab=shop');
+                    router.push('/shop');
                   }}
                   className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#447d3f] px-5 text-sm font-black tracking-wide text-white shadow-[0_3px_0_0_#2c511a] transition-transform active:translate-y-0.5 active:shadow-none"
                 >
@@ -1029,7 +1029,7 @@ export function StyleShuffleHeaderButton({
   // Nothing to shuffle between yet — don't spend a header slot on a control
   // that can't do anything. It appears on its own once a 2nd piece is owned.
   if (loaded && !eligible) return null;
-  if (pathname?.startsWith('/wardrobe')) return null;
+  if (pathname?.startsWith('/wardrobe') || pathname?.startsWith('/shop')) return null;
 
   return (
     <>

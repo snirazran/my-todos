@@ -125,16 +125,16 @@ export function metricObjectiveLabel(
 
 const METRIC_HINT_COPY: Record<string, string> = {
   trade_completed:
-    'In the Wardrobe, swap 4 outfits of the same rarity for 1 better one.',
+    'In your Closet, swap 4 outfits of the same rarity for 1 better one.',
   skin_acquired:
-    'In the Wardrobe shop, buy an outfit or a background you like.',
+    'In the Shop, buy an outfit or a background you like.',
   friend_invited:
     'Invite a friend from the Friends page — you both get a gift.',
   buddy_task_completed:
     'Share a task with your buddy. It counts once you both tick it off.',
   task_saved_later: "Open a task's menu and move it to Saved Tasks.",
   skin_equipped:
-    'In the Wardrobe, tap an outfit or a background you own to put it on.',
+    'In your Closet, tap an outfit or a background you own to put it on.',
   focus_tag_linked:
     'Tick off a task that repeats. Every one counts toward your weekly league.',
   focus_started: 'Start the focus timer on any task. Any length counts.',
