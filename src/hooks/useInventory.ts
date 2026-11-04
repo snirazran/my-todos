@@ -66,10 +66,12 @@ type ApiData = {
   unseenCount?: number;
   unseenContainerCount?: number;
   dailyDeals?: DailyDeal[];
+  everydayItemIds?: string[];
   dealRerollsLeft?: number;
   dealRerollsAllowed?: number;
   shopGift?: ShopGiftStatus;
   isPremium?: boolean;
+  frogName?: string | null;
 };
 
 export function patchInventoryShopGiftClaimed() {

@@ -2,9 +2,11 @@ import mongoose, { Schema, type Model } from 'mongoose';
 import connectMongo from '@/lib/mongoose';
 import {
   DEFAULT_SHOP_SALES,
+  SHOP_LAYOUT_VERSION,
+  SHOP_TIERS,
   type ShopSalesConfig,
 } from '@/lib/skins/shopSales';
-import { RARITY_ORDER, type Rarity } from '@/lib/skins/catalog';
+import type { Rarity } from '@/lib/skins/catalog';
 
 export interface ShopSalesConfigDoc extends ShopSalesConfig {
   _id?: mongoose.Types.ObjectId;
@@ -15,50 +17,45 @@ export interface ShopSalesConfigDoc extends ShopSalesConfig {
 
 export const SHOP_SALES_CONFIG_ID = 'shop-sales';
 
+const LEGACY_FIELDS = [
+  'slots',
+  'affordableSlots',
+  'commonWeightPercent',
+  'rareSlots',
+  'epicSlots',
+  'wishlistDealChancePercent',
+  'discountedSlots',
+  'weekendDay',
+  'weekendDiscountedSlots',
+  'weekendDiscountPercent',
+  'rarityDiscountPercent',
+  'raritySaleDaysPercent',
+  'maxDiscountPercent',
+] as const;
+
 const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
   {
     configId: { type: String, required: true, unique: true, index: true },
-    slots: { type: Number, default: DEFAULT_SHOP_SALES.slots },
+    layoutVersion: { type: Number, default: SHOP_LAYOUT_VERSION },
     refreshHour: { type: Number, default: DEFAULT_SHOP_SALES.refreshHour },
-    affordableSlots: {
+    freeSlots: { type: Number, default: DEFAULT_SHOP_SALES.freeSlots },
+    plusSlots: { type: Number, default: DEFAULT_SHOP_SALES.plusSlots },
+    specialEpicPercent: {
       type: Number,
-      default: DEFAULT_SHOP_SALES.affordableSlots,
+      default: DEFAULT_SHOP_SALES.specialEpicPercent,
     },
-    commonWeightPercent: {
+    everydayRarities: {
+      type: [String],
+      default: () => [...DEFAULT_SHOP_SALES.everydayRarities],
+    },
+    everydayRarePercent: {
       type: Number,
-      default: DEFAULT_SHOP_SALES.commonWeightPercent,
+      default: DEFAULT_SHOP_SALES.everydayRarePercent,
     },
-    rareSlots: { type: Number, default: DEFAULT_SHOP_SALES.rareSlots },
-    epicSlots: { type: Number, default: DEFAULT_SHOP_SALES.epicSlots },
     wishlistSlot: { type: Boolean, default: DEFAULT_SHOP_SALES.wishlistSlot },
-    wishlistDealChancePercent: {
+    saleDiscountPercent: {
       type: Number,
-      default: DEFAULT_SHOP_SALES.wishlistDealChancePercent,
-    },
-    discountedSlots: {
-      type: Number,
-      default: DEFAULT_SHOP_SALES.discountedSlots,
-    },
-    weekendDay: { type: Number, default: DEFAULT_SHOP_SALES.weekendDay },
-    weekendDiscountedSlots: {
-      type: Number,
-      default: DEFAULT_SHOP_SALES.weekendDiscountedSlots,
-    },
-    weekendDiscountPercent: {
-      type: Number,
-      default: DEFAULT_SHOP_SALES.weekendDiscountPercent,
-    },
-    rarityDiscountPercent: {
-      type: Schema.Types.Mixed,
-      default: () => ({ ...DEFAULT_SHOP_SALES.rarityDiscountPercent }),
-    } as any,
-    raritySaleDaysPercent: {
-      type: Schema.Types.Mixed,
-      default: () => ({ ...DEFAULT_SHOP_SALES.raritySaleDaysPercent }),
-    } as any,
-    maxDiscountPercent: {
-      type: Number,
-      default: DEFAULT_SHOP_SALES.maxDiscountPercent,
+      default: DEFAULT_SHOP_SALES.saleDiscountPercent,
     },
     plusRerolls: { type: Number, default: DEFAULT_SHOP_SALES.plusRerolls },
     adRerolls: { type: Number, default: DEFAULT_SHOP_SALES.adRerolls },
@@ -83,102 +80,79 @@ function num(value: unknown, fallback: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-export function sanitizeRarityMap(
-  raw: unknown,
-  fallback: Record<Rarity, number>,
-): Record<Rarity, number> {
-  const source = (raw ?? {}) as Record<string, unknown>;
-  const out = {} as Record<Rarity, number>;
-  for (const rarity of RARITY_ORDER) {
-    out[rarity] = num(source[rarity], fallback[rarity], 0, 100);
-  }
-  return out;
+function rarityList(value: unknown, fallback: Rarity[]): Rarity[] {
+  if (!Array.isArray(value)) return [...fallback];
+  return SHOP_TIERS.filter((rarity) => value.includes(rarity));
 }
 
-export function sanitizeShopSales(raw: Partial<ShopSalesConfig> | null | undefined) {
+export function sanitizeShopSales(
+  raw: Partial<ShopSalesConfig> | null | undefined,
+): ShopSalesConfig {
   const source = raw ?? {};
   return {
-    slots: num(source.slots, DEFAULT_SHOP_SALES.slots, 1, 12),
+    layoutVersion: SHOP_LAYOUT_VERSION,
     refreshHour: num(source.refreshHour, DEFAULT_SHOP_SALES.refreshHour, 0, 23),
-    affordableSlots: num(
-      source.affordableSlots,
-      DEFAULT_SHOP_SALES.affordableSlots,
-      0,
-      12,
-    ),
-    commonWeightPercent: num(
-      source.commonWeightPercent,
-      DEFAULT_SHOP_SALES.commonWeightPercent,
+    freeSlots: num(source.freeSlots, DEFAULT_SHOP_SALES.freeSlots, 1, 12),
+    plusSlots: num(source.plusSlots, DEFAULT_SHOP_SALES.plusSlots, 0, 12),
+    specialEpicPercent: num(
+      source.specialEpicPercent,
+      DEFAULT_SHOP_SALES.specialEpicPercent,
       0,
       100,
     ),
-    rareSlots: num(source.rareSlots, DEFAULT_SHOP_SALES.rareSlots, 0, 12),
-    epicSlots: num(source.epicSlots, DEFAULT_SHOP_SALES.epicSlots, 0, 12),
+    everydayRarities: rarityList(
+      source.everydayRarities,
+      DEFAULT_SHOP_SALES.everydayRarities,
+    ),
+    everydayRarePercent: num(
+      source.everydayRarePercent,
+      DEFAULT_SHOP_SALES.everydayRarePercent,
+      0,
+      100,
+    ),
     wishlistSlot:
       typeof source.wishlistSlot === 'boolean'
         ? source.wishlistSlot
         : DEFAULT_SHOP_SALES.wishlistSlot,
-    wishlistDealChancePercent: num(
-      source.wishlistDealChancePercent,
-      DEFAULT_SHOP_SALES.wishlistDealChancePercent,
-      0,
-      100,
-    ),
-    discountedSlots: num(
-      source.discountedSlots,
-      DEFAULT_SHOP_SALES.discountedSlots,
-      0,
-      12,
-    ),
-    weekendDay: num(source.weekendDay, DEFAULT_SHOP_SALES.weekendDay, 0, 6),
-    weekendDiscountedSlots: num(
-      source.weekendDiscountedSlots,
-      DEFAULT_SHOP_SALES.weekendDiscountedSlots,
-      0,
-      12,
-    ),
-    weekendDiscountPercent: num(
-      source.weekendDiscountPercent,
-      DEFAULT_SHOP_SALES.weekendDiscountPercent,
-      0,
-      90,
-    ),
-    rarityDiscountPercent: sanitizeRarityMap(
-      source.rarityDiscountPercent,
-      DEFAULT_SHOP_SALES.rarityDiscountPercent,
-    ),
-    raritySaleDaysPercent: sanitizeRarityMap(
-      source.raritySaleDaysPercent,
-      DEFAULT_SHOP_SALES.raritySaleDaysPercent,
-    ),
-    maxDiscountPercent: num(
-      source.maxDiscountPercent,
-      DEFAULT_SHOP_SALES.maxDiscountPercent,
+    saleDiscountPercent: num(
+      source.saleDiscountPercent,
+      DEFAULT_SHOP_SALES.saleDiscountPercent,
       0,
       90,
     ),
     plusRerolls: num(source.plusRerolls, DEFAULT_SHOP_SALES.plusRerolls, 0, 10),
     adRerolls: num(source.adRerolls, DEFAULT_SHOP_SALES.adRerolls, 0, 10),
-  } satisfies ShopSalesConfig;
+  };
 }
 
-/**
- * Mongoose defaults only fire for new documents, so a config saved before a
- * field existed comes back with it undefined — backfill on read.
- */
 export async function ensureShopSalesConfig(): Promise<ShopSalesConfig> {
   await connectMongo();
   const existing = (await ShopSalesConfigModel.findOne({
     configId: SHOP_SALES_CONFIG_ID,
   }).lean()) as Partial<ShopSalesConfig> | null;
 
-  const resolved = sanitizeShopSales(existing);
+  const outdated = (existing?.layoutVersion ?? 0) < SHOP_LAYOUT_VERSION;
+  const resolved = sanitizeShopSales(
+    outdated
+      ? {
+          refreshHour: existing?.refreshHour,
+          wishlistSlot: existing?.wishlistSlot,
+          plusRerolls: existing?.plusRerolls,
+          adRerolls: existing?.adRerolls,
+        }
+      : existing,
+  );
 
-  if (!existing) {
+  if (!existing || outdated) {
     await ShopSalesConfigModel.updateOne(
       { configId: SHOP_SALES_CONFIG_ID },
-      { $set: { configId: SHOP_SALES_CONFIG_ID, ...resolved } },
-      { upsert: true },
+      {
+        $set: { configId: SHOP_SALES_CONFIG_ID, ...resolved },
+        ...(existing
+          ? { $unset: Object.fromEntries(LEGACY_FIELDS.map((field) => [field, 1])) }
+          : {}),
+      },
+      { upsert: true, strict: false },
     ).catch(() => {});
   }
 

@@ -21,6 +21,15 @@ import Fly from '@/components/ui/fly';
 import { Plus, CalendarClock } from 'lucide-react';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import useSWR from 'swr';
+import { useAuth } from '@/components/auth/AuthContext';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import {
+  DONE_TOAST_CELEBRATION_MS,
+  DONE_TOAST_MS,
+  TaskDoneToast,
+} from '@/components/ui/TaskDoneToast';
+import { buildDoneMoment, friendlyFirstName } from '@/lib/taskDoneMoments';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useBuddyState } from '@/hooks/useBuddyState';
@@ -261,6 +270,12 @@ export default React.memo(function TaskList({
   // Planner mutations go straight to the API and refresh via the board event.
   const refresh = () => window.dispatchEvent(new Event('board-refresh'));
   const { showNotification } = useNotification();
+  const { user } = useAuth();
+  const { data: profile } = useSWR<{ name?: string | null }>(
+    user ? '/api/user' : null,
+    bootstrapFetcher,
+    { revalidateOnFocus: false },
+  );
   const buddyState = useBuddyState();
   const { triggerTongue, isBusy } = useLeftTongue();
 
@@ -314,6 +329,29 @@ export default React.memo(function TaskList({
     toggleComplete(t);
   };
 
+  const showDoneToast = (t: Task) => {
+    const now = new Date();
+    const moment = buildDoneMoment({
+      task: { ...t, completed: true },
+      dayTasks: items.map((item) => ({
+        ...item,
+        completed: item.id === t.id || !!item.completed,
+      })),
+      tags: userTags ?? [],
+      todayKey: dateKey ?? todayYmdStr(),
+      now,
+      name: friendlyFirstName(profile?.name),
+    });
+    showNotification(
+      <TaskDoneToast moment={moment} frogEnabled={!!user} />,
+      () => toggleComplete({ ...t, completed: true }),
+      {
+        durationMs: moment.confetti ? DONE_TOAST_CELEBRATION_MS : DONE_TOAST_MS,
+        menu: { title: t.text, actionHint: 'Puts it back on your list' },
+      },
+    );
+  };
+
   const toggleComplete = (t: Task) => {
     const completing = !t.completed;
     if (completing && isBusy()) return;
@@ -325,6 +363,7 @@ export default React.memo(function TaskList({
       // Scope to this column's date so sibling instances of a repeating task
       // don't all flash completed and then revert on refetch.
       onPatchTask?.(t.id, { completed: completing }, 'one', undefined, dateKey);
+      if (completing) showDoneToast(t);
       return fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

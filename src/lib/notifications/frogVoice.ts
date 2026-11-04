@@ -1424,6 +1424,18 @@ export function wishlistDealMessage(opts: {
   };
 }
 
+export function wishlistInShopMessage(opts: { itemName: string }): Push {
+  return {
+    title: `${opts.itemName} is in the shop today`,
+    body: pick([
+      "The one you're saving for is in the Special collection. It's gone at the next refresh.",
+      'Your wishlist called. It made the Special collection today.',
+      "I spotted it on the shelf. I'd pounce, personally.",
+      'Straight off your wishlist and into the shop. Just for today.',
+    ]),
+  };
+}
+
 type TimerPhase = 'focus' | 'break';
 
 export type TimerPhaseEndType =

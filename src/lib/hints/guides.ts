@@ -354,7 +354,7 @@ const GUIDES: Record<string, HintGuide> = {
       {
         href: '/shop',
         anchor: 'shop-deals',
-        say: 'Tap any outfit to try it on your frog, then buy the one you love',
+        say: 'Tap anything to see it on your frog, then buy the one you love',
       },
     ],
   },

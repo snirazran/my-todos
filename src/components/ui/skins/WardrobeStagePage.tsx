@@ -12,8 +12,6 @@ import { DEFAULT_BACKGROUND_IMAGES, useBackgrounds } from '@/hooks/useBackground
 import { useWardrobeTryOn, WARDROBE_EQUIPPED_EVENT } from '@/lib/wardrobeTryOnStore';
 import { pickEmote } from '@/lib/frogEmotes';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
-import { useUIStore } from '@/lib/uiStore';
-import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { BackgroundCrossfade } from '@/components/ui/BackgroundCrossfade';
 import {
   PurchaseBurst,
@@ -94,7 +92,7 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
   }, []);
 
   const stage = (
-    <FlyCatchSwipeLauncher source="wardrobe" className="shrink-0">
+    <div className="relative shrink-0">
       <div
         data-fly-hero
         className={`relative flex items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))] ${
@@ -134,7 +132,7 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
           <PremiumFrogAura />
         </div>
       </div>
-    </FlyCatchSwipeLauncher>
+    </div>
   );
 
   const stageBackground = (
@@ -152,8 +150,8 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
             defaultTab={defaultTab}
             focusItemId={focusItemId}
             focusItemKind={focusItemKind}
-            stage={stage}
-            stageBackground={stageBackground}
+            stage={section === 'shop' ? undefined : stage}
+            stageBackground={section === 'shop' ? undefined : stageBackground}
             onClose={() => router.push('/')}
           />
         </section>

@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Bell, UserMinus, UserPlus, Loader2, Search, Plus } from 'lucide-react';
-import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
@@ -29,13 +28,12 @@ import {
   useInventory,
 } from '@/hooks/useInventory';
 import { presentFlyReward } from '@/components/ui/questRewardReveal';
-import { FlyCounter } from '@/components/ui/FlyCounter';
+import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import {
   MobileHeaderActions,
   HEADER_CONTROL_ICON_BUTTON,
 } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
-import { useUIStore } from '@/lib/uiStore';
 import { PondHero } from '@/components/ui/friends/PondHero';
 import { FriendRow } from '@/components/ui/friends/FriendRow';
 import { GrowPondCard } from '@/components/ui/friends/GrowPondCard';
@@ -70,7 +68,6 @@ export default function FriendsPage() {
   );
 
   const { indices } = useWardrobeIndices(!!user);
-  const openFlyShop = useUIStore((s) => s.openFlyShop);
   const { data: inventorySummary } = useInventory(!!user, true);
   const flyBalance = inventorySummary?.wardrobe?.flies;
   const isFrogHungry = useIsFrogHungry(!!user);
@@ -271,7 +268,6 @@ export default function FriendsPage() {
           visibleOnDesktop
           className="md:top-[calc(env(safe-area-inset-top)+0.75rem)]"
         >
-          <StyleShuffleHeaderButton className="md:hidden" />
           <button
             type="button"
             onClick={() => setAddOpen(true)}
@@ -299,17 +295,8 @@ export default function FriendsPage() {
               </span>
             )}
           </button>
-          {flyBalance !== undefined && (
-            <div className="md:hidden">
-              <FlyCounter
-                balance={flyBalance}
-                variant="mobile"
-                onClick={() => openFlyShop()}
-                showGoal
-              />
-            </div>
-          )}
         </MobileHeaderActions>
+        {user && <FlyGainPopup />}
 
         <PondHero
           indices={{ ...indices, mood: isFrogHungry ? 1 : 0 }}

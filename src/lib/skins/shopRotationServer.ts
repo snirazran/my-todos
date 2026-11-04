@@ -1,11 +1,18 @@
 import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
-import { getShopRotation, shopDay, rerollsUsed, type DealReroll } from './dailyDeal';
+import {
+  everydayItemIds,
+  getShopRotation,
+  shopDay,
+  rerollsUsed,
+  type DealReroll,
+} from './dailyDeal';
 import { rerollsAllowed, type ShopSalesConfig } from './shopSales';
 import { readWishlistPins } from './wishlist';
 import type { ItemDef } from './catalog';
 
 type WardrobeLike = {
   inventory?: Record<string, number> | null;
+  inventoryHistory?: Record<string, string> | null;
   wishlist?: unknown;
   wishlistItems?: unknown;
   dealReroll?: DealReroll | null;
@@ -15,6 +22,14 @@ export function ownedItemIds(wardrobe: WardrobeLike): string[] {
   return Object.entries(wardrobe?.inventory ?? {})
     .filter(([, count]) => (count ?? 0) > 0)
     .map(([id]) => id);
+}
+
+function ownedBefore(wardrobe: WardrobeLike, since: number): string[] {
+  const history = wardrobe?.inventoryHistory ?? {};
+  return ownedItemIds(wardrobe).filter((id) => {
+    const at = Date.parse(history[id] ?? '');
+    return Number.isNaN(at) || at < since;
+  });
 }
 
 /** Pinned items the player doesn't own yet — the only ones worth a slot. */
@@ -53,6 +68,7 @@ export async function loadShopRotation({
   const allowed = rerollsAllowed(resolved, isPlus);
   const used = rerollsUsed(wardrobe?.dealReroll ?? undefined, dayKey, allowed);
   const rerollCount = rerollOverride ?? used;
+  const dayStart = Date.parse(endsAt) - 86_400_000;
 
   return {
     config: resolved,
@@ -61,14 +77,16 @@ export async function loadShopRotation({
     rerollsAllowed: allowed,
     rerollsUsed: used,
     rerollsLeft: Math.max(0, allowed - used),
+    everydayIds: everydayItemIds(catalog, resolved, now),
     deals: getShopRotation({
       catalog,
       now,
       timezone,
       config: resolved,
       rerollCount,
-      ownedIds: ownedItemIds(wardrobe),
+      ownedIds: ownedBefore(wardrobe, dayStart),
       wishlistItemIds: wishlistShopIds(wardrobe),
+      isPlus,
     }),
   };
 }

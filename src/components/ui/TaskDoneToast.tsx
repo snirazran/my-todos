@@ -22,6 +22,9 @@ const FROG_PEEK_FROM = 6;
 const FROG_WAIT_MAX_MS = 1200;
 const CONFETTI_DELAY_MS = 200;
 const CONFETTI_Z = 1310;
+export const DONE_TOAST_MS = 5600;
+export const DONE_TOAST_CELEBRATION_MS = 7600;
+
 const CONFETTI_COLORS = ['#7ccf5a', '#4f9a45', '#fcd34d', '#fb923c', '#f472b6', '#60a5fa', '#a78bfa'];
 
 const FROG_PRELOAD_DELAY_MS = 2000;

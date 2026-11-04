@@ -1,6 +1,7 @@
 import type { IconName } from '@/components/ui/Icon';
 import { SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
+import { DEFAULT_SHOP_SALES } from '@/lib/skins/shopSales';
 
 export type PlusBenefit = { icon: IconName; title: string; body: string };
 export type PaywallContext = {
@@ -131,6 +132,21 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     sub: placement === 'trade_reroll' ? 'Another chance to find a trade reward you love.' : 'Refresh today’s deals and find your next look.',
     benefits: [{ icon: 'shuffle', title: placement === 'trade_reroll' ? 'Free trade rerolls' : 'Shop rerolls without ads', body: placement === 'trade_reroll' ? 'Not feeling the prize? Try another.' : 'Fresh deals, no ad break.' }, REWARDS, GIFTS],
   };
+  if (placement === 'shop_plus_slot' || placement === 'shop_plus_sale') {
+    const { freeSlots, plusSlots, saleDiscountPercent } = DEFAULT_SHOP_SALES;
+    const total = freeSlots + plusSlots;
+    return {
+      ...context,
+      headline: placement === 'shop_plus_sale' ? `${saleDiscountPercent}% off, every day.` : 'Love that look?',
+      accent: placement === 'shop_plus_sale' ? 'Only with Plus.' : 'Unlock every Special slot.',
+      sub: `All ${total} Special items and a daily sale for ${name}.`,
+      benefits: [
+        { icon: 'wardrobe', title: `All ${total} Special items`, body: `Not just the first ${freeSlots}.` },
+        { icon: 'discount', title: `A ${saleDiscountPercent}% off sale every day`, body: 'A new pick every morning.' },
+        DOUBLE,
+      ],
+    };
+  }
   if (placement.includes('tag_limit')) return {
     ...context,
     headline: 'Room for all your plans.',

@@ -66,12 +66,16 @@ const EMPTY_NOUN: Record<ClosetSlot, string> = {
 type Source = { label: string; icon: 'store' | 'closetGifts' | 'trade' };
 
 const SHOP_SOURCE: Source = { label: 'Shop', icon: 'store' };
+const SPECIAL_SOURCE: Source = { label: 'Special collection', icon: 'store' };
 const GIFT_SOURCE: Source = { label: 'Gifts', icon: 'closetGifts' };
 const TRADE_SOURCE: Source = { label: 'Trade Up', icon: 'trade' };
 
-function entrySources(entry: ClosetEntry): Source[] {
+function entrySources(entry: ClosetEntry, everydayIds?: ReadonlySet<string>): Source[] {
   if (isTradeOnlyRarity(entryRarity(entry))) return [TRADE_SOURCE, GIFT_SOURCE];
-  if (entry.price > 0) return [SHOP_SOURCE, GIFT_SOURCE, TRADE_SOURCE];
+  if (entry.price > 0) {
+    const special = entry.kind === 'item' && !!everydayIds?.size && !everydayIds.has(entry.item.id);
+    return [special ? SPECIAL_SOURCE : SHOP_SOURCE, GIFT_SOURCE, TRADE_SOURCE];
+  }
   return [GIFT_SOURCE, TRADE_SOURCE];
 }
 
@@ -150,6 +154,10 @@ export function ClosetAlbum({
   onWear,
   onSeeInShop,
   onTradeUp,
+  title = 'Album',
+  shopActionLabel = 'See in Shop',
+  everydayIds,
+  buyableIds,
 }: {
   open: boolean;
   initialSlot: ClosetSlot;
@@ -163,8 +171,14 @@ export function ClosetAlbum({
   onWear: (entry: ClosetEntry) => void;
   onSeeInShop: (entry: ClosetEntry) => void;
   onTradeUp: () => void;
+  title?: string;
+  shopActionLabel?: string;
+  everydayIds?: ReadonlySet<string>;
+  buyableIds?: ReadonlySet<string>;
 }) {
   const { gridClass } = useShelfGrid();
+  const inShopToday = (entry: ClosetEntry) =>
+    entry.kind !== 'item' || !buyableIds || buyableIds.has(entry.item.id);
   const [slot, setSlot] = useState<ClosetSlot>(initialSlot);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -239,7 +253,7 @@ export function ClosetAlbum({
       }}
       className="h-[88dvh] select-none sm:h-[84dvh] sm:max-w-[640px]"
       zIndex={1150}
-      closeAriaLabel="Close album"
+      closeAriaLabel={`Close ${title.toLowerCase()}`}
     >
       {({ bindScroll }) => (
         <div className="flex flex-col flex-1 min-h-0">
@@ -247,7 +261,7 @@ export function ClosetAlbum({
             <div className="flex items-center gap-2 pr-12 sm:pr-14">
               <Icon name="closetAlbum" className="h-7 w-7 shrink-0" />
               <h2 className="text-xl font-black tracking-tight text-foreground">
-                Album
+                {title}
               </h2>
               <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-black tabular-nums text-muted-foreground">
                 {total.owned}/{total.count}
@@ -384,7 +398,7 @@ export function ClosetAlbum({
                       <span className="mr-0.5 text-[12px] font-bold text-muted-foreground">
                         Get it from
                       </span>
-                      {entrySources(selected).map((source) => (
+                      {entrySources(selected, everydayIds).map((source) => (
                         <span
                           key={source.label}
                           className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-[3px] text-[11.5px] font-extrabold leading-none text-foreground/80"
@@ -416,13 +430,13 @@ export function ClosetAlbum({
                   >
                     Trade up
                   </button>
-                ) : selected.price > 0 ? (
+                ) : selected.price > 0 && inShopToday(selected) ? (
                   <button
                     type="button"
                     onClick={() => onSeeInShop(selected)}
                     className="flex h-11 shrink-0 items-center rounded-2xl bg-[#447d3f] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
                   >
-                    See in Shop
+                    {shopActionLabel}
                   </button>
                 ) : null}
               </div>

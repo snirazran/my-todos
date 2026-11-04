@@ -10,7 +10,8 @@ import { Icon } from '@/components/ui/Icon';
 import { Bell, Check, ChevronLeft, ChevronRight, Crown, Loader2, ShieldAlert, Sparkles, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
-import { CATALOG, rarityRank, type ItemDef, type Rarity } from '@/lib/skins/catalog';
+import type { WardrobeSlot } from '@/lib/skins/catalog';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { FrogStampIndices } from '@/lib/frogStampEngine';
@@ -143,6 +144,7 @@ export type PlusPaywallArgs = {
   frogName?: string;
   offering?: string;
   variant?: string;
+  previewItem?: PaywallPreviewItem | null;
 };
 
 export function usePlusPaywall({
@@ -534,9 +536,7 @@ export function usePlusPaywall({
 
 export function PlusUpgradeModal(props: PlusPaywallArgs) {
   const { open, onClose } = props;
-  useEffect(() => {
-    void loadLiveShowcaseItems();
-  }, []);
+  const look = usePaywallLook(open, props.previewItem);
   const {
     mounted,
     view,
@@ -632,6 +632,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                     Choose a subscription below. Prices and eligible offers come from your store.
                   </Dialog.Description>
                   <PaywallEnteredContext.Provider value={entered}>
+                  <PaywallLookContext.Provider value={look}>
                   <div inert={needsAccount || undefined} className="flex min-h-0 flex-1 flex-col">
                     <header className={cn('relative flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] short:pb-1 md:px-7 md:pt-4', !isDesktop && view === 'offer' && step === 'offer' && 'absolute inset-x-0 top-0 z-20')}>
                       {showBack ? (
@@ -714,6 +715,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                       </div>
                     </div>
                   </div>
+                  </PaywallLookContext.Provider>
                   </PaywallEnteredContext.Provider>
 
               <PlusAccountPrompt
@@ -735,138 +737,21 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
 }
 
 
-type ShowcaseItem = Pick<ItemDef, 'slot' | 'rarity' | 'riveIndex'>;
-type ShowcaseLook = { indices: FrogStampIndices; rarity: Rarity };
+export type PaywallPreviewItem = { slot: WardrobeSlot; riveIndex: number };
 
-const SHOWCASE_RARITIES: readonly Rarity[] = ['rare', 'epic', 'legendary'];
-const LOOK_ROTATE_MS = 7000;
+const BARE_LOOK: FrogStampIndices = { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
+const PaywallLookContext = React.createContext<FrogStampIndices>(BARE_LOOK);
 
-let liveShowcaseItems: ShowcaseItem[] | null = null;
-let liveShowcaseRequest: Promise<ShowcaseItem[] | null> | null = null;
-
-function loadLiveShowcaseItems() {
-  liveShowcaseRequest ??= fetch('/api/skins/catalog')
-    .then((res) => (res.ok ? res.json() : null))
-    .then((payload: { items?: ShowcaseItem[] } | null) => {
-      if (payload?.items?.length) liveShowcaseItems = payload.items;
-      return liveShowcaseItems;
-    })
-    .catch(() => {
-      liveShowcaseRequest = null;
-      return null;
-    });
-  return liveShowcaseRequest;
+function usePaywallLook(open: boolean, preview?: PaywallPreviewItem | null) {
+  const { ownedIndices } = useWardrobeIndices(open);
+  const { skin, hat, body, hand_item } = ownedIndices;
+  const previewSlot = preview && preview.slot !== 'container' ? preview.slot : null;
+  const previewIndex = preview?.riveIndex ?? 0;
+  return React.useMemo<FrogStampIndices>(() => {
+    const look = { skin, mood: 0, hat, body, hand_item };
+    return previewSlot ? { ...look, [previewSlot]: previewIndex } : look;
+  }, [skin, hat, body, hand_item, previewSlot, previewIndex]);
 }
-
-type ShowcaseSlot = 'skin' | 'hat' | 'body' | 'hand_item';
-
-const SHOWCASE_SLOTS: readonly ShowcaseSlot[] = ['skin', 'hat', 'body', 'hand_item'];
-
-const SLOT_WEAR_CHANCE: Record<ShowcaseSlot, number> = {
-  skin: 0.35,
-  hat: 0.8,
-  body: 0.55,
-  hand_item: 0.6,
-};
-
-function shuffle<T>(list: T[]) {
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list;
-}
-
-function createShowcaseDrawer(items: readonly ShowcaseItem[]) {
-  const pools = Object.fromEntries(
-    SHOWCASE_SLOTS.map((slot) => [
-      slot,
-      items.filter((item) => item.slot === slot && SHOWCASE_RARITIES.includes(item.rarity)),
-    ]),
-  ) as Record<ShowcaseSlot, ShowcaseItem[]>;
-  const bags: Record<ShowcaseSlot, ShowcaseItem[]> = { skin: [], hat: [], body: [], hand_item: [] };
-  const last: Partial<Record<ShowcaseSlot, ShowcaseItem>> = {};
-
-  const draw = (slot: ShowcaseSlot) => {
-    if (!pools[slot].length) return undefined;
-    if (!bags[slot].length) {
-      bags[slot] = shuffle([...pools[slot]]);
-      const end = bags[slot].length - 1;
-      if (end > 0 && bags[slot][end] === last[slot]) {
-        [bags[slot][0], bags[slot][end]] = [bags[slot][end], bags[slot][0]];
-      }
-    }
-    const item = bags[slot].pop();
-    last[slot] = item;
-    return item;
-  };
-
-  return (): ShowcaseLook | null => {
-    const available = SHOWCASE_SLOTS.filter((slot) => pools[slot].length);
-    if (!available.length) return null;
-    let slots = available.filter((slot) => Math.random() < SLOT_WEAR_CHANCE[slot]);
-    if (slots.length < 2) {
-      slots = shuffle([...available]).slice(0, Math.min(2, available.length));
-    }
-    const indices: FrogStampIndices = { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
-    let rarity: Rarity = 'rare';
-    for (const slot of slots) {
-      const item = draw(slot);
-      if (!item) continue;
-      indices[slot] = item.riveIndex;
-      if (rarityRank[item.rarity] > rarityRank[rarity]) rarity = item.rarity;
-    }
-    return { indices, rarity };
-  };
-}
-
-const STATIC_SHOWCASE_ITEMS = CATALOG.filter((item) => item.slot !== 'skin');
-const EMPTY_LOOK: ShowcaseLook = {
-  indices: { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 },
-  rarity: 'rare',
-};
-
-function useShowcaseLook(rotating: boolean) {
-  const drawRef = React.useRef<(() => ShowcaseLook | null) | null>(null);
-  const [look, setLook] = useState<ShowcaseLook>(() => {
-    drawRef.current = createShowcaseDrawer(liveShowcaseItems ?? STATIC_SHOWCASE_ITEMS);
-    return drawRef.current() ?? EMPTY_LOOK;
-  });
-  const [tick, setTick] = useState(0);
-  const rotatingRef = React.useRef(rotating);
-  rotatingRef.current = rotating;
-
-  useEffect(() => {
-    if (liveShowcaseItems) return;
-    let cancelled = false;
-    void loadLiveShowcaseItems().then((items) => {
-      if (cancelled || !items) return;
-      drawRef.current = createShowcaseDrawer(items);
-      if (!rotatingRef.current) {
-        const next = drawRef.current();
-        if (next) setLook(next);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!rotating) return;
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      const next = drawRef.current?.();
-      if (!next) return;
-      setLook(next);
-      setTick((t) => t + 1);
-    }, LOOK_ROTATE_MS);
-    return () => window.clearInterval(id);
-  }, [rotating]);
-
-  return { look, tick };
-}
-
 
 const offerLine = (trialDuration?: string | null) =>
   trialDuration ? `Psst! You can try it\nfree for ${trialDuration}!` : 'Psst! No commitment.\nCancel anytime!';
@@ -946,7 +831,7 @@ function ArrivalBurst({ className }: { className: string }) {
 }
 
 /** One live frog changes outfits in place; no remount between looks or plan choices. */
-function useLookHop(look: ShowcaseLook, dressed: boolean, reduceMotion: boolean) {
+function useLookHop(look: FrogStampIndices, dressed: boolean, reduceMotion: boolean) {
   const [shownLook, setShownLook] = useState(look);
   const hop = useAnimationControls();
   useEffect(() => {
@@ -988,7 +873,7 @@ function FrogBand({ line, desktop = false }: { line: string; desktop?: boolean }
   const ready = useFrogMount(STEP_SLIDE_MS);
   const [dressed, setDressed] = useState(false);
   const [landedOnce, setLandedOnce] = useState(false);
-  const { look } = useShowcaseLook(landedOnce && !reduceMotion);
+  const look = React.useContext(PaywallLookContext);
   const { shownLook, hop } = useLookHop(look, dressed, !!reduceMotion);
   const depth = desktop ? 195 : 130;
   const landed = useFrogArrival(hop, dressed, depth);
@@ -998,7 +883,7 @@ function FrogBand({ line, desktop = false }: { line: string; desktop?: boolean }
   const size = desktop ? 354 : 236;
   const height = Math.round(size * 1.125);
   const lift = desktop ? 27 : 24;
-  const hasHat = look.indices.hat !== 0;
+  const hasHat = look.hat !== 0;
   return (
     <>
       <span className={cn('absolute left-1/2 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.2),rgba(255,255,255,0.06)_55%,transparent)]', desktop ? 'bottom-[40px] h-[440px] w-[520px]' : '-bottom-6 h-[300px] w-[380px]')} />
@@ -1018,7 +903,7 @@ function FrogBand({ line, desktop = false }: { line: string; desktop?: boolean }
           {dressed && !reduceMotion ? <ArrivalBurst className={desktop ? 'bottom-[128px]' : 'bottom-[85px]'} /> : null}
           <motion.div initial={reduceMotion ? false : { y: depth }} animate={hop} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2) + lift, width: size, height, marginLeft: -size / 2 }}>
             {ready ? (
-              <Frog width={size} height={height} indices={shownLook.indices} visualOffsetY={-5}
+              <Frog width={size} height={height} indices={shownLook} visualOffsetY={-5}
                 paused={!!reduceMotion} greet="loveShy"
                 ignoreIdlePause onDressed={() => setDressed(true)} />
             ) : null}
@@ -1227,7 +1112,7 @@ function TrialPromise({ line }: { line: string }) {
   const [dressed, setDressed] = useState(false);
   const arrive = useAnimationControls();
   const landed = useFrogArrival(arrive, dressed, 110);
-  const [look] = useState(() => createShowcaseDrawer(liveShowcaseItems ?? STATIC_SHOWCASE_ITEMS)() ?? EMPTY_LOOK);
+  const look = React.useContext(PaywallLookContext);
   const size = 168;
   const height = Math.round(size * 1.125);
   return (
@@ -1250,7 +1135,7 @@ function TrialPromise({ line }: { line: string }) {
       <div className="absolute bottom-0 left-0 h-[136px] w-[132px] origin-bottom-left short:scale-[0.84]">
         <motion.div initial={reduceMotion ? false : { y: 110 }} animate={arrive} className="absolute left-1/2 origin-[50%_77%]" style={{ bottom: -Math.round(height * 0.2), width: size, height, marginLeft: -size / 2 }}>
           {ready ? (
-            <Frog width={size} height={height} indices={look.indices} visualOffsetY={-5}
+            <Frog width={size} height={height} indices={look} visualOffsetY={-5}
               paused={!!reduceMotion} greet="love"
               ignoreIdlePause onDressed={() => setDressed(true)} />
           ) : null}

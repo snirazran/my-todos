@@ -34,6 +34,7 @@ import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { GiftOddsButton } from './ItemCard';
 import { PurchaseSheet, type PurchaseTarget } from './PurchaseSheet';
+import { ShopWindow } from '@/components/ui/shop/ShopWindow';
 import { SlideSwap } from './SlideSwap';
 import { FilterBar, FilterCategory } from './FilterBar';
 import { cn } from '@/lib/utils';
@@ -47,14 +48,11 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
-import { DailyDealsShelf } from './DailyDealsShelf';
 import { afterAdPlacement } from '@/lib/plusPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
-import { ShopGiftPopup, ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
+import { ShopGiftPopup } from '@/components/ui/shop/ShopGiftPopup';
 import { WishlistButton } from './WishlistButton';
-import { WishlistShelf } from './WishlistShelf';
 import { WishlistSheet } from './WishlistSheet';
-import { SeenOnFriendsRow } from './SeenOnFriendsRow';
 import { SavedLooksButton } from './LooksRow';
 import { SaveOutfitButton, SavedOutfitsGrid, useOutfitSaver } from './SavedOutfits';
 import { StyleShufflePill } from '@/components/ui/SkinRotation';
@@ -87,8 +85,6 @@ import {
   ClosetEmptyPrompt,
   ClosetFlyIcon,
   ClosetGrid,
-  CollectionBook,
-  DealTileRow,
   SetCompleteCard,
   TileArt,
   TryOnBar,
@@ -303,11 +299,13 @@ function WardrobeManagerContent({
   );
   const [plusOpen, setPlusOpen] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('premium_daily_deal');
+  const [plusPreview, setPlusPreview] = useState<ItemDef | null>(null);
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const pendingDealRerollRef = React.useRef(false);
-  const openPlus = (placement: string) => {
+  const openPlus = (placement: string, item?: ItemDef) => {
     pendingDealRerollRef.current = false;
     setPlusPlacement(placement);
+    setPlusPreview(item ?? null);
     setPlusOpen(true);
   };
   const { showNotification } = useNotification();
@@ -922,11 +920,17 @@ function WardrobeManagerContent({
         }),
       });
 
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(typeof payload?.error === 'string' ? payload.error : 'Purchase failed.');
+      }
       refreshInventory();
       return true;
     } catch (e) {
-      setNotif({ msg: 'Purchase failed.', type: 'error' });
+      setNotif({
+        msg: e instanceof Error && e.message !== 'Failed to fetch' ? e.message : 'Purchase failed.',
+        type: 'error',
+      });
       refreshInventory();
       return false;
     } finally {
@@ -936,19 +940,17 @@ function WardrobeManagerContent({
 
   const closetSlot = toClosetSlot(activeFilter);
   const { gridClass: shelfGridClass } = useShelfGrid();
-  const shopDayKey =
-    data?.dailyDeals?.[0]?.endsAt ?? new Date().toDateString();
-  const shuffleSeed = `${user?.uid ?? 'guest'}|${shopDayKey}`;
-
-  const dealPrices = useMemo(
-    () =>
-      new Map(
-        (data?.dailyDeals ?? [])
-          .filter((deal) => deal.onSale)
-          .map((deal) => [deal.itemId, deal.dealPrice] as const),
-      ),
-    [data?.dailyDeals],
+  const everydaySet = useMemo(
+    () => new Set(data?.everydayItemIds ?? []),
+    [data?.everydayItemIds],
   );
+  const buyableToday = useMemo(() => {
+    const set = new Set(everydaySet);
+    for (const deal of data?.dailyDeals ?? []) {
+      if (!deal.plusOnly || data?.isPremium) set.add(deal.itemId);
+    }
+    return set;
+  }, [everydaySet, data?.dailyDeals, data?.isPremium]);
   const ownedGiftCards = useMemo<WardrobeCard[]>(
     () =>
       (data?.catalog ?? [])
@@ -1001,10 +1003,6 @@ function WardrobeManagerContent({
     const bucket = wishlistBucket(entry);
     return bucket === 'ready' || bucket === 'deal';
   }).length;
-  const dealsVisible = activeFilter === 'all' && !!data?.dailyDeals?.length;
-  const shelfWishlistEntries = wishlistEntries.filter(
-    (entry) => !(dealsVisible && entry.onDeal),
-  );
 
   const openWishlist = () => {
     setWishlistOpen(true);
@@ -1085,6 +1083,26 @@ function WardrobeManagerContent({
       : 0;
 
   const openItemPurchase = (item: ItemDef, dealPrice: number | null = null) => {
+    const ownedNow = (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0;
+    if (
+      !isGuest &&
+      data?.everydayItemIds &&
+      !ownedNow &&
+      !isTradeOnlyRarity(item.rarity) &&
+      !buyableToday.has(item.id)
+    ) {
+      const locked = data.dailyDeals?.find((deal) => deal.itemId === item.id && deal.plusOnly);
+      if (locked) {
+        openPlus('shop_plus_slot', item);
+        return;
+      }
+      hapticTick();
+      setNotif({
+        msg: `${item.name} isn't in the shop today. It shows up in the Special collection now and then.`,
+        type: 'error',
+      });
+      return;
+    }
     hapticSelect();
     // Sale prices apply everywhere, not just on the shelf — resolve today's
     // price here so a card opened from the main grid quotes what the server
@@ -1153,40 +1171,6 @@ function WardrobeManagerContent({
     data?.isPremium,
     bg.catalog,
   ]);
-
-  const renderCollection = (
-    slot: ClosetSlot,
-    show: 'owned' | 'unowned',
-    empty?: React.ReactNode,
-  ) =>
-    data ? (
-      <CollectionBook
-        slot={slot}
-        catalog={data.catalog ?? []}
-        backgrounds={bg.catalog}
-        inventory={data.wardrobe?.inventory ?? {}}
-        bgInventory={bg.inventory}
-        equipped={data.wardrobe?.equipped ?? {}}
-        equippedBgId={bg.equipped}
-        dealPrices={dealPrices}
-        tryOnId={
-          tryTarget?.kind === 'item'
-            ? tryTarget.item.id
-            : tryTarget?.kind === 'bg'
-              ? tryTarget.bg.id
-              : null
-        }
-        unseen={unseenInventorySet}
-        wishlistedIds={wishlistedItemIds}
-        balance={balance}
-        shuffleSeed={shuffleSeed}
-        show={show}
-        empty={empty}
-        onTapItem={tapClosetItem}
-        onTapBackground={tapClosetBackground}
-        onTradeUp={show === 'unowned' && !isGuest ? goToTradeUp : undefined}
-      />
-    ) : null;
 
   const renderGiftTile = (card: WardrobeCard) => {
     if (card.kind !== 'item') return null;
@@ -1262,6 +1246,35 @@ function WardrobeManagerContent({
         </div>
       )}
 
+      {isShop && embedded ? (
+        <ShopWindow
+          loading={!canRenderItems || !data || bg.isLoading}
+          frogName={data?.frogName ?? null}
+          balance={balance}
+          catalog={data?.catalog ?? []}
+          backgrounds={bg.catalog}
+          inventory={data?.wardrobe?.inventory ?? {}}
+          bgInventory={bg.inventory}
+          deals={data?.dailyDeals ?? []}
+          everydayIds={data?.everydayItemIds}
+          isPremium={!!data?.isPremium}
+          isGuest={isGuest}
+          rerollsLeft={data?.dealRerollsLeft ?? 0}
+          rerolling={rerolling}
+          wishlistedIds={wishlistedItemIds}
+          shopGift={data?.shopGift}
+          onOpenItem={(item, dealPrice) => openItemPurchase(item, dealPrice)}
+          onOpenBackground={openBgPurchase}
+          onReroll={() => void rerollDeals()}
+          onPlus={openPlus}
+          onClaimGift={() => setShopGiftClaimRequest((n) => n + 1)}
+          onOpenCatalog={() => {
+            hapticTick();
+            setAlbumSlot('all');
+          }}
+          onGetFlies={() => openFlyShop()}
+        />
+      ) : (
       <div
         className={cn(
           'flex flex-col',
@@ -1576,95 +1589,6 @@ function WardrobeManagerContent({
             </TabsContent>
 
             <TabsContent
-              value="shop"
-              className={cn(
-                embedded
-                  ? 'relative'
-                  : 'absolute inset-0 overflow-y-auto overscroll-none p-3',
-                'data-[state=inactive]:hidden',
-              )}
-            >
-              {!canRenderItems || !data ? (
-                <WardrobeGridSkeleton />
-              ) : (
-                <div className="flex flex-col gap-5 pb-4">
-                  <AnimatePresence initial={false}>
-                    {!isGuest && data.shopGift?.available && (
-                      <motion.div
-                        key="shop-gift-tile"
-                        exit={{ opacity: 0, height: 0, marginBottom: -20 }}
-                        transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
-                        className="overflow-hidden"
-                      >
-                        <ShopGiftTile
-                          gift={data.shopGift}
-                          onClaim={() => setShopGiftClaimRequest((n) => n + 1)}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  {showTryOnHint && (
-                    <p className="-mb-2 flex items-center justify-center gap-1.5 text-[12px] font-bold text-muted-foreground">
-                      <Shirt className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                      Tap anything to try it on your frog
-                    </p>
-                  )}
-                  {activeFilter === 'all' && !!data.dailyDeals?.length && (
-                    <DailyDealsShelf
-                      deals={data.dailyDeals}
-                      catalog={data.catalog ?? []}
-                      isPremium={!!data.isPremium}
-                      rerollsLeft={data.dealRerollsLeft ?? 0}
-                      rerolling={rerolling}
-                      wishlistedIds={wishlistedItemIds}
-                      onReroll={() => void rerollDeals()}
-                      onUpgrade={() => void rerollDeals()}
-                      renderEntries={(entries) => (
-                        <DealTileRow
-                          deals={entries.map(({ deal, item }) => ({
-                            item,
-                            dealPrice: deal.dealPrice,
-                            onSale: deal.onSale,
-                          }))}
-                          inventory={data.wardrobe?.inventory ?? {}}
-                          equipped={data.wardrobe?.equipped ?? {}}
-                          tryOnId={tryTarget?.kind === 'item' ? tryTarget.item.id : null}
-                          wishlistedIds={wishlistedItemIds}
-                          balance={balance}
-                          onTapItem={tapClosetItem}
-                        />
-                      )}
-                    />
-                  )}
-                  {activeFilter === 'all' && !isGuest && (
-                    <WishlistShelf
-                      entries={shelfWishlistEntries}
-                      slots={wishlistSlots}
-                      removing={wishlistBusy}
-                      onOpen={openWishlistEntry}
-                      onRemove={(entry) =>
-                        void removeFromWishlist(entry.view.itemId, entry.view.kind)
-                      }
-                      onSeeAll={openWishlist}
-                    />
-                  )}
-                  {renderCollection(closetSlot, 'unowned')}
-                  {activeFilter === 'all' && !isGuest && (
-                    <SeenOnFriendsRow
-                      enabled={activeTab === 'shop' && activeFilter === 'all'}
-                      catalog={data.catalog ?? []}
-                      backgrounds={bg.catalog}
-                      ownedItems={data.wardrobe?.inventory ?? {}}
-                      ownedBackgrounds={bg.inventory}
-                      onPickItem={(item) => tapClosetItem(item, null)}
-                      onPickBackground={tapClosetBackground}
-                    />
-                  )}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent
               value="trade"
               className={cn(
                 embedded ? 'relative' : 'absolute inset-0 overflow-hidden',
@@ -1693,6 +1617,7 @@ function WardrobeManagerContent({
           </div>
         </Tabs>
       </div>
+      )}
 
       {openingGiftId && (
         <GiftBoxOpening
@@ -1704,10 +1629,14 @@ function WardrobeManagerContent({
       )}
 
       {!isShop && outfits.dialog}
-      {!isShop && data && (
+      {data && (
         <ClosetAlbum
           open={albumSlot !== null}
           initialSlot={albumSlot ?? 'all'}
+          title={isShop ? 'Catalog' : undefined}
+          shopActionLabel={isShop ? 'Buy' : undefined}
+          everydayIds={everydaySet}
+          buyableIds={isGuest ? undefined : buyableToday}
           catalog={data.catalog ?? []}
           backgrounds={bg.catalog}
           inventory={data.wardrobe?.inventory ?? {}}
@@ -1722,6 +1651,11 @@ function WardrobeManagerContent({
           }}
           onSeeInShop={(entry) => {
             setAlbumSlot(null);
+            if (isShop) {
+              if (entry.kind === 'item') openItemPurchase(entry.item);
+              else openBgPurchase(entry.bg);
+              return;
+            }
             const id = entry.kind === 'item' ? entry.item.id : entry.bg.id;
             const kind = entry.kind === 'item' ? 'item' : 'background';
             router.push(`/shop?item=${encodeURIComponent(id)}&kind=${kind}`);
@@ -1951,6 +1885,7 @@ function WardrobeManagerContent({
       <PlusUpgradeModal
         open={plusOpen}
         placement={plusPlacement}
+        previewItem={plusPreview}
         onStartTrial={async () => {
           if (!pendingDealRerollRef.current) return;
           pendingDealRerollRef.current = false;

@@ -6,6 +6,7 @@ import PlannerTour from '@/components/board/tour/PlannerTour';
 import PlannerCalendarNudge from '@/components/board/tour/PlannerCalendarNudge';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
+import { usePreloadDoneToastFrog } from '@/components/ui/TaskDoneToast';
 import { syncQuestProgress } from '@/lib/questClaims';
 import { PlannerPageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
@@ -79,6 +80,7 @@ export default function ManageTasksPage() {
     : 'UTC';
 
   const { showNotification } = useNotification();
+  usePreloadDoneToastFrog(true);
 
   // Board writes land as whole-column PUTs (adds, removes, reorders alike),
   // so quest progress is refreshed on a short debounce after the last write.

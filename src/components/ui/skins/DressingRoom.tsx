@@ -942,6 +942,7 @@ export function ClosetFlyIcon() {
 }
 
 const BARE_SLOT_NOUN: Partial<Record<ClosetSlot, string>> = {
+  skin: 'skin',
   hat: 'hat',
   body: 'body item',
   hand_item: 'held item',

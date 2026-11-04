@@ -78,10 +78,7 @@ import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
 import { isFocusWrapUp, useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
-import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
-import { StreakChip } from '@/components/ui/streak/StreakChip';
-import { FlyCounter } from '@/components/ui/FlyCounter';
-import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
+import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import {
@@ -93,7 +90,6 @@ import { useFlyOfferHeight } from '@/components/ui/questRewardReveal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { leapViewKey } from '@/lib/leap/viewKey';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
-import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
 import { markFreshTasks } from '@/lib/taskEntrance';
 import { frogReact, pickEmote } from '@/lib/frogEmotes';
@@ -138,7 +134,6 @@ export default function HomeDashboard() {
     setWardrobeOpen,
     setIsCinematicActive,
     setPremiumModalOpen,
-    openFlyShop,
   } = useUIStore();
 
   // -- NEW STATE HOOK --
@@ -605,25 +600,6 @@ export default function HomeDashboard() {
     },
   });
   const guided = firstRun.guided;
-  const earnedChipsVisible = !guided;
-  const flyCounterVisible =
-    !guided || (firstRun.phase !== 'hungry' && firstRun.phase !== 'off');
-  const [firstRunFlyStart, setFirstRunFlyStart] = useState<number | null>(null);
-  useEffect(() => {
-    if (firstRun.phase === 'hungry' && firstRunFlyStart === null && !isLoading) {
-      setFirstRunFlyStart(flyBalance);
-    }
-  }, [firstRun.phase, firstRunFlyStart, flyBalance, isLoading]);
-  const [firstRunFlyShown, setFirstRunFlyShown] = useState(false);
-  useEffect(() => {
-    if (firstRun.phase !== 'yum') return;
-    const timer = window.setTimeout(() => setFirstRunFlyShown(true), 650);
-    return () => window.clearTimeout(timer);
-  }, [firstRun.phase]);
-  const shownFlyBalance =
-    firstRun.phase === 'yum' && !firstRunFlyShown && firstRunFlyStart !== null
-      ? Math.min(firstRunFlyStart, flyBalance)
-      : flyBalance;
   const taskListHidden =
     guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off';
   const listTasks = useMemo(
@@ -834,37 +810,7 @@ export default function HomeDashboard() {
   return (
     <main className="relative min-h-screen pb-20 overflow-x-hidden md:pb-8">
       {!guided && <MobileMenuCluster position="absolute" />}
-      {user && (
-        <MobileHeaderActions position="absolute">
-          {!guided && <StyleShuffleHeaderButton />}
-          {earnedChipsVisible && (
-            <motion.span
-              className="inline-flex"
-              initial={firstRun.active ? { opacity: 0, scale: 0.4 } : false}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 18 }}
-            >
-              <StreakChip variant="mobile" />
-            </motion.span>
-          )}
-          {flyCounterVisible && (
-            <motion.span
-              className="inline-flex"
-              initial={firstRun.active ? { opacity: 0, scale: 0.4 } : false}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 18 }}
-            >
-              <FlyCounter
-                balance={shownFlyBalance}
-                variant="mobile"
-                onClick={() => openFlyShop()}
-                showGoal={!!user}
-                alwaysCelebrate={firstRun.phase === 'yum'}
-              />
-            </motion.span>
-          )}
-        </MobileHeaderActions>
-      )}
+      {user && <FlyGainPopup />}
       <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-12">
         <Header router={router} />
 
@@ -1171,7 +1117,6 @@ export default function HomeDashboard() {
                 </motion.div>
                 )}
                 </AnimatePresence>
-                {!firstRun.active && <HomeShopRail />}
                 {!firstRun.active && <BuddyNudgeCard />}
               </div>
             </div>

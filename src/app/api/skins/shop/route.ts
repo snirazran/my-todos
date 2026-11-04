@@ -4,7 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import { isPremiumActive } from '@/lib/skins/dailyDeal';
+import { isEverydayItem, isPremiumActive } from '@/lib/skins/dailyDeal';
 import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { availabilityStateAt } from '@/lib/skins/availability';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
@@ -69,16 +69,21 @@ export async function POST(req: NextRequest) {
       return json({ ok: true });
     }
 
-    // Check balance. Sale prices apply to everyone — Plus buys a reroll of the
-    // shelf, not a cheaper price on it.
+    const isPlus = isPremiumActive(user.premiumUntil);
     let price = byId[itemId].priceFlies ?? 0;
     const rotation = await loadShopRotation({
       catalog: fullCatalog,
       wardrobe: user.wardrobe,
       timezone,
-      isPlus: isPremiumActive(user.premiumUntil),
+      isPlus,
     });
     const deal = rotation.deals.find((d) => d.itemId === itemId);
+    if (!isEverydayItem(byId[itemId], rotation.config)) {
+      if (!deal) return json({ error: "This item isn't in the shop today" }, 400);
+      if (deal.plusOnly && !isPlus) {
+        return json({ error: 'This one is for Plus members today' }, 403);
+      }
+    }
     if (deal?.onSale) {
       price = deal.dealPrice;
     }

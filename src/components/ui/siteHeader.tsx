@@ -50,10 +50,7 @@ import { ChevronRight, CalendarDays, ShieldCheck } from 'lucide-react';
 import { openPrivacyOptions, privacyOptionsAvailable, subscribeAdConsent } from '@/lib/ads';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import {
-  MobileHeaderActions,
-  HEADER_CONTROL_ICON_BUTTON,
-} from '@/components/ui/MobileHeaderActions';
+import { HEADER_CONTROL_ICON_BUTTON } from '@/components/ui/MobileHeaderActions';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
@@ -73,7 +70,6 @@ export default function SiteHeader() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   useEffect(() => setPendingHref(null), [pathname]);
   const {
-    isLoadingScreenVisible,
     isWardrobeStuck,
     wardrobeTab,
     openFlyShop,
@@ -155,22 +151,7 @@ export default function SiteHeader() {
 
   return (
     <>
-      {pathname === '/shop' && <MobileMenuCluster />}
       {pathname === '/wardrobe' && <WardrobeMobileChrome />}
-      {pathname === '/shop' &&
-        user &&
-        flyBalance !== undefined && (
-          <MobileHeaderActions disabled={isLoadingScreenVisible}>
-            <StyleShuffleHeaderButton />
-            <StreakChip variant="mobile" />
-            <FlyCounter
-              balance={flyBalance}
-              variant="mobile"
-              onClick={() => openFlyShop()}
-              showGoal
-            />
-          </MobileHeaderActions>
-        )}
       <header
         data-app-site-header
         style={{

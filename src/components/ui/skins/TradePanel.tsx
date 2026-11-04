@@ -450,8 +450,7 @@ export function TradePanel({
   const byKey = useMemo(() => new Map(entries.map((entry) => [entry.key, entry])), [entries]);
   const pickedCount = (key: string) => picks.filter((pick) => pick === key).length;
   const full = picks.length >= need;
-  const canAutofill =
-    !full && entries.some((entry) => pickedCount(entry.key) < sparesOf(entry.owned));
+  const canAutofill = !full && entries.some((entry) => pickedCount(entry.key) < entry.owned);
 
   useEffect(() => {
     setPicks((prev) => {
@@ -509,16 +508,25 @@ export function TradePanel({
   };
 
   const autofill = () => {
+    if (isTrading) return;
     hapticSelect();
+    setError(null);
     setPicks((prev) => {
       const next = [...prev];
       const taken = (key: string) => next.filter((pick) => pick === key).length;
-      for (const entry of [...entries].sort((a, b) => sparesOf(b.owned) - sparesOf(a.owned))) {
-        while (next.length < need && taken(entry.key) < sparesOf(entry.owned)) {
-          next.push(entry.key);
+      const fill = (list: Entry[], limit: (entry: Entry) => number) => {
+        for (const entry of list) {
+          while (next.length < need && taken(entry.key) < limit(entry)) next.push(entry.key);
         }
-        if (next.length >= need) break;
-      }
+      };
+      fill(
+        [...entries].sort((a, b) => sparesOf(b.owned) - sparesOf(a.owned)),
+        (entry) => sparesOf(entry.owned),
+      );
+      fill(
+        [...entries].sort((a, b) => Number(isWorn(a)) - Number(isWorn(b))),
+        (entry) => entry.owned,
+      );
       return next;
     });
   };

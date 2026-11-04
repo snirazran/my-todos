@@ -7,7 +7,10 @@ import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
 import { sendWardrobePush } from '@/lib/skins/push';
 import { readWishlistPins } from '@/lib/skins/wishlist';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import { wishlistDealMessage } from '@/lib/notifications/frogVoice';
+import {
+  wishlistDealMessage,
+  wishlistInShopMessage,
+} from '@/lib/notifications/frogVoice';
 
 /**
  * Local hours the alert may fire in. A deal dies at local midnight, so waiting
@@ -56,6 +59,7 @@ type Candidate = {
   premiumUntil?: Date | null;
   wardrobe?: {
     inventory?: Record<string, number> | null;
+    inventoryHistory?: Record<string, string> | null;
     wishlist?: unknown;
     wishlistItems?: unknown;
     dealReroll?: { date: string; count: number } | null;
@@ -91,6 +95,7 @@ export async function runWishlistDealAlerts(): Promise<{
     {
       premiumUntil: 1,
       'wardrobe.inventory': 1,
+      'wardrobe.inventoryHistory': 1,
       'wardrobe.wishlist': 1,
       'wardrobe.wishlistItems': 1,
       'wardrobe.dealReroll': 1,
@@ -112,11 +117,12 @@ export async function runWishlistDealAlerts(): Promise<{
     if (hour < EARLIEST_HOUR || hour > LATEST_HOUR) continue;
 
     const today = shopDay(new Date(), tz, config).dayKey;
+    const isPlus = isPremiumActive(user.premiumUntil);
     const { deals } = await loadShopRotation({
       catalog,
       wardrobe: user.wardrobe,
       timezone: tz,
-      isPlus: isPremiumActive(user.premiumUntil),
+      isPlus,
       config,
     });
     if (deals.length === 0) continue;
@@ -132,7 +138,8 @@ export async function runWishlistDealAlerts(): Promise<{
       }))
       .find(
         ({ pin, deal }) =>
-          !!deal?.onSale &&
+          !!deal &&
+          (deal.onSale || !deal.plusOnly || isPlus) &&
           daysBetween(pin.notifiedDealKey?.split(':')[0] ?? '', today) >=
             MIN_DAYS_BETWEEN_ALERTS &&
           (new Date(deal.endsAt).getTime() - Date.now()) / 3_600_000 >=
@@ -179,12 +186,14 @@ export async function runWishlistDealAlerts(): Promise<{
     if (!claimed) continue;
 
     const ok = await sendWardrobePush(user._id, {
-      ...wishlistDealMessage({
-        itemName: item.name,
-        discountPercent: deal.discountPercent,
-        dealPrice: deal.dealPrice.toLocaleString(),
-        fullPrice: deal.priceFlies.toLocaleString(),
-      }),
+      ...(deal.onSale
+        ? wishlistDealMessage({
+            itemName: item.name,
+            discountPercent: deal.discountPercent,
+            dealPrice: deal.dealPrice.toLocaleString(),
+            fullPrice: deal.priceFlies.toLocaleString(),
+          })
+        : wishlistInShopMessage({ itemName: item.name })),
       type: 'wishlist_deal',
       path: `/shop?item=${encodeURIComponent(pin.itemId)}&kind=item`,
     });

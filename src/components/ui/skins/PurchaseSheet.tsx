@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowRight,
   Heart,
   Check,
   ChevronDown,
@@ -165,8 +164,6 @@ export function PurchaseSheet({
   const showFoil =
     !!target && (target.rarity === 'epic' || target.rarity === 'legendary');
   const showBalance = phase === 'success' || owned;
-  const showAfter =
-    phase === 'confirm' && !owned && !tradeOnly && canAfford;
   const showGoal =
     phase === 'confirm' && !owned && !tradeOnly && !canAfford && !isGuest;
 
@@ -256,7 +253,7 @@ export function PurchaseSheet({
 
               <div
                 ref={bindScroll}
-                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 sm:pt-3"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-px sm:pt-3"
               >
                 <div
                   ref={tileRef}
@@ -393,7 +390,7 @@ export function PurchaseSheet({
                   )}
                 </div>
 
-                {(showBalance || showAfter || showGoal) && (
+                {(showBalance || showGoal) && (
                   <div className="mx-1.5 mt-3.5 h-px bg-border/60" />
                 )}
 
@@ -405,21 +402,6 @@ export function PurchaseSheet({
                       className="font-black text-foreground"
                       amount={<AnimatedNumber value={balance} haptics />}
                     />
-                  </div>
-                )}
-
-                {showAfter && (
-                  <div className="flex items-center gap-2 px-1.5 pt-3 text-[13px] font-bold text-muted-foreground">
-                    <FlyAmount
-                      size={15}
-                      className="font-black text-foreground"
-                      amount={<AnimatedNumber value={balance} />}
-                    />
-                    <ArrowRight className="h-3.5 w-3.5 opacity-60" strokeWidth={3} />
-                    <span className="font-black tabular-nums text-foreground">
-                      {(balance - price).toLocaleString()}
-                    </span>
-                    left after
                   </div>
                 )}
 

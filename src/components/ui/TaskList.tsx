@@ -108,12 +108,14 @@ import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
 import { guideById } from '@/lib/hints/guides';
 import { format } from 'date-fns';
-import { TaskDoneToast, usePreloadDoneToastFrog } from '@/components/ui/TaskDoneToast';
+import {
+  DONE_TOAST_CELEBRATION_MS,
+  DONE_TOAST_MS,
+  TaskDoneToast,
+  usePreloadDoneToastFrog,
+} from '@/components/ui/TaskDoneToast';
 import { buildDoneMoment, friendlyFirstName } from '@/lib/taskDoneMoments';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-
-const DONE_TOAST_MS = 5600;
-const DONE_TOAST_CELEBRATION_MS = 7600;
 
 interface Task {
   id: string;

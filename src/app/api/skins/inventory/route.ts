@@ -173,8 +173,8 @@ export async function GET(req: NextRequest) {
     if (!wardrobe) return json({ error: 'User not found' }, 404);
     const fullCatalog = await getFullCatalog();
     const premiumUser = (await UserModel.findById(userId)
-      .select(`premiumUntil ${ECONOMY_TIMEZONE_FIELDS}`)
-      .lean()) as ({ premiumUntil?: Date | null } & EconomyTimezoneUser) | null;
+      .select(`premiumUntil frogName ${ECONOMY_TIMEZONE_FIELDS}`)
+      .lean()) as ({ premiumUntil?: Date | null; frogName?: string } & EconomyTimezoneUser) | null;
     const isPremium = isPremiumActive(premiumUser?.premiumUntil);
     const economy = await loadFlyEconomyConfig();
     const giftStatus = (salesConfig: ShopSalesConfig) =>
@@ -269,10 +269,12 @@ export async function GET(req: NextRequest) {
       ),
       catalog: visibleCatalog(fullCatalog, wardrobe, now),
       dailyDeals: rotation.deals,
+      everydayItemIds: rotation.everydayIds,
       dealRerollsLeft: rotation.rerollsLeft,
       dealRerollsAllowed: rotation.rerollsAllowed,
       shopGift: await giftStatus(rotation.config),
       isPremium,
+      frogName: premiumUser?.frogName ?? null,
     });
   } catch {
     // Guest Mode or Unauthorized
