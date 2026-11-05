@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { GiftBadge } from '@/components/ui/GiftBadge';
 import { useWardrobeBadges } from '@/hooks/useWardrobeBadges';
@@ -35,28 +34,8 @@ export function WardrobeMobileChrome() {
   const onTrade = useUIStore((s) => s.wardrobeTab) === 'trade';
   const { shopGiftReady } = useWardrobeBadges();
 
-  const close = () => {
-    hapticTick();
-    if (previousPath && previousPath !== '/wardrobe') router.back();
-    else router.push('/');
-  };
-
   return (
     <>
-      <button
-        type="button"
-        data-fly-fade
-        aria-label="Close closet"
-        onClick={close}
-        className={cn(
-          'fixed left-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] md:hidden',
-          ROUND_BUTTON,
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-          loading && 'pointer-events-none',
-        )}
-      >
-        <X className="h-5 w-5" strokeWidth={3} />
-      </button>
       {!onTrade && (
       <button
         type="button"

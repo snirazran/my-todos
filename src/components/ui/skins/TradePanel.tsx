@@ -698,8 +698,8 @@ export function TradePanel({
       className={cn(
         'md:pb-10 md:pt-4',
         entries.length > 0
-          ? 'pb-[calc(156px+env(safe-area-inset-bottom))]'
-          : 'pb-[calc(92px+env(safe-area-inset-bottom))]',
+          ? 'pb-[calc(216px+env(safe-area-inset-bottom))]'
+          : 'pb-[calc(152px+env(safe-area-inset-bottom))]',
       )}
     >
       <div className="md:grid md:grid-cols-[300px_minmax(0,1fr)] md:items-start md:gap-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-8">
@@ -903,9 +903,9 @@ export function TradePanel({
         createPortal(
           <div
             data-fly-fade
-            className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-50 bg-background/90 backdrop-blur-lg md:hidden"
+            className="fixed inset-x-0 bottom-[calc(136px+env(safe-area-inset-bottom))] z-50 border-t border-border/50 bg-background/90 backdrop-blur-lg md:hidden"
           >
-            <div className="mx-auto max-w-md px-4 pt-2.5">{actions}</div>
+            <div className="mx-auto max-w-md px-4 pb-2 pt-2.5">{actions}</div>
           </div>,
           document.body,
         )}

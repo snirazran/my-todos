@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 export function MainScroll({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const fullBleed = pathname === '/fly-catch' || pathname === '/shop';
+  const fullBleed = pathname === '/fly-catch';
 
   return (
     <main

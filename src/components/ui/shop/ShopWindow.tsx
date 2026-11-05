@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { Check, ChevronRight, Heart, Sparkle, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronRight, Heart, Sparkle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
@@ -10,11 +9,13 @@ import { rewardedAdsAvailable } from '@/lib/ads';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { EMOTE_MS, onFrogReact, pickEmote, type FrogEmote } from '@/lib/frogEmotes';
+import { useRiveIdlePause } from '@/lib/riveIdlePause';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
 import { BackgroundArt, ItemArt, TileArt } from '@/components/ui/skins/DressingRoom';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
-import { previousRoute } from '@/components/ui/skins/WardrobeMobileChrome';
 import {
   byId as staticById,
   isTradeOnlyRarity,
@@ -27,13 +28,30 @@ import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import type { ShopGiftStatus } from '@/lib/economy/shopGift';
 import { warmFrogStamps, type FrogStampIndices } from '@/lib/frogStampEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
-import { hapticTick } from '@/lib/haptics';
 
 type ShopEntry =
   | { kind: 'item'; key: string; item: ItemDef; rarity: Rarity; price: number }
   | { kind: 'bg'; key: string; bg: BackgroundItem; rarity: Rarity; price: number };
 
 const SELLER_OUTFIT = { hat: '3002', body: '2002', hand_item: '4003' } as const;
+const SELLER_NAME = 'Sir Croaksalot';
+const SELLER_EMOTES: readonly FrogEmote[] = [
+  'hop',
+  'love',
+  'loveShy',
+  'hop',
+  'love',
+  'loveShy',
+  'celebrate',
+  'loveBurst',
+  'tada',
+  'loveHeartbeat',
+];
+const SELLER_HAPPY: ReadonlySet<FrogEmote> = new Set(SELLER_EMOTES);
+const SELLER_FIRST_EMOTE_MS = 4500;
+const SELLER_EMOTE_GAP_MS = 5000;
+const SELLER_EMOTE_JITTER_MS = 4000;
+const SELLER_FADE_MS = 200;
 
 function stableRank(id: string) {
   let h = 2166136261;
@@ -288,17 +306,10 @@ export function ShopWindow({
   onOpenCatalog: () => void;
   onGetFlies: () => void;
 }) {
-  const router = useRouter();
   const byId = useMemo(() => new Map(catalog.map((item) => [item.id, item])), [catalog]);
 
-  const close = () => {
-    hapticTick();
-    const previous = previousRoute();
-    if (previous && previous !== '/shop') router.back();
-    else router.push('/');
-  };
-
-  const sellerIndices = useMemo<FrogStampIndices>(() => {
+  const sellerIndices = useMemo<FrogStampIndices | null>(() => {
+    if (byId.size === 0) return null;
     const index = (id: string) => (byId.get(id) ?? staticById[id])?.riveIndex ?? 0;
     return {
       skin: 0,
@@ -320,6 +331,46 @@ export function ShopWindow({
   );
   const endsAt = deals[0]?.endsAt;
   const countdown = useCountdown(endsAt);
+  const sellerRef = useRef<FrogHandle>(null);
+  const [sellerGreet] = useState(() => pickEmote('greet'));
+  const [sellerLive, setSellerLive] = useState(false);
+  const sellerFadeTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(sellerFadeTimer.current), []);
+  useEffect(() => {
+    if (!sellerLive) return;
+    let timer = 0;
+    let last: FrogEmote | null = null;
+    const schedule = (wait: number) => {
+      timer = window.setTimeout(() => {
+        if (document.visibilityState !== 'visible' || useRiveIdlePause.getState().idle) {
+          schedule(SELLER_EMOTE_GAP_MS);
+          return;
+        }
+        const options = SELLER_EMOTES.filter((name) => name !== last);
+        const name = options[Math.floor(Math.random() * options.length)];
+        last = name;
+        sellerRef.current?.fireEmote(name, { soft: true });
+        schedule(EMOTE_MS[name] + SELLER_EMOTE_GAP_MS + Math.random() * SELLER_EMOTE_JITTER_MS);
+      }, wait);
+    };
+    schedule(SELLER_FIRST_EMOTE_MS);
+    return () => window.clearTimeout(timer);
+  }, [sellerLive]);
+  useEffect(
+    () =>
+      onFrogReact((name) => {
+        if (SELLER_HAPPY.has(name)) sellerRef.current?.fireEmote(name);
+      }),
+    [],
+  );
+  const dealsKey = deals.map((deal) => deal.itemId).join(',');
+  const shownDealsRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || !dealsKey) return;
+    const previous = shownDealsRef.current;
+    shownDealsRef.current = dealsKey;
+    if (previous && previous !== dealsKey) sellerRef.current?.fireEmote('tada');
+  }, [loading, dealsKey]);
   const refreshState: RefreshState | null =
     isGuest || special.length === 0
       ? null
@@ -379,7 +430,7 @@ export function ShopWindow({
   }, [loading, everydayIds, catalog, backgrounds, inventory, bgInventory]);
 
   const warmList = useMemo(() => {
-    const list: FrogStampIndices[] = [sellerIndices];
+    const list: FrogStampIndices[] = sellerIndices ? [sellerIndices] : [];
     if (saleItem) list.push({ [saleItem.slot]: saleItem.riveIndex });
     for (const { item } of special) list.push({ [item.slot]: item.riveIndex });
     for (const entry of everyday) {
@@ -435,14 +486,6 @@ export function ShopWindow({
       className="relative -mx-4 flex min-h-[100dvh] flex-1 flex-col bg-background md:mx-0 md:min-h-0 md:bg-transparent"
     >
       <div className="pond-panel sticky top-0 z-30 flex shrink-0 items-center gap-2 bg-[color:var(--pond-surface-top)] px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:hidden">
-        <button
-          type="button"
-          aria-label="Close shop"
-          onClick={close}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur-md transition-transform active:scale-95"
-        >
-          <X className="h-5 w-5" strokeWidth={3} />
-        </button>
         {!isGuest && <FlyCounter balance={balance} variant="mobile" onClick={onGetFlies} />}
         {catalogButton('ml-auto')}
       </div>
@@ -509,21 +552,44 @@ export function ShopWindow({
           </div>
 
           <div className="relative h-[128px]">
-            <div className="pointer-events-none absolute bottom-[-24px] left-1 z-[25] md:left-5">
-              <FrogSnapshot indices={sellerIndices} width={204} height={228} />
+            <div className="pointer-events-none absolute bottom-[-24px] left-1 z-[25] h-[228px] w-[204px] md:left-5">
+              {sellerIndices && !sellerLive && (
+                <div className="absolute inset-0">
+                  <FrogSnapshot indices={sellerIndices} width={204} height={228} />
+                </div>
+              )}
+              {sellerIndices && (
+                <div className="absolute inset-0">
+                  <Frog
+                    ref={sellerRef}
+                    width={204}
+                    height={228}
+                    indices={sellerIndices}
+                    greet={sellerGreet}
+                    pokeable={false}
+                    onDressed={() => {
+                      sellerFadeTimer.current = window.setTimeout(
+                        () => setSellerLive(true),
+                        SELLER_FADE_MS,
+                      );
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <FrogSpeechBubble
               rate={0}
               done={0}
               total={0}
               side
+              name={SELLER_NAME}
               fixedMessage="I've got new things every day!"
               className="!left-[178px] !top-[70px] md:!left-[198px] [--bubble-max:min(calc(100vw-210px),15rem)]"
             />
           </div>
         </div>
 
-        <div className="relative z-20 -mt-6 flex-1 rounded-t-[28px] bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-6 md:mb-10 md:flex-none md:rounded-[32px] md:px-6 md:pb-8 md:shadow-sm md:ring-1 md:ring-border/50">
+        <div className="relative z-20 -mt-6 flex-1 rounded-t-[28px] bg-background px-4 pb-8 pt-6 md:mb-10 md:flex-none md:rounded-[32px] md:px-6 md:pb-8 md:shadow-sm md:ring-1 md:ring-border/50">
           {!isGuest && shopGift?.available && (
             <div className="mb-5">
               <ShopGiftTile gift={shopGift} onClaim={onClaimGift} />
@@ -569,9 +635,7 @@ export function ShopWindow({
                   <RefreshButton
                     state={refreshState}
                     busy={rerolling}
-                    onClick={
-                      rerollsLeft > 0 ? onReroll : () => onPlus('shop_reroll')
-                    }
+                    onClick={rerollsLeft > 0 ? onReroll : () => onPlus('shop_reroll')}
                   />
                 ) : undefined
               }

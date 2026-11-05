@@ -1284,7 +1284,7 @@ export function SetCompleteCard({
   }, [onDone]);
 
   return (
-    <div className="tryon-bar-enter fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[45] mx-auto max-w-md md:bottom-6">
+    <div className="tryon-bar-enter fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+148px)] z-[45] mx-auto max-w-md md:bottom-6">
       <button
         type="button"
         onClick={onDone}

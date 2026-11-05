@@ -24,6 +24,7 @@ import {
 } from '@rive-app/react-canvas-lite';
 import { useReducedMotion } from 'framer-motion';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
+import { useSharedFrogFile } from '@/hooks/useSharedFrogFile';
 import { useSheetEntered } from '@/lib/sheetEntered';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
@@ -244,6 +245,9 @@ const Frog = memo(
         cancelAnimationFrame(second);
       };
     }, [live, sheetEntered]);
+    const sharedFrog = useSharedFrogFile(!riveFile && live);
+    const frogFile = riveFile ?? sharedFrog.file;
+    const fallbackSrc = !frogFile && sharedFrog.ready ? riveUrl : null;
     const [dressed, setDressed] = React.useState(false);
     const dressedRef = useRef(false);
     const onDressedRef = useRef(onDressed);
@@ -257,7 +261,7 @@ const Frog = memo(
 
     const { RiveComponent, rive } = useRive(
       {
-        ...(riveFile ? { riveFile } : { src: riveUrl || undefined }),
+        ...(frogFile ? { riveFile: frogFile } : { src: fallbackSrc || undefined }),
         artboard: ARTBOARD_NAME,
         stateMachines: STATE_MACHINE,
         autoplay: true,
@@ -997,7 +1001,7 @@ const Frog = memo(
             }}
           />
         )}
-        {(riveFile || riveUrl) && live && (
+        {(frogFile || fallbackSrc) && live && (
           <RiveComponent
             style={{
               width: '100%',

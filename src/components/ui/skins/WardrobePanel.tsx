@@ -9,6 +9,7 @@ import { hapticTick, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { frogReact } from '@/lib/frogEmotes';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -288,6 +289,8 @@ function WardrobeManagerContent({
   useEffect(() => {
     setActiveTab(normalizeTab(defaultTab, section));
   }, [defaultTab, section]);
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
@@ -1515,7 +1518,7 @@ function WardrobeManagerContent({
               ref={(node) => bindScroll?.(node)}
               className={cn(
                 embedded
-                  ? 'relative'
+                  ? cn('relative', !isShop && 'pb-[60px] md:pb-0')
                   : 'absolute inset-0 overflow-y-auto overscroll-none p-3',
                 'data-[state=inactive]:hidden',
               )}
@@ -1760,68 +1763,72 @@ function WardrobeManagerContent({
         );
       })()}
 
-      {embedded && !isShop && (
-        <nav
-          aria-label="Closet sections"
-          className="fixed bottom-0 left-0 z-50 w-full bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden"
-        >
-          <div className="mx-auto grid h-[76px] max-w-md grid-cols-2 gap-2.5 px-4 py-2.5">
-            {(
-              [
-                { tab: 'inventory', label: 'Closet', icon: 'wardrobe', hint: 'wardrobe-inventory-tab' },
-                { tab: 'trade', label: 'Trade Up', icon: 'trade', hint: 'wardrobe-trade-tab' },
-              ] as const
-            ).map((item) => {
-              const active = activeTab === item.tab;
-              return (
-                <button
-                  key={item.tab}
-                  type="button"
-                  data-hint={item.hint}
-                  aria-current={active ? 'page' : undefined}
-                  onClick={() => {
-                    if (active) return;
-                    hapticTick();
-                    setActiveTab(item.tab);
-                    scrollPageToTop();
-                  }}
-                  className={cn(
-                    'flex h-full w-full items-center justify-center gap-2.5 rounded-[18px] transition-[transform,background-color,box-shadow] active:scale-[0.97]',
-                    active
-                      ? 'bg-primary/10 shadow-[inset_0_0_0_1.5px_hsl(var(--primary)/0.22)]'
-                      : 'hover:bg-muted/60',
-                  )}
-                >
-                  <span className="relative">
-                    <AppIcon name={item.icon} className="h-9 w-9" />
-                    {item.tab === 'inventory' && closetTabBadge > 0 && (
-                      <span className="absolute -right-2.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full border-2 border-background bg-rose-500 px-1 text-[11px] font-black leading-none text-white">
-                        {closetTabBadge > 9 ? '9+' : closetTabBadge}
-                      </span>
-                    )}
-                    {item.tab === 'trade' && tradeTabBadge > 0 && (
-                      <span
-                        title={tradeReadyTitle(readyTrades, tradeReadiness.byRarity)}
-                        className="absolute -right-2.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full border-2 border-background bg-amber-500 px-1 text-[11px] font-black leading-none text-white"
-                      >
-                        {readyTrades > 9 ? '9+' : readyTrades}
-                      </span>
-                    )}
-                  </span>
-                  <span
+      {embedded &&
+        !isShop &&
+        portalReady &&
+        createPortal(
+          <nav
+            data-fly-fade
+            aria-label="Closet sections"
+            className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[51] border-t border-border/50 bg-background/90 backdrop-blur-lg md:hidden"
+          >
+            <div className="mx-auto h-[60px] max-w-md px-4 py-2">
+            <div className="grid h-full grid-cols-2 gap-1 rounded-[16px] bg-muted p-1">
+              {(
+                [
+                  { tab: 'inventory', label: 'Closet', icon: 'wardrobe', hint: 'wardrobe-inventory-tab' },
+                  { tab: 'trade', label: 'Trade Up', icon: 'trade', hint: 'wardrobe-trade-tab' },
+                ] as const
+              ).map((item) => {
+                const active = activeTab === item.tab;
+                return (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    data-hint={item.hint}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => {
+                      if (active) return;
+                      hapticTick();
+                      setActiveTab(item.tab);
+                      scrollPageToTop();
+                    }}
                     className={cn(
-                      'text-[15px] font-black tracking-tight text-muted-foreground',
-                      active && 'text-primary',
+                      'flex h-full w-full items-center justify-center gap-2 rounded-[12px] transition-[transform,background-color,box-shadow,color] active:scale-[0.97]',
+                      active
+                        ? 'bg-card text-primary shadow-[0_1px_2px_rgba(0,0,0,0.08),0_2px_0_0_hsl(var(--border))]'
+                        : 'text-muted-foreground',
                     )}
                   >
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-      )}
+                    <span className="relative">
+                      <AppIcon
+                        name={item.icon}
+                        className={cn('h-7 w-7 transition-opacity', !active && 'opacity-60')}
+                      />
+                      {item.tab === 'inventory' && closetTabBadge > 0 && (
+                        <span className="absolute -right-2.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-muted bg-rose-500 px-1 text-[10px] font-black leading-none text-white">
+                          {closetTabBadge > 9 ? '9+' : closetTabBadge}
+                        </span>
+                      )}
+                      {item.tab === 'trade' && tradeTabBadge > 0 && (
+                        <span
+                          title={tradeReadyTitle(readyTrades, tradeReadiness.byRarity)}
+                          className="absolute -right-2.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-muted bg-amber-500 px-1 text-[10px] font-black leading-none text-white"
+                        >
+                          {readyTrades > 9 ? '9+' : readyTrades}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[15px] font-black tracking-tight">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            </div>
+          </nav>,
+          document.body,
+        )}
+
       {setMoment && !tryTarget && !purchaseCard && activeTab === 'inventory' && (
         <SetCompleteCard
           key={setMoment.key}

@@ -23,6 +23,7 @@ interface FrogSpeechBubbleProps {
   className?: string;
   messageClassName?: string;
   side?: boolean;
+  name?: string;
 }
 
 export function FrogSpeechBubble({
@@ -37,6 +38,7 @@ export function FrogSpeechBubble({
   className = '',
   messageClassName = '',
   side = false,
+  name,
 }: FrogSpeechBubbleProps & { isCatching?: boolean }) {
   const reduceMotion = useReducedMotion();
   const [message, setMessage] = useState('');
@@ -179,13 +181,22 @@ export function FrogSpeechBubble({
               className={`frog-bubble flex items-center ${side ? 'flex-row-reverse' : 'flex-col'}`}
             >
               <div
-                className={`relative rounded-[22px] bg-card px-4 pb-2.5 pt-2 ${
+                className={`relative rounded-[22px] bg-card px-4 pb-2.5 ${name ? 'pt-3.5' : 'pt-2'} ${
                   side
                     ? 'max-w-[var(--bubble-max,15rem)]'
                     : 'min-w-[7.5rem] max-w-[min(17.5rem,calc(100vw-2rem))]'
                 }`}
               >
                 <span className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20" />
+                {name ? (
+                  <span
+                    className={`absolute -top-3 -rotate-2 whitespace-nowrap rounded-full bg-[#447d3f] px-2.5 py-1 text-[11.5px] font-black leading-none tracking-[0.01em] text-white shadow-[0_2px_0_0_#2c511a] ${
+                      side ? 'left-3' : 'left-1/2 -translate-x-1/2'
+                    }`}
+                  >
+                    {name}
+                  </span>
+                ) : null}
                 <p
                   className={`whitespace-pre-line text-balance ${side ? 'text-left' : 'text-center'} text-[15px] font-semibold leading-[1.35] tracking-[-0.005em] text-foreground ${messageClassName}`}
                 >

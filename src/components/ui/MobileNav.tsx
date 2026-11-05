@@ -85,8 +85,6 @@ export default function MobileNav() {
     pathname === '/welcome' ||
     pathname === '/try' ||
     pathname === '/fly-catch' ||
-    pathname === '/wardrobe' ||
-    pathname === '/shop' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/onboarding' ||
