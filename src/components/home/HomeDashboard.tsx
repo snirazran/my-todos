@@ -878,13 +878,14 @@ export default function HomeDashboard() {
             </div>
           </FlyCatchSwipeLauncher>
 
-          <StatusDock className="-mt-2">
+          <StatusDock className="-mt-2 md:w-[360px]" flatOnMobile>
             <FrogBellyDeck
               bare
+              rich
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
-              className="rounded-[19px] md:h-auto md:min-h-12 md:w-[300px] md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
+              className="rounded-[19px] md:h-auto md:w-[360px] md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
             />
           </StatusDock>
 
@@ -896,7 +897,7 @@ export default function HomeDashboard() {
 
           <div
             data-fly-sheet
-            className="relative z-20 -mx-3 -mt-12 flex min-h-[12rem] flex-col gap-2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pb-8 md:pt-5 xl:px-10"
+            className="relative z-20 -mx-3 -mt-8 flex min-h-[12rem] flex-col gap-2 bg-background px-1.5 pt-10 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-transparent md:px-8 md:pb-8 md:pt-5 xl:px-10"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div

@@ -62,24 +62,29 @@ export function HomePageSkeleton() {
     >
       <div className="mx-auto max-w-4xl px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 md:px-6 md:pt-12">
         <div className="h-[226px] md:h-[254px]" />
-        <div className="relative z-10 w-full overflow-hidden rounded-[20px] border border-border/60 bg-card shadow-sm md:mx-auto md:w-[300px]">
-          <div className="flex h-12 items-center gap-3 px-3.5">
-            <Skeleton className="h-3.5 w-12 shrink-0 rounded-full" />
-            <div className="flex flex-1 gap-1">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-3.5 flex-1 rounded-full" />
-              ))}
+        <div className="relative z-[25] -mt-2 w-full pt-4 md:mx-auto md:w-[360px] md:pt-0">
+          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:hidden" />
+          <div className="w-full overflow-hidden rounded-[20px] bg-foreground/[0.045] dark:bg-white/[0.06] md:border md:border-border/60 md:bg-card md:shadow-sm md:dark:bg-card">
+            <div className="flex flex-col gap-2.5 px-4 pb-4 pt-3">
+              <div className="flex h-5 items-center justify-between">
+                <Skeleton className="h-3.5 w-24 rounded-full" />
+                <Skeleton className="h-3.5 w-12 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-full rounded-full" />
             </div>
           </div>
         </div>
 
-        <div className="relative -mx-3 -mt-10 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] px-1.5 pt-14 md:mx-auto md:mt-4 md:w-full md:max-w-3xl md:bg-none md:px-8 md:pt-5 xl:px-10">
-          <div className="mb-2 flex min-h-9 items-center justify-between pl-5 pr-3 md:pl-8 md:pr-5">
+        <div className="relative z-20 -mx-3 -mt-6 bg-background px-1.5 pt-10 md:mx-auto md:mt-4 md:w-full md:max-w-3xl md:bg-transparent md:px-8 md:pt-5 xl:px-10">
+          <div className="mb-2 flex min-h-11 items-center justify-between pl-5 pr-2 md:min-h-9 md:pl-8 md:pr-5">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-20 rounded-full" />
               <Skeleton className="h-3.5 w-12 rounded-full" />
             </div>
-            <Skeleton className="h-9 w-9 rounded-xl" />
+            <div className="flex items-center gap-1 md:gap-0.5">
+              <Skeleton className="h-11 w-11 rounded-2xl md:h-9 md:w-9 md:rounded-xl" />
+              <Skeleton className="h-11 w-11 rounded-2xl md:h-9 md:w-9 md:rounded-xl" />
+            </div>
           </div>
 
           <div className="mb-16 px-1.5 md:px-4">
@@ -92,23 +97,16 @@ export function HomePageSkeleton() {
                   )}
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    <Skeleton className={cn('h-3.5 rounded-full', w)} />
-                    <Skeleton className="h-2.5 w-24 rounded-full" />
+                    <Skeleton className={cn('h-4 rounded-full', w)} />
                   </div>
                   <Skeleton className="h-11 w-11 shrink-0 rounded-full md:h-12 md:w-12" />
                 </div>
               </div>
             ))}
             <div className="pt-1">
-              <div
-                className={cn(
-                  'flex items-center gap-3 py-2 pl-3.5 pr-2.5 md:pl-4 md:pr-3',
-                  HOME_CARD_SURFACE,
-                )}
-              >
-                <Skeleton className="h-3.5 w-20 rounded-full" />
-                <span className="flex-1" />
-                <span className="h-11 w-11 shrink-0 rounded-full bg-primary/[0.12] ring-1 ring-inset ring-primary/20 md:h-12 md:w-12" />
+              <div className="flex h-16 items-center gap-4 rounded-[22px] bg-foreground/[0.04] pl-4 pr-3.5 dark:bg-white/[0.05] md:pl-[18px]">
+                <span className="h-8 w-8 shrink-0 rounded-full bg-primary/80" />
+                <Skeleton className="h-4 w-24 rounded-full" />
               </div>
             </div>
           </div>
@@ -134,9 +132,13 @@ function PlannerColumnSkeleton({
     </div>
   );
   const actions = (
-    <div className="flex items-center gap-2">
-      <Skeleton className="h-7 w-7 rounded-lg" />
-      <Skeleton className="h-7 w-7 rounded-lg" />
+    <div className="flex items-center gap-1 md:gap-0.5">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton
+          key={i}
+          className="h-11 w-11 rounded-2xl md:h-9 md:w-9 md:rounded-xl"
+        />
+      ))}
     </div>
   );
   return (
@@ -146,7 +148,7 @@ function PlannerColumnSkeleton({
         className,
       )}
     >
-      <div className="flex min-h-9 items-center justify-between pb-1.5 pl-3.5 pr-2 md:hidden">
+      <div className="flex min-h-11 items-center justify-between pb-1.5 pl-3.5 pr-2 md:hidden">
         {heading}
         {actions}
       </div>
@@ -172,7 +174,6 @@ function PlannerColumnSkeleton({
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <Skeleton className={cn('h-4 rounded-full', w)} />
-                  <Skeleton className="h-2.5 w-20 rounded-full" />
                 </div>
                 <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
               </div>
@@ -181,15 +182,19 @@ function PlannerColumnSkeleton({
         </div>
         <div className="px-2 pb-2">
           {!isPast && (
-            <div className="flex items-center py-1.5 pl-3.5 pr-2.5 md:pl-3 md:pr-2">
+            <div className="flex h-12 items-center gap-3 pl-3.5 pr-3 md:h-11 md:gap-2.5 md:pl-3">
+              <span className="h-7 w-7 shrink-0 rounded-full bg-primary/80" />
               <Skeleton className="h-4 w-24 rounded-full" />
-              <span className="flex-1" />
-              <span className="h-10 w-10 shrink-0 rounded-full border-[1.5px] border-dashed border-muted-foreground/25" />
             </div>
           )}
-          <div className="flex items-center gap-2 py-2.5 pl-3.5 pr-3 md:hidden">
-            <Skeleton className="h-[18px] w-[18px] rounded-md" />
-            <Skeleton className="h-3.5 w-14 rounded-full" />
+          <div className="md:hidden">
+            {!isPast && <div className="mx-3.5 my-1.5 h-px bg-foreground/[0.08]" />}
+            <div className="flex h-11 items-center gap-3 pl-3.5 pr-3">
+              <span className="grid w-7 shrink-0 place-items-center">
+                <Skeleton className="h-[18px] w-[18px] rounded-md" />
+              </span>
+              <Skeleton className="h-3.5 w-14 rounded-full" />
+            </div>
           </div>
         </div>
       </div>
@@ -336,31 +341,20 @@ export function QuestsPageSkeleton() {
       label="Loading quests"
       className="h-full overflow-hidden bg-background md:h-auto md:overflow-visible"
     >
-      <div className="relative h-[372px] w-full overflow-hidden md:h-[340px]">
+      <div className="relative h-[calc(300px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[340px]">
         <Skeleton className="absolute inset-0 h-full w-full rounded-none" />
         <div aria-hidden="true" className="absolute inset-0 bg-muted-foreground/10" />
-        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_88%)]" />
-        <div className="absolute inset-x-0 top-[calc(3rem+env(safe-area-inset-top))] flex justify-center p-4 md:top-[4.5rem]">
-          <div className="flex flex-col items-center gap-3 md:gap-2">
-            <div className="h-4 w-20 rounded-full bg-background/50" />
-            <div className="h-9 w-56 rounded-2xl bg-background/50 sm:h-12 sm:w-80" />
-          </div>
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 hidden h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)] md:block" />
+        <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-24 md:gap-2">
+          <div className="h-[22px] w-20 rounded-full bg-background/50" />
+          <div className="h-7 w-56 rounded-2xl bg-background/50 md:h-12 md:w-80" />
         </div>
-      </div>
-      <div className="relative z-10 -mt-[68px] px-3 md:-mt-14 md:px-6">
-        <div className="w-full rounded-[20px] border border-border/60 bg-card shadow-sm md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
-          <div className="flex items-center gap-3 py-3 pl-3 pr-3">
-            <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <Skeleton className="h-4 w-2/5 rounded-full" />
-              <Skeleton className="h-[22px] w-full rounded-full" />
-            </div>
-            <Skeleton className="h-11 w-12 shrink-0 rounded-[14px]" />
-          </div>
+        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-10">
+          <div className="h-11 w-36 rounded-full bg-background/50" />
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-7 md:gap-9 md:px-6 md:pb-12 md:pt-10">
+      <div className="relative z-10 mx-auto -mt-7 flex w-full max-w-3xl flex-col gap-7 rounded-t-[28px] bg-background px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:mt-0 md:gap-9 md:rounded-none md:px-6 md:pb-12 md:pt-6 md:shadow-none">
         <div>
           <QuestSectionHeaderSkeleton
             titleWidth="w-36"
@@ -555,15 +549,16 @@ export function FriendsPageSkeleton() {
           <div className="absolute bottom-4 left-[84%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[78%] lg:left-[72%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-6 w-16 rounded-full" /></div>
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2"><Skeleton className="h-[170px] w-[170px] rounded-b-none rounded-t-[72px]" /></div>
         </div>
-        <div className="relative z-[25] w-full md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
-          <div className="flex items-center gap-3 rounded-[20px] border border-border/60 bg-card py-2.5 pl-3 pr-3 shadow-sm">
+        <div className="relative z-[25] w-full pt-4 md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] md:pt-0 xl:w-[calc(min(100%,48rem)-7rem)]">
+          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:hidden" />
+          <div className="flex w-full items-center gap-3 rounded-[20px] bg-foreground/[0.045] py-2.5 pl-3 pr-3 dark:bg-white/[0.06] md:border md:border-border/60 md:bg-card md:shadow-sm md:dark:bg-card">
             <div className="hidden w-[238px] shrink-0 items-center gap-2 border-r border-border/50 pr-3 md:flex"><Skeleton className="h-4 w-20 rounded-full" /><Skeleton className="h-3 flex-1 rounded-full" /></div>
             <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
             <div className="flex min-w-0 flex-1 flex-col gap-2"><Skeleton className="h-4 w-1/2 rounded-md" /><Skeleton className="h-2.5 w-full rounded-full" /></div>
           </div>
         </div>
-        <div className="relative z-20 -mx-3 -mt-12 flex w-[calc(100%+1.5rem)] flex-col gap-7 px-3 pt-16 md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:gap-9 md:px-8 md:pt-14">
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)]" />
+        <div className="relative z-20 -mx-3 -mt-9 flex w-[calc(100%+1.5rem)] flex-col gap-7 bg-background px-3 pt-[52px] md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:gap-9 md:bg-transparent md:px-8 md:pt-14">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] md:block" />
           <section>
             <FriendsHeaderSkeleton />
             <div className="flex flex-col gap-2">

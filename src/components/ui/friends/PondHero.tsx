@@ -249,7 +249,7 @@ export function PondHero({ indices, paused = false, friends, claimable, claiming
           </FlyCatchSwipeLauncher>
         </div>
       </div>
-      <StatusDock>
+      <StatusDock flatOnMobile>
         <div className="hidden md:contents"><FrogBellyDeck bare hunger={hunger ?? undefined} maxHunger={maxHunger} animateHunger={!paused && !reduceMotion} className="rounded-[19px] md:w-[250px] md:shrink-0 group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none" /></div>
         <PondStatusRow friends={seated} claimable={claimable} claiming={claiming} gate={gate} onClaim={onClaim} onInvite={onInvite} />
       </StatusDock>

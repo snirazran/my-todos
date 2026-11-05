@@ -26,24 +26,28 @@ export function BellyPip({
   breathing?: boolean;
   className?: string;
 }) {
+  const radius = 'rounded-full';
   return (
     <div
       className={cn(
-        'relative flex-1 rounded-full bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)]',
+        'relative flex-1',
+        'bg-foreground/[0.07] shadow-[inset_0_1px_2px_rgba(0,0,0,0.10)]',
+        radius,
         className,
       )}
       style={popAnimation ? { animation: popAnimation } : undefined}
     >
-      <div className="absolute inset-0 overflow-hidden rounded-full">
+      <div className={cn('absolute inset-0 overflow-hidden', radius)}>
         {ghostFill !== undefined && ghostFill > 0 && (
           <div
-            className={cn('absolute inset-0 rounded-full', tone.ghost)}
+            className={cn('absolute inset-0', radius, tone.ghost)}
             style={{ transform: `translateX(${offset(ghostFill)}%)` }}
           />
         )}
         <div
           className={cn(
-            'absolute inset-0 rounded-full',
+            'absolute inset-0',
+            radius,
             tone.fill,
             animate &&
               'transition-transform duration-500 ease-[cubic-bezier(0.34,1.3,0.64,1)]',
@@ -53,14 +57,21 @@ export function BellyPip({
             transitionDelay: delayMs ? `${delayMs}ms` : undefined,
           }}
         >
-          <div className="absolute inset-x-[3px] top-[2px] h-[32%] rounded-full bg-white/45" />
+          <div
+            className={cn(
+              'absolute rounded-full bg-white/45',
+              'inset-x-[3px] top-[2px] h-[32%]',
+            )}
+          />
         </div>
       </div>
       {breathing && (
         <span
           aria-hidden
           className={cn(
-            'absolute -inset-px rounded-full ring-2 motion-safe:animate-[belly-next_2.4s_ease-in-out_infinite]',
+            'absolute ring-2 motion-safe:animate-[belly-next_2.4s_ease-in-out_infinite]',
+            '-inset-px',
+            radius,
             tone.ring,
           )}
         />

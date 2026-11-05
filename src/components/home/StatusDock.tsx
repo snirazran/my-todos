@@ -23,9 +23,11 @@ export function statusDockRowClass(
 export function StatusDock({
   children,
   className,
+  flatOnMobile = false,
 }: {
   children: ReactNode;
   className?: string;
+  flatOnMobile?: boolean;
 }) {
   return (
     <div
@@ -33,10 +35,29 @@ export function StatusDock({
       className={cn(
         'relative z-[25] w-full md:mx-auto md:w-[300px] md:has-[[data-dock-row]]:w-[calc(min(100%,48rem)-6rem)] xl:has-[[data-dock-row]]:w-[calc(min(100%,48rem)-7rem)]',
         className,
+        flatOnMobile && 'pt-4 md:pt-0',
       )}
     >
-      <div className="group/dock relative flex flex-col rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)] md:flex-row md:flex-wrap md:items-stretch">
-        <div className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20" />
+      {flatOnMobile && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:hidden"
+        />
+      )}
+      <div
+        className={cn(
+          'group/dock relative flex flex-col md:flex-row md:flex-wrap md:items-stretch',
+          flatOnMobile
+            ? 'w-full rounded-[20px] bg-foreground/[0.045] dark:bg-white/[0.06] md:border md:border-border/60 md:bg-card md:dark:bg-card md:shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] md:dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]'
+            : 'rounded-[20px] border border-border/60 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)]',
+        )}
+      >
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent dark:via-white/20',
+            flatOnMobile && 'hidden md:block',
+          )}
+        />
         {children}
       </div>
     </div>

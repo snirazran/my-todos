@@ -586,7 +586,8 @@ export function QuestsPanel({
                           <div
                             className={cn(
                               'mx-auto flex w-full max-w-3xl flex-col gap-7 md:gap-9',
-                              data.activeSeason && 'px-3 pt-3 md:px-6 md:pt-6',
+                              data.activeSeason &&
+                                'relative z-10 -mt-7 rounded-t-[28px] bg-background px-3 pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:mt-0 md:rounded-none md:px-6 md:pt-6 md:shadow-none',
                             )}
                           >
                             {!data.activeSeason && (
@@ -826,7 +827,7 @@ function QuestSeasonBanner({
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[calc(5.5rem+env(safe-area-inset-top))] bg-[linear-gradient(to_bottom,rgba(15,23,42,0.28),transparent)]" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)] md:block" />
         <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-24 md:gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-950/40 py-1 pl-1.5 pr-2.5 text-[12px] font-black tabular-nums leading-none text-white backdrop-blur-sm md:text-[13px]">
             <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
@@ -843,7 +844,7 @@ function QuestSeasonBanner({
             {season.name}
           </h2>
         </div>
-        <div className="absolute inset-x-0 bottom-9 flex justify-center md:bottom-10">
+        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-10">
           <button
             type="button"
             onClick={onView}

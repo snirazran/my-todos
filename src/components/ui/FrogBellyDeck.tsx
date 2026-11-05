@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import useSWR from 'swr';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { cn } from '@/lib/utils';
 import {
   HUNGER_SEGMENTS,
@@ -29,6 +31,7 @@ export function FrogBellyDeck({
   animateHunger = true,
   onPress,
   bare = false,
+  rich = false,
   className,
 }: {
   hunger?: number;
@@ -36,6 +39,7 @@ export function FrogBellyDeck({
   animateHunger?: boolean;
   onPress?: () => void;
   bare?: boolean;
+  rich?: boolean;
   className?: string;
 }) {
   const reduceMotion = useReducedMotion();
@@ -47,6 +51,14 @@ export function FrogBellyDeck({
   const feedIdRef = React.useRef(0);
   const [feed, setFeed] = React.useState<Feed | null>(null);
   const [feedActive, setFeedActive] = React.useState(false);
+  const { data: profile } = useSWR<{ frogName?: string | null }>(
+    rich ? '/api/user' : null,
+    bootstrapFetcher,
+    { revalidateOnFocus: false },
+  );
+  const frogName = profile?.frogName?.trim();
+  const bellyLabel =
+    frogName && frogName.length <= 14 ? `${frogName}'s belly` : 'Belly';
 
   React.useEffect(() => {
     if (typeof hunger !== 'number') return;
@@ -98,7 +110,7 @@ export function FrogBellyDeck({
         data-fly-hero-card
         className={cn(
           bare
-            ? 'relative h-12 w-full'
+            ? cn('relative h-12 w-full', rich && 'h-[72px]')
             : 'relative z-10 h-[54px] w-[340px] max-w-[min(94vw,100%)] rounded-[18px] border border-border/50 bg-card/80 shadow-sm backdrop-blur-2xl',
           className,
         )}
@@ -141,7 +153,148 @@ export function FrogBellyDeck({
   const caption =
     feedActive && feed ? (feed.to >= 97 ? 'Belly full!' : title) : 'Hunger';
 
-  const content = (
+  const meter = (
+    <div
+      role="meter"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(percent)}
+      aria-valuetext={`${tone.label}, ${hint}`}
+      aria-label="Frog belly"
+      className={cn(
+        'relative flex flex-1 items-center',
+        bare ? 'gap-1' : 'gap-1.5',
+      )}
+    >
+      {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => {
+        const delay = pipDelay(i);
+        const pop = choreograph && filledByFeed(i);
+        const popAt = delay + PIP_FILL_MS * 0.55;
+        return (
+          <div key={i} className="relative flex-1">
+            <BellyPip
+              fill={segmentFill(percent, i)}
+              ghostFill={choreograph ? segmentFill(feed!.to, i) : undefined}
+              tone={tone}
+              animate={animateHunger || choreograph}
+              delayMs={delay}
+              breathing={breatheNext && i === nextPip}
+              popAnimation={
+                pop
+                  ? `belly-pip-pop-${feed!.id % 2} 460ms cubic-bezier(0.34,1.56,0.64,1) ${popAt}ms both`
+                  : undefined
+              }
+                className={bare ? 'h-3.5 w-full' : 'h-[18px] w-full'}
+            />
+            {pop && (
+              <span
+                key={feed!.id}
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full bg-white opacity-0 shadow-[0_0_12px_rgba(255,255,255,0.9)]"
+                style={{ animation: `belly-flash 480ms ease-out ${popAt}ms forwards` }}
+              />
+            )}
+          </div>
+        );
+      })}
+      {reachedFull && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full"
+        >
+          <span
+            key={feed!.id}
+            className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent"
+            style={{
+              animation: `bar-shine 900ms ease-out ${lastFedDelay + PIP_FILL_MS}ms both`,
+            }}
+          />
+        </span>
+      )}
+    </div>
+  );
+
+  const fillTo = (value: number) =>
+    `translateX(${value <= 0 ? -101 : value - 100}%)`;
+
+  const content = rich ? (
+    <div className="relative flex w-full flex-col gap-2.5 px-4 pb-4 pt-3">
+      <span
+        aria-hidden
+        className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-x-[9px] border-b-[8px] border-x-transparent border-b-foreground/[0.045] dark:border-b-white/[0.06] md:hidden"
+      />
+      <div className="flex h-5 items-center justify-between gap-3">
+        <span className="min-w-0 truncate text-[14px] font-bold text-muted-foreground">
+          {bellyLabel}
+        </span>
+        <div className="relative h-5 min-w-[6rem] shrink-0 overflow-hidden">
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.span
+              key={feedActive && feed ? `feed-${feed.id}` : 'state'}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+              className={cn(
+                'absolute inset-0 flex items-center justify-end whitespace-nowrap text-[15px] font-black leading-none transition-colors duration-300',
+                feedActive ? 'text-primary' : tone.text,
+              )}
+            >
+              {feedActive && feed ? (feed.to >= 97 ? 'Belly full!' : title) : tone.label}
+            </motion.span>
+          </AnimatePresence>
+        </div>
+      </div>
+      <div
+        role="meter"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(percent)}
+        aria-valuetext={`${tone.label}, ${hint}`}
+        aria-label={bellyLabel}
+        className="relative h-4 w-full rounded-full bg-foreground/[0.08] dark:bg-white/[0.1]"
+      >
+        {breatheNext && (
+          <span
+            aria-hidden
+            className={cn(
+              'absolute -inset-[2px] rounded-full ring-2 motion-safe:animate-[belly-next_2.4s_ease-in-out_infinite]',
+              tone.ring,
+            )}
+          />
+        )}
+        <div className="relative h-full w-full overflow-hidden rounded-full">
+          {choreograph && feed && (
+            <div
+              className={cn('absolute inset-0 rounded-full', tone.ghost)}
+              style={{ transform: fillTo(feed.to) }}
+            />
+          )}
+          <div
+            className={cn(
+              'absolute inset-0 rounded-full transition-[transform,background-color] ease-[cubic-bezier(0.34,1.2,0.64,1)]',
+              choreograph ? 'duration-[900ms]' : 'duration-500',
+              tone.bg,
+            )}
+            style={{
+              transform: fillTo(percent),
+              transitionDelay: choreograph ? '120ms' : undefined,
+            }}
+          >
+            <div className="absolute left-2 right-2.5 top-[3px] h-[4px] rounded-full bg-white/35" />
+          </div>
+          {reachedFull && (
+            <span
+              key={feed!.id}
+              aria-hidden
+              className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent"
+              style={{ animation: 'bar-shine 900ms ease-out 1000ms both' }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  ) : (
     <div
       className={cn(
         'relative flex h-full w-full items-center',
@@ -183,70 +336,13 @@ export function FrogBellyDeck({
         </AnimatePresence>
       </div>
 
-      <div
-        role="meter"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(percent)}
-        aria-valuetext={`${tone.label}, ${hint}`}
-        aria-label="Frog belly"
-        className={cn(
-          'relative flex flex-1 items-center',
-          bare ? 'gap-1' : 'gap-1.5',
-        )}
-      >
-        {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => {
-          const delay = pipDelay(i);
-          const pop = choreograph && filledByFeed(i);
-          const popAt = delay + PIP_FILL_MS * 0.55;
-          return (
-            <div key={i} className="relative flex-1">
-              <BellyPip
-                fill={segmentFill(percent, i)}
-                ghostFill={choreograph ? segmentFill(feed!.to, i) : undefined}
-                tone={tone}
-                animate={animateHunger || choreograph}
-                delayMs={delay}
-                breathing={breatheNext && i === nextPip}
-                popAnimation={
-                  pop
-                    ? `belly-pip-pop-${feed!.id % 2} 460ms cubic-bezier(0.34,1.56,0.64,1) ${popAt}ms both`
-                    : undefined
-                }
-                className={bare ? 'h-3.5 w-full' : 'h-[18px] w-full'}
-              />
-              {pop && (
-                <span
-                  key={feed!.id}
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-full bg-white opacity-0 shadow-[0_0_12px_rgba(255,255,255,0.9)]"
-                  style={{ animation: `belly-flash 480ms ease-out ${popAt}ms forwards` }}
-                />
-              )}
-            </div>
-          );
-        })}
-        {reachedFull && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full"
-          >
-            <span
-              key={feed!.id}
-              className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent"
-              style={{
-                animation: `bar-shine 900ms ease-out ${lastFedDelay + PIP_FILL_MS}ms both`,
-              }}
-            />
-          </span>
-        )}
-      </div>
+      {meter}
     </div>
   );
 
   const shell = cn(
     bare
-      ? 'relative flex h-12 w-full items-center text-left'
+      ? cn('relative flex h-12 w-full items-center text-left', rich && 'h-auto')
       : 'relative z-10 flex h-[54px] w-[340px] max-w-[min(94vw,100%)] items-center justify-center rounded-[18px] border border-border/50 bg-card/80 px-2 shadow-sm backdrop-blur-2xl',
     className,
   );
