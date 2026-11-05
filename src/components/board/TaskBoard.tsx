@@ -318,7 +318,7 @@ const ColumnAddRow = React.memo(function ColumnAddRow({
       onClick={() => onAdd('')}
       className="group flex h-12 w-full items-center gap-3 rounded-[14px] pl-3.5 pr-3 text-left transition-[transform,background-color] duration-150 active:scale-[0.985] active:bg-foreground/[0.06] md:h-11 md:gap-2.5 md:pl-3 [@media(hover:hover)]:hover:bg-foreground/[0.05]"
     >
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
         <Plus className="h-4 w-4" strokeWidth={3.5} />
       </span>
       <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
@@ -2778,26 +2778,28 @@ export default function TaskBoard({
                 isPast={pastDay}
                 headerAction={
                   <>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFilters({ ...filters, showCompleted: !completedShown })
-                      }
-                      aria-pressed={completedShown}
-                      aria-label={
-                        completedShown ? 'Hide completed' : 'Show completed'
-                      }
-                      title={completedShown ? 'Hide completed' : 'Show completed'}
-                      className={`flex shrink-0 items-center justify-center transition-all active:scale-90 ${
-                        isMobile ? 'h-11 w-11 rounded-2xl' : 'h-9 w-9 rounded-xl'
-                      } ${
-                        completedShown
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
-                      }`}
-                    >
-                      <CircleCheck size={isMobile ? 20 : 18} strokeWidth={2.5} />
-                    </button>
+                    {dk === todayKey && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters({ ...filters, showCompleted: !completedShown })
+                        }
+                        aria-pressed={completedShown}
+                        aria-label={
+                          completedShown ? 'Hide completed' : 'Show completed'
+                        }
+                        title={completedShown ? 'Hide completed' : 'Show completed'}
+                        className={`flex shrink-0 items-center justify-center transition-all active:scale-90 ${
+                          isMobile ? 'h-11 w-11 rounded-2xl' : 'h-9 w-9 rounded-xl'
+                        } ${
+                          completedShown
+                            ? 'bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white'
+                            : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+                        }`}
+                      >
+                        <CircleCheck size={isMobile ? 20 : 18} strokeWidth={2.5} />
+                      </button>
+                    )}
                     <FilterTriggerButton
                       compact
                       size={isMobile ? 'lg' : 'md'}
@@ -2826,7 +2828,7 @@ export default function TaskBoard({
                         isMobile ? 'h-11 w-11 rounded-2xl' : 'h-9 w-9 rounded-xl'
                       } ${
                         selection.active
-                          ? 'bg-primary text-primary-foreground'
+                          ? 'bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white'
                           : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
                       }`}
                     >

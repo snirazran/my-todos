@@ -2,7 +2,7 @@
 
 import React, { useLayoutEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { CheckCircle2, ChevronDown, ListChecks } from 'lucide-react';
+import { ChevronDown, ListChecks } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { ChecklistCheckbox } from '@/components/board/ChecklistEditor';
 import { StepPips } from '@/components/ui/TaskAdornments';
@@ -18,6 +18,59 @@ const stopRowGesture = {
 
 type Flip = { height: number; siblings: [HTMLElement, number][] };
 
+export function StepsChip({
+  done,
+  total,
+  open = false,
+  onClick,
+  label,
+}: {
+  done: number;
+  total: number;
+  open?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+  label?: string;
+}) {
+  const allDone = total > 0 && done === total;
+  const body = (
+    <>
+      <ListChecks className="h-3.5 w-3.5" strokeWidth={2.5} />
+      {done}/{total}
+      {onClick && (
+        <ChevronDown
+          aria-hidden
+          className={`h-3 w-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          strokeWidth={3}
+        />
+      )}
+    </>
+  );
+  const look = `-my-1.5 inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-bold tabular-nums leading-none transition-colors ${
+    allDone
+      ? 'bg-primary/10 text-primary'
+      : 'bg-foreground/[0.05] text-muted-foreground dark:bg-white/[0.07]'
+  }`;
+  if (!onClick) {
+    return (
+      <span aria-hidden className={look}>
+        {body}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={label}
+      {...stopRowGesture}
+      onClick={onClick}
+      className={`${look} touch-manipulation [@media(hover:hover)]:hover:bg-foreground/[0.09]`}
+    >
+      {body}
+    </button>
+  );
+}
+
 export function StepsStrip({
   taskText,
   items,
@@ -27,6 +80,7 @@ export function StepsStrip({
   onToggleOpen,
   onToggleItem,
   slideRows = true,
+  renderMeta,
 }: {
   taskText: string;
   items: ChecklistItem[];
@@ -36,15 +90,13 @@ export function StepsStrip({
   onToggleOpen: () => void;
   onToggleItem?: (itemId: string) => void;
   slideRows?: boolean;
+  renderMeta: (chip: React.ReactNode) => React.ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef<Flip | null>(null);
   const total = items.length;
-  const allDone = doneCount === total;
-  const next = items.find((it) => !it.done);
   const canTick = !!onToggleItem && !isDone;
-  const stepsLabel = `${total} ${total === 1 ? 'step' : 'steps'}`;
 
   const toggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -101,18 +153,26 @@ export function StepsStrip({
           },
         );
       });
-    } else {
-      root.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 180,
-        easing: 'ease-out',
-      });
     }
   }, [open, reduceMotion, slideRows]);
 
   return (
-    <div ref={rootRef} className="mt-0.5">
-      {open ? (
-        <div>
+    <div ref={rootRef}>
+      {renderMeta(
+        <StepsChip
+          done={doneCount}
+          total={total}
+          open={open}
+          onClick={toggle}
+          label={
+            open
+              ? `Hide steps for ${taskText}`
+              : `Show steps for ${taskText}, ${doneCount} of ${total} done`
+          }
+        />,
+      )}
+      {open && (
+        <div className="mt-1.5">
           <ul className="flex flex-col">
             {items.map((item, i) => (
               <li key={item.id} data-step-in>
@@ -177,67 +237,6 @@ export function StepsStrip({
             </span>
             <StepPips items={items} done={doneCount} />
             Hide
-          </button>
-        </div>
-      ) : (
-        <div className="flex h-7 max-w-full items-center gap-2">
-          <span
-            {...stopRowGesture}
-            className="flex w-[22px] flex-shrink-0 justify-center"
-          >
-            {next && canTick ? (
-              <ChecklistCheckbox
-                size={18}
-                checked={false}
-                onToggle={() => onToggleItem?.(next.id)}
-              />
-            ) : (
-              <span
-                aria-hidden
-                className={allDone ? 'text-primary' : 'text-muted-foreground/70'}
-              >
-                {allDone ? (
-                  <CheckCircle2 className="h-[18px] w-[18px]" />
-                ) : (
-                  <ListChecks className="h-[18px] w-[18px]" />
-                )}
-              </span>
-            )}
-          </span>
-          <button
-            type="button"
-            aria-expanded={false}
-            aria-label={`Show steps for ${taskText}, ${doneCount} of ${total} done`}
-            {...stopRowGesture}
-            onClick={toggle}
-            className="-mr-1.5 flex h-full min-w-0 touch-manipulation items-center gap-2 rounded-lg pr-1 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/50"
-          >
-            <span className="relative min-w-0 overflow-hidden">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={next && !isDone ? next.id : allDone ? 'done' : 'steps'}
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -10, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-                  className={`block truncate text-[13px] font-semibold leading-[1.35] md:text-[14px] ${
-                    allDone ? 'text-primary' : 'text-foreground/65'
-                  }`}
-                >
-                  {next && !isDone
-                    ? next.text || 'Untitled step'
-                    : allDone
-                      ? `All ${stepsLabel} done`
-                      : stepsLabel}
-                </motion.span>
-              </AnimatePresence>
-            </span>
-            <StepPips items={items} done={doneCount} />
-            <ChevronDown
-              aria-hidden
-              className="h-4 w-4 shrink-0 text-muted-foreground/55"
-              strokeWidth={2.75}
-            />
           </button>
         </div>
       )}

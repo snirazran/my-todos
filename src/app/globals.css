@@ -36,6 +36,7 @@
     --repeat-icon-grey: #6c6c6c;
     --repeat-icon-green: #1f621c;
     --board-list: 140 10% 94.5%;
+    --card-raised: 0 0% 100%;
     color-scheme: light;
   }
 
@@ -71,6 +72,7 @@
     --repeat-icon-grey: #a3ada6;
     --repeat-icon-green: #3ed66b;
     --board-list: 150 24% 4.5%;
+    --card-raised: 150 13% 13.5%;
     color-scheme: dark;
   }
 }
@@ -184,7 +186,7 @@ body:has([data-public-home]) #main-scroll {
   }
 }
 html.dark {
-  --toast-surface: hsl(115 30% 29% / 0.88);
+  --toast-surface: hsl(115 30% 29% / 0.94);
 }
 @keyframes toast-countdown {
   from {

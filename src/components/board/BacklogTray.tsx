@@ -117,7 +117,7 @@ function QuickSave({ onSave }: { onSave: (text: string) => Promise<void> | void 
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: 'spring', stiffness: 520, damping: 30 }}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white active:scale-90"
           >
             <CornerDownLeft className="h-4 w-4" strokeWidth={2.75} />
           </motion.button>

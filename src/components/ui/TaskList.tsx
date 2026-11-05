@@ -1,3 +1,4 @@
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
   Check,
   CheckCircle2,
@@ -15,12 +16,13 @@ import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
 import { TaskMetaLine } from '@/components/ui/TaskMeta';
-import { StepPips, StreakPill } from '@/components/ui/TaskAdornments';
 import {
   HOME_CARD_RADIUS,
   HOME_CARD_SURFACE,
+  TASK_CARD_SURFACE,
+  TASK_FLY_SLOT,
 } from '@/components/ui/taskSurfaces';
-import { StepsStrip } from '@/components/ui/TaskSteps';
+import { StepsChip, StepsStrip } from '@/components/ui/TaskSteps';
 import {
   hapticGrab,
   hapticImpact,
@@ -95,9 +97,6 @@ import {
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
-import {
-  ChecklistCheckbox,
-} from '../board/ChecklistEditor';
 import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
 import {
   matchesTaskFilters,
@@ -273,66 +272,35 @@ function TaskDragPreview({
 }) {
   const steps = task.checklist ?? [];
   const stepsDone = steps.filter((step) => step.done).length;
-  const nextStep = steps.find((step) => !step.done);
   return (
     <div className={`h-full w-full ${TASK_CARD_GAP}`}>
     <div
       data-drag-lift
       data-tilt
-      className={`relative flex h-full w-full items-center gap-3 overflow-hidden py-[15px] pl-3.5 pr-2.5 md:pl-4 md:pr-3 ${HOME_CARD_SURFACE}`}
+      className={`relative flex h-full w-full items-center gap-3 overflow-hidden py-[15px] pl-3.5 pr-2.5 md:pl-4 md:pr-3 ${TASK_CARD_SURFACE}`}
     >
-      {tags.length > 0 && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1/2 h-[26px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full opacity-90"
-          style={{ backgroundColor: tags[0].color }}
-        />
-      )}
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className="text-[17px] font-bold leading-snug text-foreground md:text-[17.5px]">
-            {task.text}
-            {(task.streak ?? 0) > 0 && (
-              <StreakPill
-                count={task.streak ?? 0}
-                size="sm"
-                className="ml-1.5 translate-y-[-1px] align-middle"
-              />
-            )}
-          </span>
+        <span className="line-clamp-2 break-words text-[17px] font-semibold leading-snug text-foreground md:text-[17.5px]">
+          {task.text}
         </span>
         <TaskMetaLine
           tags={tags}
           startTime={task.startTime}
           endTime={task.endTime}
+          streak={task.streak ?? 0}
+          trailing={
+            steps.length > 0 ? (
+              <StepsChip done={stepsDone} total={steps.length} />
+            ) : undefined
+          }
         />
         <BuddyLine
           className="mt-0.5"
           taskId={task.id}
           date={new Intl.DateTimeFormat('en-CA').format(new Date())}
         />
-        {steps.length > 0 && (
-          <span className="mt-0.5 flex h-7 min-w-0 items-center gap-2 text-muted-foreground/70">
-            <span className="flex w-[22px] shrink-0 justify-center">
-              {nextStep ? (
-                <ChecklistCheckbox
-                  size={18}
-                  checked={false}
-                  onToggle={() => {}}
-                  interactive={false}
-                />
-              ) : (
-                <CheckCircle2 className="h-[18px] w-[18px] text-primary" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground/65 md:text-[14px]">
-              {nextStep ? nextStep.text || 'Untitled step' : `All ${steps.length} steps done`}
-            </span>
-            <StepPips items={steps} done={stepsDone} />
-          </span>
-        )}
       </span>
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-12 md:w-12">
+      <span className={`grid h-11 w-11 shrink-0 place-items-center md:h-12 md:w-12 ${TASK_FLY_SLOT}`}>
         <Fly size={40} y={-3} paused interactive={false} alwaysPlay />
       </span>
     </div>
@@ -470,6 +438,20 @@ const TaskRowBody = React.memo(function TaskRowBody(
       .map((tagId) => getTagDetails(tagId))
       .filter((tag): tag is NonNullable<typeof tag> => !!tag);
     const focusSecondsToday = task.frogodoroSession?.focusTime ?? 0;
+    const renderMeta = (trailing?: React.ReactNode) => (
+      <TaskMetaLine
+        tags={metaTags}
+        startTime={task.startTime}
+        endTime={task.endTime}
+        isNext={isNextTimed}
+        isDone={isDone}
+        activePhase={!isDone && timerPhase ? timerPhase : null}
+        fromCalendar={!!task.calendarEventId}
+        focusSeconds={focusSecondsToday}
+        streak={isDone ? 0 : task.streak ?? 0}
+        trailing={trailing}
+      />
+    );
 
     /* Swipe Logic */
     const [openSide, setOpenSide] = useState<'timer' | 'secondary' | null>(null);
@@ -895,7 +877,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
         ref={containerRef}
         data-task-card
         style={{ overflow: isDragging ? 'visible' : 'hidden' }}
-        className={`relative w-full ${isDragging ? `${HOME_CARD_RADIUS} bg-muted/60` : HOME_CARD_SURFACE} ${hintRowGlow ? 'hint-row-glow' : ''}`}
+        className={`relative w-full ${isDragging ? `${HOME_CARD_RADIUS} bg-muted/60` : TASK_CARD_SURFACE} ${hintRowGlow ? 'hint-row-glow' : ''}`}
         initial={skipMountFade ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={isExitingLater ? { opacity: 1 } : { opacity: 0 }}
@@ -1023,7 +1005,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
               relative flex w-full flex-col py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3
               ${HOME_CARD_RADIUS}
               transition-[box-shadow,background-color] duration-200
-              bg-card
+              bg-[hsl(var(--card-raised))]
               shadow-none
               ${isHovered && isDesktop && !isDone ? 'bg-muted/40' : ''}
               ${
@@ -1033,7 +1015,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
               }
 
               select-none active:bg-muted/50
-              has-[[data-completion-target]:active]:bg-card
+              has-[[data-completion-target]:active]:bg-[hsl(var(--card-raised))]
               ${isDragging ? 'z-[100] opacity-100 ring-2 ring-primary/40' : ''}
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-muted/40' : ''}
               cursor-pointer
@@ -1045,19 +1027,6 @@ const TaskRowBody = React.memo(function TaskRowBody(
             }}
             onClick={handleCardClick}
           >
-            {metaTags.length > 0 && (
-              <span
-                aria-hidden
-                className={`pointer-events-none absolute left-0 top-1/2 h-[26px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-200 ${isDone ? 'opacity-30' : 'opacity-90'}`}
-                style={{
-                  background:
-                    metaTags.length > 1
-                      ? `linear-gradient(to bottom, ${metaTags[0].color} 50%, ${metaTags[1].color} 50%)`
-                      : metaTags[0].color,
-                }}
-              />
-            )}
-
             {/* Glow Animation Overlay */}
             {isGlowActive && !isDone && (
               <div
@@ -1082,7 +1051,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
             >
                 <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                   <motion.span
-                    className={`text-[17px] font-bold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17.5px] ${
+                    className={`line-clamp-2 text-[17px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17.5px] ${
                       isDone
                         ? 'text-muted-foreground decoration-current'
                         : 'text-foreground decoration-transparent'
@@ -1093,34 +1062,9 @@ const TaskRowBody = React.memo(function TaskRowBody(
                     transition={{ duration: 0.2 }}
                   >
                     {task.text}
-                    {(task.streak ?? 0) > 0 && !isDone && (
-                      <StreakPill
-                        count={task.streak ?? 0}
-                        size="sm"
-                        className="ml-1.5 translate-y-[-1px] align-middle"
-                      />
-                    )}
                   </motion.span>
                 </span>
-                <TaskMetaLine
-                  tags={metaTags}
-                  startTime={task.startTime}
-                  endTime={task.endTime}
-                  isNext={isNextTimed}
-                  isDone={isDone}
-                  activePhase={!isDone && timerPhase ? timerPhase : null}
-                  fromCalendar={!!task.calendarEventId}
-                  focusSeconds={focusSecondsToday}
-                />
-
-                <BuddyLine
-                  className="mt-0.5"
-                  taskId={task.id}
-                  isDone={isDone}
-                  date={new Intl.DateTimeFormat('en-CA').format(new Date())}
-                />
-
-                {checklist.length > 0 && (
+                {checklist.length > 0 ? (
                   <StepsStrip
                     taskText={task.text}
                     items={checklistPayoutState.items}
@@ -1136,8 +1080,18 @@ const TaskRowBody = React.memo(function TaskRowBody(
                         ? (itemId) => onToggleChecklistItem(task, itemId)
                         : undefined
                     }
+                    renderMeta={(chip) => renderMeta(chip)}
                   />
+                ) : (
+                  renderMeta()
                 )}
+
+                <BuddyLine
+                  className="mt-0.5"
+                  taskId={task.id}
+                  isDone={isDone}
+                  date={new Intl.DateTimeFormat('en-CA').format(new Date())}
+                />
             </div>
 
             {isDesktop &&
@@ -1271,7 +1225,9 @@ const TaskRowBody = React.memo(function TaskRowBody(
                         handleTaskToggle(task, false);
                       }}
                     >
-                      <CheckCircle2 className="text-primary w-9 h-9 drop-shadow-sm md:w-10 md:h-10" />
+                      <span className="grid h-full w-full place-items-center rounded-full bg-primary/[0.1] text-primary dark:bg-primary/[0.14]">
+                        <Check className="h-5 w-5 md:h-[22px] md:w-[22px]" strokeWidth={3.5} />
+                      </span>
                     </button>
                   </motion.div>
                 )}
@@ -1591,14 +1547,16 @@ function AddTaskComposerRow({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const desktop = useMediaQuery('(min-width: 768px)');
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-hint={desktop ? 'add-task' : undefined}
       className={`group relative flex h-16 w-full items-center gap-4 bg-foreground/[0.04] pl-4 pr-3.5 text-left transition-[transform,opacity,background-color] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-0 dark:bg-white/[0.05] md:pl-[18px] md:pr-4 [@media(hover:hover)]:hover:bg-foreground/[0.07] ${HOME_CARD_RADIUS}`}
     >
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
         <Plus className="h-[18px] w-[18px]" strokeWidth={3.5} />
       </span>
       <span className="min-w-0 flex-1 truncate text-[17px] font-bold leading-snug text-muted-foreground transition-colors md:text-[17.5px] [@media(hover:hover)]:group-hover:text-foreground">

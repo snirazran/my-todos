@@ -59,12 +59,14 @@ export function GlobalPageBackground() {
     shouldWaitForUserBackground
   ) return null;
 
+  const tall = pathname === '/' || pathname === '/friends';
+
   return (
     <div
       aria-hidden
       data-fly-page-bg
       style={backgroundFadeMaskStyle}
-      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[480px]"
+      className={`pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden ${tall ? 'md:h-[640px]' : 'md:h-[480px]'}`}
     >
       <BackgroundCrossfade id={backgroundKey} images={images} />
       <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset]" />

@@ -333,7 +333,6 @@ export default function FrogodoroSheet({
     if (open) setBackdropHandoff(useSheetStore.getState().count > 0);
   }
   useRegisterOpenSheet(open);
-  const [chipFlyDrawn, setChipFlyDrawn] = useState(false);
   const taskDisplayName = task ? getTaskDisplayName(task) : '';
   const subjectChipLabel = task
     ? subjectHeadline(task.subjectKind ?? subjectKindOf(task.id), taskDisplayName)
@@ -521,7 +520,6 @@ export default function FrogodoroSheet({
   useEffect(() => {
     if (!open) {
       setSheetEntered(false);
-      setChipFlyDrawn(false);
     }
   }, [open]);
 
@@ -1317,27 +1315,12 @@ export default function FrogodoroSheet({
                                 {/* Fixed box + leading-none on every sibling is
                                     what keeps the row on one optical centre line. */}
                                 <span className="relative flex h-8 w-8 shrink-0 -translate-y-1 items-center justify-center">
-                                  {!chipFlyDrawn && (
-                                    <img
-                                      src="/fly.svg"
-                                      alt=""
-                                      width={30}
-                                      height={30}
-                                      aria-hidden
-                                      className="absolute"
-                                    />
-                                  )}
-                                  {sheetEntered && (
-                                    <Fly
-                                      size={34}
-                                      interactive={false}
-                                      alwaysPlay
-                                      paused
-                                      onLoad={() =>
-                                        window.setTimeout(() => setChipFlyDrawn(true), 120)
-                                      }
-                                    />
-                                  )}
+                                  <Fly
+                                    size={34}
+                                    interactive={false}
+                                    alwaysPlay
+                                    paused
+                                  />
                                 </span>
                                 {timerActive &&
                                 phase === 'focus' &&
@@ -1667,42 +1650,25 @@ export default function FrogodoroSheet({
                             out. */}
                         {!awaitingDone && (
                           <div className="relative z-30">
-                            {sheetEntered && (
-                              <FocusScene
-                                indices={frogIndices}
-                                running={isRunning}
-                                showFlies={timerActive && phase === 'focus'}
-                                caught={sceneCaught}
-                                fliesPotential={Math.max(
-                                  fliesPotential,
-                                  sceneCaught,
-                                )}
-                                catchImminent={catchImminent}
-                                counterRef={catchChipRef}
-                                onGainLand={() => setChipPulse((p) => p + 1)}
-                                suspended={
-                                  confirmStop ||
-                                  confirmPause ||
-                                  confirmTaskSwitch ||
-                                  subjectsOpen
-                                }
-                              />
-                            )}
-                            {!sheetEntered && (
-                              <div
-                                aria-hidden
-                                className="pointer-events-none flex flex-col items-center"
-                              >
-                                <div
-                                  style={{
-                                    width: 144,
-                                    height: 162,
-                                    marginTop: -Math.round(144 * 0.42),
-                                    marginBottom: -6,
-                                  }}
-                                />
-                              </div>
-                            )}
+                            <FocusScene
+                              indices={frogIndices}
+                              running={isRunning}
+                              showFlies={timerActive && phase === 'focus'}
+                              caught={sceneCaught}
+                              fliesPotential={Math.max(
+                                fliesPotential,
+                                sceneCaught,
+                              )}
+                              catchImminent={catchImminent}
+                              counterRef={catchChipRef}
+                              onGainLand={() => setChipPulse((p) => p + 1)}
+                              suspended={
+                                confirmStop ||
+                                confirmPause ||
+                                confirmTaskSwitch ||
+                                subjectsOpen
+                              }
+                            />
                           </div>
                         )}
 

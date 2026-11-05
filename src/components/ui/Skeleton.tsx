@@ -4,6 +4,7 @@ import {
   BOARD_CARD_SURFACE,
   BOARD_LIST_SURFACE,
   HOME_CARD_SURFACE,
+  TASK_CARD_SURFACE,
 } from './taskSurfaces';
 
 export function Skeleton({ className }: { className?: string }) {
@@ -58,13 +59,17 @@ export function HomePageSkeleton() {
   return (
     <SkeletonShell
       label="Loading your tasks"
-      className="min-h-screen overflow-x-hidden pb-20 md:pb-8"
+      className="relative min-h-screen overflow-x-hidden pb-20 md:pb-8"
     >
-      <div className="mx-auto max-w-4xl px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 md:px-6 md:pt-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(440px+env(safe-area-inset-top))] -z-10 bg-[hsl(var(--board-list))] dark:hidden md:top-[640px]"
+      />
+      <div className="mx-auto max-w-4xl px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 md:px-6 md:pt-40">
         <div className="h-[226px] md:h-[254px]" />
-        <div className="relative z-[25] -mt-2 w-full pt-4 md:mx-auto md:w-[360px] md:pt-0">
-          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:hidden" />
-          <div className="w-full overflow-hidden rounded-[20px] bg-foreground/[0.045] dark:bg-white/[0.06] md:border md:border-border/60 md:bg-card md:shadow-sm md:dark:bg-card">
+        <div className="relative z-[25] -mt-2 w-full pt-4 md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
+          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-[hsl(var(--board-list))] shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:bg-background dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:rounded-t-[32px]" />
+          <div className="w-full rounded-[20px] bg-[hsl(var(--card-raised))] shadow-[0_0_0_1px_rgba(15,23,42,0.035),0_2px_0_0_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_2px_0_0_rgba(0,0,0,0.35)] overflow-hidden">
             <div className="flex flex-col gap-2.5 px-4 pb-4 pt-3">
               <div className="flex h-5 items-center justify-between">
                 <Skeleton className="h-3.5 w-24 rounded-full" />
@@ -75,13 +80,15 @@ export function HomePageSkeleton() {
           </div>
         </div>
 
-        <div className="relative z-20 -mx-3 -mt-6 bg-background px-1.5 pt-10 md:mx-auto md:mt-4 md:w-full md:max-w-3xl md:bg-transparent md:px-8 md:pt-5 xl:px-10">
+        <div className="relative z-20 -mx-3 -mt-6 bg-[hsl(var(--board-list))] px-1.5 pt-10 dark:bg-background md:mx-auto md:w-full md:max-w-3xl md:bg-transparent md:px-8 md:pt-12 xl:px-10">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block" />
           <div className="mb-2 flex min-h-11 items-center justify-between pl-5 pr-2 md:min-h-9 md:pl-8 md:pr-5">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-20 rounded-full" />
               <Skeleton className="h-3.5 w-12 rounded-full" />
             </div>
             <div className="flex items-center gap-1 md:gap-0.5">
+              <Skeleton className="hidden h-9 w-9 rounded-xl md:block" />
               <Skeleton className="h-11 w-11 rounded-2xl md:h-9 md:w-9 md:rounded-xl" />
               <Skeleton className="h-11 w-11 rounded-2xl md:h-9 md:w-9 md:rounded-xl" />
             </div>
@@ -93,7 +100,7 @@ export function HomePageSkeleton() {
                 <div
                   className={cn(
                     'flex items-center gap-3 py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3',
-                    HOME_CARD_SURFACE,
+                    TASK_CARD_SURFACE,
                   )}
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -104,8 +111,8 @@ export function HomePageSkeleton() {
               </div>
             ))}
             <div className="pt-1">
-              <div className="flex h-16 items-center gap-4 rounded-[22px] bg-foreground/[0.04] pl-4 pr-3.5 dark:bg-white/[0.05] md:pl-[18px]">
-                <span className="h-8 w-8 shrink-0 rounded-full bg-primary/80" />
+              <div className="flex h-16 items-center gap-4 rounded-[18px] bg-foreground/[0.04] pl-4 pr-3.5 dark:bg-white/[0.05] md:pl-[18px]">
+                <span className="h-8 w-8 shrink-0 rounded-full bg-primary/80 dark:bg-[#4a8a44]/80" />
                 <Skeleton className="h-4 w-24 rounded-full" />
               </div>
             </div>
@@ -119,10 +126,12 @@ export function HomePageSkeleton() {
 function PlannerColumnSkeleton({
   rows,
   isPast = false,
+  today = false,
   className,
 }: {
   rows: number;
   isPast?: boolean;
+  today?: boolean;
   className?: string;
 }) {
   const heading = (
@@ -133,7 +142,7 @@ function PlannerColumnSkeleton({
   );
   const actions = (
     <div className="flex items-center gap-1 md:gap-0.5">
-      {Array.from({ length: 3 }).map((_, i) => (
+      {Array.from({ length: today ? 3 : 2 }).map((_, i) => (
         <Skeleton
           key={i}
           className="h-11 w-11 rounded-2xl md:h-9 md:w-9 md:rounded-xl"
@@ -183,7 +192,7 @@ function PlannerColumnSkeleton({
         <div className="px-2 pb-2">
           {!isPast && (
             <div className="flex h-12 items-center gap-3 pl-3.5 pr-3 md:h-11 md:gap-2.5 md:pl-3">
-              <span className="h-7 w-7 shrink-0 rounded-full bg-primary/80" />
+              <span className="h-7 w-7 shrink-0 rounded-full bg-primary/80 dark:bg-[#4a8a44]/80" />
               <Skeleton className="h-4 w-24 rounded-full" />
             </div>
           )}
@@ -234,7 +243,7 @@ export function PlannerPageSkeleton() {
       <div className="flex h-full justify-center gap-6 overflow-hidden px-3 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(112px+env(safe-area-inset-top))] md:gap-3 md:px-4 md:pb-[calc(32px+env(safe-area-inset-bottom))] md:pt-[140px]">
         <PlannerColumnSkeleton rows={4} isPast className="hidden md:flex" />
         <PlannerColumnSkeleton rows={5} isPast />
-        <PlannerColumnSkeleton rows={5} />
+        <PlannerColumnSkeleton rows={5} today />
         <PlannerColumnSkeleton rows={5} />
         <PlannerColumnSkeleton rows={4} className="hidden md:flex" />
       </div>
@@ -339,22 +348,22 @@ export function QuestsPageSkeleton() {
   return (
     <SkeletonShell
       label="Loading quests"
-      className="h-full overflow-hidden bg-background md:h-auto md:overflow-visible"
+      className="h-full overflow-hidden bg-[hsl(var(--board-list))] dark:bg-background md:h-auto md:overflow-x-clip md:overflow-y-visible"
     >
-      <div className="relative h-[calc(300px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[340px]">
+      <div className="relative h-[calc(300px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[460px]">
         <Skeleton className="absolute inset-0 h-full w-full rounded-none" />
         <div aria-hidden="true" className="absolute inset-0 bg-muted-foreground/10" />
-        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 hidden h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)] md:block" />
         <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-24 md:gap-2">
           <div className="h-[22px] w-20 rounded-full bg-background/50" />
           <div className="h-7 w-56 rounded-2xl bg-background/50 md:h-12 md:w-80" />
         </div>
-        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-10">
+        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-14">
           <div className="h-11 w-36 rounded-full bg-background/50" />
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto -mt-7 flex w-full max-w-3xl flex-col gap-7 rounded-t-[28px] bg-background px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:mt-0 md:gap-9 md:rounded-none md:px-6 md:pb-12 md:pt-6 md:shadow-none">
+      <div className="relative z-10 mx-auto -mt-7 flex w-full max-w-3xl flex-col gap-7 rounded-t-[28px] bg-[hsl(var(--board-list))] dark:bg-background px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:-mt-8 md:gap-9 md:rounded-none md:bg-transparent md:px-6 md:pb-12 md:pt-8 md:shadow-none md:dark:bg-transparent md:dark:shadow-none">
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-[hsl(var(--board-list))] dark:bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
         <div>
           <QuestSectionHeaderSkeleton
             titleWidth="w-36"
@@ -401,19 +410,13 @@ export function WardrobeGridSkeleton({
   showAction?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-4 pb-20 md:pb-4">
+    <div className="grid grid-cols-4 gap-2 pb-20 md:grid-cols-6 md:gap-2.5 md:pb-4">
       {Array.from({ length: 12 }).map((_, index) => (
         <div
           key={index}
-          className={cn(
-            'mx-auto flex w-full max-w-[240px] flex-col rounded-xl border-2 border-border bg-card p-1.5 md:p-2',
-            showAction ? 'pb-0 md:pb-0.5' : 'pb-1.5 md:pb-2',
-          )}
+          className="skeleton flex aspect-square w-full flex-col items-center justify-end overflow-hidden rounded-2xl p-2"
         >
-          <Skeleton className="aspect-square rounded-lg" />
-          {showAction && (
-            <Skeleton className="mx-auto my-1 h-5 w-1/2 rounded-lg" />
-          )}
+          {showAction && <div className="h-4 w-1/2 rounded-full bg-background/60" />}
         </div>
       ))}
     </div>
@@ -454,67 +457,98 @@ export function TradePanelSkeleton() {
 }
 
 export function WardrobePageSkeleton({ tabs = 2 }: { tabs?: number }) {
+  if (tabs === 0) return <ShopPageSkeleton />;
   return (
     <SkeletonShell
-      label={tabs > 0 ? 'Loading wardrobe' : 'Loading shop'}
+      label="Loading wardrobe"
       className="relative flex min-h-[100dvh] flex-col overflow-x-clip md:min-h-[calc(100vh-4rem)]"
     >
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 md:px-6">
-        <div
-          className={cn(
-            'shrink-0 md:h-[calc(222px+env(safe-area-inset-top))]',
-            tabs > 0
-              ? 'h-[calc(252px+env(safe-area-inset-top))]'
-              : 'h-[calc(204px+env(safe-area-inset-top))]',
-          )}
-        />
-
-        <div className="mt-20 flex flex-col gap-4 md:mt-24">
-          {tabs > 0 && (
-            <div className="hidden gap-2 md:flex">
-              {Array.from({ length: tabs }).map((_, i) => (
-                <Skeleton key={i} className="h-10 flex-1 rounded-2xl" />
-              ))}
-            </div>
-          )}
-          {tabs > 0 ? (
-            <div className="flex gap-2 overflow-hidden">
-              <Skeleton className="h-10 w-[4.5rem] shrink-0 rounded-full" />
-              {Array.from({ length: 7 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-10 shrink-0 rounded-full" />
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="flex min-w-0 flex-1 gap-2 overflow-hidden">
-                {['w-16', 'w-20', 'w-[4.5rem]', 'w-[4.5rem]', 'w-20'].map(
-                  (w, i) => (
-                    <Skeleton
-                      key={i}
-                      className={cn('h-10 shrink-0 rounded-full', w)}
-                    />
-                  ),
-                )}
-              </div>
-              <Skeleton className="h-10 w-10 shrink-0 rounded-full md:w-24" />
-              <Skeleton className="h-10 w-10 shrink-0 rounded-full md:w-24" />
-            </div>
-          )}
-          <WardrobeGridSkeleton />
-        </div>
-      </div>
-      {tabs > 0 && (
-        <div className="fixed bottom-0 left-0 z-50 w-full bg-background/90 pb-[env(safe-area-inset-bottom)] md:hidden">
-          <div className="mx-auto grid h-[76px] max-w-md grid-cols-2 gap-2.5 px-4 py-2.5">
-            {[0, 1].map((i) => (
-              <div key={i} className="flex items-center justify-center gap-2.5">
-                <Skeleton className="h-9 w-9 rounded-xl" />
+        <div className="h-[calc(252px+env(safe-area-inset-top))] shrink-0 md:h-[calc(302px+env(safe-area-inset-top))]" />
+        <div className="pt-[60px] md:pt-2">
+          <div className="mx-auto hidden h-12 w-full gap-1 rounded-[18px] border border-border/50 bg-muted p-1 shadow-lg md:flex md:translate-y-16">
+            {Array.from({ length: tabs }).map((_, i) => (
+              <div key={i} className="flex flex-1 items-center justify-center gap-2 rounded-[14px]">
+                <Skeleton className="h-5 w-5 rounded-md" />
                 <Skeleton className="h-3.5 w-16 rounded-full" />
               </div>
             ))}
           </div>
         </div>
-      )}
+        <div className="relative -mx-4 flex flex-1 flex-col rounded-t-[24px] bg-background md:-mx-6 md:mt-20">
+          <div aria-hidden className="pointer-events-none absolute -bottom-px left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+          <div className="flex gap-2 overflow-hidden border-b border-border/60 px-4 pb-1.5 pt-5 md:px-6 md:pt-3">
+            <Skeleton className="h-10 w-[4.5rem] shrink-0 rounded-full" />
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-10 shrink-0 rounded-full" />
+            ))}
+          </div>
+          <div className="px-4 pt-2 md:px-6 md:pt-3">
+            <WardrobeGridSkeleton />
+          </div>
+        </div>
+      </div>
+      <div className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[51] border-t border-border/50 bg-background md:hidden">
+        <div className="mx-auto h-[60px] max-w-md px-4 py-2">
+          <div className="grid h-full grid-cols-2 gap-1 rounded-[16px] bg-muted p-1">
+            {[0, 1].map((i) => (
+              <div key={i} className={cn('flex items-center justify-center gap-2 rounded-[12px]', i === 0 && 'bg-card')}>
+                <Skeleton className="h-6 w-6 rounded-lg" />
+                <Skeleton className="h-3.5 w-14 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </SkeletonShell>
+  );
+}
+
+function ShopPageSkeleton() {
+  return (
+    <SkeletonShell
+      label="Loading shop"
+      className="relative flex min-h-[100dvh] flex-col overflow-x-clip md:min-h-[calc(100vh-4rem)]"
+    >
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col md:px-6">
+        <div className="pond-panel sticky top-0 z-30 flex shrink-0 items-center gap-2 bg-[color:var(--pond-surface-top)] px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:hidden">
+          <Skeleton className="h-10 w-24 rounded-full" />
+          <Skeleton className="ml-auto h-12 w-12 rounded-2xl" />
+        </div>
+        <div className="pond-panel relative bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] pb-10 pt-1 md:bg-none md:pt-[140px]">
+          <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] md:block" />
+          <div className="relative px-4 md:px-6">
+            <div className="mx-auto mt-3 h-[118px] w-full max-w-[340px] animate-pulse rounded-[26px] bg-[color:var(--pond-well)]" />
+          </div>
+          <div className="h-[128px]" />
+        </div>
+        <div className="relative z-20 -mt-6 flex-1 rounded-t-[28px] bg-background px-4 pb-8 pt-6 md:flex-none md:rounded-none md:bg-transparent md:px-6 md:pb-12 md:pt-8">
+          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+          <div className="-mx-1.5 rounded-[28px] bg-[#fff8e3] p-2.5 pb-3 ring-1 ring-[#f6e3ae] dark:bg-amber-400/[0.06] dark:ring-amber-300/15">
+            <div className="mb-2.5 flex items-center gap-2.5 px-1 pt-0.5">
+              <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-4 w-36 rounded-full" />
+                <Skeleton className="h-3 w-24 rounded-full" />
+              </div>
+              <Skeleton className="h-10 w-24 shrink-0 rounded-full" />
+            </div>
+            <div className="grid grid-cols-3 gap-2.5 md:grid-cols-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] animate-pulse rounded-[22px] bg-muted" />
+              ))}
+            </div>
+          </div>
+          <div className="mt-8">
+            <Skeleton className="mb-3 ml-1 h-5 w-40 rounded-full" />
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] animate-pulse rounded-[22px] bg-muted" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </SkeletonShell>
   );
 }
@@ -543,22 +577,26 @@ function FriendsRowSkeleton({ avatar = false }: { avatar?: boolean }) {
 export function FriendsPageSkeleton() {
   return (
     <SkeletonShell label="Loading your friends and shared habits" className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
-      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(440px+env(safe-area-inset-top))] -z-10 bg-[hsl(var(--board-list))] dark:hidden md:top-[640px]"
+      />
+      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-32">
         <div className="relative h-[232px] w-full max-w-[480px] md:h-[286px] md:max-w-[760px]">
           <div className="absolute bottom-4 left-[16%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[22%] lg:left-[28%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-6 w-16 rounded-full" /></div>
           <div className="absolute bottom-4 left-[84%] -ml-11 flex w-[88px] flex-col items-center gap-2 md:left-[78%] lg:left-[72%]"><Skeleton className="h-20 w-20 rounded-[35px]" /><Skeleton className="h-6 w-16 rounded-full" /></div>
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2"><Skeleton className="h-[170px] w-[170px] rounded-b-none rounded-t-[72px]" /></div>
         </div>
-        <div className="relative z-[25] w-full pt-4 md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] md:pt-0 xl:w-[calc(min(100%,48rem)-7rem)]">
-          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:hidden" />
-          <div className="flex w-full items-center gap-3 rounded-[20px] bg-foreground/[0.045] py-2.5 pl-3 pr-3 dark:bg-white/[0.06] md:border md:border-border/60 md:bg-card md:shadow-sm md:dark:bg-card">
+        <div className="relative z-[25] w-full pt-4 md:mx-auto md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]">
+          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 w-screen -translate-x-1/2 rounded-t-[28px] bg-[hsl(var(--board-list))] shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:bg-background dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:rounded-t-[32px]" />
+          <div className="flex w-full items-center gap-3 rounded-[20px] bg-[hsl(var(--card-raised))] py-2.5 pl-3 pr-3 shadow-[0_0_0_1px_rgba(15,23,42,0.035),0_2px_0_0_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_2px_0_0_rgba(0,0,0,0.35)]">
             <div className="hidden w-[238px] shrink-0 items-center gap-2 border-r border-border/50 pr-3 md:flex"><Skeleton className="h-4 w-20 rounded-full" /><Skeleton className="h-3 flex-1 rounded-full" /></div>
             <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
             <div className="flex min-w-0 flex-1 flex-col gap-2"><Skeleton className="h-4 w-1/2 rounded-md" /><Skeleton className="h-2.5 w-full rounded-full" /></div>
           </div>
         </div>
-        <div className="relative z-20 -mx-3 -mt-9 flex w-[calc(100%+1.5rem)] flex-col gap-7 bg-background px-3 pt-[52px] md:mx-auto md:-mt-6 md:w-full md:max-w-3xl md:gap-9 md:bg-transparent md:px-8 md:pt-14">
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] md:block" />
+        <div className="relative z-20 -mx-3 -mt-9 flex w-[calc(100%+1.5rem)] flex-col gap-7 bg-[hsl(var(--board-list))] dark:bg-background px-3 pt-[52px] md:mx-auto md:w-full md:max-w-3xl md:gap-9 md:bg-transparent md:px-8 md:pt-14">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block" />
           <section>
             <FriendsHeaderSkeleton />
             <div className="flex flex-col gap-2">

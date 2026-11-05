@@ -518,8 +518,8 @@ export function QuestsPanel({
                       }}
                       className={cn(
                         'no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-none [overflow-anchor:none]',
-                        'md:flex-none md:min-h-[100dvh] md:overflow-visible',
-                        'bg-background',
+                        'md:flex-none md:min-h-[100dvh] md:overflow-x-clip md:overflow-y-visible',
+                        'bg-[hsl(var(--board-list))] dark:bg-background',
                         data.activeSeason
                           ? 'px-0 pt-0 md:pb-12'
                           : 'px-3 pt-[calc(1rem+env(safe-area-inset-top))] md:px-6 md:pt-24 md:pb-12',
@@ -587,9 +587,12 @@ export function QuestsPanel({
                             className={cn(
                               'mx-auto flex w-full max-w-3xl flex-col gap-7 md:gap-9',
                               data.activeSeason &&
-                                'relative z-10 -mt-7 rounded-t-[28px] bg-background px-3 pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:mt-0 md:rounded-none md:px-6 md:pt-6 md:shadow-none',
+                                'relative z-10 -mt-7 rounded-t-[28px] bg-[hsl(var(--board-list))] dark:bg-background px-3 pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:-mt-8 md:rounded-none md:bg-transparent md:px-6 md:pt-8 md:shadow-none md:dark:bg-transparent md:dark:shadow-none',
                             )}
                           >
+                            {data.activeSeason && (
+                              <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-[hsl(var(--board-list))] dark:bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+                            )}
                             {!data.activeSeason && (
                               <div className="flex items-end justify-between gap-3 px-3.5">
                                 <h1 className="text-[30px] font-black leading-none tracking-tight text-foreground">
@@ -816,7 +819,7 @@ function QuestSeasonBanner({
 
   return (
     <section className="relative">
-      <div className="relative h-[calc(300px+env(safe-area-inset-top))] overflow-hidden md:h-[340px]">
+      <div className="relative h-[calc(300px+env(safe-area-inset-top))] overflow-hidden md:h-[460px]">
         {hasSeasonCover(season.images) ? (
           <SeasonCoverImage
             images={season.images}
@@ -827,7 +830,6 @@ function QuestSeasonBanner({
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[calc(5.5rem+env(safe-area-inset-top))] bg-[linear-gradient(to_bottom,rgba(15,23,42,0.28),transparent)]" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-16 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_92%)] md:block" />
         <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-6 md:top-24 md:gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-950/40 py-1 pl-1.5 pr-2.5 text-[12px] font-black tabular-nums leading-none text-white backdrop-blur-sm md:text-[13px]">
             <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
@@ -844,7 +846,7 @@ function QuestSeasonBanner({
             {season.name}
           </h2>
         </div>
-        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-10">
+        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-14">
           <button
             type="button"
             onClick={onView}

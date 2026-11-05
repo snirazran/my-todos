@@ -1302,7 +1302,7 @@ function WardrobeManagerContent({
                   <motion.div
                     key="stage-rail"
                     {...stagePillMotion(1)}
-                    className="fixed right-4 top-[calc(88px+env(safe-area-inset-top))] flex origin-right flex-col items-center gap-4 md:absolute md:right-0 md:top-[92px] md:gap-3"
+                    className="fixed right-4 top-[calc(88px+env(safe-area-inset-top))] flex origin-right flex-col items-center gap-4 md:absolute md:right-0 md:top-[172px] md:gap-3"
                   >
                     <StyleShufflePill iconOnly />
                     <SaveOutfitButton saved={outfits.saved} onClick={outfits.saveNow} />
@@ -1320,7 +1320,7 @@ function WardrobeManagerContent({
                     'z-40 -mx-4 px-4 md:-mx-6 md:px-6',
                     activeTab === 'trade'
                       ? 'relative'
-                      : 'sticky top-[-90px] md:top-[-96px]',
+                      : 'sticky top-[-90px] md:top-[-176px]',
                   )
                 : 'relative z-40 space-y-2 px-4 pt-0 md:space-y-2 md:px-6 md:pt-2',
             )}
@@ -1336,7 +1336,7 @@ function WardrobeManagerContent({
                   data-fly-page-bg
                   style={backgroundFadeMaskStyle}
                   className={cn(
-                    'pointer-events-none absolute left-[calc(50%-50vw)] top-0 bottom-0 z-0 w-screen overflow-hidden',
+                    'pointer-events-none absolute left-[calc(50%-50vw)] top-0 bottom-0 z-0 w-screen overflow-hidden md:![-webkit-mask-image:none] md:![mask-image:none]',
                     activeTab === 'trade' && 'hidden',
                   )}
                 >
@@ -1447,6 +1447,9 @@ function WardrobeManagerContent({
                   : 'mt-2 w-full min-w-0',
               )}
             >
+              {embedded && !isShop && (
+                <div aria-hidden className="pointer-events-none absolute -bottom-px left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] border-b border-border/60 bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+              )}
               <div className="min-w-0">
                 <FilterBar
                   active={activeFilter}

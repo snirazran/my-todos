@@ -175,6 +175,8 @@ export function TaskMetaLine({
   activePhase = null,
   fromCalendar = false,
   focusSeconds = 0,
+  streak = 0,
+  trailing,
   className,
 }: {
   tags?: TaskMetaTag[];
@@ -185,6 +187,8 @@ export function TaskMetaLine({
   activePhase?: 'focus' | 'break' | null;
   fromCalendar?: boolean;
   focusSeconds?: number;
+  streak?: number;
+  trailing?: React.ReactNode;
   className?: string;
 }) {
   const parts: { key: string; node: React.ReactNode; fill?: boolean }[] = [];
@@ -197,6 +201,14 @@ export function TaskMetaLine({
       fill: true,
       node: (
         <span className="flex min-w-0 items-center font-medium text-muted-foreground/80">
+          <span
+            aria-hidden
+            className={cn(
+              'mr-1.5 h-2 w-2 shrink-0 rounded-full transition-opacity',
+              isDone && 'opacity-50',
+            )}
+            style={{ backgroundColor: tag.color || '#6366f1' }}
+          />
           <span className="truncate">{tag.name}</span>
           {more > 0 && <span className="ml-1 shrink-0 tabular-nums">+{more}</span>}
         </span>
@@ -241,6 +253,27 @@ export function TaskMetaLine({
     });
   }
 
+  if (streak > 0) {
+    parts.push({
+      key: 'streak',
+      node: (
+        <span
+          aria-label={`${streak} in a row`}
+          title={`${streak} in a row`}
+          className="inline-flex items-center gap-0.5 font-bold tabular-nums text-muted-foreground"
+        >
+          <Flame
+            aria-hidden
+            className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400"
+            fill="currentColor"
+            strokeWidth={0}
+          />
+          {streak}
+        </span>
+      ),
+    });
+  }
+
   if (fromCalendar) {
     parts.push({
       key: 'calendar',
@@ -266,7 +299,7 @@ export function TaskMetaLine({
     });
   }
 
-  if (!parts.length) return null;
+  if (!parts.length && !trailing) return null;
 
   return (
     <span
@@ -288,6 +321,11 @@ export function TaskMetaLine({
           </span>
         </React.Fragment>
       ))}
+      {trailing && (
+        <span className={cn('flex shrink-0 items-center', parts.length > 0 && 'ml-1')}>
+          {trailing}
+        </span>
+      )}
     </span>
   );
 }

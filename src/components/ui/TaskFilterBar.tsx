@@ -50,7 +50,7 @@ export function FilterTriggerButton({
         title="Filter"
         className={`relative flex shrink-0 items-center justify-center transition-all active:scale-90 ${box} ${
           on
-            ? 'bg-primary text-primary-foreground'
+            ? 'bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white'
             : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
         }`}
       >

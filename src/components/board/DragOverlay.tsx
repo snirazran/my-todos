@@ -1,9 +1,8 @@
 'use client';
 import { motion } from 'framer-motion';
-import { CheckCircle2 } from 'lucide-react';
 import { TaskMetaLine } from '@/components/ui/TaskMeta';
-import { StepPips } from '@/components/ui/TaskAdornments';
-import { ChecklistCheckbox } from './ChecklistEditor';
+import { StepsChip } from '@/components/ui/TaskSteps';
+import { TASK_FLY_SLOT } from '@/components/ui/taskSurfaces';
 import Fly from '@/components/ui/fly';
 
 export default function DragOverlay({
@@ -46,8 +45,6 @@ export default function DragOverlay({
   const stacked = Math.min(Math.max(bundleCount - 1, 0), 3);
   const steps = checklist ?? [];
   const stepsDone = steps.filter((step) => step.done).length;
-  const nextStep = steps.find((step) => !step.done);
-  const tag = tags?.find((t) => !!t.color);
 
   return (
     <div
@@ -95,49 +92,25 @@ export default function DragOverlay({
         <div
           data-drag-lift
           data-tilt
-          className="relative flex select-none items-center gap-2.5 rounded-[14px] bg-card py-3 pl-3.5 pr-2.5 ring-1 ring-black/[0.06] dark:ring-white/10 md:gap-2 md:py-2.5 md:pl-3 md:pr-2"
+          className="relative flex select-none items-center gap-2.5 rounded-[14px] bg-card py-3 pl-3.5 pr-2.5 ring-1 ring-black/[0.04] dark:ring-white/10 md:gap-2 md:py-2.5 md:pl-3 md:pr-2"
           style={{ minHeight: height }}
         >
-          {tag && (
-            <span
-              aria-hidden
-              className="absolute left-0 top-1/2 h-[24px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full opacity-90"
-              style={{ backgroundColor: tag.color }}
-            />
-          )}
           <span className="min-w-0 flex-1">
-            <span className="block break-words text-[16px] font-semibold leading-snug text-foreground md:text-[15px]">
+            <span className="line-clamp-2 break-words text-[16px] font-semibold leading-snug text-foreground md:text-[15px]">
               {text}
             </span>
             <TaskMetaLine
               tags={tags}
               startTime={startTime}
               endTime={endTime}
+              trailing={
+                steps.length > 0 ? (
+                  <StepsChip done={stepsDone} total={steps.length} />
+                ) : undefined
+              }
             />
-            {steps.length > 0 && (
-              <span className="mt-0.5 flex h-7 min-w-0 items-center gap-2">
-                <span className="flex w-[22px] shrink-0 justify-center">
-                  {nextStep ? (
-                    <ChecklistCheckbox
-                      size={18}
-                      checked={false}
-                      onToggle={() => {}}
-                      interactive={false}
-                    />
-                  ) : (
-                    <CheckCircle2 className="h-[18px] w-[18px] text-primary" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground/65 md:text-[13.5px]">
-                  {nextStep
-                    ? nextStep.text || 'Untitled step'
-                    : `All ${steps.length} steps done`}
-                </span>
-                <StepPips items={steps as never} done={stepsDone} />
-              </span>
-            )}
           </span>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-10 md:w-10">
+          <span className={`grid h-11 w-11 shrink-0 place-items-center md:h-10 md:w-10 ${TASK_FLY_SLOT}`}>
             <Fly size={36} y={-3} paused interactive={false} alwaysPlay />
           </span>
         </div>

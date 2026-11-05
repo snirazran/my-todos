@@ -492,10 +492,10 @@ export function ShopWindow({
         {catalogButton('ml-auto')}
       </div>
       <div className="relative flex flex-1 flex-col">
-        <div className="pond-panel relative bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] pb-10 pt-1 md:bg-none md:pt-[88px]">
+        <div className="pond-panel relative bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] pb-10 pt-1 md:bg-none md:pt-[140px]">
           <div
             aria-hidden
-            className="pointer-events-none absolute -bottom-28 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom)_72%,hsl(var(--background)))] md:block"
+            className="pointer-events-none absolute -bottom-28 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] md:block"
           />
           <div className="relative px-4 md:px-6">
             {catalogButton('absolute right-6 top-0 hidden md:flex')}
@@ -509,7 +509,7 @@ export function ShopWindow({
                 aria-label={`${saleItem.name}, ${sale.discountPercent}% off sale`}
                 className="relative mx-auto mt-8 flex w-full max-w-[340px] items-center gap-4 rounded-[26px] border border-[color:var(--pond-line)] bg-[color:var(--pond-well)] py-3 pl-3 pr-3.5 text-left shadow-[0_3px_0_0_var(--pond-line)] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
               >
-                <span className="relative -mt-9 w-[104px] shrink-0 self-end">
+                <span className="relative -mt-9 w-[104px] shrink-0 self-end rounded-[20px] bg-background">
                   <TileArt
                     rarity={saleItem.rarity}
                     tone="closet"
@@ -591,7 +591,8 @@ export function ShopWindow({
           </div>
         </div>
 
-        <div className="relative z-20 -mt-6 flex-1 rounded-t-[28px] bg-background px-4 pb-8 pt-6 md:mb-10 md:flex-none md:rounded-[32px] md:px-6 md:pb-8 md:shadow-sm md:ring-1 md:ring-border/50">
+        <div className="relative z-20 -mt-6 flex-1 rounded-t-[28px] bg-background px-4 pb-8 pt-6 md:flex-none md:rounded-none md:bg-transparent md:px-6 md:pb-12 md:pt-8">
+          <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 bottom-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
           {!isGuest && shopGift?.available && (
             <div className="mb-5">
               <ShopGiftTile gift={shopGift} onClaim={onClaimGift} />

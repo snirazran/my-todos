@@ -22,6 +22,7 @@ export function markFreshTasks(
 let pendingOrigin: { rect: DOMRect; until: number } | null = null;
 
 export function launchTaskEntranceFrom(rect: DOMRect) {
+  preloadFly();
   pendingOrigin = { rect, until: Date.now() + FRESH_TTL_MS };
 }
 
@@ -188,64 +189,145 @@ function revealInScroller(row: HTMLElement, scroller: HTMLElement | null) {
 }
 
 const FLIGHT_MS = 540;
+const FLY_SRC = '/widgets/Fly.svg';
+let flyPreloaded = false;
 
-function flyIntoSlot(origin: DOMRect, slot: HTMLElement, scrollDelta: number) {
-  const target = slot.getBoundingClientRect();
-  const size = Math.max(28, Math.min(40, target.width * 0.86));
-  const startX = origin.left + origin.width / 2 - size / 2;
-  const startY = origin.top + origin.height / 2 - size / 2;
-  const dx = target.left + target.width / 2 - size / 2 - startX;
-  const dy = target.top - scrollDelta + target.height / 2 - size / 2 - startY;
+function preloadFly() {
+  if (flyPreloaded || typeof Image === 'undefined') return;
+  flyPreloaded = true;
+  const img = new Image();
+  img.src = FLY_SRC;
+}
+
+function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  const cx = 3 * x1;
+  const bx = 3 * (x2 - x1) - cx;
+  const ax = 1 - cx - bx;
+  const cy = 3 * y1;
+  const by = 3 * (y2 - y1) - cy;
+  const ay = 1 - cy - by;
+  const sampleX = (t: number) => ((ax * t + bx) * t + cx) * t;
+  const sampleY = (t: number) => ((ay * t + by) * t + cy) * t;
+  const slopeX = (t: number) => (3 * ax * t + 2 * bx) * t + cx;
+  return (x: number) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const err = sampleX(t) - x;
+      if (Math.abs(err) < 1e-5) return sampleY(t);
+      const d = slopeX(t);
+      if (Math.abs(d) < 1e-6) break;
+      t -= err / d;
+    }
+    let lo = 0;
+    let hi = 1;
+    t = x;
+    for (let i = 0; i < 24; i++) {
+      if (sampleX(t) < x) lo = t;
+      else hi = t;
+      t = (lo + hi) / 2;
+    }
+    return sampleY(t);
+  };
+}
+
+const easeAcross = cubicBezier(0.45, 0, 0.25, 1);
+const easeDip = cubicBezier(0.2, 0.7, 0.4, 1);
+const easeRise = cubicBezier(0.5, 0, 0.3, 1);
+const DIP_AT = 0.16;
+const FLY_FRAMES: ReadonlyArray<[number, number, number, number]> = [
+  [0, 0.5, 0, 0],
+  [0.22, 1.12, -1, 1],
+  [0.7, 1.04, 0.6, 1],
+  [0.96, 0.92, 0, 1],
+  [1, 0.92, 0, 0],
+];
+
+function flyFrame(p: number) {
+  for (let i = 1; i < FLY_FRAMES.length; i++) {
+    const b = FLY_FRAMES[i];
+    if (p <= b[0]) {
+      const a = FLY_FRAMES[i - 1];
+      const k = (p - a[0]) / (b[0] - a[0]);
+      return {
+        scale: a[1] + (b[1] - a[1]) * k,
+        turn: a[2] + (b[2] - a[2]) * k,
+        opacity: a[3] + (b[3] - a[3]) * k,
+      };
+    }
+  }
+  const last = FLY_FRAMES[FLY_FRAMES.length - 1];
+  return { scale: last[1], turn: last[2], opacity: last[3] };
+}
+
+function flyIntoSlot(origin: DOMRect, slot: HTMLElement) {
+  const first = slot.getBoundingClientRect();
+  const size = Math.max(28, Math.min(40, first.width * 0.86));
+  const startX = origin.left + origin.width / 2;
+  const startY = origin.top + origin.height / 2;
+  let targetX = first.left + first.width / 2;
+  let targetY = first.top + first.height / 2;
+  const lift = Math.min(70, Math.abs(targetY - startY) * 0.18);
+  const wobble = targetX >= startX ? 16 : -16;
 
   const layer = document.createElement('div');
   layer.setAttribute('aria-hidden', 'true');
   layer.style.cssText =
-    'position:fixed;inset:0;pointer-events:none;z-index:10050;overflow:hidden;contain:strict';
-  const xLayer = document.createElement('div');
-  const yLayer = document.createElement('div');
+    'position:fixed;inset:0;pointer-events:none;z-index:10050;overflow:hidden';
+  const body = document.createElement('div');
+  body.style.cssText = `position:absolute;left:0;top:0;width:${size}px;height:${size}px;opacity:0;will-change:transform,opacity;transform:translate3d(${startX - size / 2}px,${startY - size / 2}px,0) scale(0.5)`;
   const fly = document.createElement('img');
-  fly.src = '/widgets/Fly.svg';
+  fly.src = FLY_SRC;
   fly.alt = '';
-  xLayer.style.cssText = `position:absolute;left:${startX}px;top:${startY}px;width:${size}px;height:${size}px;will-change:transform`;
-  yLayer.style.cssText = 'width:100%;height:100%;will-change:transform';
+  fly.decoding = 'sync';
+  fly.draggable = false;
   fly.style.cssText =
-    'display:block;width:100%;height:100%;will-change:transform,opacity;filter:drop-shadow(0 3px 4px rgba(15,23,42,0.22))';
-  yLayer.appendChild(fly);
-  xLayer.appendChild(yLayer);
-  layer.appendChild(xLayer);
+    'display:block;width:100%;height:100%;filter:drop-shadow(0 3px 4px rgba(15,23,42,0.22))';
+  body.appendChild(fly);
+  layer.appendChild(body);
   document.body.appendChild(layer);
 
-  const timing: KeyframeAnimationOptions = { duration: FLIGHT_MS, fill: 'both' };
-  const lift = Math.min(70, Math.abs(dy) * 0.18);
-  xLayer.animate(
-    [
-      { transform: 'translate3d(0,0,0)' },
-      { transform: `translate3d(${dx}px,0,0)` },
-    ],
-    { ...timing, easing: 'cubic-bezier(0.45, 0, 0.25, 1)' },
-  );
-  yLayer.animate(
-    [
-      { transform: 'translate3d(0,0,0)', easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)' },
-      { transform: `translate3d(0,${lift}px,0)`, offset: 0.16, easing: 'cubic-bezier(0.5, 0, 0.3, 1)' },
-      { transform: `translate3d(0,${dy}px,0)` },
-    ],
-    timing,
-  );
-  const wobble = dx >= 0 ? 16 : -16;
-  const flight = fly.animate(
-    [
-      { transform: 'scale(0.5) rotate(0deg)', opacity: 0 },
-      { transform: `scale(1.12) rotate(${-wobble}deg)`, opacity: 1, offset: 0.22 },
-      { transform: `scale(1.04) rotate(${wobble * 0.6}deg)`, opacity: 1, offset: 0.7 },
-      { transform: 'scale(0.92) rotate(0deg)', opacity: 1, offset: 0.96 },
-      { transform: 'scale(0.92) rotate(0deg)', opacity: 0 },
-    ],
-    timing,
-  );
-  const cleanup = () => layer.remove();
-  flight.onfinish = cleanup;
-  flight.oncancel = cleanup;
+  let raf = 0;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    window.cancelAnimationFrame(raf);
+    window.clearTimeout(fallback);
+    document.removeEventListener('visibilitychange', onHidden);
+    layer.style.display = 'none';
+    window.setTimeout(() => layer.remove(), 48);
+  };
+  const onHidden = () => {
+    if (document.visibilityState === 'hidden') finish();
+  };
+  const fallback = window.setTimeout(finish, FLIGHT_MS + 400);
+  document.addEventListener('visibilitychange', onHidden);
+
+  const begin = performance.now();
+  const tick = (now: number) => {
+    if (finished) return;
+    const p = Math.min(1, Math.max(0, (now - begin) / FLIGHT_MS));
+    if (slot.isConnected) {
+      const r = slot.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        targetX = r.left + r.width / 2;
+        targetY = r.top + r.height / 2;
+      }
+    }
+    const x = startX + (targetX - startX) * easeAcross(p);
+    const y =
+      p < DIP_AT
+        ? startY + lift * easeDip(p / DIP_AT)
+        : startY + lift + (targetY - startY - lift) * easeRise((p - DIP_AT) / (1 - DIP_AT));
+    const f = flyFrame(p);
+    body.style.transform = `translate3d(${x - size / 2}px,${y - size / 2}px,0) scale(${f.scale}) rotate(${f.turn * wobble}deg)`;
+    body.style.opacity = String(f.opacity);
+    if (p < 1) raf = window.requestAnimationFrame(tick);
+    else finish();
+  };
+  raf = window.requestAnimationFrame(tick);
 }
 
 function sparkBurst(row: HTMLElement, fly: HTMLElement, delay: number) {
@@ -458,7 +540,7 @@ export function playTaskEntrance(
 
   const card = cardEl ?? row;
   const scroller = scrollParent(row);
-  const scrollDelta = revealInScroller(row, scroller);
+  revealInScroller(row, scroller);
   const origin = takeOrigin();
 
   if (prefersReducedMotion()) {
@@ -495,7 +577,7 @@ export function playTaskEntrance(
   const fly = row.querySelector<HTMLElement>('[data-fly-slot]');
   let landAt = impactAt;
   if (fly && origin) {
-    flyIntoSlot(origin, fly, scrollDelta);
+    flyIntoSlot(origin, fly);
     landAt = Math.max(landAt, FLIGHT_MS - 30);
   }
   if (fly) {

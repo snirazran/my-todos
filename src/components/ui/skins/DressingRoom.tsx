@@ -42,11 +42,11 @@ export const TILE_TONE: Record<Rarity, string> = {
 
 export const CLOSET_TONE: Record<Rarity, string> = {
   common: 'bg-slate-100 dark:bg-slate-500/15',
-  uncommon: 'bg-emerald-100/70 dark:bg-emerald-500/15',
-  rare: 'bg-sky-100/80 dark:bg-sky-500/15',
-  epic: 'bg-gradient-to-b from-violet-100 to-violet-200/70 dark:from-violet-500/15 dark:to-violet-500/25',
+  uncommon: 'bg-[#dffbed] dark:bg-emerald-500/15',
+  rare: 'bg-[#e6f5fe] dark:bg-sky-500/15',
+  epic: 'bg-gradient-to-b from-violet-100 to-[#e7e2fe] dark:from-violet-500/15 dark:to-violet-500/25',
   legendary:
-    'bg-gradient-to-b from-amber-100 via-amber-100 to-orange-200/70 shadow-[0_6px_16px_-8px_rgba(245,158,11,0.65)] dark:from-amber-500/20 dark:via-amber-500/20 dark:to-orange-500/25',
+    'bg-gradient-to-b from-amber-100 via-amber-100 to-[#fee3c4] shadow-[0_6px_16px_-8px_rgba(245,158,11,0.65)] dark:from-amber-500/20 dark:via-amber-500/20 dark:to-orange-500/25',
 };
 
 export const BAR_TONE: Record<Rarity, string> = {

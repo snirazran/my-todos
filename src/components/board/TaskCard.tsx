@@ -8,14 +8,12 @@ import React, {
   useState,
 } from 'react';
 import {
-  CheckCircle2,
   Plus,
   Check,
 } from 'lucide-react';
 import { TaskMetaLine } from '@/components/ui/TaskMeta';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
-import { StreakPill } from '@/components/ui/TaskAdornments';
-import { BOARD_CARD_SURFACE } from '@/components/ui/taskSurfaces';
+import { BOARD_CARD_SURFACE, TASK_FLY_SLOT } from '@/components/ui/taskSurfaces';
 import { StepsStrip } from '@/components/ui/TaskSteps';
 import { checklistPayout } from '@/lib/checklist';
 import type { Task } from './helpers';
@@ -422,6 +420,19 @@ export default function TaskCard({
   const [stepsOpen, setStepsOpen] = useState(false);
   const focusSeconds = task.frogodoroSession?.focusTime ?? 0;
   const streak = showStreak && isRepeating && !isDone ? (task.streak ?? 0) : 0;
+  const renderMeta = (trailing?: React.ReactNode) => (
+    <TaskMetaLine
+      tags={tags}
+      startTime={task.startTime}
+      endTime={task.endTime}
+      isDone={isDone}
+      activePhase={!isDone && timerPhase ? timerPhase : null}
+      fromCalendar={!!task.calendarEventId}
+      focusSeconds={focusSeconds}
+      streak={streak}
+      trailing={trailing}
+    />
+  );
   const showDoToday = !!onDoToday && !hideDoTodayButton && !selectionMode;
   const showFly = !!onToggleComplete;
 
@@ -459,21 +470,6 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      {tags.length > 0 && (
-        <span
-          aria-hidden
-          className={`pointer-events-none absolute left-0 top-1/2 h-[24px] max-h-[60%] w-[3px] -translate-y-1/2 rounded-r-full ${
-            isDone ? 'opacity-30' : 'opacity-90'
-          }`}
-          style={{
-            background:
-              tags.length > 1
-                ? `linear-gradient(to bottom, ${tags[0].color} 50%, ${tags[1].color} 50%)`
-                : tags[0].color,
-          }}
-        />
-      )}
-
       {selectionMode && (
         <span
           aria-hidden
@@ -494,20 +490,13 @@ export default function TaskCard({
       >
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span
-            className={`break-words text-[16px] font-bold leading-snug line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[15px] ${
+            className={`line-clamp-2 break-words text-[16px] font-semibold leading-snug line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[15px] ${
               isDone
                 ? 'text-muted-foreground decoration-current'
                 : 'text-foreground decoration-transparent'
             }`}
           >
             {task.text}
-            {streak > 0 && (
-              <StreakPill
-                count={streak}
-                size="sm"
-                className="ml-1.5 translate-y-[-1px] align-middle"
-              />
-            )}
           </span>
           {task.isTutorial && (
             <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary">
@@ -515,23 +504,9 @@ export default function TaskCard({
             </span>
           )}
         </span>
-        <TaskMetaLine
-          tags={tags}
-          startTime={task.startTime}
-          endTime={task.endTime}
-          isDone={isDone}
-          activePhase={!isDone && timerPhase ? timerPhase : null}
-          fromCalendar={!!task.calendarEventId}
-          focusSeconds={focusSeconds}
-        />
-        <BuddyLine
-          className="mt-0.5"
-          taskId={task.id}
-          isDone={isDone}
-          date={occurrenceDate}
-        />
-        {steps && (
+        {steps ? (
           <StepsStrip
+            renderMeta={(chip) => renderMeta(chip)}
             slideRows={false}
             taskText={task.text}
             items={steps.items}
@@ -548,7 +523,15 @@ export default function TaskCard({
                 : undefined
             }
           />
+        ) : (
+          renderMeta()
         )}
+        <BuddyLine
+          className="mt-0.5"
+          taskId={task.id}
+          isDone={isDone}
+          date={occurrenceDate}
+        />
       </div>
 
       {showDoToday && (
@@ -582,7 +565,7 @@ export default function TaskCard({
           <span
             ref={(el) => registerFly(dragId, el)}
             data-fly-slot
-            className={`absolute inset-0 flex items-center justify-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 transition-opacity duration-200 ${
+            className={`absolute inset-0 flex items-center justify-center ${TASK_FLY_SLOT} transition-opacity duration-200 ${
               isDone || grabbing ? 'pointer-events-none opacity-0' : 'opacity-100'
             }`}
           >
@@ -594,7 +577,9 @@ export default function TaskCard({
               isDone || grabbing ? 'opacity-100' : 'pointer-events-none opacity-0'
             }`}
           >
-            <CheckCircle2 className="h-9 w-9 text-primary md:h-8 md:w-8" />
+            <span className="grid h-full w-full place-items-center rounded-full bg-primary/[0.1] text-primary dark:bg-primary/[0.14]">
+              <Check className="h-5 w-5" strokeWidth={3.5} />
+            </span>
           </span>
         </button>
       )}

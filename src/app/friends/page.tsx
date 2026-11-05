@@ -260,8 +260,12 @@ export default function FriendsPage() {
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(440px+env(safe-area-inset-top))] -z-10 bg-[hsl(var(--board-list))] dark:hidden md:top-[640px]"
+      />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-12">
+      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-32">
         <MobileMenuCluster position="absolute" />
         <MobileHeaderActions
           position="absolute"
@@ -312,8 +316,8 @@ export default function FriendsPage() {
           onOpenFriend={openFriend}
           onInvite={() => setInviteOpen(true)}
         />
-        <div data-fly-sheet className="relative z-20 -mx-3 -mt-9 flex w-[calc(100%+1.5rem)] flex-col gap-7 bg-background px-3 pt-[52px] md:mx-auto md:bg-transparent md:-mt-6 md:w-full md:max-w-3xl md:gap-9 md:px-8 md:pt-14">
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_40px)] md:block" />
+        <div data-fly-sheet className="relative z-20 -mx-3 -mt-9 flex w-[calc(100%+1.5rem)] flex-col gap-7 bg-[hsl(var(--board-list))] dark:bg-background px-3 pt-[52px] md:mx-auto md:bg-transparent md:w-full md:max-w-3xl md:gap-9 md:px-8 md:pt-14">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block" />
           {(friendsError || pond.error || claimError || alertsWaiting > 0) && (
             <div className="-mb-3 flex flex-col gap-2 md:-mb-5">
               {(friendsError || pond.error || claimError) && (

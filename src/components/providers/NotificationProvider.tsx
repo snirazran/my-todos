@@ -142,7 +142,9 @@ function readingTimeMs(text: string, hasAction: boolean): number {
 const STAY_SCALE = 0.5;
 
 export const TOAST_SURFACE_STYLE = {
-  backgroundColor: 'var(--toast-surface, hsl(115 36% 36% / 0.88))',
+  backgroundColor: 'var(--toast-surface, hsl(115 36% 36% / 0.94))',
+  backdropFilter: 'blur(14px) saturate(1.4)',
+  WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
   boxShadow:
     '0 0 0 1px rgb(255 255 255 / 0.08), 0 14px 28px -18px rgb(28 64 26 / 0.7)',
   '--foreground': '0 0% 100%',

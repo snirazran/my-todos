@@ -52,6 +52,8 @@ import {
 } from '@/components/ui/HomeFocusFlies';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
+import { Icon } from '@/components/ui/Icon';
+import { hapticSelect } from '@/lib/haptics';
 import {
   QuickFilterSheet,
   FilterTriggerButton,
@@ -60,6 +62,7 @@ import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { FrogBellyDeck } from '@/components/ui/FrogBellyDeck';
+import { TASK_FLY_SLOT } from '@/components/ui/taskSurfaces';
 import { StatusDock } from '@/components/home/StatusDock';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { HomePageSkeleton } from '@/components/ui/Skeleton';
@@ -284,6 +287,7 @@ export default function HomeDashboard() {
   const { showNotification, stackHeight: notificationStackHeight } = useNotification();
   const flyOfferHeight = useFlyOfferHeight();
   const flyOfferOverlapsFab = useMediaQuery('(max-width: 767px)');
+  const webLayout = useMediaQuery('(min-width: 768px)');
   const fabLift = Math.max(
     notificationStackHeight,
     flyOfferOverlapsFab ? flyOfferHeight : 0,
@@ -392,6 +396,7 @@ export default function HomeDashboard() {
   // This page hosts the full timer UI (pill + sheet), so suppress the global
   // mini overlay while it's mounted.
   const addFullTimerHost = useFrogodoroUiStore((s) => s.addFullTimerHost);
+  const openFocusLauncher = useFrogodoroUiStore((s) => s.openFocusLauncher);
   const removeFullTimerHost = useFrogodoroUiStore((s) => s.removeFullTimerHost);
   useEffect(() => {
     addFullTimerHost();
@@ -777,6 +782,21 @@ export default function HomeDashboard() {
               inList ? 'gap-0.5' : 'gap-1',
             )}
           >
+            {webLayout && inList && (
+              <button
+                type="button"
+                data-hint="focus-timer"
+                onClick={() => {
+                  hapticSelect();
+                  openFocusLauncher();
+                }}
+                aria-label="Start a focus session"
+                title="Focus timer"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-90 [@media(hover:hover)]:hover:bg-muted"
+              >
+                <Icon name="clock" className="h-6 w-6" />
+              </button>
+            )}
             <button
                 type="button"
                 onClick={() => {
@@ -815,9 +835,13 @@ export default function HomeDashboard() {
 
   return (
     <main className="relative min-h-screen pb-20 overflow-x-hidden md:pb-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(440px+env(safe-area-inset-top))] -z-10 bg-[hsl(var(--board-list))] dark:hidden md:top-[640px]"
+      />
       {!guided && <MobileMenuCluster position="absolute" />}
       {user && <FlyGainPopup />}
-      <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-12">
+      <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-40">
         <Header router={router} />
 
         <div className="relative flex flex-col items-stretch gap-2">
@@ -878,14 +902,14 @@ export default function HomeDashboard() {
             </div>
           </FlyCatchSwipeLauncher>
 
-          <StatusDock className="-mt-2 md:w-[360px]" flatOnMobile>
+          <StatusDock className="-mt-2 md:w-[calc(min(100%,48rem)-6rem)] xl:w-[calc(min(100%,48rem)-7rem)]" flat tinted>
             <FrogBellyDeck
               bare
               rich
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
-              className="rounded-[19px] md:h-auto md:w-[360px] md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
+              className="rounded-[19px] md:h-auto md:w-full md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
             />
           </StatusDock>
 
@@ -897,12 +921,12 @@ export default function HomeDashboard() {
 
           <div
             data-fly-sheet
-            className="relative z-20 -mx-3 -mt-8 flex min-h-[12rem] flex-col gap-2 bg-background px-1.5 pt-10 md:mx-auto md:mt-2 md:w-full md:max-w-3xl md:bg-transparent md:px-8 md:pb-8 md:pt-5 xl:px-10"
+            className="relative z-20 -mx-3 -mt-8 flex min-h-[12rem] flex-col gap-2 bg-[hsl(var(--board-list))] px-1.5 pt-10 dark:bg-background md:mx-auto md:w-full md:max-w-3xl md:bg-transparent md:px-8 md:pb-8 md:pt-12 xl:px-10"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div
               aria-hidden
-              className="pointer-events-none absolute -top-14 bottom-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_72px)] md:block"
+              className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block"
             />
             <div className="flex w-full flex-col gap-2 md:gap-5">
               {!firstRun.active && <GuestAccountBanner />}
@@ -954,7 +978,7 @@ export default function HomeDashboard() {
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25 md:h-12 md:w-12"
+                        className={`relative flex h-11 w-11 shrink-0 items-center justify-center md:h-12 md:w-12 ${TASK_FLY_SLOT}`}
                         data-fly-slot
                         data-hint="task-fly"
                         data-tag-ids={task.tags?.join(',') || undefined}
@@ -1414,7 +1438,7 @@ export default function HomeDashboard() {
 
       <div
         aria-hidden={fabsConcealed || guided || undefined}
-        className={`fixed right-4 z-[40] flex items-center gap-1 rounded-full bg-card/95 p-1 shadow-[0_4px_14px_-6px_rgba(15,23,42,0.3),0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-border/60 backdrop-blur-xl bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
+        className={`fixed right-4 z-[40] flex items-center gap-1 md:hidden rounded-full bg-card/95 p-1 shadow-[0_4px_14px_-6px_rgba(15,23,42,0.3),0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-border/60 backdrop-blur-xl bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
           fabsConcealed || guided ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
         }`}
         style={
@@ -1427,7 +1451,7 @@ export default function HomeDashboard() {
           } as React.CSSProperties
         }
       >
-        <FocusFabSatellite concealed={fabsConcealed || guided} />
+        <FocusFabSatellite hidden={webLayout} concealed={fabsConcealed || guided} />
         <button
           type="button"
           aria-label="Add task"
@@ -1441,7 +1465,7 @@ export default function HomeDashboard() {
             setQuickText('');
             setShowQuickAdd(true);
           }}
-          className="relative grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-transform hover:brightness-105 active:scale-95"
+          className="relative grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-transform hover:brightness-105 active:scale-95"
         >
           {firstRun.phase === 'finale' && (
             <span

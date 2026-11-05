@@ -95,7 +95,7 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
     <div className="relative shrink-0">
       <div
         data-fly-hero
-        className={`relative flex items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))] ${
+        className={`relative flex items-end justify-center pointer-events-none md:h-[calc(302px+env(safe-area-inset-top))] ${
           section === 'wardrobe'
             ? 'h-[calc(252px+env(safe-area-inset-top))]'
             : 'h-[calc(204px+env(safe-area-inset-top))]'
@@ -136,7 +136,7 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
   );
 
   const stageBackground = (
-    <div className="absolute inset-x-0 top-0 h-[calc(440px+env(safe-area-inset-top))] md:h-[480px]">
+    <div className="absolute inset-x-0 top-0 h-[calc(440px+env(safe-area-inset-top))] md:h-[600px]">
       <BackgroundCrossfade id={stageBackgroundId} images={stageImages} />
     </div>
   );

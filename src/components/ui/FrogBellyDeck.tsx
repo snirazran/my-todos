@@ -214,14 +214,16 @@ export function FrogBellyDeck({
     </div>
   );
 
-  const fillTo = (value: number) =>
-    `translateX(${value <= 0 ? -101 : value - 100}%)`;
+  const fillClip = (value: number) =>
+    `inset(0 ${100 - Math.max(0, Math.min(100, value))}% 0 0 round 9999px)`;
+  const shineRight = (value: number) =>
+    `calc(${100 - Math.max(0, Math.min(100, value))}% + 10px)`;
 
   const content = rich ? (
     <div className="relative flex w-full flex-col gap-2.5 px-4 pb-4 pt-3">
       <span
         aria-hidden
-        className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-x-[9px] border-b-[8px] border-x-transparent border-b-foreground/[0.045] dark:border-b-white/[0.06] md:hidden"
+        className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-x-[9px] border-b-[8px] border-x-transparent border-b-[hsl(var(--card-raised))]"
       />
       <div className="flex h-5 items-center justify-between gap-3">
         <span className="min-w-0 truncate text-[14px] font-bold text-muted-foreground">
@@ -263,26 +265,35 @@ export function FrogBellyDeck({
             )}
           />
         )}
-        <div className="relative h-full w-full overflow-hidden rounded-full">
+        <div className="relative isolate h-full w-full overflow-hidden rounded-full">
           {choreograph && feed && (
             <div
-              className={cn('absolute inset-0 rounded-full', tone.ghost)}
-              style={{ transform: fillTo(feed.to) }}
+              className={cn('absolute inset-0', tone.ghost)}
+              style={{ clipPath: fillClip(feed.to) }}
             />
           )}
           <div
             className={cn(
-              'absolute inset-0 rounded-full transition-[transform,background-color] ease-[cubic-bezier(0.34,1.2,0.64,1)]',
+              'absolute inset-0 transition-[clip-path,background-color] ease-[cubic-bezier(0.22,1,0.36,1)]',
               choreograph ? 'duration-[900ms]' : 'duration-500',
               tone.bg,
             )}
             style={{
-              transform: fillTo(percent),
+              clipPath: fillClip(percent),
               transitionDelay: choreograph ? '120ms' : undefined,
             }}
-          >
-            <div className="absolute left-2 right-2.5 top-[3px] h-[4px] rounded-full bg-white/35" />
-          </div>
+          />
+          <div
+            aria-hidden
+            className={cn(
+              'absolute left-2 top-[3px] h-[4px] rounded-full bg-white/35 transition-[right] ease-[cubic-bezier(0.22,1,0.36,1)]',
+              choreograph ? 'duration-[900ms]' : 'duration-500',
+            )}
+            style={{
+              right: shineRight(percent),
+              transitionDelay: choreograph ? '120ms' : undefined,
+            }}
+          />
           {reachedFull && (
             <span
               key={feed!.id}
