@@ -112,7 +112,7 @@ export function HomePageSkeleton() {
             ))}
             <div className="pt-1">
               <div className="flex h-16 items-center gap-4 rounded-[18px] bg-foreground/[0.04] pl-4 pr-3.5 dark:bg-white/[0.05] md:pl-[18px]">
-                <span className="h-8 w-8 shrink-0 rounded-full bg-primary/80 dark:bg-[#4a8a44]/80" />
+                <span className="h-8 w-8 shrink-0 rounded-full bg-foreground/[0.08] dark:bg-white/[0.1]" />
                 <Skeleton className="h-4 w-24 rounded-full" />
               </div>
             </div>

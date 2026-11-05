@@ -1556,7 +1556,7 @@ function AddTaskComposerRow({
       data-hint={desktop ? 'add-task' : undefined}
       className={`group relative flex h-16 w-full items-center gap-4 bg-foreground/[0.04] pl-4 pr-3.5 text-left transition-[transform,opacity,background-color] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-0 dark:bg-white/[0.05] md:pl-[18px] md:pr-4 [@media(hover:hover)]:hover:bg-foreground/[0.07] ${HOME_CARD_RADIUS}`}
     >
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-foreground/[0.08] text-muted-foreground transition-colors dark:bg-white/[0.1] [@media(hover:hover)]:group-hover:text-foreground">
         <Plus className="h-[18px] w-[18px]" strokeWidth={3.5} />
       </span>
       <span className="min-w-0 flex-1 truncate text-[17px] font-bold leading-snug text-muted-foreground transition-colors md:text-[17.5px] [@media(hover:hover)]:group-hover:text-foreground">
