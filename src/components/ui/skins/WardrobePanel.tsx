@@ -1770,7 +1770,7 @@ function WardrobeManagerContent({
           <nav
             data-fly-fade
             aria-label="Closet sections"
-            className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[51] border-t border-border/50 bg-background/90 backdrop-blur-lg md:hidden"
+            className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[51] border-t border-border/50 bg-background md:hidden"
           >
             <div className="mx-auto h-[60px] max-w-md px-4 py-2">
             <div className="grid h-full grid-cols-2 gap-1 rounded-[16px] bg-muted p-1">

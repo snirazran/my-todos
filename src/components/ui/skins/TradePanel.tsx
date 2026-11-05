@@ -903,7 +903,7 @@ export function TradePanel({
         createPortal(
           <div
             data-fly-fade
-            className="fixed inset-x-0 bottom-[calc(136px+env(safe-area-inset-bottom))] z-50 border-t border-border/50 bg-background/90 backdrop-blur-lg md:hidden"
+            className="fixed inset-x-0 bottom-[calc(136px+env(safe-area-inset-bottom))] z-50 border-t border-border/50 bg-background md:hidden"
           >
             <div className="mx-auto max-w-md px-4 pb-2 pt-2.5">{actions}</div>
           </div>,

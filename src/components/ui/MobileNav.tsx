@@ -136,7 +136,7 @@ export default function MobileNav() {
       <nav
         data-app-bottom-nav
         aria-hidden={firstRunGuided || undefined}
-        className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 left-0 z-50 w-full bg-background md:hidden pb-[env(safe-area-inset-bottom)]"
         style={{
           transform: firstRunGuided ? 'translateY(110%)' : 'translateY(0)',
           pointerEvents: firstRunGuided ? 'none' : undefined,
