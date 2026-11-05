@@ -17,7 +17,7 @@ export function FlyValueBadge({
   return (
     <span
       aria-label={`Pays ${value} flies`}
-      className={`pointer-events-none absolute -right-1 -top-1 grid place-items-center rounded-full bg-primary font-black leading-none tabular-nums text-primary-foreground ring-2 ring-card shadow-[0_1px_3px_rgba(0,0,0,0.22)] ${
+      className={`pointer-events-none absolute -right-1 -top-1 grid place-items-center rounded-full bg-primary font-black leading-none tabular-nums text-primary-foreground ring-2 ring-card dark:bg-[#447d3f] dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.22)] ${
         sm
           ? 'h-[17px] min-w-[17px] px-1 text-[10px]'
           : 'h-[19px] min-w-[19px] px-1 text-[11px]'
