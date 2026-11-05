@@ -447,7 +447,8 @@ function WardrobeManagerContent({
   const rerollDeals = async (asPlus = false) => {
     if (rerolling) return;
     const isPlus = asPlus || !!data?.isPremium;
-    if (!isPlus && !rewardedAdsAvailable()) {
+    const viaAd = !isPlus && !data?.dealRerollFree;
+    if (viaAd && !rewardedAdsAvailable()) {
       openPlus('shop_reroll');
       pendingDealRerollRef.current = true;
       return;
@@ -455,7 +456,7 @@ function WardrobeManagerContent({
     setRerolling(true);
     hapticImpact();
     try {
-      if (!isPlus) {
+      if (viaAd) {
         const adResult = await showRewardedAd('shop_reroll');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
@@ -472,12 +473,12 @@ function WardrobeManagerContent({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          viaAd: !isPlus,
+          viaAd,
         }),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (!isPlus) creditRewardedAd('shop_reroll');
+        if (viaAd) creditRewardedAd('shop_reroll');
         setNotif({
           msg: payload?.error ?? 'Could not reroll deals.',
           type: 'error',
@@ -493,14 +494,15 @@ function WardrobeManagerContent({
                 dailyDeals: payload.dailyDeals,
                 dealRerollsLeft: payload.rerollsLeft,
                 dealRerollsAllowed: payload.rerollsAllowed,
+                dealRerollFree: !!payload.rerollFree,
               }
             : curr,
         { revalidate: false },
       );
       mutateInventoryCaches();
-      if (!isPlus && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('shop_reroll'));
+      if (viaAd && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('shop_reroll'));
     } catch {
-      if (!isPlus) creditRewardedAd('shop_reroll');
+      if (viaAd) creditRewardedAd('shop_reroll');
       setNotif({ msg: 'Could not reroll deals.', type: 'error' });
     } finally {
       setRerolling(false);
@@ -1249,7 +1251,6 @@ function WardrobeManagerContent({
       {isShop && embedded ? (
         <ShopWindow
           loading={!canRenderItems || !data || bg.isLoading}
-          frogName={data?.frogName ?? null}
           balance={balance}
           catalog={data?.catalog ?? []}
           backgrounds={bg.catalog}
@@ -1260,6 +1261,7 @@ function WardrobeManagerContent({
           isPremium={!!data?.isPremium}
           isGuest={isGuest}
           rerollsLeft={data?.dealRerollsLeft ?? 0}
+          rerollFree={!!data?.dealRerollFree}
           rerolling={rerolling}
           wishlistedIds={wishlistedItemIds}
           shopGift={data?.shopGift}

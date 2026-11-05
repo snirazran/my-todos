@@ -8,11 +8,13 @@ export type ShopSalesConfig = {
   freeSlots: number;
   plusSlots: number;
   specialEpicPercent: number;
+  plusEpicPercent: number;
   everydayRarities: Rarity[];
   everydayRarePercent: number;
   wishlistSlot: boolean;
   saleDiscountPercent: number;
-  plusRerolls: number;
+  freeRerolls: number;
+  plusRefreshes: number;
   adRerolls: number;
 };
 
@@ -22,11 +24,13 @@ export const DEFAULT_SHOP_SALES: ShopSalesConfig = {
   freeSlots: 6,
   plusSlots: 6,
   specialEpicPercent: 35,
+  plusEpicPercent: 60,
   everydayRarities: ['common', 'uncommon'],
   everydayRarePercent: 35,
   wishlistSlot: true,
   saleDiscountPercent: 50,
-  plusRerolls: 1,
+  freeRerolls: 1,
+  plusRefreshes: 3,
   adRerolls: 1,
 };
 
@@ -35,5 +39,18 @@ export const SHOP_TIERS: readonly Rarity[] = RARITY_ORDER.filter(
 );
 
 export function rerollsAllowed(config: ShopSalesConfig, isPlus: boolean) {
-  return Math.max(0, isPlus ? config.plusRerolls : config.adRerolls);
+  return Math.max(
+    0,
+    isPlus
+      ? Math.max(config.plusRefreshes, config.freeRerolls)
+      : config.freeRerolls + config.adRerolls,
+  );
+}
+
+export function rerollNeedsAd(
+  config: ShopSalesConfig,
+  isPlus: boolean,
+  used: number,
+) {
+  return !isPlus && used >= config.freeRerolls;
 }

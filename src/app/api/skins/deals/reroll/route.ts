@@ -7,7 +7,7 @@ import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
 import { consumeAdView, refundAdView } from '@/lib/rewards/adBudget';
 import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
-import { rerollsAllowed } from '@/lib/skins/shopSales';
+import { rerollNeedsAd, rerollsAllowed } from '@/lib/skins/shopSales';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
@@ -39,11 +39,6 @@ export async function POST(req: NextRequest) {
     if (allowed <= 0) {
       return json({ error: 'Rerolls are a Plus perk', rerollsLeft: 0 }, 403);
     }
-    // Plus pays with the membership, everyone else pays with a rewarded ad —
-    // and that ad comes out of the one daily view budget.
-    if (!isPlus && !viaAd) {
-      return json({ error: 'Watch a short ad to reroll', rerollsLeft: 0 }, 403);
-    }
     const { dayKey } = shopDay(new Date(), timezone, config);
     const stored = user.wardrobe?.dealReroll ?? null;
     const used =
@@ -53,7 +48,11 @@ export async function POST(req: NextRequest) {
     if (used >= allowed)
       return json({ error: 'No rerolls left today', rerollsLeft: 0 }, 429);
 
-    if (!isPlus) {
+    const needsAd = rerollNeedsAd(config, isPlus, used);
+    if (needsAd && !viaAd) {
+      return json({ error: 'Watch a short ad to reroll', rerollsLeft: allowed - used }, 403);
+    }
+    if (needsAd) {
       const spend = await consumeAdView({
         userId,
         placement: 'shop_reroll',
@@ -85,7 +84,7 @@ export async function POST(req: NextRequest) {
       { projection: { _id: 1 } },
     ).lean();
     if (!claimed) {
-      if (!isPlus) {
+      if (needsAd) {
         await refundAdView({ userId, placement: 'shop_reroll', tz: timezone });
       }
       return json({ error: 'Try again' }, 409);
@@ -108,7 +107,7 @@ export async function POST(req: NextRequest) {
         reroll_index: next,
         deals: rotation.deals.length,
         discounts: rotation.deals.filter((deal) => deal.onSale).length,
-        via_ad: !isPlus,
+        via_ad: needsAd,
       },
     });
 
@@ -117,6 +116,7 @@ export async function POST(req: NextRequest) {
       dailyDeals: rotation.deals,
       rerollsLeft: Math.max(0, allowed - next),
       rerollsAllowed: allowed,
+      rerollFree: next < allowed && !rerollNeedsAd(config, isPlus, next),
     });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Bell, Check, ChevronLeft, ChevronRight, Crown, Loader2, ShieldAlert, Sparkles, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
+import { DEFAULT_SHOP_SALES } from '@/lib/skins/shopSales';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -1314,7 +1315,7 @@ const COMPARISON_GROUPS: Array<{
     { label: 'Wishlist slots', free: '4', plus: '10' },
     { label: 'Saved looks', free: String(SAVED_LOOKS_FREE), plus: String(SAVED_LOOKS_PLUS) },
     { label: 'Trade reward rerolls', free: 'With ads', plus: 'No ads' },
-    { label: 'Daily shop rerolls', free: 'With ads', plus: 'No ads' },
+    { label: 'Shop refreshes a day', free: `${DEFAULT_SHOP_SALES.freeRerolls} + ${DEFAULT_SHOP_SALES.adRerolls} ad`, plus: String(Math.max(DEFAULT_SHOP_SALES.plusRefreshes, DEFAULT_SHOP_SALES.freeRerolls)) },
   ] },
   { title: 'Planning & coaching', icon: 'planner', rows: [
     { label: 'Weekly coach read', free: '—', plus: 'Included' },

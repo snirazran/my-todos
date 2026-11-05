@@ -16,6 +16,7 @@ import {
   takePlusOfferAfterAd,
 } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
+import { usePlusInsteadOfAd } from '@/hooks/usePlusInsteadOfAd';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
@@ -87,7 +88,9 @@ export default function GiftBoxOpening({
     setMounted(true);
   }, []);
 
-  useRewardedAdPreload('gift_double', phase !== 'idle');
+  const giftToPlus = usePlusInsteadOfAd('gift_double');
+  const giftAds = rewardedAdsAvailable() && !giftToPlus;
+  useRewardedAdPreload('gift_double', phase !== 'idle' && !giftToPlus);
 
   useEffect(() => {
     if (phase === 'shaking') {
@@ -224,7 +227,7 @@ export default function GiftBoxOpening({
         }
         setBundleUsed(true);
         flies.onDoubled(flies.flies, data.summary?.flyBalanceAfter, source);
-        if (takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('gift_double'));
+        if (!viaPlus && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('gift_double'));
         return;
       }
       const claimId = doubleClaimId;
@@ -249,7 +252,7 @@ export default function GiftBoxOpening({
         setPrize(data.prize);
         setPrizeMeta(data.prizeMeta ?? null);
         if (onWin) onWin(data.prize);
-        if (takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('gift_double'));
+        if (!viaPlus && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('gift_double'));
       } else {
         if (!viaPlus) creditRewardedAd('gift_double');
         setAdError(
@@ -392,7 +395,7 @@ export default function GiftBoxOpening({
                     ? [
                         <BonusHeroButton
                           key="hero"
-                          mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
+                          mode={giftAds ? 'ad' : 'plus'}
                           visual={
                             doubleClaimId ? (
                               <GiftRive color={giftColor} className="h-full w-full" />
@@ -411,14 +414,14 @@ export default function GiftBoxOpening({
                           }
                           parts={flies ? bonusParts : undefined}
                           busy={adBusy}
-                          busyLabel="Loading ad..."
+                          busyLabel={giftAds ? 'Loading ad...' : 'Opening...'}
                           onClick={(event) => {
                             const source = event.currentTarget.getBoundingClientRect();
-                            if (rewardedAdsAvailable()) void handleDouble(false, source);
+                            if (giftAds) void handleDouble(false, source);
                             else openPlusOffer('gift_double');
                           }}
                         />,
-                        rewardedAdsAvailable() ? (
+                        giftAds ? (
                           <SkipAdsLink
                             key="plus"
                             featured

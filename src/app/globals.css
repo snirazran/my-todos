@@ -1798,6 +1798,21 @@ body.dragging {
   }
 }
 
+@keyframes shop-sale-glint {
+  0%,
+  64% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+
 @keyframes plus-sparkle {
   0%,
   100% {

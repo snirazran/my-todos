@@ -421,6 +421,47 @@ export function AdminEconomyManager() {
             </Group>
 
             <Group
+              title="Ad or Plus"
+              subtitle="Mobile only. Checked: the button opens the Plus popup instead of an ad, and the small Plus link under it goes away. Plus members and web are unchanged."
+            >
+              <ToggleField
+                label="Double quest reward → Plus"
+                value={config.rewardedAds.questDoublePlus}
+                onChange={(questDoublePlus) =>
+                  patch('rewardedAds', { questDoublePlus })
+                }
+              />
+              <ToggleField
+                label="Double gift → Plus"
+                value={config.rewardedAds.giftDoublePlus}
+                onChange={(giftDoublePlus) =>
+                  patch('rewardedAds', { giftDoublePlus })
+                }
+              />
+              <ToggleField
+                label="Save streak → Plus"
+                value={config.rewardedAds.streakRescuePlus}
+                onChange={(streakRescuePlus) =>
+                  patch('rewardedAds', { streakRescuePlus })
+                }
+              />
+              <ToggleField
+                label="Double streak celebration → Plus"
+                value={config.rewardedAds.streakDoublePlus}
+                onChange={(streakDoublePlus) =>
+                  patch('rewardedAds', { streakDoublePlus })
+                }
+              />
+              <ToggleField
+                label="Double friends pond → Plus"
+                value={config.rewardedAds.friendsDoublePlus}
+                onChange={(friendsDoublePlus) =>
+                  patch('rewardedAds', { friendsDoublePlus })
+                }
+              />
+            </Group>
+
+            <Group
               title="Daily shop gift"
               subtitle={`Free flies for opening the Shop once a day; renews with the deals. ${SHOP_GIFT_MAX_FLIES} at ${SHOP_GIFT_FULL_BELOW_BALANCE} flies or less, sliding to ${SHOP_GIFT_MIN_FLIES} at ${SHOP_GIFT_FLOOR_FROM_BALANCE}+. The first visit is ${SHOP_GIFT_FIRST_FLIES}.`}
             >

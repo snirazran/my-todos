@@ -18,6 +18,8 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
 import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { adOffersFrom } from '@/lib/adOffers';
 
 export async function GET(req: NextRequest) {
   let uid: string;
@@ -50,6 +52,7 @@ export async function GET(req: NextRequest) {
     const isPremium = user.premiumUntil
       ? new Date(user.premiumUntil) > now
       : false;
+    const economy = await loadFlyEconomyConfig();
 
     return NextResponse.json({
       createdAt: user.createdAt.toISOString(),
@@ -65,6 +68,7 @@ export async function GET(req: NextRequest) {
       birthday: user.birthday ?? null,
       onboardingCompleted: user.onboardingCompleted ?? null,
       weekStartsOn: normalizeWeekStart((user as { weekStartsOn?: unknown }).weekStartsOn),
+      adOffers: adOffersFrom(economy.rewardedAds),
     });
   } catch (error) {
     console.error('Error fetching user data:', error);

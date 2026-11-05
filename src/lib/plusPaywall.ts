@@ -130,7 +130,7 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     headline: 'Not quite your style?',
     accent: 'Try something new.',
     sub: placement === 'trade_reroll' ? 'Another chance to find a trade reward you love.' : 'Refresh today’s deals and find your next look.',
-    benefits: [{ icon: 'shuffle', title: placement === 'trade_reroll' ? 'Free trade rerolls' : 'Shop rerolls without ads', body: placement === 'trade_reroll' ? 'Not feeling the prize? Try another.' : 'Fresh deals, no ad break.' }, REWARDS, GIFTS],
+    benefits: [{ icon: 'shuffle', title: placement === 'trade_reroll' ? 'Free trade rerolls' : `${DEFAULT_SHOP_SALES.plusRefreshes} free refreshes a day`, body: placement === 'trade_reroll' ? 'Not feeling the prize? Try another.' : 'Fresh deals, no ad break.' }, REWARDS, GIFTS],
   };
   if (placement === 'shop_plus_slot' || placement === 'shop_plus_sale') {
     const { freeSlots, plusSlots, saleDiscountPercent } = DEFAULT_SHOP_SALES;

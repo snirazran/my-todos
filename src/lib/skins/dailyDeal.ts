@@ -212,10 +212,15 @@ export function getShopRotation({
       .sort((a, b) => a.rank - b.rank || a.item.id.localeCompare(b.item.id))
       .map(({ item }) => item);
 
-  const special = eligible.filter((item) => !isEverydayItem(item, config));
-  const everyday = eligible.filter((item) => isEverydayItem(item, config));
+  const specialTier = (item: ItemDef) => rarityRank[item.rarity] >= rarityRank.rare;
+  const special = eligible.filter(
+    (item) => specialTier(item) && !isEverydayItem(item, config),
+  );
+  const borrowable = eligible.filter(
+    (item) => specialTier(item) && isEverydayItem(item, config),
+  );
 
-  const salePool = special.length > 0 ? special : everyday;
+  const salePool = special.length > 0 ? special : borrowable;
   const saleItem = ranked(salePool, `shop-sale:${dayKey}`)[0] ?? null;
 
   const queues = new Map<Rarity, ItemDef[]>();
@@ -229,7 +234,7 @@ export function getShopRotation({
     );
   }
   const fill = ranked(
-    everyday.filter((item) => item.id !== saleItem?.id),
+    borrowable.filter((item) => item.id !== saleItem?.id),
     `shop-fill:${seed}`,
   ).sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]);
   const take = (rarity: Rarity): ItemDef | null => {
@@ -246,8 +251,11 @@ export function getShopRotation({
   const rand = mulberry32(hashString(`shop-slots:${seed}`));
   const picks: ItemDef[] = [];
   const openSlots = saleItem ? total - 1 : total;
+  const offsetSlots = saleItem ? 1 : 0;
   for (let i = 0; i < openSlots; i++) {
-    const item = take(rand() * 100 < config.specialEpicPercent ? 'epic' : 'rare');
+    const epicPercent =
+      i + offsetSlots < free ? config.specialEpicPercent : config.plusEpicPercent;
+    const item = take(rand() * 100 < epicPercent ? 'epic' : 'rare');
     if (!item) break;
     picks.push(item);
   }

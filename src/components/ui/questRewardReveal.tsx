@@ -40,6 +40,8 @@ import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
 import { useAutoPopupHold } from '@/lib/popupGate';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
+import { usePlusInsteadOfAd } from '@/hooks/usePlusInsteadOfAd';
+import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { cn } from '@/lib/utils';
 
 export type QuestRewardSummary = {
@@ -680,10 +682,16 @@ function FlyDoubleOffer() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [held, setHeld] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const plusOfferRef = useRef<FlyDoubleOffer | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const remainingRef = useRef(OFFER_MS);
+  const plusInstead = usePlusInsteadOfAd(offer?.placement ?? 'double_reward');
 
-  useRewardedAdPreload(offer?.placement ?? 'double_reward', visible && !!offer);
+  useRewardedAdPreload(
+    offer?.placement ?? 'double_reward',
+    visible && !!offer && !plusInstead,
+  );
 
   const revealBusy = useStore(
     revealStore,
@@ -724,20 +732,45 @@ function FlyDoubleOffer() {
   }, [visible, offer?.id]);
 
   useEffect(() => {
-    if (!visible || busy || held) return;
+    if (!visible || busy || held || plusOpen) return;
     const startedAt = Date.now();
     const timer = window.setTimeout(() => setVisible(false), remainingRef.current);
     return () => {
       window.clearTimeout(timer);
       remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
     };
-  }, [visible, busy, held]);
+  }, [visible, busy, held, plusOpen]);
 
   if (typeof document === 'undefined') return null;
 
   const dismiss = () => setVisible(false);
+  const doubleWithPlus = async () => {
+    const pending = plusOfferRef.current;
+    plusOfferRef.current = null;
+    if (!pending) return;
+    setBusy(true);
+    try {
+      const { bonus, balanceAfter } = await pending.run();
+      landFlies(bonus, balanceAfter, panelRef.current);
+      setVisible(false);
+    } catch (err) {
+      showNotification(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not double this reward — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const double = async () => {
     if (!offer || busy) return;
+    if (plusInstead) {
+      plusOfferRef.current = offer;
+      setPlusOpen(true);
+      return;
+    }
     setBusy(true);
     try {
       const outcome = await showRewardedAd(offer.placement);
@@ -764,6 +797,7 @@ function FlyDoubleOffer() {
   };
 
   return createPortal(
+    <>
     <AnimatePresence
       onExitComplete={() => {
         if (!revealStore.getState().flyOffer) return;
@@ -787,14 +821,14 @@ function FlyDoubleOffer() {
           className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+88px)] z-[1310] mx-auto w-[min(calc(100vw-24px),360px)] md:bottom-[calc(env(safe-area-inset-bottom)+24px)]"
         >
           <PlusOfferButton
-            mode="ad"
+            mode={plusInstead ? 'plus' : 'ad'}
             intent="double"
             visual={<FlyGlyph />}
             badge="×2"
             title="Double your reward"
             anchor={{ from: offer.amount, to: offer.amount * 2, unit: 'flies', ready: true }}
             busy={busy}
-            busyLabel="Loading ad..."
+            busyLabel={plusInstead ? 'Doubling...' : 'Loading ad...'}
             onClick={() => void double()}
           />
           <span
@@ -821,7 +855,18 @@ function FlyDoubleOffer() {
           </button>
         </motion.div>
       )}
-    </AnimatePresence>,
+    </AnimatePresence>
+      <PlusUpgradeModal
+        open={plusOpen}
+        placement={offer?.placement ?? 'quest_reward_double'}
+        onStartTrial={doubleWithPlus}
+        onClose={() => {
+          setPlusOpen(false);
+          plusOfferRef.current = null;
+          setVisible(false);
+        }}
+      />
+    </>,
     document.body,
   );
 }

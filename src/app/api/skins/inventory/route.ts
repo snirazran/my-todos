@@ -244,6 +244,7 @@ export async function GET(req: NextRequest) {
         dailyDeals,
         dealRerollsLeft: rotation.rerollsLeft,
         dealRerollsAllowed: rotation.rerollsAllowed,
+        dealRerollFree: rotation.rerollFree,
         shopGift: await giftStatus(rotation.config),
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
@@ -272,6 +273,7 @@ export async function GET(req: NextRequest) {
       everydayItemIds: rotation.everydayIds,
       dealRerollsLeft: rotation.rerollsLeft,
       dealRerollsAllowed: rotation.rerollsAllowed,
+      dealRerollFree: rotation.rerollFree,
       shopGift: await giftStatus(rotation.config),
       isPremium,
       frogName: premiumUser?.frogName ?? null,

@@ -99,6 +99,11 @@ export type FlyEconomyConfig = {
     giftDoublePerDay: number;
     shopRerollPerDay: number;
     tradeRerollPerDay: number;
+    questDoublePlus: boolean;
+    giftDoublePlus: boolean;
+    streakRescuePlus: boolean;
+    streakDoublePlus: boolean;
+    friendsDoublePlus: boolean;
   };
   shopGift: {
     enabled: boolean;
@@ -187,6 +192,11 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     giftDoublePerDay: 2,
     shopRerollPerDay: 1,
     tradeRerollPerDay: 1,
+    questDoublePlus: false,
+    giftDoublePlus: false,
+    streakRescuePlus: false,
+    streakDoublePlus: false,
+    friendsDoublePlus: false,
   },
   shopGift: {
     enabled: true,

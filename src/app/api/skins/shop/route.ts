@@ -4,7 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import { isEverydayItem, isPremiumActive } from '@/lib/skins/dailyDeal';
+import { isPremiumActive } from '@/lib/skins/dailyDeal';
 import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { availabilityStateAt } from '@/lib/skins/availability';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       isPlus,
     });
     const deal = rotation.deals.find((d) => d.itemId === itemId);
-    if (!isEverydayItem(byId[itemId], rotation.config)) {
+    if (!rotation.everydayIds.includes(itemId)) {
       if (!deal) return json({ error: "This item isn't in the shop today" }, 400);
       if (deal.plusOnly && !isPlus) {
         return json({ error: 'This one is for Plus members today' }, 403);

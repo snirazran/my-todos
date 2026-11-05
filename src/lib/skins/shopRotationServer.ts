@@ -6,7 +6,7 @@ import {
   rerollsUsed,
   type DealReroll,
 } from './dailyDeal';
-import { rerollsAllowed, type ShopSalesConfig } from './shopSales';
+import { rerollNeedsAd, rerollsAllowed, type ShopSalesConfig } from './shopSales';
 import { readWishlistPins } from './wishlist';
 import type { ItemDef } from './catalog';
 
@@ -69,6 +69,17 @@ export async function loadShopRotation({
   const used = rerollsUsed(wardrobe?.dealReroll ?? undefined, dayKey, allowed);
   const rerollCount = rerollOverride ?? used;
   const dayStart = Date.parse(endsAt) - 86_400_000;
+  const deals = getShopRotation({
+    catalog,
+    now,
+    timezone,
+    config: resolved,
+    rerollCount,
+    ownedIds: ownedBefore(wardrobe, dayStart),
+    wishlistItemIds: wishlistShopIds(wardrobe),
+    isPlus,
+  });
+  const onShelf = new Set(deals.map((deal) => deal.itemId));
 
   return {
     config: resolved,
@@ -77,16 +88,8 @@ export async function loadShopRotation({
     rerollsAllowed: allowed,
     rerollsUsed: used,
     rerollsLeft: Math.max(0, allowed - used),
-    everydayIds: everydayItemIds(catalog, resolved, now),
-    deals: getShopRotation({
-      catalog,
-      now,
-      timezone,
-      config: resolved,
-      rerollCount,
-      ownedIds: ownedBefore(wardrobe, dayStart),
-      wishlistItemIds: wishlistShopIds(wardrobe),
-      isPlus,
-    }),
+    rerollFree: used < allowed && !rerollNeedsAd(resolved, isPlus, used),
+    everydayIds: everydayItemIds(catalog, resolved, now).filter((id) => !onShelf.has(id)),
+    deals,
   };
 }

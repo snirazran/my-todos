@@ -9,6 +9,7 @@ import {
   showRewardedAd,
 } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
+import { usePlusInsteadOfAd } from '@/hooks/usePlusInsteadOfAd';
 import { skipAdsPlacement } from '@/lib/plusPaywall';
 
 export type RewardGateMode = 'free' | 'ad' | 'plus';
@@ -31,9 +32,10 @@ export function useRewardGate(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const plusInstead = usePlusInsteadOfAd(placement);
   const mode: RewardGateMode = isPlus
     ? 'free'
-    : rewardedAdsAvailable()
+    : rewardedAdsAvailable() && !plusInstead
       ? 'ad'
       : 'plus';
 

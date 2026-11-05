@@ -69,6 +69,7 @@ type ApiData = {
   everydayItemIds?: string[];
   dealRerollsLeft?: number;
   dealRerollsAllowed?: number;
+  dealRerollFree?: boolean;
   shopGift?: ShopGiftStatus;
   isPremium?: boolean;
   frogName?: string | null;

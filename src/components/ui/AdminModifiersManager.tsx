@@ -681,13 +681,22 @@ function ShopSalesEditor({
             onChange={(plusSlots) => patch({ plusSlots })}
           />
           <NumberField
-            label="Epic chance per slot"
+            label="Epic chance, free slots"
             hint="The rest draw rares."
             min={0}
             max={100}
             suffix="%"
             value={shop.specialEpicPercent}
             onChange={(specialEpicPercent) => patch({ specialEpicPercent })}
+          />
+          <NumberField
+            label="Epic chance, Plus slots"
+            hint="The rest draw rares."
+            min={0}
+            max={100}
+            suffix="%"
+            value={shop.plusEpicPercent}
+            onChange={(plusEpicPercent) => patch({ plusEpicPercent })}
           />
           <NumberField
             label="Refresh hour"
@@ -736,19 +745,27 @@ function ShopSalesEditor({
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
         <p className="text-lg font-black text-foreground">Refreshes</p>
         <p className="text-sm text-muted-foreground">
-          Swaps the Special collection early. Plus refreshes for free; everyone
-          else watches an ad.
+          Swaps the Special collection early. Everyone gets the free ones; after
+          that, free users watch an ad for each extra. Plus refreshes free, up
+          to its own daily total.
         </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <NumberField
+            label="Free refreshes a day"
+            min={0}
+            max={10}
+            value={shop.freeRerolls}
+            onChange={(freeRerolls) => patch({ freeRerolls })}
+          />
           <NumberField
             label="Plus refreshes a day"
             min={0}
             max={10}
-            value={shop.plusRerolls}
-            onChange={(plusRerolls) => patch({ plusRerolls })}
+            value={shop.plusRefreshes}
+            onChange={(plusRefreshes) => patch({ plusRefreshes })}
           />
           <NumberField
-            label="Ad refreshes a day"
+            label="Extra ad refreshes (free users)"
             min={0}
             max={10}
             value={shop.adRerolls}

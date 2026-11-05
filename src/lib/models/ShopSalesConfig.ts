@@ -31,6 +31,7 @@ const LEGACY_FIELDS = [
   'rarityDiscountPercent',
   'raritySaleDaysPercent',
   'maxDiscountPercent',
+  'plusRerolls',
 ] as const;
 
 const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
@@ -43,6 +44,10 @@ const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
     specialEpicPercent: {
       type: Number,
       default: DEFAULT_SHOP_SALES.specialEpicPercent,
+    },
+    plusEpicPercent: {
+      type: Number,
+      default: DEFAULT_SHOP_SALES.plusEpicPercent,
     },
     everydayRarities: {
       type: [String],
@@ -57,7 +62,8 @@ const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
       type: Number,
       default: DEFAULT_SHOP_SALES.saleDiscountPercent,
     },
-    plusRerolls: { type: Number, default: DEFAULT_SHOP_SALES.plusRerolls },
+    freeRerolls: { type: Number, default: DEFAULT_SHOP_SALES.freeRerolls },
+    plusRefreshes: { type: Number, default: DEFAULT_SHOP_SALES.plusRefreshes },
     adRerolls: { type: Number, default: DEFAULT_SHOP_SALES.adRerolls },
   },
   {
@@ -100,6 +106,12 @@ export function sanitizeShopSales(
       0,
       100,
     ),
+    plusEpicPercent: num(
+      source.plusEpicPercent,
+      DEFAULT_SHOP_SALES.plusEpicPercent,
+      0,
+      100,
+    ),
     everydayRarities: rarityList(
       source.everydayRarities,
       DEFAULT_SHOP_SALES.everydayRarities,
@@ -120,7 +132,8 @@ export function sanitizeShopSales(
       0,
       90,
     ),
-    plusRerolls: num(source.plusRerolls, DEFAULT_SHOP_SALES.plusRerolls, 0, 10),
+    freeRerolls: num(source.freeRerolls, DEFAULT_SHOP_SALES.freeRerolls, 0, 10),
+    plusRefreshes: num(source.plusRefreshes, DEFAULT_SHOP_SALES.plusRefreshes, 0, 10),
     adRerolls: num(source.adRerolls, DEFAULT_SHOP_SALES.adRerolls, 0, 10),
   };
 }
@@ -137,7 +150,8 @@ export async function ensureShopSalesConfig(): Promise<ShopSalesConfig> {
       ? {
           refreshHour: existing?.refreshHour,
           wishlistSlot: existing?.wishlistSlot,
-          plusRerolls: existing?.plusRerolls,
+          freeRerolls: existing?.freeRerolls,
+          plusRefreshes: existing?.plusRefreshes,
           adRerolls: existing?.adRerolls,
         }
       : existing,
