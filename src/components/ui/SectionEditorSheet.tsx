@@ -1,10 +1,20 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Tag, Trash2 } from 'lucide-react';
+import { ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 import { revealInScroller } from '@/lib/revealInScroller';
+import { useDragScroll } from '@/components/ui/quick-add/useDragScroll';
+import {
+  DANGER_BUTTON,
+  FIELD_TILE,
+  PRIMARY_BUTTON,
+  SECONDARY_BUTTON,
+  SHEET_TITLE,
+  TagPillContent,
+  tagPillProps,
+} from '@/components/ui/quick-add/kit';
 
 export type SectionTagOption = { id: string; name: string; color: string };
 
@@ -43,9 +53,16 @@ export function SectionEditorSheet({
   const [name, setName] = useState(initialName);
   const [tagIds, setTagIds] = useState<string[]>(initialTagIds);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [tagsOpen, setTagsOpen] = useState(initialTagIds.length > 0);
   const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const nameRail = useDragScroll();
+  const tagRail = useDragScroll();
+  const [tagFadeRight, setTagFadeRight] = useState(false);
+  const updateTagFade = () => {
+    const el = tagRail.ref.current;
+    if (!el) return;
+    setTagFadeRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
   const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
   const keyboardActive = inputFocused && keyboardInset > 0;
 
@@ -75,7 +92,6 @@ export function SectionEditorSheet({
     if (!open) return;
     setName(initialName);
     setTagIds(initialTagIds);
-    setTagsOpen(initialTagIds.length > 0);
     setConfirmDelete(false);
     setInputFocused(false);
     const id = window.setTimeout(() => {
@@ -97,6 +113,22 @@ export function SectionEditorSheet({
     (n) => !taken.has(n.toLowerCase()),
   );
 
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(updateTagFade);
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tags.length]);
+
+  const movingFrom = Array.from(
+    new Set(
+      tagIds
+        .filter((id) => !initialTagIds.includes(id))
+        .map((id) => tagOwners[id])
+        .filter((owner): owner is string => !!owner),
+    ),
+  );
+
   const toggleTag = (id: string) =>
     setTagIds((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
@@ -114,173 +146,178 @@ export function SectionEditorSheet({
           ? { maxHeight: Math.max(220, viewportHeight - 8) }
           : undefined
       }
-      className="bg-background ring-1 ring-border/70 sm:max-w-[460px] max-h-[92vh]"
+      className="max-h-[92vh] bg-background ring-1 ring-border/70 sm:max-w-[440px]"
     >
       {({ bindScroll }) => (
-        <div
-          ref={bindScroll}
-          className={`mx-auto min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pt-1 sm:pb-6 ${
-            keyboardActive ? 'pb-4' : 'pb-[calc(env(safe-area-inset-bottom)+24px)]'
-          }`}
-        >
-          <div className="relative mb-4 flex h-9 items-center justify-center">
-            <h2 className="text-[17px] font-black text-foreground">
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="flex h-11 shrink-0 items-center justify-center px-14 sm:h-14 sm:pt-1">
+            <h2 className={SHEET_TITLE}>
               {displayMode === 'create' ? 'New section' : 'Edit section'}
             </h2>
           </div>
 
-          <input
-            ref={inputRef}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => setInputFocused(false)}
-            maxLength={60}
-            placeholder="e.g. Morning routine"
-            aria-label="Section name"
-            enterKeyHint="done"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                commit();
-              }
-            }}
-            className="w-full rounded-2xl bg-muted/60 px-4 py-3.5 text-[16px] font-black text-foreground ring-1 ring-inset ring-border/60 transition-shadow placeholder:font-bold placeholder:text-muted-foreground/50 focus:outline-none focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/50"
-          />
+          <div
+            ref={bindScroll}
+            className="min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 pb-3 pt-2 sm:px-5"
+          >
+            <label className={`flex h-14 items-center gap-2 pl-4 pr-2 ${FIELD_TILE}`}>
+              <input
+                ref={inputRef}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                maxLength={60}
+                placeholder="Section name"
+                aria-label="Section name"
+                enterKeyHint="done"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commit();
+                  }
+                }}
+                className="min-w-0 flex-1 bg-transparent text-[17px] font-black text-foreground placeholder:font-bold placeholder:text-muted-foreground/50 focus:outline-none"
+              />
+              {name && (
+                <button
+                  type="button"
+                  aria-label="Clear name"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setName('');
+                    inputRef.current?.focus({ preventScroll: true });
+                  }}
+                  className="-mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-colors active:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                >
+                  <X className="h-4 w-4" strokeWidth={3} />
+                </button>
+              )}
+            </label>
 
-          {displayMode === 'create' && suggestions.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {suggestions.map((suggestion) => {
-                const picked = name.trim() === suggestion;
-                return (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setName(suggestion)}
-                    className={`h-8 rounded-full px-3 text-[13px] font-bold transition-[transform,background-color,color] active:scale-95 ${
-                      picked
-                        ? 'bg-primary/15 text-primary'
-                        : 'bg-muted/70 text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+            {displayMode === 'create' && suggestions.length > 0 && (
+              <div
+                ref={nameRail.ref}
+                {...nameRail.handlers}
+                className="no-scrollbar -mx-4 mt-2 flex cursor-grab select-none gap-1.5 overflow-x-auto px-4 touch-pan-x active:cursor-grabbing sm:-mx-5 sm:px-5"
+              >
+                {suggestions.map((suggestion) => {
+                  const picked = name.trim() === suggestion;
+                  return (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      aria-pressed={picked}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={nameRail.guard(() => setName(picked ? '' : suggestion))}
+                      className={`h-8 shrink-0 rounded-full px-3 text-[13px] font-bold transition-[transform,background-color,color,box-shadow] active:scale-95 ${
+                        picked
+                          ? 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/40'
+                          : 'text-muted-foreground ring-1 ring-inset ring-border [@media(hover:hover)]:hover:bg-muted/50 [@media(hover:hover)]:hover:text-foreground'
+                      }`}
+                    >
+                      {suggestion}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {tags.length > 0 && (
+              <div className="mt-6">
+                <div className="flex min-h-8 items-center justify-between gap-3 px-1 pb-1">
+                  <p className="text-[14px] font-black text-foreground">
+                    Tasks with these tags go here
+                  </p>
+                  {tagIds.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setTagIds([])}
+                      className="-mr-1 shrink-0 rounded-full px-2 py-1 text-[13px] font-bold text-muted-foreground transition-colors active:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  ) : (
+                    <span className="shrink-0 text-[13px] font-semibold text-muted-foreground/70">
+                      Optional
+                    </span>
+                  )}
+                </div>
+                <div className="relative -mx-4 sm:-mx-5">
+                  <div
+                    ref={tagRail.ref}
+                    {...tagRail.handlers}
+                    onScroll={updateTagFade}
+                    className={`no-scrollbar grid auto-cols-max grid-flow-col ${
+                      tags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
+                    } cursor-grab select-none items-center justify-start gap-2 overflow-x-auto px-4 py-1 touch-pan-x active:cursor-grabbing sm:px-5 ${
+                      tagFadeRight ? 'mask-fade-right' : ''
                     }`}
                   >
-                    {suggestion}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {tags.length > 0 && (
-            <div className="mt-5 overflow-hidden rounded-2xl ring-1 ring-inset ring-border/60">
-              <button
-                type="button"
-                aria-expanded={tagsOpen}
-                onClick={() => setTagsOpen((v) => !v)}
-                className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/40"
-              >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                  <Tag className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-black text-foreground">
-                    File tasks by tag
-                  </span>
-                  <span className="block truncate text-[12px] font-semibold text-muted-foreground">
-                    {tagIds.length === 0
-                      ? 'Optional'
-                      : tags
-                          .filter((t) => tagIds.includes(t.id))
-                          .map((t) => t.name)
-                          .join(', ')}
-                  </span>
-                </span>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                    tagsOpen ? 'rotate-180' : ''
-                  }`}
-                  strokeWidth={2.75}
-                />
-              </button>
-
-              {tagsOpen && (
-                <div className="border-t border-border/60 px-4 pb-4 pt-3">
-                  <p className="text-[12px] font-semibold leading-snug text-muted-foreground">
-                    New tasks you add with these tags go into this section.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
                     {tags.map((tag) => {
                       const selected = tagIds.includes(tag.id);
                       const owner = tagOwners[tag.id];
+                      const pill = tagPillProps({ color: tag.color, selected });
                       return (
                         <button
                           key={tag.id}
                           type="button"
                           aria-pressed={selected}
-                          onClick={() => toggleTag(tag.id)}
-                          className="inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-[13px] font-black transition-[transform,background-color,border-color,color] active:scale-95"
-                          style={
-                            selected
-                              ? {
-                                  backgroundColor: tag.color,
-                                  borderColor: tag.color,
-                                  color: '#fff',
-                                }
-                              : {
-                                  backgroundColor: 'transparent',
-                                  borderColor: `${tag.color}55`,
-                                  color: tag.color,
-                                }
-                          }
+                          onClick={tagRail.guard(() => toggleTag(tag.id))}
+                          className={pill.className}
+                          style={pill.style}
                         >
-                          {selected ? (
-                            <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
-                          ) : (
-                            <span
-                              aria-hidden
-                              className="h-2 w-2 shrink-0 rounded-full"
-                              style={{ backgroundColor: tag.color }}
-                            />
-                          )}
-                          <span className="max-w-[140px] truncate">{tag.name}</span>
-                          {owner && !selected && (
-                            <span className="shrink-0 text-[11px] font-bold opacity-60">
-                              · in {owner}
-                            </span>
-                          )}
+                          <TagPillContent
+                            name={tag.name}
+                            color={tag.color}
+                            selected={selected}
+                            trailing={
+                              owner && !selected ? (
+                                <span className="shrink-0 text-[11.5px] font-semibold text-muted-foreground/70">
+                                  {owner}
+                                </span>
+                              ) : undefined
+                            }
+                          />
                         </button>
                       );
                     })}
                   </div>
-                  {tagIds.some((id) => tagOwners[id]) && (
-                    <p className="mt-2.5 text-[12px] font-semibold text-muted-foreground">
-                      Tags already in another section will move here.
-                    </p>
-                  )}
                 </div>
-              )}
-            </div>
-          )}
+                {movingFrom.length > 0 && (
+                  <p className="px-1 pt-1.5 text-[12.5px] font-semibold text-muted-foreground">
+                    Moves from {movingFrom.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={commit}
-            disabled={!name.trim()}
-            className="mt-6 w-full rounded-2xl bg-[#447d3f] py-3.5 text-[15px] font-black text-white shadow-[0_4px_0_0_#2c511a] transition-all active:translate-y-1 active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+          <div
+            className={`shrink-0 px-4 pt-2 sm:px-5 sm:pb-5 ${
+              keyboardActive ? 'pb-3' : 'pb-[calc(env(safe-area-inset-bottom)+16px)]'
+            }`}
           >
-            {displayMode === 'create' ? 'Create section' : 'Save'}
-          </button>
-
-          {displayMode === 'edit' && displayDelete && (
             <button
               type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl text-[13px] font-black text-rose-500 transition-colors [@media(hover:hover)]:hover:bg-rose-500/10"
+              onClick={commit}
+              disabled={!name.trim()}
+              className={PRIMARY_BUTTON}
             >
-              <Trash2 className="h-4 w-4" />
-              Delete section
+              {displayMode === 'create' ? 'Create section' : 'Save'}
             </button>
-          )}
+
+            {displayMode === 'edit' && displayDelete && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="mt-1.5 flex h-11 w-full items-center justify-center gap-2 rounded-2xl text-[14px] font-black text-rose-500 transition-colors active:bg-rose-500/10 [@media(hover:hover)]:hover:bg-rose-500/10"
+              >
+                <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+                Delete section
+              </button>
+            )}
+          </div>
         </div>
       )}
     </BaseSheet>
@@ -311,7 +348,7 @@ export function SectionEditorSheet({
             <button
               type="button"
               onClick={() => setConfirmDelete(false)}
-              className="h-12 rounded-2xl bg-muted text-[14px] font-black text-foreground transition hover:bg-muted/80"
+              className={SECONDARY_BUTTON}
             >
               Cancel
             </button>
@@ -322,7 +359,7 @@ export function SectionEditorSheet({
                 displayDelete?.();
                 onClose();
               }}
-              className="h-12 rounded-2xl bg-rose-500 text-[14px] font-black tracking-wide text-white transition active:translate-y-[2px]"
+              className={DANGER_BUTTON}
             >
               Delete
             </button>
@@ -331,5 +368,111 @@ export function SectionEditorSheet({
       )}
     </BaseSheet>
     </>
+  );
+}
+
+export function SectionsManagerSheet({
+  open,
+  onClose,
+  sections,
+  taskCounts,
+  tags,
+  canCreate,
+  onEdit,
+  onCreate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sections: { id: string; name: string; tagIds?: string[] }[];
+  taskCounts: Record<string, number>;
+  tags: SectionTagOption[];
+  canCreate: boolean;
+  onEdit: (sectionId: string) => void;
+  onCreate: () => void;
+}) {
+  const tagById = new Map(tags.map((t) => [t.id, t]));
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1400}
+      className="max-h-[88vh] bg-background ring-1 ring-border/70 sm:max-w-[440px]"
+    >
+      {({ bindScroll }) => (
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="flex h-11 shrink-0 items-center justify-center px-14 sm:h-14 sm:pt-1">
+            <h2 className={SHEET_TITLE}>Sections</h2>
+          </div>
+
+          <div
+            ref={bindScroll}
+            className="min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 pb-2 pt-2 sm:px-5"
+          >
+            <div className="flex flex-col gap-2">
+              {sections.map((section) => {
+                const count = taskCounts[section.id] ?? 0;
+                const sectionTags = (section.tagIds ?? [])
+                  .map((id) => tagById.get(id))
+                  .filter((t): t is SectionTagOption => !!t);
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => onEdit(section.id)}
+                    className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-muted/50 px-4 py-2.5 text-left transition-[transform,background-color] active:scale-[0.985] active:bg-muted [@media(hover:hover)]:hover:bg-muted/80"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[16px] font-black text-foreground">
+                        {section.name}
+                      </span>
+                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-muted-foreground">
+                        <span className="shrink-0 tabular-nums">
+                          {count} {count === 1 ? 'task' : 'tasks'}
+                        </span>
+                        {sectionTags.length > 0 && (
+                          <>
+                            <span aria-hidden className="shrink-0">·</span>
+                            <span className="flex min-w-0 items-center gap-1">
+                              {sectionTags.map((t) => (
+                                <span
+                                  key={t.id}
+                                  aria-hidden
+                                  className="h-2 w-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: t.color }}
+                                />
+                              ))}
+                              <span className="truncate">
+                                {sectionTags.map((t) => t.name).join(', ')}
+                              </span>
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </span>
+                    <ChevronRight
+                      className="h-5 w-5 shrink-0 text-muted-foreground/60"
+                      strokeWidth={2.5}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="shrink-0 border-t border-border/60 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 sm:px-5 sm:pb-5">
+            {canCreate ? (
+              <button type="button" onClick={onCreate} className={PRIMARY_BUTTON}>
+                <Plus className="h-5 w-5" strokeWidth={3} />
+                New section
+              </button>
+            ) : (
+              <p className="py-2 text-center text-[13px] font-semibold text-muted-foreground">
+                You've reached the 10-section limit.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </BaseSheet>
   );
 }

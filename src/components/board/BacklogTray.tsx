@@ -9,9 +9,8 @@ import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import {
-  FilterChipStrip,
+  QuickFilterSheet,
   FilteredEmptyState,
-  FilterStatusLine,
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { matchesTaskFilters, sortTasks, type TaskFilters } from '@/lib/taskFilters';
@@ -172,7 +171,7 @@ export default React.memo(function BacklogTray({
 
   const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(null);
 
-  const [stripOpen, setStripOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const canFilterInline = !!onChangeFilters && !!baseFilters;
 
   const handleDelete = async () => {
@@ -263,9 +262,9 @@ export default React.memo(function BacklogTray({
           canFilterInline ? (
             <FilterTriggerButton
               compact
-              onClick={() => setStripOpen((v) => !v)}
+              onClick={() => setFilterSheetOpen(true)}
               activeCount={activeFilterCount}
-              open={stripOpen}
+              open={filterSheetOpen}
             />
           ) : (
             <FilterTriggerButton
@@ -276,30 +275,6 @@ export default React.memo(function BacklogTray({
           )
         }
       >
-        {canFilterInline && (stripOpen || filtersActive) && (
-          <div
-            style={{ ['--strip-fade' as string]: 'var(--card)' }}
-            className="sticky top-0 z-20 -mx-1 flex flex-col gap-1.5 bg-card px-1 pb-2 pt-1"
-          >
-            <FilterChipStrip
-              filters={filters}
-              base={baseFilters!}
-              tags={userTags}
-              tasks={tasks}
-              onChange={onChangeFilters!}
-              onClearAll={() => onClearFilters?.()}
-              onOpenMore={() => onOpenFilters?.()}
-            />
-            {filtersActive && (
-              <FilterStatusLine
-                tasks={tasks}
-                filters={filters}
-                onClearAll={() => onClearFilters?.()}
-                className="self-start"
-              />
-            )}
-          </div>
-        )}
         {onQuickSave && (
           <div className="shrink-0 pb-3 pt-1">
             <QuickSave onSave={onQuickSave} />
@@ -346,7 +321,7 @@ export default React.memo(function BacklogTray({
                 <div key={bucket}>
                   {showGroupHeaders && (
                     <div className="relative bg-muted/40 px-3.5 py-2 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/60 first:before:hidden">
-                      <p className="flex items-center gap-2 text-[13px] font-black text-foreground/70">
+                      <p className="flex items-center gap-2 text-[13px] font-bold text-foreground/70">
                         {BUCKET_LABEL[bucket]}
                         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-black tabular-nums leading-none text-muted-foreground">
                           {groupTasks.length}
@@ -438,6 +413,19 @@ export default React.memo(function BacklogTray({
           )}
         </AnimatePresence>
       </SideOpenTray>
+
+      {canFilterInline && (
+        <QuickFilterSheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          filters={filters}
+          base={baseFilters!}
+          tags={userTags}
+          tasks={tasks}
+          onChange={onChangeFilters!}
+          onClearAll={() => onClearFilters?.()}
+        />
+      )}
 
       <TaskMenu
         menu={menu}

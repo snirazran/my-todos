@@ -84,7 +84,7 @@ export function HomePageSkeleton() {
 
           <div className="mb-16 px-1.5 md:px-4">
             {['w-2/5', 'w-1/4', 'w-1/3', 'w-2/5', 'w-1/4'].map((w, i) => (
-              <div key={i} className="pb-2">
+              <div key={i} className="pb-3">
                 <div
                   className={cn(
                     'flex items-center gap-3 py-[15px] pl-3.5 pr-2.5 md:py-4 md:pl-4 md:pr-3',
@@ -162,7 +162,7 @@ function PlannerColumnSkeleton({
         </div>
         <div className="min-h-0 overflow-hidden px-2 pt-2">
           {['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3', 'w-2/5'].slice(0, rows).map((w, i) => (
-            <div key={i} className="pb-2">
+            <div key={i} className="pb-3">
               <div
                 className={cn(
                   'flex items-center gap-2.5 py-3 pl-3.5 pr-2.5 md:py-2.5 md:pl-3',

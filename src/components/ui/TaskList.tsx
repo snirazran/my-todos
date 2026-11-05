@@ -4,13 +4,11 @@ import {
   ChevronDown,
   Circle,
   EllipsisVertical,
-  MoreHorizontal,
   CalendarCheck,
   CalendarClock,
   Filter,
   Plus,
   ListChecks,
-  ListPlus,
   EyeOff,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
@@ -90,7 +88,10 @@ import TaskMenu from '../board/TaskMenu';
 import TaskDetailSheet from '../board/TaskDetailSheet';
 import { EditScopeDialog } from '../board/EditScopeDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
-import { SectionEditorSheet } from '@/components/ui/SectionEditorSheet';
+import {
+  SectionEditorSheet,
+  SectionsManagerSheet,
+} from '@/components/ui/SectionEditorSheet';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
@@ -243,7 +244,7 @@ const SWIPE_SNAP_THRESHOLD = 32;
 const SWIPE_COMMIT_X = SWIPE_ACTION_WIDTH + 40;
 const SWIPE_SPRING = { type: 'spring' as const, stiffness: 900, damping: 80, mass: 1 };
 const SWIPE_MAX_RELEASE_VELOCITY = 1500;
-const TASK_CARD_GAP = 'pb-2';
+const TASK_CARD_GAP = 'pb-3';
 
 const SORT_TRANSITION = {
   duration: 240,
@@ -289,7 +290,7 @@ function TaskDragPreview({
       )}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className="text-[17px] font-semibold leading-snug text-foreground md:text-[17.5px]">
+          <span className="text-[17px] font-bold leading-snug text-foreground md:text-[17.5px]">
             {task.text}
             {(task.streak ?? 0) > 0 && (
               <StreakPill
@@ -408,6 +409,15 @@ type SlotPreviewProps = {
 };
 
 const SORT_TRANSITION_CSS = `transform ${SORT_TRANSITION.duration}ms ${SORT_TRANSITION.easing}`;
+const COMPLETED_COLLAPSE_MS = 300;
+const COMPLETED_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
 
 function previewTransform(
   transform: { x: number; y: number } | null,
@@ -1072,7 +1082,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
             >
                 <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                   <motion.span
-                    className={`text-[17px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17.5px] ${
+                    className={`text-[17px] font-bold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17.5px] ${
                       isDone
                         ? 'text-muted-foreground decoration-current'
                         : 'text-foreground decoration-transparent'
@@ -1392,7 +1402,6 @@ function SortableSectionHeader({
   previewShift,
   slotHoleHeight,
   onToggleCollapsed,
-  onEdit,
   onAddTask,
 }: {
   section: TaskListSection;
@@ -1403,7 +1412,6 @@ function SortableSectionHeader({
   previewShift?: number;
   slotHoleHeight?: number;
   onToggleCollapsed: () => void;
-  onEdit: () => void;
   onAddTask?: () => void;
 }) {
   const {
@@ -1457,8 +1465,8 @@ function SortableSectionHeader({
         }`}
       >
         <span
-          className={`min-w-0 truncate text-[16px] font-black tracking-tight transition-colors duration-150 md:text-[17px] ${
-            isDropTarget ? 'text-primary' : 'text-foreground'
+          className={`min-w-0 truncate text-[15px] font-bold tracking-tight transition-colors duration-150 md:text-[15.5px] ${
+            isDropTarget ? 'text-primary' : 'text-foreground/80'
           }`}
         >
           {section.name}
@@ -1503,21 +1511,6 @@ function SortableSectionHeader({
           </button>
         )}
 
-        {!section.collapsed && (
-          <button
-            type="button"
-            aria-label={`Edit section ${section.name}`}
-            title="Edit section"
-            {...stopDndActivation}
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-[transform,background-color,color] active:scale-90 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
-          >
-            <MoreHorizontal className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        )}
       </div>
       {showSlot && !isDragging && (
         <div ref={setSlotRef} className="relative pb-2 pt-1">
@@ -1552,28 +1545,45 @@ function SortableSectionHeader({
   );
 }
 
-function AddSectionRow({
-  onOpen,
-  disabled,
+function CompletedTodayBar({
+  count,
+  expanded,
+  onToggle,
 }: {
-  onOpen: () => void;
-  disabled?: boolean;
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onOpen}
-      disabled={disabled}
-      className="mt-2.5 inline-flex h-9 items-center gap-1.5 rounded-full bg-muted/70 pl-3 pr-3.5 text-[13px] font-black text-muted-foreground transition-[transform,background-color,color,opacity] active:scale-95 disabled:pointer-events-none disabled:opacity-0 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className={`mt-6 flex h-11 w-full items-center gap-[18px] pl-[18px] pr-3.5 text-left transition-[transform,background-color] duration-150 active:scale-[0.985] md:pl-5 md:pr-4 ${HOME_CARD_RADIUS} ${
+        expanded
+          ? 'bg-foreground/[0.07] dark:bg-white/[0.08]'
+          : 'bg-foreground/[0.04] dark:bg-white/[0.05] [@media(hover:hover)]:hover:bg-foreground/[0.07]'
+      }`}
     >
-      <ListPlus className="h-4 w-4" strokeWidth={2.5} />
-      New section
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground/[0.08] text-muted-foreground dark:bg-white/[0.1]">
+        <Check className="h-4 w-4" strokeWidth={3.5} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-muted-foreground md:text-[14.5px]">
+        <span className="tabular-nums">{count}</span>{' '}
+        {count === 1 ? 'goal' : 'goals'} completed today!
+      </span>
+      <ChevronDown
+        className={`h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 ${
+          expanded ? 'rotate-180' : ''
+        }`}
+        strokeWidth={3}
+      />
     </button>
   );
 }
 
 function AddTaskComposerRow({
-  label = 'Add a task',
+  label = 'Add a goal',
   disabled,
   onClick,
 }: {
@@ -1586,13 +1596,13 @@ function AddTaskComposerRow({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group relative flex w-full items-center gap-3 py-2 pl-3.5 pr-2.5 text-left transition-[transform,opacity] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-0 md:pl-4 md:pr-3 ${HOME_CARD_SURFACE}`}
+      className={`group relative flex h-16 w-full items-center gap-4 bg-foreground/[0.04] pl-4 pr-3.5 text-left transition-[transform,opacity,background-color] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-0 dark:bg-white/[0.05] md:pl-[18px] md:pr-4 [@media(hover:hover)]:hover:bg-foreground/[0.07] ${HOME_CARD_RADIUS}`}
     >
-      <span className="min-w-0 flex-1 text-[17px] font-semibold leading-snug text-muted-foreground/80 transition-colors md:text-[17.5px] [@media(hover:hover)]:group-hover:text-foreground">
-        {label}
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
+        <Plus className="h-[18px] w-[18px]" strokeWidth={3.5} />
       </span>
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/[0.12] text-primary ring-1 ring-inset ring-primary/20 transition-colors md:h-12 md:w-12 [@media(hover:hover)]:group-hover:bg-primary/[0.2]">
-        <Plus className="h-5 w-5" strokeWidth={3} />
+      <span className="min-w-0 flex-1 truncate text-[17px] font-bold leading-snug text-muted-foreground transition-colors md:text-[17.5px] [@media(hover:hover)]:group-hover:text-foreground">
+        {label}
       </span>
     </button>
   );
@@ -1739,6 +1749,7 @@ export default function TaskList({
   onClearFilters,
   filtersActive,
   onShowCompleted,
+  onToggleCompleted,
   isGuest,
   isGlowActive,
   isFrozen = false,
@@ -1747,6 +1758,7 @@ export default function TaskList({
   hideAddControls = false,
   header,
   sections = [],
+  newSectionRequest = 0,
   onCreateSection,
   onUpdateSection,
   onDeleteSection,
@@ -1812,6 +1824,7 @@ export default function TaskList({
   filtersActive: boolean;
   /** Reveals the day's finished tasks from the all-done card. */
   onShowCompleted?: () => void;
+  onToggleCompleted?: () => void;
   isGuest?: boolean;
   isGlowActive?: boolean;
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
@@ -1821,6 +1834,7 @@ export default function TaskList({
   hideAddControls?: boolean;
   header?: React.ReactNode;
   sections?: TaskListSection[];
+  newSectionRequest?: number;
   onCreateSection?: (name: string, tagIds: string[]) => void;
   onUpdateSection?: (
     sectionId: string,
@@ -1974,6 +1988,15 @@ export default function TaskList({
   const [sectionEditor, setSectionEditor] = useState<
     { mode: 'create' } | { mode: 'edit'; sectionId: string } | null
   >(null);
+  const handledSectionRequest = useRef(newSectionRequest);
+  useEffect(() => {
+    if (newSectionRequest === handledSectionRequest.current) return;
+    handledSectionRequest.current = newSectionRequest;
+    if (sections.length === 0) setSectionEditor({ mode: 'create' });
+    else setSectionsManagerOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newSectionRequest]);
+  const [sectionsManagerOpen, setSectionsManagerOpen] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
     null,
   );
@@ -2330,12 +2353,95 @@ export default function TaskList({
     if (ordered.map((t) => t.id).join('|') !== before) onReorder(ordered);
   }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [listShowsCompleted, setListShowsCompleted] = useState(
+    filters.showCompleted,
+  );
+  const completedIdsRef = useRef<string[]>([]);
+  const completedRowEls = () => {
+    const root = listRootRef.current;
+    if (!root) return [];
+    return completedIdsRef.current
+      .map((id) =>
+        root.querySelector<HTMLElement>(
+          `[data-row][data-task-id="${CSS.escape(id)}"]`,
+        ),
+      )
+      .filter((el): el is HTMLElement => !!el);
+  };
+  useEffect(() => {
+    if (filters.showCompleted) {
+      setListShowsCompleted(true);
+      return;
+    }
+    const rows = completedRowEls();
+    if (rows.length === 0 || prefersReducedMotion()) {
+      setListShowsCompleted(false);
+      return;
+    }
+    const animations = rows.map((el) => {
+      const style = getComputedStyle(el);
+      const from = {
+        height: `${el.offsetHeight}px`,
+        paddingBottom: style.paddingBottom,
+        marginTop: style.marginTop,
+        opacity: 1,
+      };
+      el.style.overflow = 'hidden';
+      return el.animate(
+        [from, { height: '0px', paddingBottom: '0px', marginTop: '0px', opacity: 0 }],
+        { duration: COMPLETED_COLLAPSE_MS, easing: COMPLETED_EASE, fill: 'forwards' },
+      );
+    });
+    const hide = window.setTimeout(
+      () => setListShowsCompleted(false),
+      COMPLETED_COLLAPSE_MS,
+    );
+    return () => {
+      window.clearTimeout(hide);
+      animations.forEach((a) => a.cancel());
+      rows.forEach((el) => {
+        el.style.overflow = '';
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.showCompleted]);
+  const prevListShowsCompletedRef = useRef(listShowsCompleted);
+  useLayoutEffect(() => {
+    const was = prevListShowsCompletedRef.current;
+    prevListShowsCompletedRef.current = listShowsCompleted;
+    if (!listShowsCompleted || was || prefersReducedMotion()) return;
+    completedRowEls().forEach((el) => {
+      const style = getComputedStyle(el);
+      const to = {
+        height: `${el.offsetHeight}px`,
+        paddingBottom: style.paddingBottom,
+        marginTop: style.marginTop,
+        opacity: 1,
+      };
+      el.style.overflow = 'hidden';
+      const animation = el.animate(
+        [{ height: '0px', paddingBottom: '0px', marginTop: '0px', opacity: 0 }, to],
+        { duration: COMPLETED_COLLAPSE_MS, easing: COMPLETED_EASE },
+      );
+      const release = () => {
+        el.style.overflow = '';
+      };
+      animation.onfinish = release;
+      animation.oncancel = release;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listShowsCompleted]);
+  const listFilters =
+    listShowsCompleted === filters.showCompleted
+      ? filters
+      : { ...filters, showCompleted: listShowsCompleted };
+
   // Determine visible tasks
   const visibleTasks = tasks.filter((t) => {
     const isTemporarilyVisible = delayedCompleted.has(t.id);
     const isActuallyCompleted =
       t.completed && !vSet.has(t.id) && !isTemporarilyVisible;
-    return matchesTaskFilters(t, filters, isActuallyCompleted);
+    return matchesTaskFilters(t, listFilters, isActuallyCompleted);
   });
 
   // Helper: is this task truly completed (not in grace period, not visually uncompleted)
@@ -2360,6 +2466,8 @@ export default function TaskList({
     filters.sort,
     tagSortOrder,
   );
+
+  completedIdsRef.current = completedTasks.map((t) => t.id);
 
   // ---- Freeze sort order during tongue animation to prevent layout shifts ----
   const frozenOrderRef = useRef<string[]>([]);
@@ -2455,6 +2563,10 @@ export default function TaskList({
     }
   }, [collapseSignature, rowSignature]);
   const hasSections = sectionsSorted.length > 0;
+  const sectionTaskCounts: Record<string, number> = {};
+  for (const t of tasks)
+    if (t.sectionId)
+      sectionTaskCounts[t.sectionId] = (sectionTaskCounts[t.sectionId] ?? 0) + 1;
   const knownSectionIds = new Set(sectionsSorted.map((s) => s.id));
   const rows: ListRow[] = (() => {
     if (!hasSections)
@@ -2481,6 +2593,7 @@ export default function TaskList({
     }));
     for (const s of sectionsSorted) {
       const secTasks = bySection.get(s.id) ?? [];
+      if (secTasks.length === 0) continue;
       const done = doneBySection.get(s.id) ?? 0;
       out.push({
         kind: 'header',
@@ -2496,11 +2609,13 @@ export default function TaskList({
   const rowIds = rows.map((r) =>
     r.kind === 'task' ? r.task.id : sectionSortableId(r.section.id),
   );
+  const doneTodayCount = tasks.filter(isTaskSettledCompleted).length;
+  const showListFooter = !hideAddControls;
   const slotPreview = (() => {
     if (!slotTarget || !dragActiveId) return null;
     const order = [
       ...rowIds,
-      ...(completedTasks.length > 0 ? ['completed-divider'] : []),
+      ...(showListFooter ? ['list-footer'] : []),
       ...completedTasks.map((t) => t.id),
     ];
     const origin = order.indexOf(dragActiveId);
@@ -2756,9 +2871,15 @@ export default function TaskList({
         return;
       }
       const movedIds = arrayMove(rowIds, oldIndex, newIndex);
-      const orderedSectionIds = movedIds
+      const visibleSectionIds = movedIds
         .map((id) => sectionIdFromSortable(id))
         .filter((id): id is string => !!id);
+      const orderedSectionIds = [
+        ...visibleSectionIds,
+        ...sectionsSorted
+          .map((sec) => sec.id)
+          .filter((id) => !visibleSectionIds.includes(id)),
+      ];
       hapticTick();
       onReorderSections(orderedSectionIds);
       clearDraggingSection(280);
@@ -2969,36 +3090,43 @@ export default function TaskList({
                   <AnimatePresence initial={false} mode="popLayout">
                     {[
                       ...rows,
-                      ...(completedTasks.length > 0
-                        ? [{ kind: 'completed-divider' } as const]
+                      ...(showListFooter
+                        ? [{ kind: 'list-footer' } as const]
                         : []),
                       ...completedTasks.map(
                         (task) => ({ kind: 'task', task }) as ListRow,
                       ),
                     ].map((row) => {
-                      if (row.kind === 'completed-divider') {
+                      if (row.kind === 'list-footer') {
                         return (
                           <div
-                            key="completed-divider"
-                            data-completed-divider
+                            key="list-footer"
+                            data-list-footer
                             style={
                               slotPreview
                                 ? {
-                                    transform: `translate3d(0, ${slotPreview.shifts.get('completed-divider') ?? 0}px, 0)`,
+                                    transform: `translate3d(0, ${slotPreview.shifts.get('list-footer') ?? 0}px, 0)`,
                                     transition: SORT_TRANSITION_CSS,
                                   }
                                 : isAnyDragging
                                   ? { transition: SORT_TRANSITION_CSS }
                                   : undefined
                             }
-                            className="relative flex min-h-[40px] items-center gap-2 pl-3.5 pr-1 pt-3 md:pl-4"
+                            className={`relative ${rows.some((r) => r.kind === 'header') ? 'pt-4' : 'pt-1'}`}
                           >
-                            <span className="text-[16px] font-black tracking-tight text-muted-foreground md:text-[17px]">
-                              Completed
-                            </span>
-                            <span className="text-[13px] font-bold tabular-nums text-muted-foreground/80">
-                              {completedTasks.length}
-                            </span>
+                            <AddTaskComposerRow
+                              disabled={quickAddOpen}
+                              onClick={() =>
+                                onAddRequested('', null, { preselectToday: true })
+                              }
+                            />
+                            {onToggleCompleted && doneTodayCount > 0 && (
+                              <CompletedTodayBar
+                                count={doneTodayCount}
+                                expanded={filters.showCompleted}
+                                onToggle={onToggleCompleted}
+                              />
+                            )}
                           </div>
                         );
                       }
@@ -3031,12 +3159,6 @@ export default function TaskList({
                               );
                               onSetSectionCollapsed?.(s.id, !s.collapsed);
                             }}
-                            onEdit={() =>
-                              setSectionEditor({
-                                mode: 'edit',
-                                sectionId: s.id,
-                              })
-                            }
                             onAddTask={
                               quickAddOpen
                                 ? undefined
@@ -3136,26 +3258,7 @@ export default function TaskList({
                 )}
             </DndContext>
           )}
-
-          {/* Show Finished Toggle (Removed from bottom) */}
         </div>
-
-        {!hideAddControls &&
-          (exitAction ||
-          (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-          <div data-list-footer className={hasSections ? 'pt-4' : 'pt-1'}>
-            <AddTaskComposerRow
-              disabled={quickAddOpen}
-              onClick={() => onAddRequested('', null, { preselectToday: true })}
-            />
-            {onCreateSection && sections.length < 10 && (
-              <AddSectionRow
-                onOpen={() => setSectionEditor({ mode: 'create' })}
-                disabled={quickAddOpen}
-              />
-            )}
-          </div>
-        )}
         </div>
       </div>
 
@@ -3270,6 +3373,17 @@ export default function TaskList({
               }
             : undefined
         }
+      />
+
+      <SectionsManagerSheet
+        open={sectionsManagerOpen}
+        onClose={() => setSectionsManagerOpen(false)}
+        sections={sectionsSorted}
+        taskCounts={sectionTaskCounts}
+        tags={userTags}
+        canCreate={!!onCreateSection && sections.length < 10}
+        onEdit={(sectionId) => setSectionEditor({ mode: 'edit', sectionId })}
+        onCreate={() => setSectionEditor({ mode: 'create' })}
       />
 
       {(() => {

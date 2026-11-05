@@ -125,6 +125,10 @@ body:has([data-public-home]) #main-scroll {
 }
 
 /* Shared UI animations */
+[data-list-footer] + [data-row] {
+  margin-top: 0.75rem;
+}
+
 @keyframes demo-glow-breathe {
   0%,
   100% {
@@ -2697,25 +2701,6 @@ body.dragging {
   }
 }
 
-.buddy-nudge-fly {
-  animation: buddy-nudge-fly 3.2s ease-in-out infinite;
-}
-
-@keyframes buddy-nudge-fly {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(-4deg);
-  }
-  50% {
-    transform: translate3d(0, -4px, 0) rotate(4deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .buddy-nudge-fly {
-    animation: none;
-  }
-}
 
 .toast-enter {
   animation:

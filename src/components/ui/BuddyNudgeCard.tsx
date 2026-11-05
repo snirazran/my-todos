@@ -11,6 +11,8 @@ import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
 import type { FriendSummary } from '@/lib/friends/indices';
+import { HOME_CARD_SURFACE } from '@/components/ui/taskSurfaces';
+import { PRIMARY_BUTTON } from '@/components/ui/quick-add/kit';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -31,9 +33,9 @@ export function BuddyNudgeCardView({
   onDismiss: () => void;
 }) {
   return (
-    <div className="mx-1.5 mt-[76px] md:mx-4 md:mt-[92px]">
+    <div className="mx-1.5 mt-[81px] md:mx-4 md:mt-[97px]">
       <div className="relative">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-[98px] flex justify-center">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-[103px] z-10 flex justify-center">
           <span className="relative flex items-end">
             <span className="-mr-4">
               <Frog width={FROG_W} height={FROG_H} indices={indices} paused />
@@ -41,29 +43,34 @@ export function BuddyNudgeCardView({
             <span className="-ml-4 -scale-x-100">
               <Frog width={FROG_W} height={FROG_H} paused />
             </span>
-            <span className="buddy-nudge-fly absolute left-1/2 top-[26px] -ml-[14px]">
-              <Fly size={28} y={-1} interactive={false} />
+            <span className="absolute left-1/2 top-[26px] -ml-[14px]">
+              <Fly size={28} y={-1} paused interactive={false} />
             </span>
           </span>
         </div>
 
-        <div className="relative overflow-hidden rounded-[24px] border border-border/60 bg-card px-5 pb-4 pt-6 text-center shadow-[0_1px_2px_rgba(15,23,42,0.05),0_14px_30px_-22px_rgba(15,23,42,0.35)]">
+        <div className={`relative overflow-hidden px-5 pb-4 pt-6 text-center ${HOME_CARD_SURFACE}`}>
           <h3 className="text-[17px] font-black leading-tight tracking-tight text-foreground">
             Habits are better together
           </h3>
           <p className="mx-auto mt-1.5 max-w-[19rem] text-balance text-[13.5px] font-semibold leading-snug text-muted-foreground">
-            Share a goal with a friend. When you both finish it, you each get{' '}
-            <span className="inline-flex translate-y-[3px] items-center gap-0.5 rounded-full bg-amber-100 py-0.5 pl-0.5 pr-2 text-[12.5px] font-black leading-none text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
-              <span className="grid h-[18px] w-[18px] place-items-center">
-                <Fly size={20} y={-2} paused interactive={false} />
+            Share a goal with a friend. When you both finish it,{' '}
+            <span className="whitespace-nowrap">
+              you each get{' '}
+              <span className="ml-0.5 inline-flex h-6 -translate-y-px items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 pl-0.5 pr-2.5 align-middle text-[13px] font-black leading-none text-amber-700 ring-1 ring-inset ring-amber-300/50 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/25">
+                <span className="-my-1.5 grid h-8 w-8 shrink-0 place-items-center">
+                  <Fly size={30} y={-2} paused interactive={false} />
+                </span>
+                <span className="-ml-1">
+                  +{bonusFlies} {bonusFlies === 1 ? 'fly' : 'flies'}
+                </span>
               </span>
-              +{bonusFlies}
             </span>
           </p>
           <button
             type="button"
             onClick={onOpen}
-            className="mt-4 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-[16px] font-black text-primary-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.16)] transition-[transform,filter] duration-150 active:translate-y-[2px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 [@media(hover:hover)]:hover:brightness-105"
+            className={`${PRIMARY_BUTTON} mt-4 text-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2`}
           >
             Buddy up
           </button>

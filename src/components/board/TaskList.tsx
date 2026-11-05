@@ -47,7 +47,7 @@ import {
 } from '@/lib/taskFilters';
 import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
 
-const CARD_GAP = 8;
+const CARD_GAP = 12;
 const LIST_PAD_TOP = 8;
 const DRAG_SHIFT_TRANSITION = 'transform 200ms cubic-bezier(0.2, 0, 0, 1)';
 
@@ -782,7 +782,7 @@ export default React.memo(function TaskList({
         data-row
         data-drag-source={isDraggedHere ? 'true' : undefined}
         className={cn(
-          'relative z-[1] px-2 pb-2',
+          'relative z-[1] px-2 pb-3',
           isDraggedHere && 'pointer-events-none opacity-0',
         )}
         style={

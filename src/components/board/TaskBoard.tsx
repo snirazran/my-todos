@@ -22,6 +22,7 @@ import {
   ChevronRight,
   ChevronUp,
   EyeOff,
+  CircleCheck,
   ListChecks,
   Plus,
   RotateCw,
@@ -59,10 +60,8 @@ import {
 } from './hooks/useTaskSelection';
 import { monthlyRepeatLabel } from '@/components/ui/quick-add/utils';
 import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
-import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
 import {
-  FilterChipStrip,
-  FilterStatusLine,
+  QuickFilterSheet,
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
@@ -317,13 +316,13 @@ const ColumnAddRow = React.memo(function ColumnAddRow({
     <button
       type="button"
       onClick={() => onAdd('')}
-      className="group flex w-full items-center gap-2.5 rounded-[14px] py-1.5 pl-3.5 pr-2.5 text-left transition-colors active:bg-foreground/[0.07] md:gap-2 md:pl-3 md:pr-2 [@media(hover:hover)]:hover:bg-foreground/[0.05]"
+      className="group flex h-12 w-full items-center gap-3 rounded-[14px] pl-3.5 pr-3 text-left transition-[transform,background-color] duration-150 active:scale-[0.985] active:bg-foreground/[0.06] md:h-11 md:gap-2.5 md:pl-3 [@media(hover:hover)]:hover:bg-foreground/[0.05]"
     >
-      <span className="min-w-0 flex-1 text-[15px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
-        Add a task
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
+        <Plus className="h-4 w-4" strokeWidth={3.5} />
       </span>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/30 text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
-        <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
+      <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
+        Add a goal
       </span>
     </button>
   );
@@ -344,18 +343,21 @@ const SavedRow = React.memo(function SavedRow({
 }) {
   return (
     <div data-hint={hinted ? 'saved-drop-target' : undefined}>
+      {bordered && (
+        <div aria-hidden className="mx-3.5 my-1.5 h-px bg-foreground/[0.08] md:mx-3" />
+      )}
       <button
         type="button"
         data-hint={hinted ? 'saved-tasks' : undefined}
         aria-label={count ? `Saved tasks, ${count}` : 'Saved tasks'}
         aria-expanded={expanded}
         onClick={onOpen}
-        className={`flex w-full items-center justify-between gap-2 rounded-[14px] py-2.5 pl-3.5 pr-3 text-left transition-colors active:bg-foreground/[0.07] [@media(hover:hover)]:hover:bg-foreground/[0.05] ${
-          bordered ? 'mt-0.5' : ''
-        }`}
+        className="flex h-11 w-full items-center justify-between gap-2 rounded-[14px] pl-3.5 pr-3 text-left transition-colors active:bg-foreground/[0.07] md:h-10 md:pl-3 [@media(hover:hover)]:hover:bg-foreground/[0.05]"
       >
-        <span className="inline-flex items-center gap-2 text-[13px] font-bold text-muted-foreground">
-          <Icon name="saved" className="h-[18px] w-[18px]" />
+        <span className="inline-flex items-center gap-3 text-[14px] font-bold text-muted-foreground md:gap-2.5 md:text-[13px]">
+          <span className="grid w-7 shrink-0 place-items-center">
+            <Icon name="saved" className="h-[18px] w-[18px]" />
+          </span>
           Saved
         </span>
         <span className="inline-flex items-center gap-1 text-[13px] font-black tabular-nums text-foreground/75">
@@ -668,14 +670,18 @@ export default function TaskBoard({
     setFilters,
     baseFilters,
     reset: resetFilters,
-    presets,
-    savePreset,
-    deletePreset,
     isActive: filtersActive,
     activeCount: activeFilterCount,
   } = useTaskFilters('planner');
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [stripOpen, setStripOpen] = useState(false);
+  const completedShown = filters.showCompleted;
+  const lensFilterCount =
+    activeFilterCount +
+    (filters.showCompleted !== baseFilters.showCompleted ? -1 : 0);
+  const clearLensFilters = useCallback(
+    () => setFilters({ ...baseFilters, showCompleted: completedShown }),
+    [baseFilters, completedShown, setFilters],
+  );
   const filterPool = useMemo(
     () => [...windowDates.flatMap((d) => tasksByDate[d] ?? []), ...backlog],
     [windowDates, tasksByDate, backlog],
@@ -2725,18 +2731,8 @@ export default function TaskBoard({
   const skipMode = draggingRepeating && !dragBundled;
   const showDateTile = showDock && !(isPlannerTourLocked() && showSavedDrop);
 
-  // One lens for both layouts: the chips sit on the board under the header,
-  // directly below the column-header trigger that opened them.
-  const lensOpen = stripOpen || filtersActive;
-
   return (
-    <div
-      className="relative w-full h-full"
-      style={{
-        ['--lens' as string]: lensOpen ? '60px' : '0px',
-        ['--lens-m' as string]: lensOpen ? '48px' : '0px',
-      }}
-    >
+    <div className="relative w-full h-full">
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -2750,7 +2746,7 @@ export default function TaskBoard({
       >
         <div
           ref={trackRef}
-          className="flex h-full shrink-0 mx-auto gap-6 px-3 pt-[calc(112px+var(--lens-m)+env(safe-area-inset-top))] pb-[calc(24px+env(safe-area-inset-bottom))] md:gap-3 md:px-4 md:pt-[calc(140px+var(--lens))] md:pb-[calc(32px+env(safe-area-inset-bottom))]"
+          className="flex h-full shrink-0 mx-auto gap-6 px-3 pt-[calc(112px+env(safe-area-inset-top))] pb-[calc(24px+env(safe-area-inset-bottom))] md:gap-3 md:px-4 md:pt-[140px] md:pb-[calc(32px+env(safe-area-inset-bottom))]"
         >
           {renderEdge('past')}
           {windowDates.map((dk, i) => {
@@ -2782,12 +2778,32 @@ export default function TaskBoard({
                 isPast={pastDay}
                 headerAction={
                   <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters({ ...filters, showCompleted: !completedShown })
+                      }
+                      aria-pressed={completedShown}
+                      aria-label={
+                        completedShown ? 'Hide completed' : 'Show completed'
+                      }
+                      title={completedShown ? 'Hide completed' : 'Show completed'}
+                      className={`flex shrink-0 items-center justify-center transition-all active:scale-90 ${
+                        isMobile ? 'h-11 w-11 rounded-2xl' : 'h-9 w-9 rounded-xl'
+                      } ${
+                        completedShown
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+                      }`}
+                    >
+                      <CircleCheck size={isMobile ? 20 : 18} strokeWidth={2.5} />
+                    </button>
                     <FilterTriggerButton
                       compact
-                      size="md"
-                      onClick={() => setStripOpen((v) => !v)}
-                      activeCount={activeFilterCount}
-                      open={stripOpen}
+                      size={isMobile ? 'lg' : 'md'}
+                      onClick={() => setFilterSheetOpen(true)}
+                      activeCount={lensFilterCount}
+                      open={filterSheetOpen}
                     />
                     <button
                       type="button"
@@ -2806,24 +2822,17 @@ export default function TaskBoard({
                       onClick={() =>
                         selection.active ? selection.exit() : selection.enter()
                       }
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-90 disabled:opacity-25 ${
+                      className={`flex shrink-0 items-center justify-center transition-all active:scale-90 disabled:opacity-25 ${
+                        isMobile ? 'h-11 w-11 rounded-2xl' : 'h-9 w-9 rounded-xl'
+                      } ${
                         selection.active
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
                       }`}
                     >
-                      <ListChecks size={18} strokeWidth={2.5} />
+                      <ListChecks size={isMobile ? 20 : 18} strokeWidth={2.5} />
                     </button>
                   </>
-                }
-                note={
-                  filtersActive ? (
-                    <FilterStatusLine
-                      tasks={tasksByDate[dk] ?? []}
-                      filters={filters}
-                      onClearAll={resetFilters}
-                    />
-                  ) : undefined
                 }
                 footer={
                   !pastDay || isMobile ? (
@@ -3016,69 +3025,17 @@ export default function TaskBoard({
           )}
         </div>
 
-        {/* Mobile lens — drops out of the column header's filter button and
-            pushes the board down, so the chips read as belonging to it. */}
-        <AnimatePresence>
-          {isMobile && lensOpen && !calendarOpen && !drag?.active && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="pointer-events-auto w-full max-w-[480px] px-0.5 md:hidden"
-            >
-              <FilterChipStrip
-                filters={filters}
-                base={baseFilters}
-                tags={tagsData?.tags || []}
-                tasks={filterPool}
-                onChange={setFilters}
-                onClearAll={resetFilters}
-                onOpenMore={() => setFilterSheetOpen(true)}
-                menuDirection="down"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* Desktop lens — the chips sit on the board, not over it, so the columns
-          visibly re-filter under each tap. Toggled from the column header. */}
-      {lensOpen && (
-        <div className="pointer-events-none fixed inset-x-0 top-[88px] z-[61] hidden justify-center px-6 md:flex lg:px-10">
-          <div
-            style={{ ['--strip-fade' as string]: 'var(--card)' }}
-            className="pointer-events-auto flex min-w-0 max-w-full items-center rounded-[22px] border border-border/60 bg-card px-2 py-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
-          >
-            <FilterChipStrip
-              filters={filters}
-              base={baseFilters}
-              tags={tagsData?.tags || []}
-              tasks={filterPool}
-              onChange={setFilters}
-              onClearAll={resetFilters}
-              onOpenMore={() => setFilterSheetOpen(true)}
-              className="min-w-0 flex-1"
-            />
-          </div>
-        </div>
-      )}
-
-      <TaskFilterSheet
+      <QuickFilterSheet
         open={filterSheetOpen}
         onOpenChange={setFilterSheetOpen}
         filters={filters}
-        onChange={setFilters}
-        onReset={resetFilters}
+        base={baseFilters}
         tags={tagsData?.tags || []}
         tasks={filterPool}
-        presets={presets}
-        onSavePreset={savePreset}
-        onDeletePreset={deletePreset}
-        showTags={false}
-        showSort={false}
-        showCompletedToggle={false}
-        title="More filters"
+        onChange={setFilters}
+        onClearAll={clearLensFilters}
       />
 
       {/* Month calendar overlay */}

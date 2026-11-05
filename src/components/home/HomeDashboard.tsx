@@ -10,6 +10,7 @@ import {
   CalendarCheck,
   CalendarClock,
   EllipsisVertical,
+  LayoutList,
   Plus,
   Sparkles,
 } from 'lucide-react';
@@ -51,10 +52,8 @@ import {
 } from '@/components/ui/HomeFocusFlies';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
-import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
 import {
-  FilterChipStrip,
-  FilterStatusLine,
+  QuickFilterSheet,
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
@@ -217,16 +216,18 @@ export default function HomeDashboard() {
     setFilters,
     baseFilters,
     reset: resetFilters,
-    presets,
-    savePreset,
-    deletePreset,
     isActive: filtersActive,
     activeCount: activeFilterCount,
   } = useTaskFilters('home', HOME_FILTER_BASE);
-  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
-  const [stripOpen, setStripOpen] = useState(false);
-  const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
-  const headerMenuRef = useRef<HTMLDivElement>(null);
+  const completedShown = filters.showCompleted;
+  const completedChanged = filters.showCompleted !== baseFilters.showCompleted;
+  const lensFilterCount = activeFilterCount - (completedChanged ? 1 : 0);
+  const clearLensFilters = useCallback(
+    () => setFilters({ ...baseFilters, showCompleted: completedShown }),
+    [baseFilters, completedShown, setFilters],
+  );
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [newSectionRequest, setNewSectionRequest] = useState(0);
 
   // Ref for scrolling to task list
   const taskListRef = useRef<HTMLDivElement>(null);
@@ -758,7 +759,7 @@ export default function HomeDashboard() {
         <div
           className={cn(
             'mb-2 flex min-h-9 items-center justify-between gap-2',
-            inList ? 'pl-4 pr-1' : 'pl-5 pr-3',
+            inList ? 'pl-4 pr-1' : 'pl-5 pr-2',
           )}
         >
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -768,37 +769,42 @@ export default function HomeDashboard() {
             <span className="text-[13px] font-bold tabular-nums text-muted-foreground">
               {dayCleared ? 'All done' : `${openTaskCount} left`}
             </span>
-
-            {filtersActive && (
-              <FilterStatusLine
-                tasks={data}
-                filters={filters}
-                onClearAll={resetFilters}
-              />
-            )}
           </div>
 
-          <FilterTriggerButton
-            compact
-            size="md"
-            triggerRef={headerMenuBtnRef}
-            onClick={() => setStripOpen((v) => !v)}
-            activeCount={activeFilterCount}
-            open={stripOpen}
-          />
+          <div
+            className={cn(
+              'flex shrink-0 items-center',
+              inList ? 'gap-0.5' : 'gap-1',
+            )}
+          >
+            <button
+                type="button"
+                onClick={() => {
+                  if (!user) {
+                    router.push('/login');
+                    return;
+                  }
+                  setNewSectionRequest((n) => n + 1);
+                }}
+                disabled={showQuickAdd}
+                aria-label="Sections"
+                title="Sections"
+                className={cn(
+                  'flex shrink-0 items-center justify-center text-muted-foreground transition-all active:scale-90 disabled:pointer-events-none disabled:opacity-40 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground',
+                  inList ? 'h-9 w-9 rounded-xl' : 'h-11 w-11 rounded-2xl',
+                )}
+              >
+                <LayoutList size={inList ? 19 : 20} strokeWidth={2.5} />
+              </button>
+            <FilterTriggerButton
+              compact
+              size={inList ? 'md' : 'lg'}
+              onClick={() => setFilterSheetOpen(true)}
+              activeCount={lensFilterCount}
+              open={filterSheetOpen}
+            />
+          </div>
         </div>
-      )}
-      {(stripOpen || filtersActive) && (
-        <FilterChipStrip
-          filters={filters}
-          base={baseFilters}
-          tags={tags || []}
-          tasks={data}
-          onChange={setFilters}
-          onClearAll={resetFilters}
-          onOpenMore={() => setIsHeaderMenuOpen(true)}
-          className={inList ? 'mb-2 px-2.5' : 'mb-2 px-2'}
-        />
       )}
     </>
   );
@@ -908,21 +914,15 @@ export default function HomeDashboard() {
                     has nothing to count or filter — either way the header
                     steps aside, unless filters are on and must stay reachable. */}
                 <div className="md:hidden">{renderListHeader(false)}</div>
-                <TaskFilterSheet
-                  open={isHeaderMenuOpen}
-                  onOpenChange={setIsHeaderMenuOpen}
+                <QuickFilterSheet
+                  open={filterSheetOpen}
+                  onOpenChange={setFilterSheetOpen}
                   filters={filters}
-                  onChange={setFilters}
-                  onReset={resetFilters}
+                  base={baseFilters}
                   tags={tags || []}
                   tasks={data}
-                  presets={presets}
-                  onSavePreset={savePreset}
-                  onDeletePreset={deletePreset}
-                  showTags={false}
-                  showSort={false}
-                  showCompletedToggle={false}
-                  title="More filters"
+                  onChange={setFilters}
+                  onClearAll={clearLensFilters}
                 />
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
                 <AnimatePresence initial={false}>
@@ -1029,6 +1029,7 @@ export default function HomeDashboard() {
                     reorderTasks(reordered);
                   }}
                   sections={user ? sections : []}
+                  newSectionRequest={newSectionRequest}
                   onCreateSection={
                     user
                       ? createSection
@@ -1104,6 +1105,9 @@ export default function HomeDashboard() {
                   filters={filters}
                   onClearFilters={resetFilters}
                   filtersActive={filtersActive}
+                  onToggleCompleted={() =>
+                    setFilters({ ...filters, showCompleted: !completedShown })
+                  }
                   onShowCompleted={
                     filters.showCompleted
                       ? undefined
@@ -1461,7 +1465,6 @@ export default function HomeDashboard() {
         onChangeFilters={setFilters}
         filtersActive={filtersActive}
         activeFilterCount={activeFilterCount}
-        onOpenFilters={() => setIsHeaderMenuOpen(true)}
         onClearFilters={resetFilters}
         tasks={laterThisWeek.map((t) => ({ ...t, order: t.order || 0 }))}
         onGrab={() => {}}

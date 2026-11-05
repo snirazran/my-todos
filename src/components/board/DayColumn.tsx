@@ -131,8 +131,10 @@ export default function DayColumn({
       )
     ) : open === 0 ? (
       <span className="text-primary">All done</span>
-    ) : (
+    ) : isToday ? (
       `${open} left`
+    ) : (
+      `${open} planned`
     );
 
   const heading = (
@@ -145,7 +147,7 @@ export default function DayColumn({
     />
   );
   const actions = headerAction ? (
-    <div className="relative flex shrink-0 items-center gap-0.5">
+    <div className="relative flex shrink-0 items-center gap-1 md:gap-0.5">
       {headerAction}
     </div>
   ) : null;

@@ -494,7 +494,7 @@ export default function TaskCard({
       >
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span
-            className={`break-words text-[16px] font-semibold leading-snug line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[15px] ${
+            className={`break-words text-[16px] font-bold leading-snug line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[15px] ${
               isDone
                 ? 'text-muted-foreground decoration-current'
                 : 'text-foreground decoration-transparent'
