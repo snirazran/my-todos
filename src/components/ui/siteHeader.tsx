@@ -278,6 +278,7 @@ export default function SiteHeader() {
                 variant="desktop"
                 onClick={() => openFlyShop()}
                 showGoal
+                flyTarget
               />
               <span aria-hidden className="mx-0.5 h-7 w-px bg-border" />
             </>

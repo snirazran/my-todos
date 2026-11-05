@@ -486,7 +486,9 @@ export function ShopWindow({
       className="relative -mx-4 flex min-h-[100dvh] flex-1 flex-col bg-background md:mx-0 md:min-h-0 md:bg-transparent"
     >
       <div className="pond-panel sticky top-0 z-30 flex shrink-0 items-center gap-2 bg-[color:var(--pond-surface-top)] px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:hidden">
-        {!isGuest && <FlyCounter balance={balance} variant="mobile" onClick={onGetFlies} />}
+        {!isGuest && (
+          <FlyCounter balance={balance} variant="mobile" onClick={onGetFlies} flyTarget />
+        )}
         {catalogButton('ml-auto')}
       </div>
       <div className="relative flex flex-1 flex-col">

@@ -31,6 +31,7 @@ interface Props {
    * toast counters stay presentational (and skip the summary subscription).
    */
   showGoal?: boolean;
+  flyTarget?: boolean;
 }
 
 export function FlyCounter({
@@ -39,11 +40,12 @@ export function FlyCounter({
   onClick,
   alwaysCelebrate = false,
   showGoal = false,
+  flyTarget = false,
 }: Props) {
   const { wishlist, progress } = useWishlist(showGoal);
   const goalReached = !!progress?.reached;
   const held =
-    useSyncExternalStore(subscribeFlyCounterHold, isFlyCounterHeld, () => false) && showGoal;
+    useSyncExternalStore(subscribeFlyCounterHold, isFlyCounterHeld, () => false) && flyTarget;
   const heldBalanceRef = useRef(liveBalance);
   if (!held) heldBalanceRef.current = liveBalance;
   const balance = held ? heldBalanceRef.current : liveBalance;
@@ -216,7 +218,7 @@ export function FlyCounter({
         )}
         <span
           ref={padRef}
-          data-fly-counter={showGoal ? '' : undefined}
+          data-fly-counter={flyTarget ? '' : undefined}
           className={cn(
             'fly-purse-pad grid place-items-center rounded-full ring-1 ring-inset',
             ringRatio !== null ? 'h-[25px] w-[25px]' : 'h-8 w-8',
