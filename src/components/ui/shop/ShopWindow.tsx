@@ -6,6 +6,7 @@ import { Check, ChevronRight, Heart, Sparkle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
+import { rewardedAdsAvailable } from '@/lib/ads';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -136,41 +137,60 @@ function ShopTile({
   );
 }
 
+type RefreshState = 'free' | 'ad' | 'plus' | 'spent';
+
+const REFRESH_LABEL: Record<RefreshState, string> = {
+  free: 'Refresh the Special collection for free',
+  ad: 'Watch a short ad to refresh the Special collection',
+  plus: 'Get more Special collection refreshes with Plus',
+  spent: 'No refreshes left today',
+};
+
 function RefreshButton({
-  free,
-  plus,
+  state,
   busy,
   onClick,
 }: {
-  free: boolean;
-  plus: boolean;
+  state: RefreshState;
   busy: boolean;
   onClick: () => void;
 }) {
-  const label = !free
-    ? 'Watch a short ad to refresh the Special collection'
-    : plus
-      ? 'Refresh the Special collection, free with Plus'
-      : 'Refresh the Special collection, free once a day';
+  const spent = state === 'spent';
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={busy}
-      aria-label={label}
-      className="group flex h-12 shrink-0 items-center transition-transform active:translate-y-0.5 disabled:opacity-70"
+      disabled={busy || spent}
+      aria-label={REFRESH_LABEL[state]}
+      className="group flex h-12 shrink-0 items-center transition-transform active:translate-y-0.5 disabled:active:translate-y-0"
     >
-      <span className="flex h-7 items-center gap-1 rounded-full bg-[#e4f3de] pl-3 pr-6 text-[12px] font-black uppercase leading-none tracking-[0.06em] text-[#2c511a] shadow-[0_2px_0_#9fcd92] ring-1 ring-[#bfe0b5] dark:bg-[#447d3f]/30 dark:text-[#c6ecb6] dark:shadow-[0_2px_0_rgba(0,0,0,0.35)] dark:ring-[#6cbb5f]/30">
-        {free ? 'Free' : <AdPlayIcon className="h-4 w-4" strokeWidth={2.75} />}
-      </span>
-      <span className="relative -ml-4 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#5fa954] to-[#447d3f] shadow-[0_3px_0_0_#2c511a] ring-[3px] ring-inset ring-[#3a6e34] group-active:shadow-[0_1px_0_0_#2c511a]">
+      {!spent && (
+        <span className="flex h-7 min-w-[54px] items-center justify-center rounded-full bg-[#e4f3de] pl-2.5 pr-[26px] text-[12px] font-black uppercase leading-none tracking-[0.06em] text-[#2c511a] shadow-[0_2px_0_#9fcd92] ring-1 ring-[#bfe0b5] dark:bg-[#447d3f]/30 dark:text-[#c6ecb6] dark:shadow-[0_2px_0_rgba(0,0,0,0.35)] dark:ring-[#6cbb5f]/30">
+          {state === 'free' ? (
+            'Free'
+          ) : state === 'ad' ? (
+            <AdPlayIcon className="h-4 w-4" strokeWidth={2.75} />
+          ) : (
+            <Icon name="frogPlus" className="-my-1 h-6 w-6" />
+          )}
+        </span>
+      )}
+      <span
+        className={cn(
+          'relative grid h-12 w-12 place-items-center rounded-full ring-1 ring-inset',
+          !spent && '-ml-4',
+          spent
+            ? 'bg-muted ring-border shadow-[0_3px_0_0_hsl(var(--border))]'
+            : 'bg-gradient-to-b from-[#5fa954] to-[#447d3f] ring-white/15 shadow-[0_3px_0_0_#2c511a] group-active:shadow-[0_1px_0_0_#2c511a]',
+        )}
+      >
         <Icon
           name="repeat"
-          className={cn('h-10 w-10', busy && 'animate-spin')}
+          className={cn('h-10 w-10', busy && 'animate-spin', spent && 'opacity-50')}
           style={
             {
-              '--repeat-icon-grey': '#ffffff',
-              '--repeat-icon-green': '#c6ecb6',
+              '--repeat-icon-grey': spent ? 'hsl(var(--muted-foreground))' : '#ffffff',
+              '--repeat-icon-green': spent ? 'hsl(var(--muted-foreground))' : '#c6ecb6',
             } as React.CSSProperties
           }
         />
@@ -300,6 +320,20 @@ export function ShopWindow({
   );
   const endsAt = deals[0]?.endsAt;
   const countdown = useCountdown(endsAt);
+  const refreshState: RefreshState | null =
+    isGuest || special.length === 0
+      ? null
+      : isPremium
+        ? rerollsLeft > 0
+          ? 'free'
+          : 'spent'
+        : rerollsLeft <= 0
+          ? 'plus'
+          : rerollFree
+            ? 'free'
+            : rewardedAdsAvailable()
+              ? 'ad'
+              : 'plus';
 
   const frozenEveryday = useRef<Set<string> | null>(null);
   const everyday = useMemo<ShopEntry[]>(() => {
@@ -531,12 +565,13 @@ export function ShopWindow({
                 )
               }
               action={
-                !isGuest && rerollsLeft > 0 && special.length > 0 ? (
+                refreshState ? (
                   <RefreshButton
-                    free={isPremium || rerollFree}
-                    plus={isPremium}
+                    state={refreshState}
                     busy={rerolling}
-                    onClick={onReroll}
+                    onClick={
+                      rerollsLeft > 0 ? onReroll : () => onPlus('shop_reroll')
+                    }
                   />
                 ) : undefined
               }
