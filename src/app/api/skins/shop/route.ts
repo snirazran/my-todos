@@ -129,6 +129,11 @@ export async function POST(req: NextRequest) {
         slot: byId[itemId].slot,
         flies_spent: price,
         discounted: !!deal?.onSale,
+        shelf: rotation.everydayIds.includes(itemId)
+          ? 'everyday'
+          : deal?.plusOnly
+            ? 'special_plus'
+            : 'special',
         is_premium: isPremiumActive(user.premiumUntil),
       },
     });

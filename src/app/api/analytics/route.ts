@@ -79,8 +79,6 @@ const CLIENT_EVENTS = new Set([
   'friend_link_opened',
   'notification_opened',
   'wishlist_opened',
-  'home_shop_rail_viewed',
-  'home_shop_rail_tapped',
   'shield_sheet_opened',
   'shield_purchased',
   'buddy_flow_opened',
@@ -90,7 +88,6 @@ const CLIENT_EVENTS = new Set([
   'tryon_kept',
   'tryon_dismissed',
   'look_reaction_seen',
-  'starter_plan_day_start',
   'ad_ready',
   'ad_consent_resolved',
   'ad_consent_failed',
@@ -139,7 +136,6 @@ export async function POST(req: NextRequest) {
     name !== 'app_opened' &&
     name !== 'page_viewed' &&
     name !== 'starter_plan_shown' &&
-    name !== 'starter_plan_day_start' &&
     name !== 'onboarding_step_viewed' &&
     !name.startsWith('try_') &&
     !name.startsWith('fly_game_') &&

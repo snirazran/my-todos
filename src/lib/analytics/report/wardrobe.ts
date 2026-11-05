@@ -9,7 +9,7 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
     await Promise.all([
       groupByProperties(
         { occurredAt: context.window, name: 'skin_purchased' },
-        { rarity: 'rarity', tier: 'is_premium', discounted: 'discounted' },
+        { rarity: 'rarity', tier: 'is_premium', discounted: 'discounted', shelf: 'shelf' },
         { sums: { flies: 'flies_spent', items: 'item_count' } },
       ),
       groupByProperties(
@@ -42,8 +42,6 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
   const equips = context.metric('item_equipped');
   const wishlistPins = context.metric('wishlist_pinned');
   const wishlistReached = context.metric('wishlist_reached');
-  const shopRailViews = context.metric('home_shop_rail_viewed');
-  const shopRailTaps = context.metric('home_shop_rail_tapped');
 
   const fliesSpentOnSkins = purchaseRows.reduce((sum, row) => sum + row.flies, 0);
 
@@ -131,6 +129,7 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
         columns: [
           { key: 'rarity', label: 'Rarity' },
           { key: 'tier', label: 'Account tier' },
+          { key: 'shelf', label: 'Shelf' },
           { key: 'discounted', label: 'On sale' },
           { key: 'purchases', label: 'Purchases', format: 'integer' },
           { key: 'users', label: 'Buyers', format: 'integer' },
@@ -139,6 +138,14 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
         rows: purchaseRows.map((row) => ({
           rarity: String(row._id.rarity),
           tier: row._id.tier === true ? 'Plus' : 'Free',
+          shelf:
+            row._id.shelf === 'everyday'
+              ? 'Everyday'
+              : row._id.shelf === 'special_plus'
+                ? 'Special (Plus slot)'
+                : row._id.shelf === 'special'
+                  ? 'Special'
+                  : '—',
           discounted: row._id.discounted === true ? 'Yes' : 'No',
           purchases: row.count,
           users: row.users,
@@ -190,7 +197,7 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
       {
         key: 'wardrobe.discovery',
         title: 'Discovery surfaces',
-        question: 'Do the shop rail, try-on, and looks actually move people to the shop?',
+        question: 'Do try-on, saved looks, rerolls and the wishlist actually move people to the shop?',
         columns: [
           { key: 'surface', label: 'Surface' },
           { key: 'events', label: 'Events', format: 'integer' },
@@ -198,12 +205,6 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
           { key: 'follow_through', label: 'Follow-through', format: 'percent' },
         ],
         rows: [
-          {
-            surface: 'Home shop rail',
-            events: shopRailViews.events,
-            users: shopRailViews.users,
-            follow_through: rate(shopRailTaps.events, shopRailViews.events),
-          },
           {
             surface: 'Try-on',
             events: context.events('tryon_shown'),
@@ -229,7 +230,7 @@ export async function buildWardrobe(context: ReportContext): Promise<StatSection
             follow_through: rate(wishlistReached.events, wishlistPins.events),
           },
         ],
-        note: 'Follow-through is the next step in each surface: rail tap, try-on kept, look applied, wishlist reached.',
+        note: 'Follow-through is the next step in each surface: try-on kept, look applied, purchase after a reroll, wishlist reached.',
       },
       {
         key: 'wardrobe.tryon',

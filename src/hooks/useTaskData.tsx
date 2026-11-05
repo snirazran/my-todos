@@ -1049,6 +1049,38 @@ export function useTaskData({
     [todayData, mutateToday],
   );
 
+  const adoptTaggedTasksLocally = useCallback(
+    (sectionId: string, tagIds: string[]) => {
+      if (tagIds.length === 0) return;
+      mutateToday(
+        (cur) => {
+          if (!cur) return cur;
+          const rules = new Map(
+            (cur.sections ?? []).map((sec) => [
+              sec.id,
+              sec.id === sectionId
+                ? tagIds
+                : (sec.tagIds ?? []).filter((id) => !tagIds.includes(id)),
+            ]),
+          );
+          return {
+            ...cur,
+            tasks: cur.tasks.map((task) => {
+              const tags = task.tags ?? [];
+              if (task.sectionId === sectionId) return task;
+              if (!tags.some((id) => tagIds.includes(id))) return task;
+              const own = task.sectionId ? rules.get(task.sectionId) : undefined;
+              if (own && own.some((id) => tags.includes(id))) return task;
+              return { ...task, sectionId };
+            }),
+          };
+        },
+        { revalidate: false },
+      );
+    },
+    [mutateToday],
+  );
+
   const createSection = useCallback(
     async (name: string, tagIds: string[] = []) => {
       const trimmed = name.trim();
@@ -1064,6 +1096,7 @@ export function useTaskData({
           tagIds,
         },
       ]);
+      adoptTaggedTasksLocally(id, tagIds);
       try {
         await fetch('/api/sections', {
           method: 'POST',
@@ -1071,18 +1104,24 @@ export function useTaskData({
           body: JSON.stringify({ id, name: trimmed, tagIds }),
         });
         mutate(SECTIONS_KEY);
+        if (tagIds.length > 0) mutateToday();
       } catch (e) {
         console.error('Create section failed', e);
         mutateToday();
       }
     },
-    [mutateSections, mutateToday],
+    [mutateSections, mutateToday, adoptTaggedTasksLocally],
   );
 
   const updateSection = useCallback(
     async (sectionId: string, patch: { name?: string; tagIds?: string[] }) => {
       const trimmed = patch.name?.trim();
       if (patch.name !== undefined && !trimmed) return;
+      const previousTagIds =
+        todayData?.sections?.find((s) => s.id === sectionId)?.tagIds ?? [];
+      const addedTagIds = (patch.tagIds ?? []).filter(
+        (id) => !previousTagIds.includes(id),
+      );
       mutateSections((cur) =>
         cur.map((s) =>
           s.id === sectionId
@@ -1094,6 +1133,7 @@ export function useTaskData({
             : s,
         ),
       );
+      adoptTaggedTasksLocally(sectionId, addedTagIds);
       try {
         await fetch('/api/sections', {
           method: 'PUT',
@@ -1105,12 +1145,13 @@ export function useTaskData({
           }),
         });
         mutate(SECTIONS_KEY);
+        if (addedTagIds.length > 0) mutateToday();
       } catch (e) {
         console.error('Update section failed', e);
         mutateToday();
       }
     },
-    [mutateSections, mutateToday],
+    [todayData, mutateSections, mutateToday, adoptTaggedTasksLocally],
   );
 
   const setSectionCollapsed = useCallback(

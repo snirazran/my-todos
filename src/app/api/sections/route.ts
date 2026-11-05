@@ -23,6 +23,33 @@ function parseTagIds(raw: unknown): string[] | null {
   return out;
 }
 
+async function adoptTaggedTasks(uid: string, sectionId: string, tagIds: string[]) {
+  if (tagIds.length === 0) return 0;
+  await TaskSectionModel.updateMany(
+    { userId: uid, id: { $ne: sectionId }, tagIds: { $in: tagIds } },
+    { $pull: { tagIds: { $in: tagIds } } },
+  );
+  const sections = await TaskSectionModel.find({ userId: uid }).select('id tagIds').lean();
+  const rules = new Map(sections.map((sec) => [sec.id, sec.tagIds ?? []]));
+  const candidates = await TaskModel.find({
+    userId: uid,
+    deletedAt: null,
+    tags: { $in: tagIds },
+    sectionId: { $ne: sectionId },
+  })
+    .select('_id tags sectionId')
+    .lean();
+  const ids = candidates
+    .filter((task) => {
+      const own = task.sectionId ? rules.get(task.sectionId) : undefined;
+      return !own || !own.some((id) => (task.tags ?? []).includes(id));
+    })
+    .map((task) => task._id);
+  if (ids.length === 0) return 0;
+  await TaskModel.updateMany({ _id: { $in: ids } }, { $set: { sectionId } });
+  return ids.length;
+}
+
 async function currentUserId() {
   try {
     return await requireUserId();
@@ -81,8 +108,9 @@ export async function POST(req: NextRequest) {
     collapsed: false,
     tagIds: parseTagIds(body?.tagIds) ?? [],
   });
+  const moved = await adoptTaggedTasks(uid, id, parseTagIds(body?.tagIds) ?? []);
   await notifyTaskChanged(uid);
-  return NextResponse.json({ ok: true, id });
+  return NextResponse.json({ ok: true, id, moved });
 }
 
 export async function PUT(req: NextRequest) {
@@ -124,6 +152,9 @@ export async function PUT(req: NextRequest) {
   }
   const tagIds = parseTagIds(body?.tagIds);
   if (tagIds) set.tagIds = tagIds;
+  const before = tagIds
+    ? await TaskSectionModel.findOne({ userId: uid, id: sectionId }).select('tagIds').lean()
+    : null;
   if (Object.keys(set).length === 0)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
@@ -133,8 +164,10 @@ export async function PUT(req: NextRequest) {
   );
   if (res.matchedCount === 0)
     return NextResponse.json({ error: 'Section not found' }, { status: 404 });
+  const added = tagIds ? tagIds.filter((id) => !(before?.tagIds ?? []).includes(id)) : [];
+  const moved = await adoptTaggedTasks(uid, sectionId, added);
   await notifyTaskChanged(uid);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, moved });
 }
 
 export async function DELETE(req: NextRequest) {
