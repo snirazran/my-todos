@@ -213,14 +213,14 @@ export function getShopRotation({
       .map(({ item }) => item);
 
   const specialTier = (item: ItemDef) => rarityRank[item.rarity] >= rarityRank.rare;
-  const special = eligible.filter(
-    (item) => specialTier(item) && !isEverydayItem(item, config),
-  );
+  const inSpecial = (item: ItemDef) => specialTier(item) && !isEverydayItem(item, config);
+  const special = eligible.filter(inSpecial);
   const borrowable = eligible.filter(
-    (item) => specialTier(item) && isEverydayItem(item, config),
+    (item) => rarityRank[item.rarity] >= rarityRank.uncommon && !inSpecial(item),
   );
 
-  const salePool = special.length > 0 ? special : borrowable;
+  const salePool =
+    [special, borrowable.filter(specialTier), borrowable].find((pool) => pool.length > 0) ?? [];
   const saleItem = ranked(salePool, `shop-sale:${dayKey}`)[0] ?? null;
 
   const queues = new Map<Rarity, ItemDef[]>();
