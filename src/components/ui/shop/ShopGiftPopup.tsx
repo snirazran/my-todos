@@ -6,15 +6,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Crown, Sparkles, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
-import {
-  patchInventoryFlies,
-  patchInventoryShopGiftClaimed,
-} from '@/hooks/useInventory';
+import { patchInventoryShopGiftClaimed } from '@/hooks/useInventory';
 import { hapticCelebrate, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { whenScreenIsFree } from '@/lib/popupGate';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { markFlyEarn } from '@/lib/flyEarn';
-import { flyFliesToCounter } from '@/lib/flyFlight';
+import { presentFlyReward } from '@/components/ui/questRewardReveal';
 import type { ShopGiftStatus } from '@/lib/economy/shopGift';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +39,8 @@ const REFUSALS: Record<string, Notice> = {
 };
 
 let dismissedDayKey: string | null = null;
+
+const CLOSE_AFTER_LAUNCH_MS = 1700;
 
 function hoursUntil(iso: string) {
   const ms = new Date(iso).getTime() - Date.now();
@@ -168,27 +166,14 @@ export function ShopGiftPopup({
       if (data.lucky) hapticCelebrate();
       else hapticSuccess();
 
-      const settle = () => {
-        markFlyEarn();
-        patchInventoryFlies(data.balance);
-      };
-      const finish = () => {
-        closeTimer.current = window.setTimeout(close, 1100);
-      };
       closeTimer.current = window.setTimeout(() => {
-        const from = medallionRef.current?.getBoundingClientRect();
-        if (!from) {
-          settle();
-          finish();
-          return;
-        }
         setFlewAway(true);
-        flyFliesToCounter({
-          from,
-          count: data.amount,
-          onFirstLand: settle,
-          onAllLanded: finish,
+        presentFlyReward({
+          amount: data.amount,
+          balanceAfter: data.balance,
+          source: medallionRef.current,
         });
+        closeTimer.current = window.setTimeout(close, CLOSE_AFTER_LAUNCH_MS);
       }, 650);
     } catch {
       setError("Couldn't collect, try again");

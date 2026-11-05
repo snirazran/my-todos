@@ -38,6 +38,7 @@ import TourSpotlight, {
 
 const RING_PADDING = 6;
 const BEAT_REACQUIRE_MS = 60_000;
+const LOST_ANCHOR_GRACE_MS = 450;
 const MISSED_PRESS_MS = 4000;
 /** Above this width a target is a row, and gets a tint rather than a halo. */
 const WIDE_TARGET = 200;
@@ -71,6 +72,20 @@ function radiusOf(node: HTMLElement) {
 /** A selected row already draws its own inset ring; a second one is noise. */
 function hasOwnHighlight(node: HTMLElement) {
   return node.getAttribute('aria-selected') === 'true';
+}
+
+function useStickyRect(rect: AnchorRect | null, key: string | null, holdMs: number) {
+  const [held, setHeld] = useState<{ key: string; rect: AnchorRect } | null>(null);
+  useEffect(() => {
+    if (rect && key) {
+      setHeld({ key, rect });
+      return;
+    }
+    const timer = window.setTimeout(() => setHeld(null), holdMs);
+    return () => window.clearTimeout(timer);
+  }, [rect, key, holdMs]);
+  if (rect) return rect;
+  return held && key && held.key === key ? held.rect : null;
 }
 
 function edgeFallback(from: AnchorRect, target: string): AnchorRect | null {
@@ -256,7 +271,7 @@ export default function PlannerTour({
   skipBeatRef.current = tour.skipBeat;
   const everAcquiredRef = useRef(false);
 
-  const { el, rect, settled } = useAnchorTracker({
+  const { el, rect: liveRect, settled } = useAnchorTracker({
     selector: running ? anchorSelector : null,
     resetKey: running && beat ? beat.id : null,
     coverCheck: beat?.coverCheck !== false,
@@ -266,6 +281,13 @@ export default function PlannerTour({
       if (!everAcquiredRef.current) skipBeatRef.current();
     },
   });
+
+  const rect = useStickyRect(liveRect, running && beat ? beat.id : null, LOST_ANCHOR_GRACE_MS);
+  const [readyBeat, setReadyBeat] = useState<string | null>(null);
+  useEffect(() => {
+    if (running && beat && liveRect && settled) setReadyBeat(beat.id);
+  }, [running, beat, liveRect, settled]);
+  const targetReady = running && !!beat && !!rect && readyBeat === beat.id;
 
   useEffect(() => {
     everAcquiredRef.current = false;
@@ -367,7 +389,7 @@ export default function PlannerTour({
       document
         .querySelectorAll('.tour-target')
         .forEach((node) => node.classList.remove('tour-target'));
-    if (!running || !anchorSelector || !settled) {
+    if (!targetReady || !anchorSelector) {
       clear();
       return;
     }
@@ -399,7 +421,7 @@ export default function PlannerTour({
       window.clearInterval(interval);
       clear();
     };
-  }, [running, settled, beat, el, anchorSelector]);
+  }, [targetReady, beat, el, anchorSelector]);
 
   const ghostTarget = useMemo(() => {
     if (!beat?.dragTo || !rect) return null;
@@ -455,9 +477,7 @@ export default function PlannerTour({
   if (phase === 'idle' || phase === 'done') return null;
 
   const label = desktop && beat?.labelDesktop ? beat.labelDesktop : beat?.label;
-  const showRing = running && !!rect && settled && !interacting;
-  const showGhost = showRing && !!beat?.dragTo && !!ghostTarget;
-  const showTap = showRing && !beat?.dragTo;
+  const showGhost = targetReady && !interacting && !!beat?.dragTo && !!ghostTarget;
   const allRects: TourTarget[] =
     beat?.multi && siblingRects.length > 0
       ? siblingRects
@@ -473,48 +493,40 @@ export default function PlannerTour({
   // One treatment per target, picked by its shape: rows get a tint (applied as
   // a class, see the .tour-target effect), buttons and pills get a halo that
   // matches their radius, and only a full panel gets an outline.
-  const eligible = showRing ? allRects.filter((r) => !r.selected) : [];
+  const eligible = targetReady ? allRects.filter((r) => !r.selected) : [];
   const pulseRects = eligible.filter(
     (r) =>
       Math.max(r.width, r.height) <= WIDE_TARGET &&
       Math.min(r.width, r.height) <= TAP_PULSE_MAX_EXTENT,
   );
-  const ringRects = eligible.filter(
-    (r) => Math.min(r.width, r.height) > TAP_PULSE_MAX_EXTENT,
-  );
+  const ringed = (r: TourTarget) =>
+    !r.selected && Math.min(r.width, r.height) > TAP_PULSE_MAX_EXTENT;
   const isCelebrating = phase === 'payoff';
   // The step's own target(s) only. A drag beat's destination stays under the
   // dim — the trail already points at it, and a second cutout out there reads
   // as a competing target.
-  const liveHoles: SpotlightHole[] = running
+  const liveHoles: SpotlightHole[] = targetReady
     ? [
-        ...allRects.map((r) => ({
+        ...allRects.map((r, i) => ({
+          key: `target-${i}`,
           top: r.top,
           left: r.left,
           width: r.width,
           height: r.height,
           radius: radiusValue(r.radius),
+          ring: ringed(r) ? (tour.softened ? ('soft' as const) : ('strong' as const)) : undefined,
         })),
-        ...(escapeRect ? [{ ...escapeRect, radius: 20 }] : []),
+        ...(escapeRect ? [{ key: 'escape', ...escapeRect, radius: 20 }] : []),
       ]
     : [];
   // A beat completes on pointerdown, so the cutout would otherwise move out
   // from under a finger that is still pressing — the release then lands on the
   // scrim and the browser drops the click entirely.
-  if (liveHoles.length > 0 && settled && !interacting) {
+  if (liveHoles.length > 0 && !interacting) {
     holesRef.current = liveHoles;
   }
   const frozen = interacting && holesRef.current.length > 0;
-  // Between two beats — the celebration, and the card seeding behind it — the
-  // dim closes over the whole board instead of holding the finished step's
-  // cutout open on a row that has already moved or gone.
-  const scrimHoles = !running
-    ? []
-    : frozen
-      ? holesRef.current
-      : settled
-        ? liveHoles
-        : [];
+  const hitHoles = !running ? [] : frozen ? holesRef.current : liveHoles;
   // Where the card was picked up from, so the keep-going arrows sit level with
   // it rather than at some fixed height the card has already left.
   const grabbedFrom = holesRef.current[0] ?? rect;
@@ -568,9 +580,10 @@ export default function PlannerTour({
         {showScrim && (
           <TourSpotlight
             key="scrim"
-            holes={phase === 'opener' ? [] : scrimHoles}
+            holes={phase === 'opener' ? [] : liveHoles}
+            hitHoles={phase === 'opener' ? [] : hitHoles}
             blocking={
-              running && !dragging && !interacting && scrimHoles.length > 0
+              running && !dragging && !interacting && hitHoles.length > 0
             }
             viewport={viewport}
             onBlockedPress={() => setNudge((n) => n + 1)}
@@ -645,7 +658,11 @@ export default function PlannerTour({
         )}
       </AnimatePresence>
 
-      {showGhost && rect && <GhostHand from={rect} to={ghostTarget} />}
+      <AnimatePresence>
+        {showGhost && rect && (
+          <GhostHand key={`ghost-${beat?.id}`} from={rect} to={ghostTarget} />
+        )}
+      </AnimatePresence>
 
       {showDragArrows && grabbedFrom && (
         <DragEdgeArrows
@@ -682,57 +699,43 @@ export default function PlannerTour({
         <TapPulse key={`pulse-${i}`} at={r} />
       ))}
 
-      {showRing && beat?.pointAt && rect && (
-        <PointerArrow at={rect} direction={beat.pointAt} />
-      )}
+      <AnimatePresence>
+        {targetReady && beat?.pointAt && rect && (
+          <PointerArrow key={`arrow-${beat.id}`} at={rect} direction={beat.pointAt} />
+        )}
+      </AnimatePresence>
 
-      {ringRects.map((r, i) => (
-        <div
-          key={`ring-${i}`}
-          aria-hidden
-          className="pointer-events-none fixed z-[2000] transition-[top,left,width,height] duration-200 ease-out"
-          style={{
-            top: r.top - RING_PADDING,
-            left: r.left - RING_PADDING,
-            width: r.width + RING_PADDING * 2,
-            height: r.height + RING_PADDING * 2,
-          }}
-        >
-          <span
-            className={`absolute inset-0 rounded-2xl ring-[3px] ${
-              tour.softened
-                ? 'ring-primary/45'
-                : 'ring-primary shadow-[0_0_18px_5px_hsl(var(--primary)/0.35)] dark:shadow-[0_0_22px_6px_hsl(var(--primary)/0.45)]'
-            }`}
-          />
-        </div>
-        ))}
-
-      {showCoachBar && (
-        <motion.div
-          animate={shake}
-          className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+176px)] z-[2002] flex justify-center px-4 md:bottom-[calc(env(safe-area-inset-bottom)+124px)]"
-        >
+      <AnimatePresence>
+        {showCoachBar && (
           <motion.div
-            layout
-            className="pointer-events-auto w-full max-w-sm rounded-2xl border border-primary/35 bg-card px-4 py-3 shadow-xl dark:border-primary/50 dark:shadow-[0_18px_44px_-16px_rgba(0,0,0,0.95)]"
+            key="coach"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+            className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+176px)] z-[2002] flex justify-center px-4 md:bottom-[calc(env(safe-area-inset-bottom)+124px)]"
           >
-            <div className="flex items-start">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.p
-                  key={coachKey}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                  className={`min-w-0 flex-1 text-[13.5px] font-bold leading-snug ${
-                    isCelebrating ? 'text-primary' : 'text-foreground'
-                  }`}
-                >
-                  {coachText}
-                </motion.p>
-              </AnimatePresence>
-            </div>
+            <motion.div
+              animate={shake}
+              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-primary/35 bg-card px-4 py-3 shadow-xl dark:border-primary/50 dark:shadow-[0_18px_44px_-16px_rgba(0,0,0,0.95)]"
+            >
+              <div className="grid min-h-[2.75em] items-center text-[13.5px] leading-snug">
+                <AnimatePresence initial={false}>
+                  <motion.p
+                    key={coachKey}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+                    style={{ gridArea: '1 / 1' }}
+                    className={`min-w-0 font-bold ${
+                      isCelebrating ? 'text-primary' : 'text-foreground'
+                    }`}
+                  >
+                    {coachText}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
             <div className="mt-2.5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
                 {Array.from({ length: TOUR_BEAT_COUNT }).map((_, i) => (
@@ -754,9 +757,10 @@ export default function PlannerTour({
                 Skip
               </button>
             </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
+        )}
+      </AnimatePresence>
     </>,
     document.body,
   );

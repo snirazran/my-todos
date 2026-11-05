@@ -396,7 +396,7 @@ export function PlusOfferButton({
       ? { ...gift, ink: gift.lip }
       : AD_OFFER_PALETTE[intent];
 
-  const subline = plus ? 'Free with Plus trial' : 'Watch a short ad';
+  const subline = plus ? 'With Plus' : 'Watch a short ad';
   const label = anchor
     ? `Get ${anchor.to} ${anchor.unit} instead of ${anchor.from}. ${subline}`
     : `${title ?? ''}. ${subline}`;
@@ -462,7 +462,12 @@ export function PlusOfferButton({
           )}
         </span>
 
-        <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
+        <span
+          className={cn(
+            'relative flex min-w-0 flex-1 flex-col leading-tight',
+            plus && 'items-center text-center',
+          )}
+        >
           {busy ? (
             <span className="truncate text-[21px] font-black tracking-tight">
               {busyLabel ?? 'Loading...'}
@@ -483,7 +488,7 @@ export function PlusOfferButton({
                 transition={{ duration: 0.35, ease: 'easeOut' }}
                 className={cn(
                   'origin-left text-[28px] font-black tabular-nums leading-none tracking-tight',
-                  plus && 'text-[#fde68a]',
+                  plus && 'origin-center text-[#fde68a]',
                 )}
               >
                 {shown}
@@ -493,12 +498,6 @@ export function PlusOfferButton({
           ) : (
             <span className="truncate whitespace-nowrap text-[21px] font-black tracking-tight">
               {title}
-            </span>
-          )}
-          {plus && (
-            <span className="mt-1 flex items-center gap-1 text-[12px] font-bold text-white/90">
-              <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
-              {subline}
             </span>
           )}
         </span>
@@ -569,7 +568,7 @@ export function BonusHeroButton({
 }) {
   const plus = mode === 'plus';
   const palette = plus ? AD_OFFER_PALETTE.plus : AD_OFFER_PALETTE.double;
-  const subline = plus ? 'Free with Plus trial' : 'Watch a short ad';
+  const subline = plus ? 'With Plus' : 'Watch a short ad';
   const spoken = parts?.length
     ? `: ${parts
         .map((part) =>
@@ -619,7 +618,12 @@ export function BonusHeroButton({
           </span>
         </span>
 
-        <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
+        <span
+          className={cn(
+            'relative flex min-w-0 flex-1 flex-col leading-tight',
+            plus && !parts?.length && 'items-center text-center',
+          )}
+        >
           <span className="truncate whitespace-nowrap text-[17px] font-black tracking-tight">
             {busy ? (busyLabel ?? 'Loading...') : title}
           </span>
@@ -639,11 +643,6 @@ export function BonusHeroButton({
                   +{part.amount}
                 </span>
               ))}
-            </span>
-          ) : plus ? (
-            <span className="mt-1 flex items-center gap-1 text-[12px] font-bold text-white/90">
-              <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
-              {subline}
             </span>
           ) : null}
         </span>
@@ -1038,7 +1037,7 @@ export const RewardCard = ({
     : claimChoice === 'wear'
       ? isBackgroundPrize
         ? `${prize.name} is your pond now`
-        : `Now wearing ${prize.name}`
+        : 'Now wearing it'
       : `${prize.name} is in your closet`;
   const choiceChip = (
     <p
@@ -1339,9 +1338,7 @@ export const RewardCard = ({
                     ariaLabel={`Reroll for another item. ${
                       reroll.mode === 'ad'
                         ? 'Watch a short ad'
-                        : reroll.mode === 'plus'
-                          ? 'Free with Plus trial'
-                          : 'Included with Plus'
+                        : 'With Plus'
                     }`}
                     busy={reroll.busy}
                     busyLabel={reroll.mode === 'ad' ? 'Loading...' : 'Rolling...'}

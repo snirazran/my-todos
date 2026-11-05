@@ -9,6 +9,7 @@ const DOT = 28;
 const HOLD_PILL =
   'whitespace-nowrap rounded-full bg-primary px-2 py-[3px] text-[10px] font-black uppercase tracking-wide text-primary-foreground shadow-lg shadow-primary/30';
 const HOLD_BOX = 160;
+const PATH_SNAP = 16;
 
 function centerOf(rect: AnchorRect) {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -29,8 +30,10 @@ export default function GhostHand({
 
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const bow = Math.min(56, Math.max(18, Math.hypot(dx, dy) * 0.18));
-  const midX = a.x + dx / 2 + (dy === 0 ? 0 : -dy / Math.hypot(dx, dy)) * bow;
+  const distance = Math.hypot(dx, dy);
+  const bow = Math.min(56, Math.max(18, distance * 0.18));
+  const bendX = dy === 0 || distance === 0 ? 0 : (-dy / distance) * bow;
+  const midX = a.x + dx / 2 + bendX;
   const midY = a.y + dy / 2 - bow;
 
   const half = DOT / 2;
@@ -39,20 +42,26 @@ export default function GhostHand({
     top: Math.max(8, a.y - 40),
     width: HOLD_BOX,
   };
-  // Looping keyframe arrays are captured when the animation starts, so a rect
-  // that moves afterwards leaves the fingertip running the old path until
-  // something remounts it. Keying on the geometry restarts it in place.
-  const pathKey = `${Math.round(a.x)},${Math.round(a.y)},${Math.round(
-    b.x,
-  )},${Math.round(b.y)}`;
+  const snap = (value: number) => Math.round(value / PATH_SNAP) * PATH_SNAP;
+  const relX = snap(dx);
+  const relY = snap(dy);
+  const relMidX = snap(dx / 2 + bendX);
+  const relMidY = snap(dy / 2 - bow);
+  const pathKey = `${relX},${relY}`;
+  const trail = `M ${a.x} ${a.y} Q ${midX} ${midY} ${b.x} ${b.y}`;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[2001]" aria-hidden>
+    <motion.div
+      className="pointer-events-none fixed inset-0 z-[2001]"
+      aria-hidden
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
       <svg className="absolute inset-0 h-full w-full" fill="none">
-        {/* Backing stroke: the trail runs across the tour's dim scrim, where a
-            single translucent green line all but disappears. */}
         <path
-          d={`M ${a.x} ${a.y} Q ${midX} ${midY} ${b.x} ${b.y}`}
+          d={trail}
           stroke="currentColor"
           className="text-white/70 dark:text-black/60"
           strokeWidth={7}
@@ -60,7 +69,7 @@ export default function GhostHand({
           strokeDasharray="2 10"
         />
         <path
-          d={`M ${a.x} ${a.y} Q ${midX} ${midY} ${b.x} ${b.y}`}
+          d={trail}
           stroke="currentColor"
           className="text-primary"
           strokeWidth={3.5}
@@ -75,87 +84,70 @@ export default function GhostHand({
             className="absolute rounded-full border-[3px] border-primary bg-primary/25"
             style={{ left: b.x - half, top: b.y - half, width: DOT, height: DOT }}
           />
-          <span
-            className="absolute flex justify-center"
-            style={holdStyle}
-          >
+          <span className="absolute flex justify-center" style={holdStyle}>
             <span className={HOLD_PILL}>Hold first</span>
           </span>
         </>
       ) : (
         <>
-        <div className="absolute flex justify-center" style={holdStyle}>
+          <div className="absolute flex justify-center" style={holdStyle}>
+            <motion.span
+              className={HOLD_PILL}
+              animate={{ opacity: [0, 1, 1, 0], scale: [0.82, 1, 1, 0.9] }}
+              transition={{
+                duration: CYCLE_S,
+                times: [0, 0.1, 0.32, 0.44],
+                ease: 'easeOut',
+                repeat: Infinity,
+                repeatDelay: 0.5,
+              }}
+            >
+              Hold first
+            </motion.span>
+          </div>
           <motion.span
-            key={`hold-${pathKey}`}
-            className={HOLD_PILL}
-            animate={{ opacity: [0, 1, 1, 0], scale: [0.82, 1, 1, 0.9] }}
+            className="absolute rounded-full border-2 border-primary"
+            style={{
+              left: a.x - half,
+              top: a.y - half,
+              width: DOT,
+              height: DOT,
+            }}
+            animate={{ scale: [0.6, 1.7, 1.7], opacity: [0, 0.8, 0] }}
             transition={{
               duration: CYCLE_S,
-              times: [0, 0.1, 0.32, 0.44],
+              times: [0, 0.26, 0.42],
               ease: 'easeOut',
               repeat: Infinity,
               repeatDelay: 0.5,
             }}
+          />
+          <span
+            className="absolute"
+            style={{ left: a.x - half, top: a.y - half, width: DOT, height: DOT }}
           >
-            Hold first
-          </motion.span>
-        </div>
-        <motion.span
-          key={`ripple-${pathKey}`}
-          className="absolute rounded-full border-2 border-primary"
-          style={{
-            left: a.x - half,
-            top: a.y - half,
-            width: DOT,
-            height: DOT,
-          }}
-          animate={{ scale: [0.6, 1.7, 1.7], opacity: [0, 0.8, 0] }}
-          transition={{
-            duration: CYCLE_S,
-            times: [0, 0.26, 0.42],
-            ease: 'easeOut',
-            repeat: Infinity,
-            repeatDelay: 0.5,
-          }}
-        />
-        <motion.span
-          key={`dot-${pathKey}`}
-          className="absolute rounded-full border-[3px] border-primary bg-primary/30 shadow-lg shadow-primary/30"
-          style={{ width: DOT, height: DOT }}
-          initial={false}
-          animate={{
-            left: [
-              a.x - half,
-              a.x - half,
-              a.x - half,
-              midX - half,
-              b.x - half,
-              b.x - half,
-              b.x - half,
-            ],
-            top: [
-              a.y - half,
-              a.y - half,
-              a.y - half,
-              midY - half,
-              b.y - half,
-              b.y - half,
-              b.y - half,
-            ],
-            scale: [0.6, 1, 0.82, 0.82, 0.82, 1.15, 0.6],
-            opacity: [0, 1, 1, 1, 1, 0.9, 0],
-          }}
-          transition={{
-            duration: CYCLE_S,
-            times: [0, 0.12, 0.3, 0.58, 0.76, 0.88, 1],
-            ease: 'easeInOut',
-            repeat: Infinity,
-            repeatDelay: 0.5,
-          }}
-        />
+            <motion.span
+              key={pathKey}
+              className="absolute inset-0 rounded-full border-[3px] border-primary bg-primary/30 shadow-lg shadow-primary/30"
+              initial={{ x: 0, y: 0, scale: 0.6, opacity: 0 }}
+              animate={{
+                x: [0, 0, 0, relMidX, relX, relX, relX],
+                y: [0, 0, 0, relMidY, relY, relY, relY],
+                scale: [0.6, 1, 0.82, 0.82, 0.82, 1.15, 0.6],
+                opacity: [0, 1, 1, 1, 1, 0.9, 0],
+              }}
+              transition={{
+                duration: CYCLE_S,
+                times: [0, 0.12, 0.3, 0.58, 0.76, 0.88, 1],
+                ease: 'easeInOut',
+                repeat: Infinity,
+                repeatDelay: 0.5,
+              }}
+            />
+          </span>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -175,7 +167,14 @@ export function PointerArrow({
   const Chevron = up ? ChevronUp : ChevronDown;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[2001]" aria-hidden>
+    <motion.div
+      className="pointer-events-none fixed inset-0 z-[2001]"
+      aria-hidden
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
       <motion.span
         className="absolute flex flex-col items-center"
         style={{
@@ -198,7 +197,7 @@ export function PointerArrow({
           />
         </span>
       </motion.span>
-    </div>
+    </motion.div>
   );
 }
 

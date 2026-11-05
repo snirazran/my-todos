@@ -16,6 +16,7 @@ type NudgeConfig = {
   minVisits: number;
   blocking: boolean;
   inline?: boolean;
+  flatCooldown?: boolean;
 };
 
 const NUDGES = {
@@ -35,11 +36,12 @@ const NUDGES = {
     blocking: true,
   },
   planner_calendar: {
-    maxImpressions: 3,
-    cooldownHours: 72,
-    suppressAfterDismissals: 2,
+    maxImpressions: Number.POSITIVE_INFINITY,
+    cooldownHours: 24 * 7,
+    suppressAfterDismissals: Number.POSITIVE_INFINITY,
     minVisits: 2,
     blocking: true,
+    flatCooldown: true,
   },
 } satisfies Record<string, NudgeConfig>;
 
@@ -91,7 +93,11 @@ function writeRecord(
 
 function readyAt(record: NudgeRecord, config: NudgeConfig) {
   if (!record.lastShownAt) return 0;
-  const backoff = config.inline ? Math.max(0, record.dismissals - 1) : record.dismissals;
+  const backoff = config.flatCooldown
+    ? 0
+    : config.inline
+      ? Math.max(0, record.dismissals - 1)
+      : record.dismissals;
   return record.lastShownAt + config.cooldownHours * 3 ** backoff * HOUR_MS;
 }
 
@@ -177,6 +183,7 @@ export function useNudge(
     if (record.suppressed) return false;
     if (record.dismissals >= config.suppressAfterDismissals) return false;
     if (record.impressions >= config.maxImpressions) return false;
+    if (record.dismissals > 0 && Date.now() < readyAt(record, config)) return false;
     if (sessionClaim && sessionClaim !== key) return false;
     whenAutoPopupsAllowed(
       () => {
