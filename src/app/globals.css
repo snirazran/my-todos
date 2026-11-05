@@ -1999,6 +1999,36 @@ body.dragging {
   .plus-upgrade-button { transition: none; }
 }
 
+@keyframes plus-cta-sway {
+  0%, 78%, 100% { transform: rotate(0deg); }
+  82% { transform: rotate(3deg); }
+  86% { transform: rotate(-3deg); }
+  90% { transform: rotate(1.5deg); }
+  94% { transform: rotate(-0.75deg); }
+}
+.plus-cta-sway {
+  display: inline-flex;
+  transform: rotate(0deg);
+  transform-origin: 50% 70%;
+  animation: plus-cta-sway 4.5s ease-in-out infinite;
+}
+
+@keyframes plus-cta-frog {
+  0%, 70%, 100% { transform: translateY(0) rotate(0deg); }
+  76% { transform: translateY(-4px) rotate(-8deg); }
+  82% { transform: translateY(0) rotate(4deg); }
+  88% { transform: translateY(-2px) rotate(-3deg); }
+}
+.plus-cta-frog {
+  transform-origin: 50% 90%;
+  animation: plus-cta-frog 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plus-cta-sway { animation: none; }
+  .plus-cta-frog { animation: none; }
+}
+
 .plus-sheet {
   --plus-field: #123a2a;
   --plus-field-deep: #0b271c;

@@ -21,6 +21,7 @@ export function FrogSnapshot({
   className = '',
   visualOffsetY,
   cachedOnly = false,
+  oversample = 1,
 }: {
   indices?: FrogStampIndices;
   width?: number | string;
@@ -29,6 +30,7 @@ export function FrogSnapshot({
   visualOffsetY?: number;
   /** During a sheet transition, use a saved frame and do no Rive work. */
   cachedOnly?: boolean;
+  oversample?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const indicesRef = useRef(indices);
@@ -49,7 +51,7 @@ export function FrogSnapshot({
       const boxWidth = canvas.offsetWidth;
       const boxHeight = canvas.offsetHeight;
       if (boxWidth === 0 || boxHeight === 0) return;
-      const dpr = riveDevicePixelRatio();
+      const dpr = riveDevicePixelRatio() * Math.max(1, oversample);
       const w = Math.max(1, Math.round(boxWidth * dpr));
       const h = Math.max(1, Math.round(boxHeight * dpr));
       if (canvas.width === w && canvas.height === h && cancelStamp) return;
@@ -71,7 +73,7 @@ export function FrogSnapshot({
       cancelStamp?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [indicesKey, cachedOnly]);
+  }, [indicesKey, cachedOnly, oversample]);
 
   return (
     <div

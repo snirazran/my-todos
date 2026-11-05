@@ -53,6 +53,7 @@ export const GiftRive = React.memo(
     eager = false,
     onReady,
     onOpenStart,
+    oversample = 1,
   }: {
     width?: number;
     height?: number;
@@ -69,6 +70,7 @@ export const GiftRive = React.memo(
     animation?: string;
     onReady?: () => void;
     onOpenStart?: () => void;
+    oversample?: number;
   }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const riveUrl = useRiveAsset('/idle_gift.riv');
@@ -162,7 +164,7 @@ export const GiftRive = React.memo(
       const resize = () => {
         const canvas = el.querySelector('canvas');
         if (!(canvas instanceof HTMLCanvasElement)) return;
-        const dpr = riveDevicePixelRatio();
+        const dpr = riveDevicePixelRatio() * Math.max(1, oversample);
         const width = Math.round(el.clientWidth * dpr);
         const height = Math.round(el.clientHeight * dpr);
         if (!width || !height) return;
@@ -180,7 +182,7 @@ export const GiftRive = React.memo(
         cancelAnimationFrame(raf);
         observer.disconnect();
       };
-    }, [rive]);
+    }, [rive, oversample]);
 
     const startOpenInput = useStateMachineInput(
       rive,

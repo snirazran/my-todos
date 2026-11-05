@@ -95,8 +95,8 @@ export const SEASON_PASS_DEFAULTS: SeasonPassConfig = {
   tierCount: 30,
   tasksPerStep: 3,
   stepsPerTier: 1,
-  maxStepsPerDay: 2,
-  tierSkipCost: 200,
+  maxStepsPerDay: 1,
+  tierSkipCost: 0,
   graceHours: 72,
   graceMode: 'climb',
 };
@@ -108,8 +108,8 @@ export const SEASON_PASS_LIMITS: Record<
   tierCount: { min: 1, max: 100 },
   tasksPerStep: { min: 1, max: 50 },
   stepsPerTier: { min: 1, max: 20 },
-  maxStepsPerDay: { min: 1, max: 20 },
-  tierSkipCost: { min: 0, max: 100_000 },
+  maxStepsPerDay: { min: 1, max: 1 },
+  tierSkipCost: { min: 0, max: 0 },
   graceHours: { min: 0, max: 720 },
 };
 

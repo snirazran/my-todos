@@ -196,6 +196,7 @@ interface FrogProps {
   holdArrival?: boolean;
   onArrived?: () => void;
   riveFile?: RiveFile | null;
+  oversample?: number;
 }
 
 const Frog = memo(
@@ -222,6 +223,7 @@ const Frog = memo(
       holdArrival = false,
       onArrived,
       riveFile,
+      oversample = 1,
     },
     ref,
   ) {
@@ -282,7 +284,7 @@ const Frog = memo(
       const resize = () => {
         const canvas = el.querySelector('canvas');
         if (!(canvas instanceof HTMLCanvasElement)) return;
-        const dpr = riveDevicePixelRatio();
+        const dpr = riveDevicePixelRatio() * Math.max(1, oversample);
         const width = Math.round(el.clientWidth * dpr);
         const height = Math.round(el.clientHeight * dpr);
         if (!width || !height) return;
@@ -300,7 +302,7 @@ const Frog = memo(
         cancelAnimationFrame(raf);
         observer.disconnect();
       };
-    }, [rive]);
+    }, [rive, oversample]);
 
     const viewModel = useViewModel(rive, { useDefault: true });
     const viewModelInstance = useViewModelInstance(viewModel, {

@@ -192,7 +192,7 @@ function PlannerColumnSkeleton({
         <div className="px-2 pb-2">
           {!isPast && (
             <div className="flex h-12 items-center gap-3 pl-3.5 pr-3 md:h-11 md:gap-2.5 md:pl-3">
-              <span className="h-7 w-7 shrink-0 rounded-full bg-primary/80 dark:bg-[#4a8a44]/80" />
+              <span className="h-7 w-7 shrink-0 rounded-full bg-foreground/[0.08] dark:bg-white/[0.1]" />
               <Skeleton className="h-4 w-24 rounded-full" />
             </div>
           )}

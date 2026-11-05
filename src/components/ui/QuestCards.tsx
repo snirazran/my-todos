@@ -821,7 +821,7 @@ function QuestPathNode({
   }
   if (state === 'ready') {
     return (
-      <span className={cn('grid place-items-center rounded-full bg-amber-500 text-white ring-4 ring-background', size)}>
+      <span className={cn('grid place-items-center rounded-full bg-[var(--season-accent,#f59e0b)] text-white ring-4 ring-background', size)}>
         {prize ? <Gift className="h-4 w-4" strokeWidth={2.75} /> : <Check className="h-3.5 w-3.5" strokeWidth={3.5} />}
       </span>
     );
@@ -835,7 +835,7 @@ function QuestPathNode({
   }
   if (prize) {
     return (
-      <span className={cn('grid place-items-center rounded-full border-[2.5px] border-amber-400/70 bg-amber-50 text-amber-500 ring-4 ring-background dark:bg-amber-500/10', size)}>
+      <span className={cn('grid place-items-center rounded-full border-[2.5px] border-[var(--season-fill,rgba(251,191,36,0.7))] bg-[var(--season-tint,#fffbeb)] text-[var(--season-accent,#f59e0b)] ring-4 ring-background dark:bg-[var(--season-soft,rgba(245,158,11,0.1))]', size)}>
         <Gift className="h-4 w-4" strokeWidth={2.75} />
       </span>
     );
@@ -1426,7 +1426,7 @@ function CleanSweepCard({
               type="button"
               onClick={onClaim}
               disabled={claiming}
-              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-amber-500 px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--season-accent,#f59e0b)] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_var(--season-accent-lip,#b45309)] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_var(--season-accent-lip,#b45309)] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               {claiming
                 ? 'Opening…'
@@ -1635,7 +1635,7 @@ export function MoveToWebCard({
               type="button"
               onClick={onClaim}
               disabled={claiming}
-              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-amber-500 px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[var(--season-accent,#f59e0b)] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_var(--season-accent-lip,#b45309)] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_var(--season-accent-lip,#b45309)] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               {claiming ? 'Claiming...' : 'Claim'}
             </button>
@@ -1801,7 +1801,7 @@ export function JourneyCard({
               </span>
             </span>
             {item.stepsAway > 0 && (
-              <span className="shrink-0 rounded-full bg-amber-500 px-2 py-1 text-[11px] font-black leading-none text-white shadow-[0_2px_0_0_#b45309]">
+              <span className="shrink-0 rounded-full bg-[var(--season-accent,#f59e0b)] px-2 py-1 text-[11px] font-black leading-none text-white shadow-[0_2px_0_0_var(--season-accent-lip,#b45309)]">
                 {item.stepsAway === 1 ? '1 step' : `${item.stepsAway} steps`}
               </span>
             )}
@@ -1993,7 +1993,7 @@ export function QuestObjectiveRow({
               QUEST_ROW_CARD,
               'pl-3 pr-3',
               done ? 'py-2' : 'py-3',
-              claimable && 'bg-amber-50 dark:bg-amber-500/10',
+              claimable && 'bg-[var(--season-tint,#fffbeb)] dark:bg-[var(--season-soft,rgba(245,158,11,0.1))]',
             )
           : cn('py-3 pl-3.5 pr-3', divider && 'border-t border-border/50'),
         dimmed && 'opacity-55',
@@ -2205,7 +2205,7 @@ function ObjectiveRow({
             onClick={onClaimObjective}
             disabled={claimingObjective}
             data-hint="claim-objective"
-            className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:px-4"
+            className="inline-flex h-9 items-center justify-center rounded-xl bg-[var(--season-accent,#f59e0b)] px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_var(--season-accent-lip,#b45309)] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_var(--season-accent-lip,#b45309)] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:px-4"
           >
             {claimingObjective ? 'Claiming...' : 'Claim'}
           </button>

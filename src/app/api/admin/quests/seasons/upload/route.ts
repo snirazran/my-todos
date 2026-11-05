@@ -6,6 +6,8 @@ import QuestSeasonModel, {
 } from '@/lib/models/QuestSeason';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
 import { optimizeImage } from '@/lib/imageOptimize';
+import { paletteFromImageBytes } from '@/lib/quests/seasonPaletteServer';
+import { SEASON_PALETTE_VERSION } from '@/lib/seasonPaletteCore';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -106,6 +108,13 @@ export async function POST(req: NextRequest) {
       });
       season.set(`images.${size}`, publicUrl);
       urls[size] = publicUrl;
+    }
+    if (targets.includes('mobile') || !season.get('palette')) {
+      const palette = await paletteFromImageBytes(rawBytes).catch(() => null);
+      if (palette) {
+        season.set('palette', palette);
+        season.set('paletteVersion', SEASON_PALETTE_VERSION);
+      }
     }
     await season.save();
 

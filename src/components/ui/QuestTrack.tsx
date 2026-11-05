@@ -266,9 +266,9 @@ export function QuestTrack({
               transitionDuration: `${fillPct >= 100 ? FILL_MS : STEP_MS}ms`,
             }}
           >
-            <span className="absolute inset-0 bg-gradient-to-b from-amber-300 to-amber-400" />
+            <span className="absolute inset-0 bg-gradient-to-b from-[var(--season-fill,#fcd34d)] to-[var(--season-fill-strong,#fbbf24)]" />
             <span
-              className={`absolute inset-0 bg-amber-500 transition-opacity duration-200 ${
+              className={`absolute inset-0 bg-[var(--season-fill-strong,#f59e0b)] transition-opacity duration-200 ${
                 charged ? 'opacity-100' : 'opacity-0'
               }`}
             />
@@ -276,7 +276,7 @@ export function QuestTrack({
             {large && (
               <span
                 aria-hidden="true"
-                className="absolute inset-0 flex items-center justify-center text-[11.5px] font-black tabular-nums text-amber-950/80 will-change-transform"
+                className="absolute inset-0 flex items-center justify-center text-[11.5px] font-black tabular-nums text-[var(--season-on-fill,rgba(69,26,3,0.8))] will-change-transform"
                 style={{
                   transform: `translate3d(${100 - fillPct}%, 0, 0)`,
                   transition: fillTransition,
@@ -319,10 +319,10 @@ export function QuestTrack({
               event.stopPropagation();
               if (action && !action.disabled) action.onPress();
             }}
-            className={`relative flex h-9 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-amber-500 shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:ring-offset-2 ${
+            className={`relative flex h-9 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-[var(--season-accent,#f59e0b)] shadow-[0_3px_0_0_var(--season-accent-lip,#b45309)] transition-[transform,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--season-accent,#f59e0b)] focus-visible:ring-offset-2 ${
               action?.disabled
                 ? 'opacity-60'
-                : 'hover:-translate-y-px hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none'
+                : 'hover:-translate-y-px hover:shadow-[0_4px_0_0_var(--season-accent-lip,#b45309)] active:translate-y-[2px] active:shadow-none'
             }`}
           >
             <span
@@ -337,7 +337,7 @@ export function QuestTrack({
       {!large && safeTarget > 1 && showBar && !hasAction && (
         <span
           className={`shrink-0 text-[11px] font-black tabular-nums transition-colors duration-200 ${
-            charged ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+            charged ? 'text-[var(--season-soft-text,#d97706)] dark:text-[var(--season-soft-text-dark,#fbbf24)]' : 'text-muted-foreground'
           }`}
         >
           {hasAction ? safeTarget : clamped}/{safeTarget}

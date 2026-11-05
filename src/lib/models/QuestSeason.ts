@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
+import type { SeasonPalette } from '@/lib/seasonPaletteCore';
 import type {
   QuestSeasonTierReward,
   SeasonSkinIds,
@@ -37,6 +38,8 @@ export interface QuestSeasonDoc {
   skinIds?: SeasonSkinIds;
   images: QuestSeasonImages;
   imageFiles?: QuestSeasonImageFiles;
+  palette?: SeasonPalette | null;
+  paletteVersion?: number;
   startsAt: Date;
   endsAt: Date;
   tierCount: number;
@@ -67,13 +70,15 @@ const QuestSeasonSchema = new Schema<QuestSeasonDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    palette: { type: Schema.Types.Mixed, default: undefined },
+    paletteVersion: { type: Number, default: undefined },
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     tierCount: { type: Number, default: 30 },
     tasksPerStep: { type: Number, default: 3 },
     stepsPerTier: { type: Number, default: 1 },
-    maxStepsPerDay: { type: Number, default: 2 },
-    tierSkipCost: { type: Number, default: 200 },
+    maxStepsPerDay: { type: Number, default: 1 },
+    tierSkipCost: { type: Number, default: 0 },
     graceHours: { type: Number, default: 72 },
     tierRewards: { type: [Schema.Types.Mixed], default: [] } as any,
     isActive: { type: Boolean, default: true, index: true },

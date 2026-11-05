@@ -8,6 +8,12 @@ import QuestSeasonTemplateModel, {
 } from '@/lib/models/QuestSeasonTemplate';
 import { getZonedToday } from '@/lib/utils';
 import {
+  SEASON_PALETTE_VERSION,
+  readSeasonPalette,
+  type SeasonPalette,
+} from '@/lib/seasonPaletteCore';
+import { ensureSeasonPalette } from '@/lib/quests/seasonPaletteServer';
+import {
   normalizeSeasonPassConfig,
   normalizeSeasonSkinIds,
   normalizeSeasonSkinPool,
@@ -42,6 +48,7 @@ export type QuestSeasonView = {
   id: string;
   name: string;
   images: QuestSeasonImages;
+  palette: SeasonPalette | null;
   startsAt: string;
   endsAt: string;
   graceEndsAt: string;
@@ -308,6 +315,10 @@ export function buildSeasonView(args: {
     id: season.seasonId,
     name: season.name,
     images: normalizeSeasonImages(season.images),
+    palette:
+      (season as { paletteVersion?: unknown }).paletteVersion === SEASON_PALETTE_VERSION
+        ? readSeasonPalette((season as { palette?: unknown }).palette)
+        : null,
     startsAt: season.startsAt.toISOString(),
     endsAt: season.endsAt.toISOString(),
     graceEndsAt: seasonGraceEndsAt(
@@ -380,6 +391,11 @@ export async function getQuestSeasonViews(args: {
     now,
     excludeSeasonId: season?.seasonId,
   });
+
+  await Promise.all([
+    ensureSeasonPalette(season),
+    ensureSeasonPalette(graceSeason?.season),
+  ]);
 
   let graceView: QuestSeasonView | null = null;
   if (graceSeason) {

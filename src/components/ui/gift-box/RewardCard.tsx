@@ -547,6 +547,14 @@ const BONUS_PART_ICON: Record<BonusPart['kind'], string> = {
   flies: '/widgets/Fly.svg',
 };
 
+const PLUS_HERO_PALETTE = {
+  top: '#fcd04d',
+  bottom: '#f4b72e',
+  lip: '#b7791f',
+  glow: 'rgba(251,191,36,0.55)',
+  ink: '#3d2905',
+} as const;
+
 export function BonusHeroButton({
   mode,
   visual,
@@ -567,7 +575,7 @@ export function BonusHeroButton({
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const plus = mode === 'plus';
-  const palette = plus ? AD_OFFER_PALETTE.plus : AD_OFFER_PALETTE.double;
+  const palette = plus ? PLUS_HERO_PALETTE : AD_OFFER_PALETTE.double;
   const subline = plus ? 'With Plus' : 'Watch a short ad';
   const spoken = parts?.length
     ? `: ${parts
@@ -586,7 +594,10 @@ export function BonusHeroButton({
       disabled={disabled || busy}
       aria-label={`${title}${spoken}. ${subline}`}
       data-busy={busy || undefined}
-      className="gift-open-btn group relative w-full min-w-0 pb-1.5 text-left text-white outline-none disabled:cursor-not-allowed disabled:opacity-70"
+      className={cn(
+        'gift-open-btn group relative w-full min-w-0 pb-1.5 text-left outline-none disabled:cursor-not-allowed disabled:opacity-70',
+        plus ? 'text-[#3d2905]' : 'text-white',
+      )}
       style={
         {
           '--gift-top': palette.top,
@@ -601,7 +612,7 @@ export function BonusHeroButton({
       <span
         className={cn(
           'gift-open-face ad-offer-face !gap-2.5',
-          plus && 'ring-1 ring-inset ring-[#fbbf24]/60',
+          plus && 'ring-1 ring-inset ring-white/40',
         )}
       >
         <span
@@ -647,23 +658,28 @@ export function BonusHeroButton({
           ) : null}
         </span>
 
-        <span
-          aria-hidden
-          className={cn(
-            'relative grid h-10 w-10 shrink-0 place-items-center rounded-full shadow-[inset_0_-3px_0_rgba(0,0,0,0.14),0_2px_5px_rgba(0,0,0,0.2)] [text-shadow:none]',
-            !busy && 'ad-offer-play',
-            plus ? 'bg-[#fbbf24] text-[#3b2708]' : 'bg-white',
-          )}
-          style={plus ? undefined : { color: palette.ink }}
-        >
-          {busy ? (
-            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
-          ) : plus ? (
-            <ChevronRight className="h-5 w-5" strokeWidth={3} />
-          ) : (
-            <Play className="ml-0.5 h-4 w-4" fill="currentColor" strokeWidth={0} />
-          )}
-        </span>
+        {plus && !busy ? (
+          <Icon
+            name="frogPlus"
+            className="plus-cta-frog relative -my-2 h-12 w-12 shrink-0 drop-shadow-[0_3px_0_rgba(120,80,10,0.35)]"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className={cn(
+              'relative grid h-10 w-10 shrink-0 place-items-center rounded-full shadow-[inset_0_-3px_0_rgba(0,0,0,0.14),0_2px_5px_rgba(0,0,0,0.2)] [text-shadow:none]',
+              !busy && 'ad-offer-play',
+              plus ? 'bg-white/60 text-[#3d2905]' : 'bg-white',
+            )}
+            style={plus ? undefined : { color: palette.ink }}
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
+            ) : (
+              <Play className="ml-0.5 h-4 w-4" fill="currentColor" strokeWidth={0} />
+            )}
+          </span>
+        )}
       </span>
       {!busy &&
         GIFT_SPARKLES.map((sparkle) => (
@@ -1313,6 +1329,7 @@ export const RewardCard = ({
             }
             disabled={isProcessing || !showContent}
             onClick={() => handleClaimClick()}
+            icon={false}
           />
         ) : reroll ? (
           <ActionStages

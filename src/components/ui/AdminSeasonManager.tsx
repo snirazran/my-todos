@@ -100,8 +100,6 @@ const NUMBER_FIELDS: Array<[keyof typeof SEASON_PASS_LIMITS, string, string]> = 
   ['tierCount', 'Tiers', 'Rungs on the ladder.'],
   ['tasksPerStep', 'Tasks per step', 'Completed tasks that earn one step.'],
   ['stepsPerTier', 'Steps per tier', 'Steps needed to climb one tier.'],
-  ['maxStepsPerDay', 'Steps per day', 'Daily ceiling, so one huge day can’t burn the pass.'],
-  ['tierSkipCost', 'Tier skip (flies)', 'Price of buying a tier. 0 turns it off.'],
   ['graceHours', 'Grace window (hours)', 'How long an unfinished pass stays open after the month.'],
 ];
 
@@ -673,11 +671,10 @@ export function AdminSeasonManager({
   const renderRules = () => {
     if (!rulesDraft) return null;
     const ladderSteps = rulesDraft.tierCount * rulesDraft.stepsPerTier;
-    const fastDays = Math.ceil(ladderSteps / rulesDraft.maxStepsPerDay);
     const graceDays = rulesDraft.graceMode === 'climb' ? Math.floor(rulesDraft.graceHours / 24) : 0;
     const shortest = 28 + graceDays;
-    const pacingTone =
-      fastDays > shortest ? 'red' : ladderSteps > shortest ? 'amber' : 'ok';
+    const spareDays = shortest - ladderSteps;
+    const pacingTone = spareDays < 0 ? 'red' : spareDays < 5 ? 'amber' : 'ok';
     const setNumber = (key: keyof typeof SEASON_PASS_LIMITS, raw: string) => {
       const { min, max } = SEASON_PASS_LIMITS[key];
       const value = Math.min(max, Math.max(min, Math.floor(Number(raw) || min)));
@@ -729,13 +726,11 @@ export function AdminSeasonManager({
                     : 'bg-muted/50 text-muted-foreground',
               )}
             >
-              A steady player (one step a day) needs {ladderSteps} days; maxing every day takes {fastDays}. The shortest month gives {shortest} days
+              One step a day, so the ladder takes {ladderSteps} days. The shortest month gives {shortest} days
               {graceDays > 0 ? ' with grace' : ''}.
               {pacingTone === 'red'
                 ? ' Nobody can finish in February.'
-                : pacingTone === 'amber'
-                  ? ' Only players who max some days will finish short months.'
-                  : ''}
+                : ` Players can miss ${spareDays} day${spareDays === 1 ? '' : 's'} in February and still finish.`}
             </p>
 
             <div className="grid gap-2">

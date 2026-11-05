@@ -1,7 +1,6 @@
 'use client';
 
 import React, {
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -318,7 +317,7 @@ const ColumnAddRow = React.memo(function ColumnAddRow({
       onClick={() => onAdd('')}
       className="group flex h-12 w-full items-center gap-3 rounded-[14px] pl-3.5 pr-3 text-left transition-[transform,background-color] duration-150 active:scale-[0.985] active:bg-foreground/[0.06] md:h-11 md:gap-2.5 md:pl-3 [@media(hover:hover)]:hover:bg-foreground/[0.05]"
     >
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-[filter] [@media(hover:hover)]:group-hover:brightness-105">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground/[0.08] text-muted-foreground transition-colors dark:bg-white/[0.1] [@media(hover:hover)]:group-hover:text-foreground">
         <Plus className="h-4 w-4" strokeWidth={3.5} />
       </span>
       <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-muted-foreground transition-colors group-hover:text-foreground md:text-[14px]">
@@ -1028,7 +1027,7 @@ export default function TaskBoard({
       const first = cols[0];
       const last = cols[cols.length - 1];
       if (first && last && !drag?.active) {
-        const lookahead = first.clientWidth * 3;
+        const lookahead = Math.max(first.clientWidth * 3, s.clientWidth);
         const rightGap =
           last.offsetLeft + last.clientWidth - (s.scrollLeft + s.clientWidth);
         const leftGap = s.scrollLeft - first.offsetLeft;
@@ -2527,29 +2526,70 @@ export default function TaskBoard({
     return h;
   };
 
-  const [renderCenterKey, setRenderCenterKey] = useState(activeDateKey);
+  const liveCap = isMobile ? 11 : 35;
+  const liveBufferCols = isMobile ? 1 : 2;
+  const [liveKeys, setLiveKeys] = useState<string[]>(() => {
+    const r = isMobile ? 2 : 7;
+    return windowDates.slice(Math.max(0, activeIdx - r), activeIdx + r + 1);
+  });
+  const liveSet = useMemo(() => new Set(liveKeys), [liveKeys]);
+  const revealVisibleColumns = useCallback(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+    const cols = s.querySelectorAll<HTMLElement>('[data-col="true"]');
+    if (!cols.length) return;
+    const pad = cols[0].clientWidth * liveBufferCols;
+    const left = s.scrollLeft - pad;
+    const right = s.scrollLeft + s.clientWidth + pad;
+    const seen: string[] = [];
+    cols.forEach((col) => {
+      const dk = col.dataset.dateKey;
+      if (dk && col.offsetLeft + col.clientWidth > left && col.offsetLeft < right)
+        seen.push(dk);
+    });
+    if (!seen.length) return;
+    setLiveKeys((prev) => {
+      if (seen.every((k) => prev.includes(k))) return prev;
+      const next = [...seen, ...prev.filter((k) => !seen.includes(k))];
+      return dragActiveRef.current ? next : next.slice(0, liveCap);
+    });
+  }, [scrollerRef, liveBufferCols, liveCap]);
+  React.useLayoutEffect(() => {
+    revealVisibleColumns();
+  }, [revealVisibleColumns, windowDates, activeDateKey]);
   useEffect(() => {
-    if (renderCenterKey === activeDateKey) return;
-    if (!windowDates.includes(renderCenterKey)) {
-      setRenderCenterKey(activeDateKey);
-      return;
-    }
-    let id = 0;
-    const promote = () => {
-      if (pagerBusyRef.current()) {
-        id = window.setTimeout(promote, 120);
+    const s = scrollerRef.current;
+    if (!s) return;
+    let frame = 0;
+    let retry = 0;
+    let lastLeft = s.scrollLeft;
+    const run = () => {
+      frame = 0;
+      const moved = Math.abs(s.scrollLeft - lastLeft);
+      lastLeft = s.scrollLeft;
+      const col = s.querySelector<HTMLElement>('[data-col="true"]');
+      if (col && moved > col.clientWidth * 0.6) {
+        window.clearTimeout(retry);
+        retry = window.setTimeout(schedule, 60);
         return;
       }
-      startTransition(() => setRenderCenterKey(activeDateKey));
+      revealVisibleColumns();
     };
-    id = window.setTimeout(promote, 140);
-    return () => window.clearTimeout(id);
-  }, [activeDateKey, renderCenterKey, windowDates]);
-  const renderCenterIdx = windowDates.indexOf(renderCenterKey);
-  const renderCenter = renderCenterIdx >= 0 ? renderCenterIdx : activeIdx;
-  const renderRadius = (isMobile ? 3 : 7) + (drag?.active ? 3 : 0);
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(run);
+    };
+    s.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.clearTimeout(retry);
+      s.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [scrollerRef, revealVisibleColumns]);
+  const baseRadius = isMobile ? 1 : 4;
   const isColumnLive = (i: number) =>
-    Math.abs(i - renderCenter) <= renderRadius;
+    Math.abs(i - activeIdx) <= baseRadius || liveSet.has(windowDates[i]);
 
   const goToToday = useCallback(() => {
     const i = windowDates.indexOf(todayKey);
