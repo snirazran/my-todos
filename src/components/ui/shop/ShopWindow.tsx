@@ -160,69 +160,22 @@ function RefreshButton({
       aria-label={label}
       className="group flex h-12 shrink-0 items-center transition-transform active:translate-y-0.5 disabled:opacity-70"
     >
-      <span className="flex h-7 items-center gap-1 rounded-full border border-amber-200 bg-gradient-to-b from-[#ffdf83] to-[#f3bd48] pl-3 pr-6 text-[12px] font-black uppercase leading-none tracking-[0.06em] text-[#49320f] shadow-[0_2px_0_#c58c31]">
-        {free ? (
-          'Free'
-        ) : (
-          <>
-            <AdPlayIcon className="h-3.5 w-3.5" strokeWidth={3} />
-            Ad
-          </>
-        )}
+      <span className="flex h-7 items-center gap-1 rounded-full bg-[#e4f3de] pl-3 pr-6 text-[12px] font-black uppercase leading-none tracking-[0.06em] text-[#2c511a] shadow-[0_2px_0_#9fcd92] ring-1 ring-[#bfe0b5] dark:bg-[#447d3f]/30 dark:text-[#c6ecb6] dark:shadow-[0_2px_0_rgba(0,0,0,0.35)] dark:ring-[#6cbb5f]/30">
+        {free ? 'Free' : <AdPlayIcon className="h-4 w-4" strokeWidth={2.75} />}
       </span>
-      <span className="relative -ml-4 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#fff4c9] to-[#fcd264] shadow-[0_3px_0_0_#c58c31] ring-[3px] ring-inset ring-[#f3bd48] group-active:shadow-[0_1px_0_0_#c58c31]">
+      <span className="relative -ml-4 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#5fa954] to-[#447d3f] shadow-[0_3px_0_0_#2c511a] ring-[3px] ring-inset ring-[#3a6e34] group-active:shadow-[0_1px_0_0_#2c511a]">
         <Icon
           name="repeat"
           className={cn('h-10 w-10', busy && 'animate-spin')}
           style={
             {
-              '--repeat-icon-grey': '#b06d0c',
-              '--repeat-icon-green': '#447d3f',
+              '--repeat-icon-grey': '#ffffff',
+              '--repeat-icon-green': '#c6ecb6',
             } as React.CSSProperties
           }
         />
       </span>
     </button>
-  );
-}
-
-function SpecialBanner({
-  countdown,
-  action,
-}: {
-  countdown: string | null;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="relative mb-3 flex min-h-[64px] items-center gap-3 overflow-hidden rounded-[20px] bg-gradient-to-b from-[#56984d] to-[#3d7437] py-2 pl-3 pr-2 shadow-[0_3px_0_0_#2c511a] ring-1 ring-inset ring-white/10">
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent"
-      />
-      <span aria-hidden className="relative block h-9 w-9 shrink-0">
-        <Sparkle
-          className="absolute bottom-0 left-0 h-[24px] w-[24px] fill-[#ffd54f] text-[#f3bd48]"
-          strokeWidth={2}
-        />
-        <Sparkle
-          className="absolute right-0.5 top-0 h-[15px] w-[15px] fill-[#ffe58a] text-[#f3bd48]"
-          strokeWidth={2.25}
-        />
-        <Sparkle
-          className="absolute bottom-1 right-0 h-[10px] w-[10px] fill-[#ffe58a] text-[#f3bd48]"
-          strokeWidth={2.5}
-        />
-      </span>
-      <span className="relative min-w-0 flex-1">
-        <span className="block truncate text-[18px] font-black leading-tight tracking-tight text-white">
-          Special collection
-        </span>
-        <span className="mt-0.5 block truncate text-[12.5px] font-bold tabular-nums text-white/80">
-          {countdown ? `Items refresh in ${countdown}` : 'New items every day'}
-        </span>
-      </span>
-      {action ? <span className="relative">{action}</span> : null}
-    </div>
   );
 }
 
@@ -548,8 +501,35 @@ export function ShopWindow({
             data-hint="shop-deals"
             className="-mx-1.5 rounded-[28px] bg-[#fff8e3] p-2.5 pb-3 ring-1 ring-[#f6e3ae] dark:bg-amber-400/[0.06] dark:ring-amber-300/15"
           >
-            <SpecialBanner
-              countdown={countdown}
+            <SectionHeader
+              icon={
+                <span className="relative block h-8 w-8">
+                  <Sparkle
+                    className="absolute bottom-0 left-0 h-[22px] w-[22px] fill-amber-400 text-amber-500"
+                    strokeWidth={2.25}
+                  />
+                  <Sparkle
+                    className="absolute right-0 top-0 h-[14px] w-[14px] fill-amber-300 text-amber-500"
+                    strokeWidth={2.5}
+                  />
+                  <Sparkle
+                    className="absolute bottom-0.5 right-0 h-[10px] w-[10px] fill-amber-300 text-amber-500"
+                    strokeWidth={2.75}
+                  />
+                </span>
+              }
+              tone="gold"
+              title="Special collection"
+              sub={
+                countdown ? (
+                  <>
+                    <Icon name="clock" className="-my-1 h-[22px] w-[22px] shrink-0" />
+                    New in {countdown}
+                  </>
+                ) : (
+                  'New items every day'
+                )
+              }
               action={
                 !isGuest && rerollsLeft > 0 && special.length > 0 ? (
                   <RefreshButton
