@@ -94,6 +94,17 @@ export type QuestCardLogicBlock = Pick<
   | 'sessionMinutes'
   | 'requiresFollowThrough'
   | 'beforeHour'
+  | 'seasonId'
+  | 'seasonTier'
+  | 'seasonRewards'
+  | 'seasonReady'
+  | 'seasonClaimed'
+  | 'promptId'
+  | 'promptKind'
+  | 'promptQuestion'
+  | 'promptPlaceholder'
+  | 'promptOptions'
+  | 'promptAnswered'
 > & {
   targetLabel?: string;
   previewTagLabel?: string;
@@ -318,6 +329,14 @@ export function questLoot(quest: {
 export function formatQuestObjective(block: QuestCardLogicBlock) {
   const targetLabel =
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
+
+  if (block.type === 'season_step') {
+    return block.seasonTier ? `Climb to Tier ${block.seasonTier}` : 'Climb the season';
+  }
+
+  if (block.type === 'prompt') {
+    return block.promptQuestion ?? 'Answer today’s question';
+  }
 
   if (block.type === 'metric_count') {
     return metricObjectiveLabel(block.metricKey, Math.max(1, block.target ?? 1));
@@ -630,6 +649,23 @@ export type DailySweepInfo = {
   megaRewards: SweepRewardInfo[];
 };
 
+export function dailyRowState(
+  block: QuestCardLogicBlock,
+  claimed: boolean,
+): QuestPathNodeState {
+  const complete = block.progress >= Math.max(1, block.target);
+  if (block.type === 'season_step') {
+    if (block.seasonClaimed) return 'done';
+    if (block.seasonReady) return 'ready';
+    return complete ? 'done' : 'open';
+  }
+  if (block.type === 'prompt') {
+    return claimed || block.promptAnswered ? 'done' : 'open';
+  }
+  const hasRewards = (block.rewards?.length ?? 0) > 0;
+  return claimed || (complete && !hasRewards) ? 'done' : complete ? 'ready' : 'open';
+}
+
 export function DailyChecklistCard({
   quests,
   rewardCatalog,
@@ -643,6 +679,9 @@ export function DailyChecklistCard({
   swapsLeft = 0,
   swapping = false,
   onSwapQuests,
+  claimingSeason = false,
+  onClaimSeasonStep,
+  onAnswerPrompt,
 }: Omit<BaseCardProps, 'onClaimObjective'> & {
   quests: Array<QuestCardData & { placement: 'daily' }>;
   onClaimObjective?: (questId: string, objectiveId: string) => void;
@@ -652,17 +691,16 @@ export function DailyChecklistCard({
   swapsLeft?: number;
   swapping?: boolean;
   onSwapQuests?: () => void;
+  claimingSeason?: boolean;
+  onClaimSeasonStep?: (seasonId: string, tier: number) => void;
+  onAnswerPrompt?: (questId: string, block: QuestCardLogicBlock) => void;
 }) {
   const timeLeft = useTimeLeft();
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
   const rows = quests.flatMap((quest) =>
     quest.logic.map((block) => {
       const claimed = (quest.claimedObjectiveIds ?? []).includes(block.id);
-      const complete = block.progress >= Math.max(1, block.target);
-      const hasRewards = (block.rewards?.length ?? 0) > 0;
-      const state: QuestPathNodeState =
-        claimed || (complete && !hasRewards) ? 'done' : complete ? 'ready' : 'open';
-      return { quest, block, claimed, state };
+      return { quest, block, claimed, state: dailyRowState(block, claimed) };
     }),
   );
   const allDone = rows.every((row) => row.state === 'done');
@@ -676,17 +714,42 @@ export function DailyChecklistCard({
         block={row.block}
         card
         claimed={row.claimed}
-        claiming={claimingObjectiveId === row.block.id}
+        claiming={
+          row.block.type === 'season_step'
+            ? claimingSeason
+            : claimingObjectiveId === row.block.id
+        }
         isPremium={isPremium}
         rewardCatalog={rewardCatalog}
         onOpenRewards={(rewards) =>
-          setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
+          setRewardPopup({
+            eyebrow: row.block.type === 'season_step' ? 'Season' : 'Quest',
+            title: row.block.type === 'season_step' && row.block.seasonTier
+              ? `Tier ${row.block.seasonTier} rewards`
+              : 'Rewards',
+            rewards,
+          })
         }
         onClaim={
-          onClaimObjective
-            ? () => onClaimObjective(row.quest.id, row.block.id)
+          row.block.type === 'season_step'
+            ? onClaimSeasonStep && row.block.seasonId && row.block.seasonTier
+              ? () => onClaimSeasonStep(row.block.seasonId!, row.block.seasonTier!)
+              : undefined
+            : onClaimObjective
+              ? () => onClaimObjective(row.quest.id, row.block.id)
+              : undefined
+        }
+        onAnswer={
+          row.block.type === 'prompt' && onAnswerPrompt
+            ? () => onAnswerPrompt(row.quest.id, row.block)
             : undefined
         }
+        onSwap={
+          row.block.type === 'prompt' && onSwapQuests && swapsLeft > 0
+            ? onSwapQuests
+            : undefined
+        }
+        swapping={swapping}
       />
     ),
   }));
@@ -719,20 +782,6 @@ export function DailyChecklistCard({
         count={allDone ? 'All done' : openCount > 0 ? `${openCount} left` : undefined}
         right={
           <>
-            {onSwapQuests && swapsLeft > 0 && !allDone ? (
-              <button
-                type="button"
-                onClick={onSwapQuests}
-                disabled={swapping}
-                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-black text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Shuffle
-                  className={cn('h-3.5 w-3.5 shrink-0', swapping && 'animate-pulse')}
-                  strokeWidth={2.75}
-                />
-                {swapping ? 'Swapping' : 'Swap'}
-              </button>
-            ) : null}
             {timeLeft ? (
               <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap pr-1 text-[12px] font-black tabular-nums text-muted-foreground">
                 <RotateCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
@@ -1958,6 +2007,9 @@ export function QuestObjectiveRow({
   rewardCatalog,
   onOpenRewards,
   onClaim,
+  onAnswer,
+  onSwap,
+  swapping = false,
   card = false,
   divider = true,
   dimmed = false,
@@ -1970,6 +2022,9 @@ export function QuestObjectiveRow({
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   onOpenRewards?: (rewards: QuestReward[]) => void;
   onClaim?: () => void;
+  onAnswer?: () => void;
+  onSwap?: () => void;
+  swapping?: boolean;
   card?: boolean;
   divider?: boolean;
   dimmed?: boolean;
@@ -1978,10 +2033,16 @@ export function QuestObjectiveRow({
   const startHintGuide = useUIStore((state) => state.startHintGuide);
   const safeTarget = Math.max(1, block.target);
   const complete = block.progress >= safeTarget;
-  const hasRewards = (block.rewards?.length ?? 0) > 0;
-  const claimable = hasRewards && complete && !claimed;
-  const done = claimed || (complete && !hasRewards);
-  const rewards = hasRewards ? sortStreakPrizes(block.rewards!, rewardCatalog) : [];
+  const isSeason = block.type === 'season_step';
+  const isPrompt = block.type === 'prompt';
+  const shownRewardList = isSeason ? block.seasonRewards ?? [] : block.rewards ?? [];
+  const hasRewards = shownRewardList.length > 0;
+  const rowState = dailyRowState(block, claimed);
+  const claimable = rowState === 'ready';
+  const done = rowState === 'done';
+  const rewards = hasRewards ? sortStreakPrizes(shownRewardList, rewardCatalog) : [];
+  const communityPrompt =
+    block.promptKind === 'poll' || block.promptKind === 'this_or_that';
 
   return (
     <div
@@ -2012,7 +2073,7 @@ export function QuestObjectiveRow({
         <QuestRewardTileBadge
           rewards={rewards}
           catalog={rewardCatalog as never}
-          isPremium={isPremium}
+          isPremium={isSeason ? false : isPremium}
           small={!card}
         />
       </button>
@@ -2031,11 +2092,18 @@ export function QuestObjectiveRow({
               <Check className="h-2.5 w-2.5" strokeWidth={4} />
             </span>
           )}
-          <span className={card ? 'line-clamp-2' : 'min-w-0 truncate'}>
-            {formatQuestObjective(block)}
+          <span className={cn('flex min-w-0 flex-col', card ? '' : 'truncate')}>
+            {isPrompt && (
+              <span className="mb-0.5 text-[11px] font-black uppercase tracking-[0.1em] text-primary no-underline">
+                Frog asks
+              </span>
+            )}
+            <span className={card ? 'line-clamp-2' : 'min-w-0 truncate'}>
+              {formatQuestObjective(block)}
+            </span>
           </span>
         </span>
-        {!done && (
+        {!done && !isPrompt && (
           <QuestTrack
             progress={block.progress}
             target={block.target}
@@ -2052,13 +2120,46 @@ export function QuestObjectiveRow({
           />
         )}
       </div>
-      {!done && !claimable && !dimmed && (
+      {isPrompt && !dimmed ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          {!done && onSwap && (
+            <button
+              type="button"
+              onClick={onSwap}
+              disabled={swapping}
+              aria-label="Ask me something else"
+              title="Ask me something else"
+              className="grid h-11 w-10 place-items-center rounded-[14px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              <Shuffle className={cn('h-4 w-4', swapping && 'animate-pulse')} strokeWidth={2.75} />
+            </button>
+          )}
+          {!done ? (
+            <button
+              type="button"
+              onClick={onAnswer}
+              disabled={!onAnswer}
+              className="h-11 shrink-0 rounded-[14px] bg-primary px-4 text-[14px] font-black text-primary-foreground shadow-[0_3px_0_hsl(var(--primary)/0.55)] transition-transform active:translate-y-[3px] active:shadow-none"
+            >
+              Answer
+            </button>
+          ) : communityPrompt && onAnswer ? (
+            <button
+              type="button"
+              onClick={onAnswer}
+              className="h-9 shrink-0 rounded-[12px] bg-muted px-3 text-[13px] font-black text-foreground/70 transition-colors hover:text-foreground"
+            >
+              Results
+            </button>
+          ) : null}
+        </div>
+      ) : !done && !claimable && !dimmed && !isSeason ? (
         <QuestGoButton
           onPress={() =>
             startHintGuide(guideIdForBlock(block), guideContextForBlock(block))
           }
         />
-      )}
+      ) : null}
     </div>
   );
 }

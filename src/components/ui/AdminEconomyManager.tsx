@@ -1,577 +1,289 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Coins, Loader2, RotateCcw, Save } from 'lucide-react';
+import { ArrowRight, Coins } from 'lucide-react';
+import {
+  AdminCard,
+  AdminPage,
+  ConfigShell,
+  Field,
+  FieldGrid,
+  NumberInput,
+  ResetLink,
+  SaveBar,
+  ToggleRow,
+} from '@/components/admin/kit';
+import { GiftPicker } from '@/components/admin/pickers';
+import { useEconomy } from '@/components/admin/useEconomy';
+import { sourceLabel } from '@/components/admin/economy/labels';
+import { FLY_ECONOMY_DEFAULTS } from '@/lib/economy/defaults';
+import { SHOP_GIFT_MAX_FLIES } from '@/lib/economy/shopGift';
 import { cn } from '@/lib/utils';
-import {
-  FLY_ECONOMY_DEFAULTS,
-  type FlyEconomyConfig,
-} from '@/lib/economy/defaults';
-import {
-  SHOP_GIFT_FIRST_FLIES,
-  SHOP_GIFT_FLOOR_FROM_BALANCE,
-  SHOP_GIFT_FULL_BELOW_BALANCE,
-  SHOP_GIFT_MAX_FLIES,
-  SHOP_GIFT_MIN_FLIES,
-} from '@/lib/economy/shopGift';
 
-type LedgerSummary = {
-  from: string;
-  to: string;
-  sources: { source: string; granted: number; spent: number; users: number }[];
-};
-
-const inputClass =
-  'h-9 w-full rounded-lg border border-border/60 bg-background px-2.5 text-sm font-medium text-foreground outline-none focus:border-primary';
-
-function NumberField({
-  label,
-  hint,
-  value,
-  suffix,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: number;
-  suffix?: string;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-bold text-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className={inputClass}
-        />
-        {suffix && (
-          <span className="whitespace-nowrap text-xs font-black text-muted-foreground">
-            {suffix}
-          </span>
-        )}
-      </div>
-      {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-function TextField({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-bold text-foreground">{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={inputClass}
-      />
-      {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-function ToggleField({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: boolean;
-  onChange: (next: boolean) => void;
-}) {
-  return (
-    <label className="flex items-start gap-3 rounded-xl border border-border/40 bg-card/60 p-3">
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4"
-      />
-      <span className="min-w-0">
-        <span className="block text-xs font-bold text-foreground">{label}</span>
-        {hint && (
-          <span className="block text-[11px] text-muted-foreground">{hint}</span>
-        )}
-      </span>
-    </label>
-  );
-}
-
-function Group({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
-      <h2 className="text-base font-black tracking-tight text-foreground">
-        {title}
-      </h2>
-      <p className="mb-4 text-sm text-muted-foreground">{subtitle}</p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {children}
-      </div>
-    </section>
-  );
-}
+const SEGMENT_COLORS = ['bg-primary', 'bg-sky-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500'];
 
 export function AdminEconomyManager() {
-  const [config, setConfig] = useState<FlyEconomyConfig | null>(null);
-  const [ledger, setLedger] = useState<LedgerSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const economy = useEconomy({ ledger: true });
+  const config = economy.config;
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch('/api/admin/economy', {
-          credentials: 'include',
-        });
-        const payload = await res.json();
-        if (res.ok) {
-          setConfig(payload.economy);
-          setLedger(payload.ledger ?? null);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const patch = <K extends keyof FlyEconomyConfig>(
-    group: K,
-    next: Partial<FlyEconomyConfig[K]>,
-  ) =>
-    setConfig((prev) =>
-      prev ? { ...prev, [group]: { ...prev[group], ...next } } : prev,
-    );
-
-  const save = async () => {
-    if (!config) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch('/api/admin/economy', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ economy: config }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Could not save');
-      setConfig(payload.economy);
-      setLedger(payload.ledger ?? null);
-      setMessage({ type: 'success', text: 'Saved' });
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Could not save',
-      });
-    } finally {
-      setSaving(false);
-      setTimeout(() => setMessage(null), 3500);
-    }
-  };
-
-  const dailyCeiling = useMemo(() => {
-    if (!config) return 0;
-    return (
-      Math.max(config.taskIncome.dailyCapFree, config.taskIncome.dailyCapPlus) +
-      config.buddy.bonusFlies * config.buddy.dailyPayouts +
-      Math.max(config.friendsPond.dailyCapFree, config.friendsPond.dailyCapPlus) +
-      config.rewardedAds.dailyCap * config.rewardedAds.reward +
-      (config.shopGift.enabled
-        ? SHOP_GIFT_MAX_FLIES *
-          config.shopGift.luckyMultiplier *
-          config.shopGift.plusMultiplier
-        : 0)
-    );
+  const segments = useMemo(() => {
+    if (!config) return [];
+    return [
+      {
+        label: 'Tasks',
+        value: Math.max(config.taskIncome.dailyCapFree, config.taskIncome.dailyCapPlus),
+        href: '/admin/economy',
+      },
+      {
+        label: 'Buddy tasks',
+        value: config.buddy.bonusFlies * config.buddy.dailyPayouts,
+        href: '/admin/modifiers?view=social',
+      },
+      {
+        label: "Friends' pond",
+        value: Math.max(config.friendsPond.dailyCapFree, config.friendsPond.dailyCapPlus),
+        href: '/admin/modifiers?view=social',
+      },
+      {
+        label: 'Ads',
+        value: config.rewardedAds.dailyCap * config.rewardedAds.reward,
+        href: '/admin/ads',
+      },
+      {
+        label: 'Shop gift',
+        value: config.shopGift.enabled
+          ? SHOP_GIFT_MAX_FLIES * config.shopGift.luckyMultiplier * config.shopGift.plusMultiplier
+          : 0,
+        href: '/admin/modifiers?view=shop',
+      },
+    ];
   }, [config]);
 
+  const ceiling = segments.reduce((sum, segment) => sum + segment.value, 0);
+  const breaker = config?.circuitBreaker.dailyCap ?? 0;
+  const scale = Math.max(ceiling, breaker, 1);
+  const earned = (economy.ledger?.sources ?? []).filter((row) => row.granted > 0).sort((a, b) => b.granted - a.granted);
+  const spent = (economy.ledger?.sources ?? []).reduce((sum, row) => sum + row.spent, 0);
+  const ledgerMax = Math.max(1, ...earned.map((row) => row.granted));
+
   return (
-    <div className="min-h-screen bg-background p-6 md:p-12">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/admin"
-              className="rounded-full bg-muted p-2 text-muted-foreground transition-colors hover:text-foreground"
+    <AdminPage
+      title="Fly budget"
+      subtitle="How many flies a day can pay, where the extras go, and the safety nets behind it."
+      icon={<Coins />}
+      actions={<ResetLink onClick={() => economy.set(() => FLY_ECONOMY_DEFAULTS)}>Load defaults</ResetLink>}
+    >
+      <ConfigShell loading={economy.loading} error={economy.error}>
+        {config ? (
+          <div className="space-y-5">
+            <AdminCard
+              title={`A maxed-out day pays up to ${ceiling} flies`}
+              subtitle={`Every faucet at full tilt for a Plus player. The circuit breaker stops everything at ${breaker}.`}
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Link>
-            <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-600 dark:text-emerald-400">
-              <Coins className="h-7 w-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight md:text-3xl">
-                Fly economy
-              </h1>
-              <p className="text-sm font-medium text-muted-foreground">
-                Every cap and guard that decides how many flies a day can pay.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setConfig(FLY_ECONOMY_DEFAULTS)}
-              disabled={!config}
-              className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm font-black text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Defaults
-            </button>
-            <button
-              onClick={save}
-              disabled={saving || !config}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Save
-            </button>
-          </div>
-        </div>
-
-        {message && (
-          <div
-            className={cn(
-              'rounded-xl px-4 py-3 text-sm font-bold',
-              message.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'bg-red-500/10 text-red-600 dark:text-red-400',
-            )}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading
-          </div>
-        )}
-
-        {config && (
-          <>
-            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4 text-sm">
-              <span className="font-black text-foreground">
-                Theoretical daily ceiling: {dailyCeiling} flies
-              </span>
-              <span className="block text-muted-foreground">
-                Task income, buddy bonuses, the friends&apos; pond and rewarded
-                ads at full tilt. The circuit breaker stops everything at{' '}
-                {config.circuitBreaker.dailyCap}.
-              </span>
-            </div>
-
-            <Group
-              title="Task income"
-              subtitle="The real wall: base completions, streak uplift and checklist markers all draw from one budget."
-            >
-              <NumberField
-                label="Daily cap — free"
-                suffix="flies"
-                value={config.taskIncome.dailyCapFree}
-                onChange={(dailyCapFree) => patch('taskIncome', { dailyCapFree })}
-              />
-              <NumberField
-                label="Daily cap — Plus"
-                suffix="flies"
-                value={config.taskIncome.dailyCapPlus}
-                onChange={(dailyCapPlus) => patch('taskIncome', { dailyCapPlus })}
-              />
-              <NumberField
-                label="Paying completions"
-                suffix="per day"
-                hint="Completions past this earn pebbles instead of flies."
-                value={config.taskIncome.payingCompletionsPerDay}
-                onChange={(payingCompletionsPerDay) =>
-                  patch('taskIncome', { payingCompletionsPerDay })
-                }
-              />
-              <NumberField
-                label="Backdating grace"
-                suffix="hours"
-                hint="Older occurrences complete normally but pay nothing."
-                value={config.taskIncome.backdateGraceHours}
-                onChange={(backdateGraceHours) =>
-                  patch('taskIncome', { backdateGraceHours })
-                }
-              />
-              <NumberField
-                label="Milestone payouts"
-                suffix="per day"
-                hint="Across all tasks; extras queue to tomorrow. Edit the milestones themselves in Modifiers → Task streak."
-                value={config.taskStreak.milestonesPerDay}
-                onChange={(milestonesPerDay) =>
-                  patch('taskStreak', { milestonesPerDay })
-                }
-              />
-            </Group>
-
-            <Group
-              title="Overflow jar"
-              subtitle="Where a productive day's extra completions go once the flies stop."
-            >
-              <ToggleField
-                label="Jar enabled"
-                hint="Off means completions past the allowance pay nothing at all."
-                value={config.overflowJar.enabled}
-                onChange={(enabled) => patch('overflowJar', { enabled })}
-              />
-              <NumberField
-                label="Pebbles per completion"
-                value={config.overflowJar.pebblesPerCompletion}
-                onChange={(pebblesPerCompletion) =>
-                  patch('overflowJar', { pebblesPerCompletion })
-                }
-              />
-              <NumberField
-                label="Pebbles per gift"
-                value={config.overflowJar.pebblesPerGift}
-                onChange={(pebblesPerGift) =>
-                  patch('overflowJar', { pebblesPerGift })
-                }
-              />
-              <NumberField
-                label="Gifts per week"
-                hint="Pebbles above the allowance carry over; they are never burned."
-                value={config.overflowJar.giftsPerWeek}
-                onChange={(giftsPerWeek) =>
-                  patch('overflowJar', { giftsPerWeek })
-                }
-              />
-              <TextField
-                label="Gift item id"
-                hint="A catalog container, e.g. gift_box_1."
-                value={config.overflowJar.giftItemId}
-                onChange={(giftItemId) => patch('overflowJar', { giftItemId })}
-              />
-            </Group>
-
-            <div className="rounded-2xl border border-border/40 bg-card/60 p-5 text-sm">
-              <span className="font-black text-foreground">
-                Buddy tasks and the friends&apos; pond
-              </span>
-              <span className="block text-muted-foreground">
-                Both are two-account collusion targets, so both are capped on
-                three axes: per pair, per friend and per day. They live in
-                Modifiers → Social rewards, next to the generation rate, the
-                claim gate and the two weekly bonuses.
-              </span>
-            </div>
-
-            <Group
-              title="Invites & ads"
-              subtitle="The two faucets an outsider can turn on for you."
-            >
-              <NumberField
-                label="Rewarded invites"
-                suffix="per month"
-                hint="Invites past this still make friends; they just stop paying."
-                value={config.invites.monthlyCap}
-                onChange={(monthlyCap) => patch('invites', { monthlyCap })}
-              />
-              <NumberField
-                label="Ad reward"
-                suffix="flies"
-                value={config.rewardedAds.reward}
-                onChange={(reward) => patch('rewardedAds', { reward })}
-              />
-              <NumberField
-                label="Ads per day"
-                value={config.rewardedAds.dailyCap}
-                onChange={(dailyCap) => patch('rewardedAds', { dailyCap })}
-              />
-              <NumberField
-                label="Ad cooldown"
-                suffix="seconds"
-                value={config.rewardedAds.cooldownSeconds}
-                onChange={(cooldownSeconds) =>
-                  patch('rewardedAds', { cooldownSeconds })
-                }
-              />
-            </Group>
-
-            <Group
-              title="Ad or Plus"
-              subtitle="Mobile only. Checked: the button opens the Plus popup instead of an ad, and the small Plus link under it goes away. Plus members and web are unchanged."
-            >
-              <ToggleField
-                label="Double quest reward → Plus"
-                value={config.rewardedAds.questDoublePlus}
-                onChange={(questDoublePlus) =>
-                  patch('rewardedAds', { questDoublePlus })
-                }
-              />
-              <ToggleField
-                label="Double gift → Plus"
-                value={config.rewardedAds.giftDoublePlus}
-                onChange={(giftDoublePlus) =>
-                  patch('rewardedAds', { giftDoublePlus })
-                }
-              />
-              <ToggleField
-                label="Save streak → Plus"
-                value={config.rewardedAds.streakRescuePlus}
-                onChange={(streakRescuePlus) =>
-                  patch('rewardedAds', { streakRescuePlus })
-                }
-              />
-              <ToggleField
-                label="Double streak celebration → Plus"
-                value={config.rewardedAds.streakDoublePlus}
-                onChange={(streakDoublePlus) =>
-                  patch('rewardedAds', { streakDoublePlus })
-                }
-              />
-              <ToggleField
-                label="Double friends pond → Plus"
-                value={config.rewardedAds.friendsDoublePlus}
-                onChange={(friendsDoublePlus) =>
-                  patch('rewardedAds', { friendsDoublePlus })
-                }
-              />
-            </Group>
-
-            <Group
-              title="Daily shop gift"
-              subtitle={`Free flies for opening the Shop once a day; renews with the deals. ${SHOP_GIFT_MAX_FLIES} at ${SHOP_GIFT_FULL_BELOW_BALANCE} flies or less, sliding to ${SHOP_GIFT_MIN_FLIES} at ${SHOP_GIFT_FLOOR_FROM_BALANCE}+. The first visit is ${SHOP_GIFT_FIRST_FLIES}.`}
-            >
-              <ToggleField
-                label="Gift enabled"
-                value={config.shopGift.enabled}
-                onChange={(enabled) => patch('shopGift', { enabled })}
-              />
-              <NumberField
-                label="Lucky chance"
-                suffix="%"
-                value={config.shopGift.luckyChancePercent}
-                onChange={(luckyChancePercent) =>
-                  patch('shopGift', { luckyChancePercent })
-                }
-              />
-              <NumberField
-                label="Lucky multiplier"
-                suffix="×"
-                value={config.shopGift.luckyMultiplier}
-                onChange={(luckyMultiplier) =>
-                  patch('shopGift', { luckyMultiplier })
-                }
-              />
-              <NumberField
-                label="Plus multiplier"
-                suffix="×"
-                value={config.shopGift.plusMultiplier}
-                onChange={(plusMultiplier) =>
-                  patch('shopGift', { plusMultiplier })
-                }
-              />
-            </Group>
-
-            <Group
-              title="Guards"
-              subtitle="The backstops. No legitimate user should ever reach these."
-            >
-              <NumberField
-                label="Circuit breaker"
-                suffix="flies/day"
-                hint="All sources combined. Every trip is logged and reported."
-                value={config.circuitBreaker.dailyCap}
-                onChange={(dailyCap) => patch('circuitBreaker', { dailyCap })}
-              />
-              <NumberField
-                label="Timezone changes"
-                suffix="per 24h"
-                hint="Further changes are ignored for fly accounting."
-                value={config.timezone.changesPerDay}
-                onChange={(changesPerDay) =>
-                  patch('timezone', { changesPerDay })
-                }
-              />
-            </Group>
-
-            {ledger && (
-              <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
-                <h2 className="text-base font-black tracking-tight text-foreground">
-                  Ledger — {ledger.from} to {ledger.to}
-                </h2>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  What each faucet actually paid. Tune against this, not against
-                  the numbers you hoped for.
-                </p>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[420px] text-sm">
-                    <thead>
-                      <tr className="text-left text-[13px] font-black text-muted-foreground">
-                        <th className="pb-2">Source</th>
-                        <th className="pb-2 text-right">Granted</th>
-                        <th className="pb-2 text-right">Spent</th>
-                        <th className="pb-2 text-right">Users</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ledger.sources.length === 0 && (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="py-3 text-muted-foreground"
-                          >
-                            Nothing recorded yet.
-                          </td>
-                        </tr>
-                      )}
-                      {ledger.sources.map((row) => (
-                        <tr key={row.source} className="border-t border-border/40">
-                          <td className="py-2 font-bold text-foreground">
-                            {row.source}
-                          </td>
-                          <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400">
-                            +{row.granted}
-                          </td>
-                          <td className="py-2 text-right font-black text-muted-foreground">
-                            -{row.spent}
-                          </td>
-                          <td className="py-2 text-right text-muted-foreground">
-                            {row.users}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="relative">
+                <div className="flex h-5 overflow-hidden rounded-full bg-muted">
+                  {segments.map((segment, index) =>
+                    segment.value > 0 ? (
+                      <div
+                        key={segment.label}
+                        className={cn('h-full border-r-2 border-card last:border-r-0', SEGMENT_COLORS[index % SEGMENT_COLORS.length])}
+                        style={{ width: `${(segment.value / scale) * 100}%` }}
+                      />
+                    ) : null,
+                  )}
                 </div>
-              </section>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+                {breaker > 0 ? (
+                  <div
+                    className="absolute -top-1.5 h-8 w-0.5 rounded-full bg-red-500"
+                    style={{ left: `calc(${Math.min(100, (breaker / scale) * 100)}% - 1px)` }}
+                    title={`Circuit breaker · ${breaker}`}
+                  />
+                ) : null}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                {segments.map((segment, index) => (
+                  <Link
+                    key={segment.label}
+                    href={segment.href}
+                    className="group flex items-center gap-2 rounded-2xl bg-muted/50 px-3 py-2 transition hover:bg-muted"
+                  >
+                    <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', SEGMENT_COLORS[index % SEGMENT_COLORS.length])} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] font-bold text-muted-foreground">{segment.label}</span>
+                      <span className="block text-[16px] font-black tabular-nums">{segment.value}</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 transition group-hover:text-primary" />
+                  </Link>
+                ))}
+              </div>
+            </AdminCard>
+
+            <AdminCard
+              title="Task income"
+              subtitle="Base flies, streak uplift and checklist markers all draw from this one daily budget."
+              icon={<span className="text-[20px]">✅</span>}
+            >
+              <FieldGrid cols={4}>
+                <Field label="Daily cap · free">
+                  <NumberInput
+                    value={config.taskIncome.dailyCapFree}
+                    max={1000}
+                    suffix="flies"
+                    onChange={(dailyCapFree) => economy.patchGroup('taskIncome', { dailyCapFree })}
+                  />
+                </Field>
+                <Field label="Daily cap · Plus">
+                  <NumberInput
+                    value={config.taskIncome.dailyCapPlus}
+                    max={1000}
+                    suffix="flies"
+                    onChange={(dailyCapPlus) => economy.patchGroup('taskIncome', { dailyCapPlus })}
+                  />
+                </Field>
+                <Field label="Paying tasks a day" hint="Tasks after this fill the overflow jar instead.">
+                  <NumberInput
+                    value={config.taskIncome.payingCompletionsPerDay}
+                    max={200}
+                    suffix="tasks"
+                    onChange={(payingCompletionsPerDay) =>
+                      economy.patchGroup('taskIncome', { payingCompletionsPerDay })
+                    }
+                  />
+                </Field>
+                <Field label="Late check-offs pay for" hint="Older tasks still complete, but pay nothing.">
+                  <NumberInput
+                    value={config.taskIncome.backdateGraceHours}
+                    max={720}
+                    suffix="hours"
+                    onChange={(backdateGraceHours) => economy.patchGroup('taskIncome', { backdateGraceHours })}
+                  />
+                </Field>
+              </FieldGrid>
+            </AdminCard>
+
+            <AdminCard
+              title="Overflow jar"
+              subtitle="Where a busy day's extra tasks go once the flies stop: pebbles that fill up into a gift."
+              icon={<span className="text-[20px]">🫙</span>}
+              tone="sky"
+            >
+              <div className="space-y-5">
+                <ToggleRow
+                  title="Jar is on"
+                  description="Off means tasks past the paying limit earn nothing at all."
+                  checked={config.overflowJar.enabled}
+                  onChange={(enabled) => economy.patchGroup('overflowJar', { enabled })}
+                />
+                <div className={cn('transition', !config.overflowJar.enabled && 'pointer-events-none opacity-40')}>
+                  <FieldGrid cols={4}>
+                    <Field label="Pebbles per task">
+                      <NumberInput
+                        value={config.overflowJar.pebblesPerCompletion}
+                        max={20}
+                        onChange={(pebblesPerCompletion) =>
+                          economy.patchGroup('overflowJar', { pebblesPerCompletion })
+                        }
+                      />
+                    </Field>
+                    <Field label="Pebbles for a gift">
+                      <NumberInput
+                        value={config.overflowJar.pebblesPerGift}
+                        min={1}
+                        max={500}
+                        onChange={(pebblesPerGift) => economy.patchGroup('overflowJar', { pebblesPerGift })}
+                      />
+                    </Field>
+                    <Field label="Gifts a week" hint="Extra pebbles carry over, never lost.">
+                      <NumberInput
+                        value={config.overflowJar.giftsPerWeek}
+                        max={20}
+                        onChange={(giftsPerWeek) => economy.patchGroup('overflowJar', { giftsPerWeek })}
+                      />
+                    </Field>
+                    <Field label="The gift">
+                      <GiftPicker
+                        value={config.overflowJar.giftItemId}
+                        onChange={(giftItemId) => economy.patchGroup('overflowJar', { giftItemId })}
+                      />
+                    </Field>
+                  </FieldGrid>
+                </div>
+              </div>
+            </AdminCard>
+
+            <AdminCard
+              title="Safety nets"
+              subtitle="Backstops no real player should ever hit. Every trip is logged."
+              icon={<span className="text-[20px]">🛟</span>}
+              tone="berry"
+            >
+              <FieldGrid cols={2}>
+                <Field label="Circuit breaker" hint="All sources combined, per player per day.">
+                  <NumberInput
+                    value={config.circuitBreaker.dailyCap}
+                    min={1}
+                    max={100000}
+                    suffix="flies"
+                    onChange={(dailyCap) => economy.patchGroup('circuitBreaker', { dailyCap })}
+                  />
+                </Field>
+                <Field label="Timezone changes a day" hint="More changes are ignored when counting flies.">
+                  <NumberInput
+                    value={config.timezone.changesPerDay}
+                    min={1}
+                    max={24}
+                    onChange={(changesPerDay) => economy.patchGroup('timezone', { changesPerDay })}
+                  />
+                </Field>
+              </FieldGrid>
+            </AdminCard>
+
+            {economy.ledger ? (
+              <AdminCard
+                title="Where flies actually came from"
+                subtitle={`${economy.ledger.from} to ${economy.ledger.to}. Tune against this, not the numbers you hoped for.`}
+                icon={<span className="text-[20px]">📒</span>}
+                tone="sun"
+              >
+                {earned.length === 0 ? (
+                  <p className="text-[13px] font-bold text-muted-foreground">Nothing recorded yet.</p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {earned.map((row) => (
+                        <li key={row.source} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3">
+                          <span className="truncate text-[13px] font-black">{sourceLabel(row.source)}</span>
+                          <span className="h-3 overflow-hidden rounded-full bg-muted">
+                            <span
+                              className="block h-full rounded-full bg-primary"
+                              style={{ width: `${Math.max(2, (row.granted / ledgerMax) * 100)}%` }}
+                            />
+                          </span>
+                          <span className="text-right text-[12px] font-bold tabular-nums text-muted-foreground">
+                            <span className="font-black text-primary">+{row.granted.toLocaleString()}</span> ·{' '}
+                            {row.users} {row.users === 1 ? 'player' : 'players'}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                {spent > 0 ? (
+                  <p className="mt-4 rounded-2xl bg-muted/50 px-4 py-2.5 text-[13px] font-bold text-muted-foreground">
+                    Players spent <span className="font-black text-foreground">{spent.toLocaleString()}</span> flies in the same window.
+                  </p>
+                ) : null}
+              </AdminCard>
+            ) : null}
+          </div>
+        ) : null}
+      </ConfigShell>
+      <SaveBar
+        dirty={economy.dirty}
+        saving={economy.saving}
+        onSave={() => void economy.save()}
+        onDiscard={economy.discard}
+        label="Fly budget has unsaved changes"
+      />
+    </AdminPage>
   );
 }

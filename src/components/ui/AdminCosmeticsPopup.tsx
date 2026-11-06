@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Trash2, Pencil, Crown, Shirt, Hand, Paintbrush, CheckCircle, XCircle, Eye, EyeOff, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { createPortal } from 'react-dom';
+import { AdminPage } from '@/components/admin/kit';
 import Frog from '@/components/ui/frog';
 import { cn } from '@/lib/utils';
 import { availabilityStateAt } from '@/lib/skins/availability';
@@ -37,13 +37,7 @@ type DbItem = {
 const toDateInput = (value?: string | null) =>
   value ? new Date(value).toISOString().slice(0, 10) : '';
 
-export function AdminCosmeticsPopup({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function AdminCosmeticsManager() {
   const [activeSlot, setActiveSlot] = useState<CosmeticSlot>('skin');
   const [dbItems, setDbItems] = useState<DbItem[]>([]);
   const [addingNew, setAddingNew] = useState(false);
@@ -67,9 +61,8 @@ export function AdminCosmeticsPopup({
   const [importing, setImporting] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
     loadDbItems();
-  }, [open]);
+  }, []);
 
   const loadDbItems = async () => {
     try {
@@ -238,52 +231,13 @@ export function AdminCosmeticsPopup({
     }
   };
 
-  if (!open) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        key="cosmetics-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-md"
-      />
-      <div key="cosmetics-dialog-shell" className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-2xl bg-background border border-border rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-        >
-          {/* Header */}
-          <div className="relative px-6 py-5 border-b border-border/40 bg-gradient-to-br from-purple-500/10 to-pink-500/10 shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400">
-                  <Paintbrush className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black tracking-tight text-foreground">
-                    Cosmetics Manager
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    All items from DB &middot; Edit, hide, or delete any item
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted transition-colors"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-
+  return (
+    <AdminPage
+      title="Cosmetics"
+      subtitle="Every skin, hat and held item in the catalog. Edit, schedule, hide or add new ones."
+      icon={<Paintbrush />}
+    >
+      <div className="mx-auto flex max-w-3xl flex-col overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))]">
           {/* Category Tabs */}
           <div className="flex gap-2 px-6 pt-4 pb-2 shrink-0 overflow-x-auto">
             {SLOTS.map((slot) => {
@@ -530,10 +484,8 @@ export function AdminCosmeticsPopup({
               )}
             </div>
           </div>
-        </motion.div>
       </div>
-    </AnimatePresence>,
-    document.body,
+    </AdminPage>
   );
 }
 

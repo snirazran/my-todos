@@ -1,9 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Check, Copy, Download, RefreshCw } from 'lucide-react';
-import { AdminGuard } from '@/components/auth/AdminGuard';
+import { Check, Copy, Download, RefreshCw } from 'lucide-react';
 import {
   METRIC_BY_KEY,
   statusForBand,
@@ -108,9 +106,7 @@ function levelFor(entry: StatKpi): SignalLevel {
 
 export default function StatisticsPage() {
   return (
-    <AdminGuard>
-      <StatisticsPageContent />
-    </AdminGuard>
+    <StatisticsPageContent />
   );
 }
 
@@ -193,17 +189,10 @@ function StatisticsPageContent() {
 
   return (
     <div className="min-h-screen bg-background pb-20 text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
+      <header className="z-30 border-b lg:sticky lg:top-0 border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-3 px-4 py-3 md:px-6">
-          <Link
-            href="/admin"
-            title="Back to admin"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold tracking-tight md:text-xl">Statistics</h1>
+            <h1 className="truncate text-xl font-black tracking-tight md:text-2xl">Statistics</h1>
             <p className="truncate text-[12px] text-muted-foreground">
               {data
                 ? `${data.meta.range.start} → ${data.meta.range.end} · ${data.meta.range.days} days · ${integer.format(data.meta.coverage.eventsInRange)} events · UTC`

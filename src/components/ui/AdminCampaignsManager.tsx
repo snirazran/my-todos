@@ -901,13 +901,6 @@ export function AdminCampaignsManager() {
 
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-[120rem] flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
-          <Link
-            href="/admin"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-            aria-label="Back to admin"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-black tracking-tight sm:text-xl">
               Popups &amp; offers

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
-import QuestModel from '@/lib/models/Quest';
 import {
   DAILY_QUEST_REROLLS_PER_DAY,
   syncQuestState,
 } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { swapDailyPrompt } from '@/lib/prompts/daily';
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,38 +35,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Rerolling deletes today's quest doc, which is also where claim state
-    // lives. Swapping after a payout would let the same reward be earned twice.
-    const claimed = await QuestModel.exists({
-      userId,
-      placement: 'daily',
-      windowKey: todayKey,
-      $or: [
-        { claimedAt: { $ne: null } },
-        { claimedObjectiveIds: { $exists: true, $ne: [] } },
-      ],
-    });
-    if (claimed) {
-      return NextResponse.json(
-        {
-          error: 'Swap before claiming any of today’s rewards',
-          rerollsLeft: Math.max(0, DAILY_QUEST_REROLLS_PER_DAY - used),
-        },
-        { status: 409 },
-      );
-    }
-
     const nextCount = used + 1;
+    await swapDailyPrompt({ userId, timezone, seed: `swap:${nextCount}` });
     user.dailyQuestReroll = { date: todayKey, count: nextCount };
     user.markModified('dailyQuestReroll');
     await user.save();
 
-    const dashboard = await syncQuestState({
-      userId,
-      timezone,
-      refreshDaily: true,
-      dailySelectionSeed: `reroll:${todayKey}:${nextCount}`,
-    });
+    const dashboard = await syncQuestState({ userId, timezone });
 
     await recordAnalyticsEvent({
       userId,

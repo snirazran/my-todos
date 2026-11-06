@@ -90,7 +90,8 @@ export default function MobileNav() {
     pathname === '/onboarding' ||
     pathname === '/terms' ||
     pathname === '/privacy' ||
-    pathname?.startsWith('/auth/')
+    pathname?.startsWith('/auth/') ||
+    pathname?.startsWith('/admin')
   ) return null;
 
   const navItems = [

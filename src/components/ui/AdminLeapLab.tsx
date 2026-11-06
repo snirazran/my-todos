@@ -194,12 +194,6 @@ export function AdminLeapLab() {
     <div className="mx-auto max-w-[1300px] space-y-10 px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link
-            href="/admin"
-            className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
           <div>
             <h1 className="text-2xl font-black text-foreground">Leap Lab</h1>
             <p className="text-sm text-muted-foreground">

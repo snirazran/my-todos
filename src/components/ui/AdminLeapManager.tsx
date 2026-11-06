@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import React, { useMemo, useState } from 'react';
+import { ChevronRight, Plus, Trash2 } from 'lucide-react';
 import {
-  RewardPickerDialog,
-  rewardSummary,
-} from '@/components/ui/RewardPickerDialog';
+  AdminCard,
+  ConfigShell,
+  Field,
+  FieldGrid,
+  NumberInput,
+  PageTabs,
+  PondButton,
+  ResetLink,
+  SaveBar,
+  ToggleRow,
+  inputClass,
+} from '@/components/admin/kit';
+import { RewardEditButton, RewardStrip } from '@/components/admin/pickers';
+import { useAdminConfig } from '@/components/admin/useAdminConfig';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import type { QuestReward, QuestRewards } from '@/lib/quests/types';
 import {
@@ -21,228 +30,129 @@ import {
   type LeapMarkId,
 } from '@/lib/leap/types';
 import { markTargets } from '@/lib/leap/targets';
+import { cn } from '@/lib/utils';
 
 const RARITIES: BonusRarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+const LEAGUE_EMOJI = ['🍃', '🌱', '🌸', '💐', '🏡', '🌳', '🌺'];
 
-const inputClass =
-  'h-9 rounded-lg border border-border/60 bg-background px-2.5 text-sm font-medium text-foreground outline-none focus:border-primary';
-
-const CARD = 'rounded-2xl border border-border/40 bg-card/60 p-5';
-
-function NumberField({
-  label,
-  hint,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-bold text-foreground">{label}</span>
-      <input
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className={cn(inputClass, 'w-full')}
-      />
-      {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
+type Section = 'leagues' | 'hops' | 'lucky' | 'week' | 'check';
 
 const isTileReward = (reward: BonusReward): reward is QuestReward =>
   reward.type !== 'SHIELD' && reward.type !== 'RARITY_ITEM';
 
 const shieldAmount = (rewards: BonusRewards) =>
   rewards.reduce(
-    (total, reward) =>
-      reward.type === 'SHIELD'
-        ? total + Math.max(1, Math.floor(reward.amount ?? 1))
-        : total,
+    (total, reward) => (reward.type === 'SHIELD' ? total + Math.max(1, Math.floor(reward.amount ?? 1)) : total),
     0,
   );
 
 const rarityDraw = (rewards: BonusRewards) =>
-  (rewards.find((reward) => reward.type === 'RARITY_ITEM') as
-    | { rarity: BonusRarity }
-    | undefined)?.rarity ?? '';
+  (rewards.find((reward) => reward.type === 'RARITY_ITEM') as { rarity: BonusRarity } | undefined)?.rarity ?? '';
 
-function RewardLane({
-  label,
-  hint,
+function PrizeLane({
   rewards,
   rewardCatalog,
   rewardItems,
   onChange,
-  compact = false,
 }: {
-  label: string;
-  hint?: string;
   rewards: BonusRewards;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   rewardItems: QuestRewardCatalogItem[];
   onChange: (next: BonusRewards) => void;
-  compact?: boolean;
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
   const tiles = rewards.filter(isTileReward);
   const shields = shieldAmount(rewards);
   const rarity = rarityDraw(rewards);
 
-  const rebuild = (args: {
-    tiles?: QuestRewards;
-    shields?: number;
-    rarity?: BonusRarity | '';
-  }) => {
-    const nextTiles = args.tiles ?? tiles;
+  const rebuild = (args: { tiles?: QuestRewards; shields?: number; rarity?: BonusRarity | '' }) => {
+    const merged: BonusRewards = [...(args.tiles ?? tiles)];
     const nextShields = args.shields ?? shields;
     const nextRarity = args.rarity ?? rarity;
-    const merged: BonusRewards = [...nextTiles];
     if (nextShields > 0) merged.push({ type: 'SHIELD', amount: nextShields });
     if (nextRarity) merged.push({ type: 'RARITY_ITEM', rarity: nextRarity });
     onChange(merged);
   };
 
-  const summary = [
-    ...tiles.map((reward) => rewardSummary(reward, rewardCatalog)),
-    shields > 0 ? `${shields} Lily Pad${shields === 1 ? '' : 's'}` : null,
-    rarity ? `guaranteed ${rarity}` : null,
-  ].filter(Boolean);
-
   return (
-    <div className="rounded-xl border border-border/60 bg-background/40 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[13px] font-black tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-1 text-sm font-bold text-foreground">
-            {summary.length ? summary.join(' + ') : 'Nothing'}
-          </p>
-          {hint && (
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{hint}</p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="shrink-0 rounded-xl bg-primary/10 px-3 py-2 text-xs font-black text-primary transition-colors hover:bg-primary/20"
-        >
-          Pick
-        </button>
+    <div className="space-y-2.5">
+      <div className="flex min-h-[44px] flex-wrap items-center gap-2">
+        <RewardStrip
+          rewards={tiles}
+          rewardCatalog={rewardCatalog}
+          empty="Nothing"
+          extra={
+            shields > 0 || rarity ? (
+              <>
+                {shields > 0 ? (
+                  <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-black text-emerald-700 dark:text-emerald-400">
+                    +{shields} Lily Pad{shields === 1 ? '' : 's'}
+                  </span>
+                ) : null}
+                {rarity ? (
+                  <span className="rounded-full bg-violet-500/15 px-2.5 py-1 text-[12px] font-black capitalize text-violet-700 dark:text-violet-400">
+                    + a {rarity} item
+                  </span>
+                ) : null}
+    </>
+            ) : undefined
+          }
+        />
       </div>
-      {!compact && (
-        <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
-          <NumberField
-            label="Lily Pads"
-            hint="0 = none. Capped by the shield pool."
-            min={0}
-            max={5}
-            value={shields}
-            onChange={(next) => rebuild({ shields: Math.max(0, next) })}
-          />
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-foreground">Guaranteed rarity</span>
-            <select
-              value={rarity}
-              onChange={(event) =>
-                rebuild({ rarity: event.target.value as BonusRarity | '' })
-              }
-              className={cn(inputClass, 'w-full')}
-            >
-              <option value="">None</option>
-              {RARITIES.map((entry) => (
-                <option key={entry} value={entry}>
-                  {entry}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
-      <RewardPickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        rewards={tiles}
-        rewardItems={rewardItems}
-        rewardCatalog={rewardCatalog}
-        onSave={(next) => {
-          rebuild({ tiles: next });
-          setPickerOpen(false);
-        }}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <RewardEditButton
+          rewards={tiles}
+          rewardCatalog={rewardCatalog}
+          rewardItems={rewardItems}
+          onChange={(next) => rebuild({ tiles: next })}
+        />
+        <label className="flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">
+          🪷
+          <span className="w-[64px]">
+            <NumberInput value={shields} max={5} onChange={(next) => rebuild({ shields: next })} />
+          </span>
+        </label>
+        <select
+          value={rarity}
+          onChange={(event) => rebuild({ rarity: event.target.value as BonusRarity | '' })}
+          className={cn(inputClass, 'w-auto text-[12px]')}
+          aria-label="Guaranteed rarity item"
+        >
+          <option value="">No rarity item</option>
+          {RARITIES.map((entry) => (
+            <option key={entry} value={entry}>
+              + {entry} item
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
 
-function RemoveButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-    >
-      <Trash2 className="h-4 w-4" />
-    </button>
-  );
-}
-
-const MARK_LABELS: Record<LeapMarkId, string> = {
-  hold: 'Stay (Hold)',
-  leap: 'Move up (Leap)',
+const MARK_COPY: Record<LeapMarkId, { title: string; blurb: string; emoji: string }> = {
+  hold: { title: 'Stay', blurb: 'Keeps the player in their league.', emoji: '🛟' },
+  leap: { title: 'Move up', blurb: 'Promotes next week. Its % is set per league.', emoji: '🚀' },
 };
 
 export function AdminLeapManager() {
-  const [config, setConfig] = useState<LeapConfigView | null>(null);
-  const [defaults, setDefaults] = useState<LeapConfigView | null>(null);
-  const [catalog, setCatalog] = useState<QuestRewardCatalogItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch('/api/admin/leap');
-        const payload = await res.json();
-        if (res.ok) {
-          setConfig(payload.config);
-          setDefaults(payload.defaults);
-          setCatalog(payload.catalog ?? []);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
+  const leap = useAdminConfig<LeapConfigView>({
+    url: '/api/admin/leap',
+    read: (payload) => payload?.config,
+  });
+  const [section, setSection] = useState<Section>('leagues');
+  const [leagueIndex, setLeagueIndex] = useState(0);
+  const config = leap.config;
+  const defaults = (leap.payload?.defaults ?? null) as LeapConfigView | null;
+  const catalog = (leap.payload?.catalog ?? []) as QuestRewardCatalogItem[];
   const rewardCatalog = useMemo(
-    () =>
-      Object.fromEntries(catalog.map((item) => [item.id, item])) as Record<
-        string,
-        QuestRewardCatalogItem
-      >,
+    () => Object.fromEntries(catalog.map((item) => [item.id, item])) as Record<string, QuestRewardCatalogItem>,
     [catalog],
   );
 
   const previewRows = useMemo(() => {
     if (!config) return [];
     const examples = [
-      { label: '1 habit, 3×/week', scheduled: 3, days: 3 },
+      { label: '1 habit, 3× a week', scheduled: 3, days: 3 },
       { label: '1 daily habit', scheduled: 7, days: 7 },
       { label: '3 daily habits', scheduled: 21, days: 7 },
       { label: '5 weekday habits', scheduled: 25, days: 5 },
@@ -251,9 +161,6 @@ export function AdminLeapManager() {
     const top = config.leagues[topIndex]?.multiplier ?? 1;
     return examples.map((example) => {
       const marks = markTargets(config, example.scheduled, example.days, 0);
-      const topUp = markTargets(config, example.scheduled, example.days, topIndex).find(
-        (mark) => mark.id === 'leap',
-      );
       const markFlies = marks
         .filter((mark) => mark.available)
         .reduce((sum, mark) => sum + config.marks[mark.id].flies, 0);
@@ -261,451 +168,401 @@ export function AdminLeapManager() {
       const base = paidHops * config.hopFlies + markFlies;
       return {
         ...example,
-        marks: [
-          ...marks.map((mark) =>
-            mark.available ? `${mark.id === 'hold' ? 'Stay' : 'Up'} ${mark.target}` : null,
-          ),
-          topUp?.available ? `top league Up ${topUp.target}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        stay: marks.find((mark) => mark.id === 'hold'),
+        up: marks.find((mark) => mark.id === 'leap'),
         base,
         top: Math.round(base * top),
       };
     });
   }, [config]);
 
-  const patch = (next: Partial<LeapConfigView>) =>
-    setConfig((prev) => (prev ? { ...prev, ...next } : prev));
-
   const patchMark = (id: LeapMarkId, next: Partial<LeapMarkConfig>) =>
-    setConfig((prev) =>
-      prev
-        ? { ...prev, marks: { ...prev.marks, [id]: { ...prev.marks[id], ...next } } }
-        : prev,
-    );
+    leap.set((prev) => ({ ...prev, marks: { ...prev.marks, [id]: { ...prev.marks[id], ...next } } }));
 
   const patchLeague = (index: number, next: Partial<LeapLeague>) =>
-    setConfig((prev) =>
-      prev
-        ? {
-            ...prev,
-            leagues: prev.leagues.map((entry, i) =>
-              i === index ? { ...entry, ...next } : entry,
-            ),
-          }
-        : prev,
-    );
+    leap.set((prev) => ({ ...prev, leagues: prev.leagues.map((entry, i) => (i === index ? { ...entry, ...next } : entry)) }));
 
-  const save = async () => {
-    if (!config) return;
-    setSaving(true);
-    setNote(null);
-    try {
-      const res = await fetch('/api/admin/leap', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Could not save');
-      setConfig(payload.config);
-      setNote('Saved');
-    } catch (error) {
-      setNote(error instanceof Error ? error.message : 'Could not save');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading || !config) {
-    return (
-      <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">
-        Loading...
-      </div>
-    );
-  }
-
-  const lane = (
-    label: string,
-    rewards: BonusRewards,
-    onChange: (next: BonusRewards) => void,
-    hint?: string,
-  ) => (
-    <RewardLane
-      label={label}
-      hint={hint}
-      rewards={rewards}
-      rewardCatalog={rewardCatalog}
-      rewardItems={catalog}
-      onChange={onChange}
-    />
+  const lane = (rewards: BonusRewards, onChange: (next: BonusRewards) => void) => (
+    <PrizeLane rewards={rewards} rewardCatalog={rewardCatalog} rewardItems={catalog} onChange={onChange} />
   );
 
+  const dropWeightTotal = config ? config.luckyDrops.reduce((sum, drop) => sum + Math.max(0, drop.weight), 0) : 0;
+  const league = config?.leagues[Math.min(leagueIndex, Math.max(0, (config?.leagues.length ?? 1) - 1))];
+  const safeLeagueIndex = config ? Math.min(leagueIndex, Math.max(0, config.leagues.length - 1)) : 0;
+
   return (
-    <div className="space-y-4">
-      <div className={CARD}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-lg font-black text-foreground">Leap</p>
-            <p className="text-sm text-muted-foreground">
-              Every repeating task is a habit. Each on-time tick is a hop that
-              pays right away. Land the week&apos;s Leap to move up a Lily
-              league next week; miss it and you slip one league unless a Lily
-              Pad catches you.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {defaults && (
-              <button
-                type="button"
-                onClick={() => setConfig({ ...defaults })}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Load defaults
-              </button>
-            )}
-            <label className="flex items-center gap-2 text-sm font-bold">
-              <input
-                type="checkbox"
-                checked={config.isActive}
-                onChange={(event) => patch({ isActive: event.target.checked })}
-                className="h-4 w-4"
-              />
-              Active
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className={CARD}>
-        <p className="text-lg font-black text-foreground">Every hop</p>
-        <p className="text-sm text-muted-foreground">
-          Paid the instant a habit is ticked (today or yesterday), multiplied by
-          the league and doubled for Plus.
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <NumberField
-            label="Flies per hop"
-            min={0}
-            max={50}
-            value={config.hopFlies}
-            onChange={(hopFlies) => patch({ hopFlies })}
-          />
-          <NumberField
-            label="Paying hops per day"
-            hint="Hops past this still count toward the week."
-            min={0}
-            max={50}
-            value={config.hopsPaidPerDay}
-            onChange={(hopsPaidPerDay) => patch({ hopsPaidPerDay })}
-          />
-          <div />
-          <NumberField
-            label="Comeback flies"
-            hint="First hop after a habit's last scheduled day was missed."
-            min={0}
-            max={100}
-            value={config.comebackFlies}
-            onChange={(comebackFlies) => patch({ comebackFlies })}
-          />
-          <NumberField
-            label="Comeback lookback (days)"
-            min={1}
-            max={30}
-            value={config.comebackLookbackDays}
-            onChange={(comebackLookbackDays) => patch({ comebackLookbackDays })}
-          />
-          <NumberField
-            label="Comebacks per day"
-            min={0}
-            max={10}
-            value={config.comebacksPerDay}
-            onChange={(comebacksPerDay) => patch({ comebacksPerDay })}
-          />
-        </div>
-      </div>
-
-      <div className={CARD}>
-        <p className="text-lg font-black text-foreground">Lucky hops</p>
-        <p className="text-sm text-muted-foreground">
-          A variable reward on top of the hop. A user&apos;s first hop ever
-          always drops the first-hop prize.
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <NumberField
-            label="Chance per hop (%)"
-            min={0}
-            max={100}
-            step={0.5}
-            value={config.luckyChancePercent}
-            onChange={(luckyChancePercent) => patch({ luckyChancePercent })}
-          />
-          <NumberField
-            label="Guaranteed by hop #"
-            hint="Pity: a drop lands by this many hops. 0 = off."
-            min={0}
-            max={200}
-            value={config.luckyPityHops}
-            onChange={(luckyPityHops) => patch({ luckyPityHops })}
-          />
-          <NumberField
-            label="Drops per day"
-            min={0}
-            max={20}
-            value={config.luckyDropsPerDay}
-            onChange={(luckyDropsPerDay) => patch({ luckyDropsPerDay })}
-          />
-        </div>
-        <div className="mt-4 space-y-3">
-          {lane('First hop ever', config.firstHopRewards, (firstHopRewards) =>
-            patch({ firstHopRewards }),
-          )}
-          {config.luckyDrops.map((drop, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <div className="w-24 shrink-0">
-                <NumberField
-                  label="Weight"
-                  min={0}
-                  max={1000}
-                  value={drop.weight}
-                  onChange={(weight) =>
-                    patch({
-                      luckyDrops: config.luckyDrops.map((entry, i) =>
-                        i === index ? { ...entry, weight } : entry,
-                      ),
-                    })
-                  }
-                />
-              </div>
+    <ConfigShell loading={leap.loading} error={leap.error}>
+      {config ? (
+        <div className="space-y-5">
+          <AdminCard bodyClassName="p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="min-w-0 flex-1">
-                {lane(`Drop ${index + 1}`, drop.rewards, (rewards) =>
-                  patch({
-                    luckyDrops: config.luckyDrops.map((entry, i) =>
-                      i === index ? { ...entry, rewards } : entry,
-                    ),
-                  }),
-                )}
-              </div>
-              <div className="mt-5">
-                <RemoveButton
-                  label="Remove drop"
-                  onClick={() =>
-                    patch({
-                      luckyDrops: config.luckyDrops.filter((_, i) => i !== index),
-                    })
-                  }
+                <ToggleRow
+                  title={config.isActive ? 'Leap is live' : 'Leap is off'}
+                  description="Every repeating task is a habit. Each on-time tick is a hop that pays right away; land the week's Leap to climb a Lily league."
+                  checked={config.isActive}
+                  onChange={(isActive) => leap.patch({ isActive })}
                 />
               </div>
+              {defaults ? <ResetLink onClick={() => leap.set(() => ({ ...defaults }))}>Load defaults</ResetLink> : null}
             </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              patch({
-                luckyDrops: [
-                  ...config.luckyDrops,
-                  { weight: 10, rewards: [{ type: 'FLIES', amount: 10 }] },
-                ],
-              })
-            }
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add drop
-          </Button>
-        </div>
-      </div>
+          </AdminCard>
 
-      <div className={CARD}>
-        <p className="text-lg font-black text-foreground">The week</p>
-        <p className="text-sm text-muted-foreground">
-          Targets are a share of the habit ticks the user scheduled this week,
-          so every schedule is judged against itself. Each line pays the moment
-          it is crossed. Stay keeps the league; Move up promotes next week and
-          uses each league&apos;s Promotion %. No line ever needs every tick, and
-          once the week&apos;s first habit is ticked its targets can only go down.
-        </p>
-        <div className="mt-4 space-y-4">
-          {LEAP_MARK_IDS.map((id) => {
-            const mark = config.marks[id];
-            return (
-              <div key={id} className="rounded-xl border border-border/60 p-3">
-                <p className="mb-2 text-sm font-black text-foreground">{MARK_LABELS[id]}</p>
-                <div className="grid gap-3 sm:grid-cols-4">
-                  {id === 'hold' ? (
-                    <NumberField
-                      label="% of scheduled"
-                      min={1}
-                      max={100}
-                      value={mark.percent}
-                      onChange={(percent) => patchMark(id, { percent })}
-                    />
-                  ) : (
-                    <p className="self-center text-[11px] font-bold text-muted-foreground">
-                      % is set per league below.
+          <PageTabs<Section>
+            value={section}
+            onChange={setSection}
+            options={[
+              { value: 'leagues', label: 'Leagues', badge: config.leagues.length },
+              { value: 'hops', label: 'Every hop' },
+              { value: 'lucky', label: 'Lucky drops', badge: config.luckyDrops.length },
+              { value: 'week', label: 'Weekly goals' },
+              { value: 'check', label: 'Payout check' },
+            ]}
+          />
+
+          {section === 'leagues' ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {config.leagues.map((entry, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" /> : null}
+                    <button
+                      type="button"
+                      onClick={() => setLeagueIndex(index)}
+                      className={cn(
+                        'flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-left transition',
+                        index === safeLeagueIndex
+                          ? 'border-primary/40 bg-primary/10 shadow-[0_3px_0_0_hsl(var(--primary)/0.25)]'
+                          : 'border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] hover:bg-muted/40',
+                      )}
+                    >
+                      <span className="text-[20px]">{LEAGUE_EMOJI[index % LEAGUE_EMOJI.length]}</span>
+                      <span>
+                        <span className="block text-[13px] font-black leading-tight">{entry.label || `League ${index + 1}`}</span>
+                        <span className="block text-[11px] font-bold text-muted-foreground">
+                          ×{entry.multiplier} · up at {entry.leapPercent}%
+                        </span>
+                      </span>
+                    </button>
+                  </React.Fragment>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const last = config.leagues[config.leagues.length - 1];
+                    leap.patch({
+                      leagues: [
+                        ...config.leagues,
+                        {
+                          label: 'New Lily',
+                          multiplier: (last?.multiplier ?? 1) + 0.25,
+                          leapPercent: Math.min(95, (last?.leapPercent ?? config.marks.leap.percent) + 5),
+                          weekRewards: [],
+                          reachRewards: [],
+                          plusReachRewards: [],
+                          plusWeekRewards: [],
+                        },
+                      ],
+                    });
+                    setLeagueIndex(config.leagues.length);
+                  }}
+                  className="ml-1 flex h-[52px] shrink-0 items-center gap-1.5 rounded-2xl border-2 border-dashed border-border px-3 text-[12px] font-black text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+                >
+                  <Plus className="h-4 w-4" />
+                  League
+                </button>
+              </div>
+
+              {league ? (
+                <AdminCard
+                  title={league.label || `League ${safeLeagueIndex + 1}`}
+                  subtitle={
+                    safeLeagueIndex === 0
+                      ? 'Everyone starts here.'
+                      : `Reached after ${safeLeagueIndex} Leap week${safeLeagueIndex === 1 ? '' : 's'}.`
+                  }
+                  icon={<span className="text-[20px]">{LEAGUE_EMOJI[safeLeagueIndex % LEAGUE_EMOJI.length]}</span>}
+                  actions={
+                    config.leagues.length > 1 ? (
+                      <PondButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          leap.patch({ leagues: config.leagues.filter((_, i) => i !== safeLeagueIndex) });
+                          setLeagueIndex(Math.max(0, safeLeagueIndex - 1));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remove
+                      </PondButton>
+                    ) : null
+                  }
+                >
+                  <div className="space-y-5">
+                    <FieldGrid cols={3}>
+                      <Field label="Name">
+                        <input
+                          value={league.label}
+                          onChange={(event) => patchLeague(safeLeagueIndex, { label: event.target.value })}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field label="Move up at" hint="Share of the week's scheduled ticks.">
+                        <NumberInput value={league.leapPercent} min={1} max={100} suffix="%" onChange={(leapPercent) => patchLeague(safeLeagueIndex, { leapPercent })} />
+                      </Field>
+                      <Field label="Fly multiplier" hint="On every hop and goal in this league.">
+                        <NumberInput value={league.multiplier} min={1} max={5} step={0.05} suffix="×" onChange={(multiplier) => patchLeague(safeLeagueIndex, { multiplier })} />
+                      </Field>
+                    </FieldGrid>
+
+                    <div className="overflow-hidden rounded-2xl border border-border/70">
+                      <div className="hidden grid-cols-[10rem_1fr_1fr] bg-muted/50 text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground md:grid">
+                        <span className="px-4 py-2" />
+                        <span className="px-4 py-2">Everyone</span>
+                        <span className="px-4 py-2">Plus gets extra</span>
+                      </div>
+                      {(
+                        [
+                          { title: 'Each Leap week', note: 'Every week they move up from here.', free: 'weekRewards', plus: 'plusWeekRewards' },
+                          { title: 'First time here', note: 'Once. Plus is back-paid on upgrade.', free: 'reachRewards', plus: 'plusReachRewards' },
+                        ] as const
+                      ).map((row) => (
+                        <div key={row.title} className="grid gap-3 border-t border-border/60 p-4 first:border-t-0 md:grid-cols-[10rem_1fr_1fr] md:gap-0 md:p-0">
+                          <div className="md:px-4 md:py-4">
+                            <p className="text-[14px] font-black">{row.title}</p>
+                            <p className="text-[12px] font-medium text-muted-foreground">{row.note}</p>
+                          </div>
+                          <div className="md:border-l md:border-border/60 md:px-4 md:py-4">
+                            <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground md:hidden">Everyone</p>
+                            {lane(league[row.free], (next) => patchLeague(safeLeagueIndex, { [row.free]: next } as Partial<LeapLeague>))}
+                          </div>
+                          <div className="rounded-xl bg-amber-400/[0.07] p-3 md:rounded-none md:border-l md:border-border/60 md:px-4 md:py-4">
+                            <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 md:hidden">Plus gets extra</p>
+                            {lane(league[row.plus], (next) => patchLeague(safeLeagueIndex, { [row.plus]: next } as Partial<LeapLeague>))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[12px] font-medium text-muted-foreground">
+                      🪷 adds Lily Pads (held back once the shield pool is full). The rarity item draws a random item of that rarity.
                     </p>
-                  )}
-                  <NumberField
-                    label="Min distinct days"
-                    min={1}
-                    max={7}
-                    value={mark.minDays}
-                    onChange={(minDays) => patchMark(id, { minDays })}
-                  />
-                  <NumberField
-                    label="Min scheduled ticks"
-                    min={1}
-                    max={100}
-                    value={mark.minScheduled}
-                    onChange={(minScheduled) => patchMark(id, { minScheduled })}
-                  />
-                  <NumberField
-                    label="Flies"
-                    min={0}
-                    max={10000}
-                    value={mark.flies}
-                    onChange={(flies) => patchMark(id, { flies })}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className={CARD}>
-        <p className="text-lg font-black text-foreground">Lily leagues</p>
-        <p className="text-sm text-muted-foreground">
-          Everyone starts in the first league. The multiplier raises every hop
-          and line while in that league. The week prize lands with each Leap;
-          the reach prize pays once, the first time a league is reached; Plus
-          adds the Plus reach prize, back-paid for leagues already reached when
-          someone upgrades.
-        </p>
-        <div className="mt-4 space-y-4">
-          {config.leagues.map((league, index) => (
-            <div key={index} className="rounded-xl border border-border/60 p-3">
-              <div className="flex items-end gap-2">
-                <label className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="text-xs font-bold text-foreground">
-                    League {index + 1} name
-                  </span>
-                  <input
-                    value={league.label}
-                    onChange={(event) => patchLeague(index, { label: event.target.value })}
-                    className={cn(inputClass, 'w-full')}
-                  />
-                </label>
-                <div className="w-28 shrink-0">
-                  <NumberField
-                    label="Promotion %"
-                    min={1}
-                    max={100}
-                    value={league.leapPercent}
-                    onChange={(leapPercent) => patchLeague(index, { leapPercent })}
-                  />
-                </div>
-                <div className="w-28 shrink-0">
-                  <NumberField
-                    label="Multiplier"
-                    min={1}
-                    max={5}
-                    step={0.05}
-                    value={league.multiplier}
-                    onChange={(multiplier) => patchLeague(index, { multiplier })}
-                  />
-                </div>
-                <RemoveButton
-                  label="Remove league"
-                  onClick={() =>
-                    patch({ leagues: config.leagues.filter((_, i) => i !== index) })
-                  }
-                />
-              </div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {lane('Week prize', league.weekRewards, (weekRewards) =>
-                  patchLeague(index, { weekRewards }),
-                )}
-                {lane('Plus week prize', league.plusWeekRewards, (plusWeekRewards) =>
-                  patchLeague(index, { plusWeekRewards }),
-                )}
-                {lane('Reach prize', league.reachRewards, (reachRewards) =>
-                  patchLeague(index, { reachRewards }),
-                )}
-                {lane('Plus reach prize', league.plusReachRewards, (plusReachRewards) =>
-                  patchLeague(index, { plusReachRewards }),
-                )}
-              </div>
+                  </div>
+                </AdminCard>
+              ) : null}
             </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              patch({
-                leagues: [
-                  ...config.leagues,
-                  {
-                    label: 'New Lily',
-                    multiplier:
-                      (config.leagues[config.leagues.length - 1]?.multiplier ?? 1) + 0.25,
-                    leapPercent: Math.min(
-                      95,
-                      (config.leagues[config.leagues.length - 1]?.leapPercent ??
-                        config.marks.leap.percent) + 5,
-                    ),
-                    weekRewards: [],
-                    reachRewards: [],
-                    plusReachRewards: [],
-                    plusWeekRewards: [],
-                  },
-                ],
-              })
-            }
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add league
-          </Button>
-        </div>
-      </div>
+          ) : null}
 
-      <div className={CARD}>
-        <p className="text-lg font-black text-foreground">What a full week pays</p>
-        <p className="text-sm text-muted-foreground">
-          Every scheduled habit ticked, before Plus. Gifts and lucky drops not
-          included.
-        </p>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-sm">
-            <thead>
-              <tr className="text-xs text-muted-foreground">
-                <th className="py-1.5 pr-3 font-bold">Schedule</th>
-                <th className="py-1.5 pr-3 font-bold">Lines (hops)</th>
-                <th className="py-1.5 pr-3 font-bold">Flies, first league</th>
-                <th className="py-1.5 font-bold">Flies, top league</th>
-              </tr>
-            </thead>
-            <tbody>
-              {previewRows.map((row) => (
-                <tr key={row.label} className="border-t border-border/40">
-                  <td className="py-1.5 pr-3 font-bold text-foreground">{row.label}</td>
-                  <td className="py-1.5 pr-3 text-muted-foreground">{row.marks || '—'}</td>
-                  <td className="py-1.5 pr-3 font-bold tabular-nums">{row.base}</td>
-                  <td className="py-1.5 font-bold tabular-nums">{row.top}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          {section === 'hops' ? (
+            <div className="grid gap-5 lg:grid-cols-2">
+              <AdminCard
+                title="Every hop"
+                subtitle="Paid the moment a habit is ticked (today or yesterday), times the league, doubled for Plus."
+                icon={<span className="text-[20px]">🐸</span>}
+              >
+                <FieldGrid cols={2}>
+                  <Field label="Flies per hop">
+                    <NumberInput value={config.hopFlies} max={50} onChange={(hopFlies) => leap.patch({ hopFlies })} />
+                  </Field>
+                  <Field label="Paying hops a day" hint="More still count toward the week.">
+                    <NumberInput value={config.hopsPaidPerDay} max={50} onChange={(hopsPaidPerDay) => leap.patch({ hopsPaidPerDay })} />
+                  </Field>
+                </FieldGrid>
+              </AdminCard>
+              <AdminCard
+                title="Comebacks"
+                subtitle="A bonus for the first hop after a habit's last scheduled day was missed."
+                icon={<span className="text-[20px]">👋</span>}
+                tone="sky"
+              >
+                <FieldGrid cols={3}>
+                  <Field label="Bonus">
+                    <NumberInput value={config.comebackFlies} max={100} suffix="flies" onChange={(comebackFlies) => leap.patch({ comebackFlies })} />
+                  </Field>
+                  <Field label="Looks back">
+                    <NumberInput value={config.comebackLookbackDays} min={1} max={30} suffix="days" onChange={(comebackLookbackDays) => leap.patch({ comebackLookbackDays })} />
+                  </Field>
+                  <Field label="Per day">
+                    <NumberInput value={config.comebacksPerDay} max={10} onChange={(comebacksPerDay) => leap.patch({ comebacksPerDay })} />
+                  </Field>
+                </FieldGrid>
+              </AdminCard>
+            </div>
+          ) : null}
 
-      <div className="flex items-center justify-end gap-3">
-        {note && <span className="text-sm font-bold text-muted-foreground">{note}</span>}
-        <Button type="button" onClick={() => void save()} disabled={saving}>
-          {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-          Save Leap
-        </Button>
-      </div>
-    </div>
+          {section === 'lucky' ? (
+            <div className="space-y-5">
+              <AdminCard
+                title="Lucky hops"
+                subtitle="A surprise on top of a hop."
+                icon={<span className="text-[20px]">🍀</span>}
+                tone="sun"
+              >
+                <FieldGrid cols={3}>
+                  <Field label="Chance per hop">
+                    <NumberInput value={config.luckyChancePercent} max={100} step={0.5} suffix="%" onChange={(luckyChancePercent) => leap.patch({ luckyChancePercent })} />
+                  </Field>
+                  <Field label="Sure thing by hop" hint="0 turns the safety net off.">
+                    <NumberInput value={config.luckyPityHops} max={200} onChange={(luckyPityHops) => leap.patch({ luckyPityHops })} />
+                  </Field>
+                  <Field label="Drops a day">
+                    <NumberInput value={config.luckyDropsPerDay} max={20} onChange={(luckyDropsPerDay) => leap.patch({ luckyDropsPerDay })} />
+                  </Field>
+                </FieldGrid>
+              </AdminCard>
+
+              <AdminCard
+                title="What can drop"
+                subtitle="One is picked by weight each time a lucky hop lands."
+                icon={<span className="text-[20px]">🎲</span>}
+                actions={
+                  <PondButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={() =>
+                      leap.patch({ luckyDrops: [...config.luckyDrops, { weight: 10, rewards: [{ type: 'FLIES', amount: 10 }] }] })
+                    }
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add drop
+                  </PondButton>
+                }
+              >
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-4 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/[0.04] p-3">
+                    <div className="w-[7.5rem] shrink-0">
+                      <p className="text-[13px] font-black text-primary">First hop ever</p>
+                      <p className="text-[11px] font-bold text-muted-foreground">Always drops</p>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {lane(config.firstHopRewards, (firstHopRewards) => leap.patch({ firstHopRewards }))}
+                    </div>
+                  </div>
+                  {config.luckyDrops.map((drop, index) => (
+                    <div key={index} className="flex flex-wrap items-center gap-4 rounded-2xl bg-muted/45 p-3">
+                      <div className="w-[7.5rem] shrink-0 space-y-1">
+                        <NumberInput
+                          value={drop.weight}
+                          max={1000}
+                          suffix="wt"
+                          onChange={(weight) =>
+                            leap.patch({ luckyDrops: config.luckyDrops.map((entry, i) => (i === index ? { ...entry, weight } : entry)) })
+                          }
+                        />
+                        <p className="text-[12px] font-black tabular-nums text-primary">
+                          {dropWeightTotal > 0 ? `${Math.round((Math.max(0, drop.weight) / dropWeightTotal) * 1000) / 10}%` : '0%'} of drops
+                        </p>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {lane(drop.rewards, (rewards) =>
+                          leap.patch({ luckyDrops: config.luckyDrops.map((entry, i) => (i === index ? { ...entry, rewards } : entry)) }),
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => leap.patch({ luckyDrops: config.luckyDrops.filter((_, i) => i !== index) })}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500"
+                        aria-label="Remove drop"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </AdminCard>
+            </div>
+          ) : null}
+
+          {section === 'week' ? (
+            <AdminCard
+              title="Weekly goals"
+              subtitle="Targets are a share of the ticks a player scheduled, so every schedule is judged against itself. Each goal pays the moment it's crossed, and targets only go down once the week starts."
+              icon={<span className="text-[20px]">🎯</span>}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                {LEAP_MARK_IDS.map((id) => {
+                  const mark = config.marks[id];
+                  const copy = MARK_COPY[id];
+                  return (
+                    <div key={id} className="rounded-2xl bg-muted/45 p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <span className="text-[20px]">{copy.emoji}</span>
+                        <div>
+                          <p className="text-[15px] font-black">{copy.title}</p>
+                          <p className="text-[12px] font-medium text-muted-foreground">{copy.blurb}</p>
+                        </div>
+                      </div>
+                      <FieldGrid cols={2}>
+                        {id === 'hold' ? (
+                          <Field label="Share of scheduled">
+                            <NumberInput value={mark.percent} min={1} max={100} suffix="%" onChange={(percent) => patchMark(id, { percent })} />
+                          </Field>
+                        ) : (
+                          <Field label="Share of scheduled">
+                            <button
+                              type="button"
+                              onClick={() => setSection('leagues')}
+                              className="flex h-10 items-center rounded-xl border border-dashed border-border px-3 text-[12px] font-black text-primary"
+                            >
+                              Per league →
+                            </button>
+                          </Field>
+                        )}
+                        <Field label="Pays">
+                          <NumberInput value={mark.flies} max={10000} suffix="flies" onChange={(flies) => patchMark(id, { flies })} />
+                        </Field>
+                        <Field label="At least">
+                          <NumberInput value={mark.minDays} min={1} max={7} suffix="days" onChange={(minDays) => patchMark(id, { minDays })} />
+                        </Field>
+                        <Field label="At least">
+                          <NumberInput value={mark.minScheduled} min={1} max={100} suffix="ticks" onChange={(minScheduled) => patchMark(id, { minScheduled })} />
+                        </Field>
+                      </FieldGrid>
+                    </div>
+                  );
+                })}
+              </div>
+            </AdminCard>
+          ) : null}
+
+          {section === 'check' ? (
+            <AdminCard
+              title="What a perfect week pays"
+              subtitle="Every scheduled habit ticked, before Plus. Gifts and lucky drops not included."
+              icon={<span className="text-[20px]">🧮</span>}
+              tone="sky"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                {previewRows.map((row) => (
+                  <div key={row.label} className="rounded-2xl bg-muted/45 p-4">
+                    <p className="text-[14px] font-black">{row.label}</p>
+                    <p className="mt-0.5 text-[12px] font-bold text-muted-foreground">
+                      {row.stay?.available ? `Stay at ${row.stay.target}` : 'No Stay goal'} ·{' '}
+                      {row.up?.available ? `Move up at ${row.up.target}` : 'No Move-up goal'}
+                    </p>
+                    <div className="mt-3 flex items-end gap-4">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">First league</p>
+                        <p className="text-[22px] font-black tabular-nums">{row.base}🪰</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">Top league</p>
+                        <p className="text-[22px] font-black tabular-nums text-primary">{row.top}🪰</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </AdminCard>
+          ) : null}
+        </div>
+      ) : null}
+      <SaveBar
+        dirty={leap.dirty}
+        saving={leap.saving}
+        onSave={() => void leap.save()}
+        onDiscard={leap.discard}
+        label="Leap has unsaved changes"
+      />
+    </ConfigShell>
   );
 }

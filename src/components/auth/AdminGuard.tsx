@@ -40,5 +40,5 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <div className="md:pt-16">{children}</div>;
+  return <>{children}</>;
 }

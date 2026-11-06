@@ -201,21 +201,15 @@ export function AdminBackgroundsManager() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-12">
+    <div className="px-4 pb-32 pt-5 md:px-8 md:pb-20 md:pt-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Link
-              href="/admin"
-              className="p-2 rounded-full bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Link>
-            <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-              <ImageIcon className="w-7 h-7" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-[0_3px_0_0_hsl(var(--primary)/0.22)]">
+              <ImageIcon className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight">Backgrounds</h1>
+              <h1 className="text-[26px] font-black leading-tight tracking-tight md:text-[30px]">Backgrounds</h1>
               <p className="text-sm text-muted-foreground font-medium">
                 Upload an image per screen size. Users buy and equip these in the shop.
               </p>
@@ -236,7 +230,7 @@ export function AdminBackgroundsManager() {
         )}
 
         {/* Create new */}
-        <div className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6 space-y-4">
+        <div className="rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] p-5 md:p-6 space-y-4">
           <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
             <Plus className="w-5 h-5 text-primary" /> New Background
           </h2>
@@ -333,15 +327,6 @@ export function AdminBackgroundsManager() {
             ))
           )}
         </div>
-
-        <div className="pt-4 flex justify-center">
-          <button
-            onClick={() => router.push('/admin')}
-            className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ← Back to Admin
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -367,7 +352,7 @@ function BackgroundRow({
   const preview =
     item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
   return (
-    <div className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6 space-y-4">
+    <div className="rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] p-5 md:p-6 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-4">
         <div className="aspect-[4/3] rounded-2xl bg-muted overflow-hidden flex items-center justify-center text-xs text-muted-foreground">
           {preview ? (

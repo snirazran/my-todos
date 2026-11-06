@@ -147,7 +147,7 @@ export default function SiteHeader() {
   const isStagePage = pathname === '/wardrobe' || pathname === '/shop';
 
   // Desktop keeps a full header. Mobile only gets lightweight home-page controls.
-  if (pathname === '/onboarding' || pathname === '/welcome' || pathname === '/try' || pathname === '/fly-catch' || pathname === '/login' || pathname?.startsWith('/auth/')) return null;
+  if (pathname === '/onboarding' || pathname === '/welcome' || pathname === '/try' || pathname === '/fly-catch' || pathname === '/login' || pathname?.startsWith('/auth/') || pathname?.startsWith('/admin')) return null;
 
   return (
     <>

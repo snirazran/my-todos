@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   Camera,
   CheckCircle,
   ChevronDown,
@@ -11,17 +10,15 @@ import {
   Clock,
   Edit2,
   Eye,
-  Flame,
+  Compass,
   Footprints,
   Gift,
   Layers3,
-  Monitor,
-  CalendarDays,
+  MessageCircleQuestionMark,
   Pencil,
   Plus,
-  RotateCcw,
-  ScrollText,
   Trash2,
+  Trophy,
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,8 +39,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { AdminPromptManager } from '@/components/ui/AdminPromptManager';
+import {
+  AdminPage,
+  LoadingBlock,
+  Notice,
+  PondButton,
+  SaveBar,
+  SectionLabel,
+} from '@/components/admin/kit';
+import { DailyQuestEditor } from '@/components/admin/quests/DailyQuestEditor';
+import { DailyStreakPage } from '@/components/admin/streak/DailyStreakPage';
+import { MoveToWebCard } from '@/components/admin/quests/MoveToWebCard';
+import type { AdminRecipe, AdminRecipeSlot } from '@/components/admin/quests/types';
 import { QUEST_METRIC_COPY } from '@/lib/quests/metricLabels';
-import type { LoginStreakReward } from '@/lib/streak/types';
 import type {
   QuestLogicBlock,
   QuestPlacement,
@@ -95,19 +104,6 @@ type AdminSweepConfig = {
   };
 };
 
-type AdminLoginStreakTier = {
-  days: number;
-  rewards: LoginStreakReward[];
-};
-
-type AdminLoginStreakConfig = {
-  isActive: boolean;
-  saverMinStreak: number;
-  repeatPayoutPercents: number[];
-  repeatPayoutFloorPercent: number;
-  repeatItemsAtFullOnly: boolean;
-  goalTiers: AdminLoginStreakTier[];
-};
 type AdminCategory = {
   id: string;
   name: string;
@@ -129,76 +125,46 @@ type CategoryFormState = {
   starterTasks: StarterTaskTemplate[];
 };
 
-type AdminRecipePoolEntryStreak = {
-  streakDaysMin?: number;
-  streakDaysMax?: number;
-};
+const QUEST_TABS = ['daily', 'asks', 'onboarding', 'areas', 'season', 'leap', 'streaks'] as const;
+type QuestTab = (typeof QUEST_TABS)[number];
 
-type AdminRecipePoolEntry = AdminRecipePoolEntryStreak & {
-  id: string;
-  type:
-    | 'count'
-    | 'focus_minutes'
-    | 'metric_count'
-    | 'distinct_days'
-    | 'deep_session'
-    | 'day_parts';
-  action?: 'complete' | 'add';
-  metricKey?: string;
-  sessionMinutes?: number;
-  requiresFollowThrough?: boolean;
-  beforeHour?: number;
-  scaleFromHistory?: boolean;
-  scaleFactor?: number;
-  minTarget: number;
-  maxTarget: number;
-  weight: number;
+const TAB_COPY: Record<QuestTab, { title: string; subtitle: string; icon: React.ReactNode }> = {
+  daily: {
+    title: 'Daily quests',
+    subtitle: 'The lineup every player gets each day. Finishing all of them is a Clean Sweep.',
+    icon: <Icon name="quests" />,
+  },
+  asks: {
+    title: 'Frog asks',
+    subtitle: 'The daily question your frog asks. Journals and check-ins stay private; polls show how everyone answered.',
+    icon: <MessageCircleQuestionMark />,
+  },
+  onboarding: {
+    title: 'Welcome quests',
+    subtitle: 'One-time quests that walk new players through the app, plus the nudge to try it on the web.',
+    icon: <Footprints />,
+  },
+  areas: {
+    title: 'Focus areas',
+    subtitle: 'The areas players pick at onboarding, and the starter plan built from them.',
+    icon: <Compass />,
+  },
+  season: {
+    title: 'Season pass',
+    subtitle: 'A new pass every month. Plan the name, art and prizes ahead.',
+    icon: <Trophy />,
+  },
+  leap: {
+    title: 'Leap',
+    subtitle: 'The weekly habit league: hops, lucky drops, weekly goals and the Lily leagues.',
+    icon: <Icon name="leap" />,
+  },
+  streaks: {
+    title: 'Daily streak & Lily Pads',
+    subtitle: 'The app-wide streak, its goals and payouts, and the Lily Pad that protects every streak.',
+    icon: <Icon name="lilyPad" />,
+  },
 };
-
-type AdminRecipeBonusReward = {
-  chance: number;
-  reward: QuestReward;
-};
-
-type AdminRecipeSlot = {
-  id: string;
-  pool: AdminRecipePoolEntry[];
-  rewards: QuestReward[];
-  bonusRewards?: AdminRecipeBonusReward[];
-};
-
-type AdminRecipe = {
-  recipeId: string;
-  name: string;
-  isActive: boolean;
-  coverImageUrl?: string;
-  slots: AdminRecipeSlot[];
-};
-
-type AdminShieldConfig = {
-  isActive: boolean;
-  priceFlies: number;
-  twoPackPriceFlies: number;
-  capFree: number;
-  capPlus: number;
-  plusMonthlyGrant: number;
-  rescueCooldownDays: number;
-  offerCooldownDays: number;
-  offerMinStreak: number;
-  earnEveryPactWeeks: number;
-  limits: { capMin: number; capMax: number };
-};
-
-type ViewLevel =
-  | 'home'
-  | 'daily'
-  | 'onboarding'
-  | 'streaks'
-  | 'shields'
-  | 'pact'
-  | 'moveToWeb'
-  | 'season'
-  | 'form';
 
 type FormState = {
   id?: string;
@@ -365,8 +331,17 @@ export function AdminQuestManagerPage() {
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  // Navigation
-  const [view, setView] = useState<ViewLevel>('home');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawTab = searchParams?.get('tab') ?? 'daily';
+  const tab: QuestTab = (QUEST_TABS as readonly string[]).indexOf(rawTab) >= 0 ? (rawTab as QuestTab) : 'daily';
+  const [formOpen, setFormOpen] = useState(false);
+  const goTab = (next: QuestTab) => router.replace(`/admin/quests?tab=${next}`, { scroll: false });
+
+  useEffect(() => {
+    setFormOpen(false);
+    setResult(null);
+  }, [tab]);
 
   // Category dialog
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -385,40 +360,14 @@ export function AdminQuestManagerPage() {
   const [sweepConfig, setSweepConfig] = useState<AdminSweepConfig | null>(null);
   const [savingStreak, setSavingStreak] = useState(false);
 
-  // Move to web config
-  const [moveToWebConfig, setMoveToWebConfig] = useState<{
-    isActive: boolean;
-    reward: QuestReward | null;
-  } | null>(null);
-  const [savingMoveToWeb, setSavingMoveToWeb] = useState(false);
-  const [moveToWebRewardPickerOpen, setMoveToWebRewardPickerOpen] =
-    useState(false);
-
-  // Login streak (app-entry) config
-  const [loginStreakConfig, setLoginStreakConfig] =
-    useState<AdminLoginStreakConfig | null>(null);
-  const [savingLoginStreak, setSavingLoginStreak] = useState(false);
-
-  // Lily Pad (shield) economy — one pool shared by every protected streak
-  const [shieldConfig, setShieldConfig] = useState<AdminShieldConfig | null>(
-    null,
-  );
-  const [savingShields, setSavingShields] = useState(false);
-  const [loginRewardTarget, setLoginRewardTarget] = useState<{
-    list: 'goalTiers';
-    days: number;
-  } | null>(null);
 
   // Generated-mode recipe editors (focus ladder + daily roll)
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
-  const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
+  const [savedRecipes, setSavedRecipes] = useState<AdminRecipe[]>([]);
   const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
   const [resettingRecipeId, setResettingRecipeId] = useState<string | null>(
     null,
   );
-  const [confirmResetRecipeId, setConfirmResetRecipeId] = useState<
-    string | null
-  >(null);
   const [recipeRewardTarget, setRecipeRewardTarget] = useState<{
     recipeId: string;
     slotId: string;
@@ -433,15 +382,12 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, recipesRes, streakRes, loginStreakRes, moveToWebRes, shieldsRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, recipesRes, streakRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
         fetch('/api/admin/quest-recipes', { credentials: 'include' }),
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
-        fetch('/api/admin/streak/login', { credentials: 'include' }),
-        fetch('/api/admin/quests/move-to-web', { credentials: 'include' }),
-        fetch('/api/admin/shields', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
@@ -459,19 +405,8 @@ export function AdminQuestManagerPage() {
       setRewardItems(metaData.rewardsCatalog ?? []);
       setAdminCategories(categoriesData.categories ?? []);
       setAdminRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
+      setSavedRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
       if (streakRes.ok && streakData.sweep) setSweepConfig(streakData.sweep);
-      const loginStreakData = await loginStreakRes.json();
-      if (loginStreakRes.ok && loginStreakData.loginStreak) {
-        setLoginStreakConfig(loginStreakData.loginStreak);
-      }
-      const moveToWebData = await moveToWebRes.json();
-      if (moveToWebRes.ok && moveToWebData.moveToWeb) {
-        setMoveToWebConfig(moveToWebData.moveToWeb);
-      }
-      const shieldsData = await shieldsRes.json();
-      if (shieldsRes.ok && shieldsData.shields) {
-        setShieldConfig(shieldsData.shields);
-      }
     } catch (error) {
       setResult({
         type: 'error',
@@ -574,7 +509,7 @@ export function AdminQuestManagerPage() {
       if (!res.ok) throw new Error(data.error || 'Could not delete quest');
       await loadData();
       resetForm();
-      if (view === 'form') setView('onboarding');
+      setFormOpen(false);
       setResult({ type: 'success', message: 'Quest deleted' });
     } catch (error) {
       setResult({
@@ -702,138 +637,8 @@ export function AdminQuestManagerPage() {
       setForm(newForm);
       setResult(null);
     }
-    setView('form');
+    setFormOpen(true);
   };
-
-  // ── Home view ────────────────────────────────────────────────────────────
-  const renderHome = () => (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <button
-        onClick={() => setView('daily')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-blue-500/25 hover:bg-blue-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-            <ScrollText className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Daily Quests</p>
-        <p className="mt-1 text-sm text-muted-foreground">Rolled for every user each day from the recipe.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">{dailyRecipeSlotCount}</p>
-        <p className="text-xs text-muted-foreground">recipe slot{dailyRecipeSlotCount !== 1 ? 's' : ''}</p>
-      </button>
-
-      <button
-        onClick={() => setView('onboarding')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-violet-500/25 hover:bg-violet-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
-            <Footprints className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Onboarding</p>
-        <p className="mt-1 text-sm text-muted-foreground">One-time quests new users play through in order.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">{onboardingTemplates.length}</p>
-        <p className="text-xs text-muted-foreground">quest{onboardingTemplates.length !== 1 ? 's' : ''}</p>
-      </button>
-
-      <button
-        onClick={() => setView('streaks')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-orange-500/25 hover:bg-orange-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
-            <Flame className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Streak Manager</p>
-        <p className="mt-1 text-sm text-muted-foreground">Login streak commitments and goal prizes.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">
-          {loginStreakConfig ? (loginStreakConfig.isActive ? 'On' : 'Off') : '–'}
-        </p>
-        <p className="text-xs text-muted-foreground">login streak</p>
-      </button>
-
-      <button
-        onClick={() => setView('shields')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-emerald-500/25 hover:bg-emerald-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
-            <Icon name="lilyPad" className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Shields</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Lily Pad price, caps, cooldowns and how often the offer may appear.
-        </p>
-        <p className="mt-4 text-3xl font-black text-foreground">
-          {shieldConfig ? shieldConfig.priceFlies.toLocaleString() : '–'}
-        </p>
-        <p className="text-xs text-muted-foreground">flies each</p>
-      </button>
-
-      <button
-        onClick={() => setView('pact')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-teal-500/25 hover:bg-teal-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
-            <CalendarDays className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Areas &amp; Leap</p>
-        <p className="mt-1 text-sm text-muted-foreground">Focus areas, the starter plan, and the Leap: hops, marks, streak and Lilies.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
-        <p className="text-xs text-muted-foreground">
-          focus area{adminCategories.length !== 1 ? 's' : ''} · Leap rewards
-        </p>
-      </button>
-
-      <button
-        onClick={() => setView('moveToWeb')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-sky-500/25 hover:bg-sky-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
-            <Monitor className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Move to Web</p>
-        <p className="mt-1 text-sm text-muted-foreground">Nudge phone-only users to log in on the web.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">
-          {moveToWebConfig ? (moveToWebConfig.isActive ? 'On' : 'Off') : '–'}
-        </p>
-        <p className="text-xs text-muted-foreground">move to web</p>
-      </button>
-
-      <button
-        onClick={() => {
-          setResult(null);
-          setView('season');
-        }}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-amber-500/25 hover:bg-amber-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-            <Gift className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Season</p>
-        <p className="mt-1 text-sm text-muted-foreground">A new pass every month. Plan the name, art and skins ahead.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">Monthly</p>
-        <p className="text-xs text-muted-foreground">auto-scheduled</p>
-      </button>
-    </div>
-  );
 
   // ── Quest list (shared by Daily and Category views) ───────────────────────
   const renderQuestList = (questTemplates: AdminQuestTemplate[]) => (
@@ -848,7 +653,7 @@ export function AdminQuestManagerPage() {
         <button
           key={template.id}
           onClick={() => navigateToQuestForm(template)}
-          className="group flex w-full items-center gap-5 rounded-2xl border border-border/40 bg-card/60 p-4 text-left transition hover:border-primary/20 hover:bg-primary/[0.03]"
+          className="group flex w-full items-center gap-5 rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] p-4 text-left transition hover:border-primary/20 hover:bg-primary/[0.03]"
         >
           {/* Cover thumbnail */}
           <div className="h-20 w-28 shrink-0 overflow-hidden rounded-xl bg-muted/40">
@@ -891,264 +696,51 @@ export function AdminQuestManagerPage() {
     </div>
   );
 
-  // ── Daily view ────────────────────────────────────────────────────────────
   const renderDaily = () => (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Every user gets one daily quest rolled from this recipe — one objective
-        per slot, easiest first.
-      </p>
-      {adminRecipes.map(renderRecipeCard)}
+    <div className="space-y-6">
+      {loading && adminRecipes.length === 0 ? <LoadingBlock rows={2} /> : null}
+      {adminRecipes.map((r) => (
+        <DailyQuestEditor
+          key={r.recipeId}
+          recipe={r}
+          onChange={(updater) => updateRecipe(r.recipeId, updater)}
+          rewardCatalog={rewardCatalog}
+          onEditRewards={(slotId, kind) => setRecipeRewardTarget({ recipeId: r.recipeId, slotId, kind })}
+          onOpenLibrary={() => goTab('asks')}
+          onResetDefault={() => void resetRecipeToDefault(r.recipeId)}
+          resetting={resettingRecipeId === r.recipeId}
+          afterLineup={renderSweepCard()}
+        />
+      ))}
       {recipeRewardDialog}
-      {renderSweepCard()}
     </div>
   );
 
-  // ── Onboarding quests view ────────────────────────────────────────────────
   const renderOnboarding = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          New users see one quest at a time, oldest first. The next quest
-          appears once every reward in the previous one is claimed.
-        </p>
-        <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm()}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add Quest
-        </Button>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <SectionLabel>First-week quests</SectionLabel>
+          <p className="mt-0.5 max-w-xl text-[13px] font-medium text-muted-foreground">
+            New players see one at a time, oldest first. The next one appears once every reward in the previous one
+            is claimed.
+          </p>
+        </div>
+        <PondButton size="sm" onClick={() => navigateToQuestForm()}>
+          <Plus className="h-3.5 w-3.5" />
+          New quest
+        </PondButton>
       </div>
       {renderQuestList(onboardingTemplates)}
-    </div>
-  );
-
-  // ── Streak manager view ───────────────────────────────────────────────────
-  const renderStreaks = () => (
-    <div className="space-y-4">
-      {loading && !loginStreakConfig && (
-        <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>
-      )}
-      {renderLoginStreakCard()}
-    </div>
-  );
-
-  const saveShieldConfig = async () => {
-    if (!shieldConfig) return;
-    setSavingShields(true);
-    setResult(null);
-    try {
-      const res = await fetch('/api/admin/shields', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(shieldConfig),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save shields');
-      setShieldConfig(data.shields);
-      setResult({ type: 'success', message: 'Shields saved' });
-    } catch (error) {
-      setResult({
-        type: 'error',
-        message:
-          error instanceof Error ? error.message : 'Could not save shields',
-      });
-    } finally {
-      setSavingShields(false);
-    }
-  };
-
-  const shieldField = (
-    label: string,
-    field: keyof Omit<AdminShieldConfig, 'isActive' | 'limits'>,
-    hint: string,
-    min: number,
-    max: number,
-  ) => (
-    <label key={field} className="block">
-      <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={shieldConfig?.[field] ?? 0}
-        onChange={(e) =>
-          setShieldConfig((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  [field]: Math.min(
-                    max,
-                    Math.max(min, Math.floor(Number(e.target.value) || 0)),
-                  ),
-                }
-              : prev,
-          )
-        }
-        className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-      />
-      <span className="mt-1 block max-w-[15rem] text-[11px] leading-snug text-muted-foreground">
-        {hint}
-      </span>
-    </label>
-  );
-
-  const renderShields = () => {
-    if (!shieldConfig) {
-      return (
-        <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">
-          Loading...
-        </div>
-      );
-    }
-    const capMin = shieldConfig.limits?.capMin ?? 1;
-    const capMax = shieldConfig.limits?.capMax ?? 5;
-    return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-foreground">
-                Lily Pad (one shield, every streak)
-              </p>
-              <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
-                Auto-consumes on a miss — never equipped, never armed. Protects
-                the login streak and the Leap streak. It is not sold in the
-                shop: the only place to buy one is the offer that appears when a
-                user holds none and has something on the line.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={shieldConfig.isActive}
-              onClick={() =>
-                setShieldConfig((prev) =>
-                  prev ? { ...prev, isActive: !prev.isActive } : prev,
-                )
-              }
-              className={cn(
-                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                shieldConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
-              )}
-            >
-              <span
-                className={cn(
-                  'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                  shieldConfig.isActive
-                    ? 'translate-x-[22px]'
-                    : 'translate-x-0.5',
-                )}
-              />
-            </button>
-          </div>
-
-          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
-            Price
-          </p>
-          <div className="mt-2 flex flex-wrap items-start gap-5">
-            {shieldField(
-              'Price (flies)',
-              'priceFlies',
-              'What one costs in the offer.',
-              1,
-              100000,
-            )}
-            {shieldField(
-              'Two-pack (flies)',
-              'twoPackPriceFlies',
-              'Only shown when there is room for two.',
-              1,
-              200000,
-            )}
-          </div>
-
-          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
-            Holding
-          </p>
-          <div className="mt-2 flex flex-wrap items-start gap-5">
-            {shieldField(
-              'Cap — free',
-              'capFree',
-              'Most a free user can hold at once.',
-              capMin,
-              capMax,
-            )}
-            {shieldField(
-              'Cap — Plus',
-              'capPlus',
-              'Most a Plus user can hold at once.',
-              capMin,
-              capMax,
-            )}
-            {shieldField(
-              'Plus monthly grant',
-              'plusMonthlyGrant',
-              'Free ones handed to Plus each calendar month. 0 turns it off.',
-              0,
-              capMax,
-            )}
-          </div>
-
-          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
-            Rescue limit
-          </p>
-          <div className="mt-2 flex flex-wrap items-start gap-5">
-            {shieldField(
-              'Rescue cooldown (days)',
-              'rescueCooldownDays',
-              'Max one rescue per system per this many days. A streak that cannot break stops motivating.',
-              0,
-              365,
-            )}
-          </div>
-
-          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
-            Offer popup
-          </p>
-          <div className="mt-2 flex flex-wrap items-start gap-5">
-            {shieldField(
-              'Offer cooldown (days)',
-              'offerCooldownDays',
-              'Minimum gap between auto-shows. Doubles after each dismissal, up to 4×.',
-              1,
-              365,
-            )}
-            {shieldField(
-              'Offer min streak',
-              'offerMinStreak',
-              'Nothing at stake below this — the popup stays away.',
-              1,
-              365,
-            )}
-          </div>
-
-          <div className="mt-5 flex">
-            <Button
-              size="sm"
-              className="ml-auto rounded-xl font-black"
-              onClick={() => void saveShieldConfig()}
-              disabled={savingShields}
-            >
-              {savingShields ? 'Saving…' : 'Save shields'}
-            </Button>
-          </div>
-        </div>
+      <div className="space-y-2 pt-2">
+        <SectionLabel>Try it on the web</SectionLabel>
+        <MoveToWebCard />
       </div>
-    );
-  };
-
-  const renderMoveToWeb = () => (
-    <div className="space-y-4">
-      {loading && !moveToWebConfig && (
-        <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>
-      )}
-      {renderMoveToWebCard()}
     </div>
   );
 
-  // ── Focus categories view ─────────────────────────────────────────────────
+  const renderStreaks = () => <DailyStreakPage />;
+
   const updateRecipe = (
     recipeId: string,
     updater: (recipe: AdminRecipe) => AdminRecipe,
@@ -1168,118 +760,6 @@ export function AdminQuestManagerPage() {
       slots: r.slots.map((slot) =>
         slot.id === slotId ? { ...slot, ...patch } : slot,
       ),
-    }));
-  };
-
-  const updateRecipePoolEntry = (
-    recipeId: string,
-    slotId: string,
-    entryId: string,
-    patch: Partial<AdminRecipePoolEntry>,
-  ) => {
-    updateRecipe(recipeId, (r) => ({
-      ...r,
-      slots: r.slots.map((slot) =>
-        slot.id === slotId
-          ? {
-              ...slot,
-              pool: slot.pool.map((entry) =>
-                entry.id === entryId ? { ...entry, ...patch } : entry,
-              ),
-            }
-          : slot,
-      ),
-    }));
-  };
-
-  const addRecipePoolEntry = (recipeId: string, slotId: string) => {
-    const entry: AdminRecipePoolEntry = {
-      id: crypto.randomUUID(),
-      type: 'count',
-      action: 'complete',
-      minTarget: 3,
-      maxTarget: 5,
-      weight: 1,
-    };
-    updateRecipe(recipeId, (r) => ({
-      ...r,
-      slots: r.slots.map((slot) =>
-        slot.id === slotId ? { ...slot, pool: [...slot.pool, entry] } : slot,
-      ),
-    }));
-  };
-
-  const removeRecipePoolEntry = (
-    recipeId: string,
-    slotId: string,
-    entryId: string,
-  ) => {
-    updateRecipe(recipeId, (r) => ({
-      ...r,
-      slots: r.slots.map((slot) =>
-        slot.id === slotId
-          ? { ...slot, pool: slot.pool.filter((e) => e.id !== entryId) }
-          : slot,
-      ),
-    }));
-  };
-
-  const updateRecipeBonusChance = (
-    recipeId: string,
-    slotId: string,
-    index: number,
-    percent: number,
-  ) => {
-    const chance = Math.min(100, Math.max(1, Math.round(percent))) / 100;
-    updateRecipe(recipeId, (r) => ({
-      ...r,
-      slots: r.slots.map((slot) =>
-        slot.id === slotId
-          ? {
-              ...slot,
-              bonusRewards: (slot.bonusRewards ?? []).map((bonus, bi) =>
-                bi === index ? { ...bonus, chance } : bonus,
-              ),
-            }
-          : slot,
-      ),
-    }));
-  };
-
-  const addRecipeSlot = (recipeId: string) => {
-    updateRecipe(recipeId, (r) => ({
-      ...r,
-      slots: [
-        ...r.slots,
-        {
-          id: crypto.randomUUID(),
-          pool: [
-            {
-              id: crypto.randomUUID(),
-              type: 'count',
-              action: 'complete',
-              minTarget: 5,
-              maxTarget: 8,
-              weight: 1,
-            },
-          ],
-          rewards: [
-            {
-              type: 'FLIES',
-              amountMode: 'random',
-              minAmount: 10,
-              maxAmount: 15,
-            },
-          ],
-        },
-      ],
-    }));
-  };
-
-  const removeRecipeSlot = (recipeId: string, slotId: string) => {
-    updateRecipe(recipeId, (r) => ({
-      ...r,
-      slots: r.slots.filter((slot) => slot.id !== slotId),
     }));
   };
 
@@ -1304,6 +784,7 @@ export function AdminQuestManagerPage() {
         throw new Error(reloadedData.error || 'Could not reload recipes');
       }
       setAdminRecipes((reloadedData.recipes ?? []) as AdminRecipe[]);
+      setSavedRecipes((reloadedData.recipes ?? []) as AdminRecipe[]);
       setResult({
         type: 'success',
         message: 'Recipe reset to the built-in default',
@@ -1316,7 +797,6 @@ export function AdminQuestManagerPage() {
       });
     } finally {
       setResettingRecipeId(null);
-      setConfirmResetRecipeId(null);
     }
   };
 
@@ -1335,8 +815,9 @@ export function AdminQuestManagerPage() {
       if (!res.ok) throw new Error(data.error || 'Could not save recipe');
       if (data.recipe) {
         updateRecipe(recipeId, () => data.recipe as AdminRecipe);
+        setSavedRecipes((prev) => prev.map((r) => (r.recipeId === recipeId ? (data.recipe as AdminRecipe) : r)));
       }
-      setResult({ type: 'success', message: 'Recipe saved' });
+      setResult({ type: 'success', message: 'Daily quests saved' });
     } catch (error) {
       setResult({
         type: 'error',
@@ -1355,408 +836,6 @@ export function AdminQuestManagerPage() {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-
-  const handleRecipeCoverFile = async (
-    recipeId: string,
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
-    updateRecipe(recipeId, (prev) => ({ ...prev, coverImageUrl: dataUrl }));
-  };
-
-  const renderRecipeCard = (r: AdminRecipe) => {
-    const open = openRecipeId === r.recipeId;
-    return (
-      <div key={r.recipeId} className="rounded-2xl border border-border/40 bg-card/60">
-        <button
-          type="button"
-          onClick={() => setOpenRecipeId(open ? null : r.recipeId)}
-          className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-              Generated daily quest
-              <span className={cn(
-                'rounded-full border px-2 py-0.5 text-[12px] font-black tracking-wide',
-                r.isActive
-                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'border-border/50 bg-muted/40 text-muted-foreground',
-              )}>
-                {r.isActive ? 'On' : 'Off'}
-              </span>
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {`One quest · ${r.slots.length} objectives: start now, come back, close the day`}
-            </p>
-          </div>
-          <span className="text-xs font-bold text-muted-foreground">{open ? 'Hide' : 'Edit'}</span>
-        </button>
-
-        {open && (
-          <div className="space-y-3 border-t border-border/30 px-4 py-4">
-            <button
-                  type="button"
-                  onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, isActive: !prev.isActive }))}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition',
-                    r.isActive
-                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30',
-                  )}
-                >
-                  {r.isActive ? 'Generated daily quest on' : 'Generated daily quest off'}
-                </button>
-                <label className="grid gap-1.5">
-                  <span className="text-[12px] font-black text-muted-foreground">Quest title</span>
-                  <input
-                    value={r.name}
-                    onChange={(e) => updateRecipe(r.recipeId, (prev) => ({ ...prev, name: e.target.value }))}
-                    className="h-10 w-full max-w-xs rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/30"
-                  />
-                </label>
-                <div className="grid gap-1.5">
-                  <span className="text-[12px] font-black text-muted-foreground">Cover image</span>
-                  <div className="flex items-center gap-3">
-                    <div className="h-14 w-24 overflow-hidden rounded-xl border border-border/50 bg-muted/40">
-                      {r.coverImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.coverImageUrl} alt="" className="h-full w-full object-cover" />
-                      ) : null}
-                    </div>
-                    <label className="cursor-pointer rounded-full border border-border/50 bg-background px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
-                      {r.coverImageUrl ? 'Change' : 'Upload'}
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => void handleRecipeCoverFile(r.recipeId, e)} />
-                    </label>
-                    {r.coverImageUrl && (
-                      <button
-                        type="button"
-                        onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, coverImageUrl: undefined }))}
-                        className="text-[11px] font-bold text-red-500/80 hover:text-red-500"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-            {r.slots.map((slot, slotIndex) => (
-              <div key={slot.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <span className="text-[12px] font-black text-muted-foreground">
-                    Objective {slotIndex + 1} · {recipeSlotRole(slotIndex, r.slots.length)}
-                  </span>
-                  {r.slots.length > 1 && (
-                    <button onClick={() => removeRecipeSlot(r.recipeId, slot.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {slot.pool.map((entry) => {
-                    const isStreakEntry =
-                      entry.type === 'metric_count' &&
-                      !!entry.metricKey?.startsWith('task_streak');
-                    return (
-                    <div key={entry.id} className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
-                      <InlinePillSelect
-                        value={entry.type}
-                        onChange={(v) =>
-                          updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                            type: v as AdminRecipePoolEntry['type'],
-                            action: v === 'count' ? entry.action ?? 'complete' : undefined,
-                            metricKey: v === 'metric_count' ? entry.metricKey ?? 'trade_completed' : undefined,
-                            sessionMinutes: v === 'deep_session' ? entry.sessionMinutes ?? 25 : undefined,
-                            requiresFollowThrough: v === 'count' ? entry.requiresFollowThrough : undefined,
-                            beforeHour: v === 'count' ? entry.beforeHour : undefined,
-                            scaleFromHistory:
-                              v === 'count' || v === 'focus_minutes'
-                                ? entry.scaleFromHistory
-                                : undefined,
-                            scaleFactor:
-                              v === 'count' || v === 'focus_minutes'
-                                ? entry.scaleFactor
-                                : undefined,
-                          })
-                        }
-                      >
-                        <option value="count">Tasks</option>
-                        <option value="focus_minutes">Focus minutes</option>
-                        <option value="distinct_days">Days shown up</option>
-                        <option value="deep_session">Unbroken sessions</option>
-                        <option value="day_parts">Parts of the day</option>
-                        <option value="metric_count">App action</option>
-                      </InlinePillSelect>
-                      {entry.type === 'count' && (
-                        <InlinePillSelect
-                          value={entry.action ?? 'complete'}
-                          onChange={(v) =>
-                            updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                              action: v as 'complete' | 'add',
-                              requiresFollowThrough: v === 'add' ? entry.requiresFollowThrough : undefined,
-                              beforeHour: v === 'complete' ? entry.beforeHour : undefined,
-                            })
-                          }
-                        >
-                          <option value="complete">complete</option>
-                          <option value="add">add</option>
-                        </InlinePillSelect>
-                      )}
-                      {entry.type === 'count' && entry.action === 'add' && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                              requiresFollowThrough: !entry.requiresFollowThrough,
-                            })
-                          }
-                          className={cn(
-                            'rounded-full border px-2 py-0.5 text-[11px] font-bold transition',
-                            entry.requiresFollowThrough
-                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'border-border/50 bg-background text-muted-foreground hover:text-foreground',
-                          )}
-                        >
-                          {entry.requiresFollowThrough ? '+ finish them' : 'add only'}
-                        </button>
-                      )}
-                      {entry.type === 'count' && (entry.action ?? 'complete') === 'complete' && (
-                        <>
-                          <span className="text-sm font-medium text-muted-foreground">· before hour</span>
-                          <InlinePillNumber
-                            value={entry.beforeHour ?? 0}
-                            onChange={(v) =>
-                              updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                                beforeHour: v >= 1 && v <= 23 ? v : undefined,
-                              })
-                            }
-                          />
-                          <span className="text-sm font-medium text-muted-foreground">
-                            {entry.beforeHour ? '' : '(0 = any time)'}
-                          </span>
-                        </>
-                      )}
-                      {entry.type === 'deep_session' && (
-                        <>
-                          <span className="text-sm font-medium text-muted-foreground">· of</span>
-                          <InlinePillNumber
-                            value={entry.sessionMinutes ?? 25}
-                            onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { sessionMinutes: v })}
-                          />
-                          <span className="text-sm font-medium text-muted-foreground">min each,</span>
-                        </>
-                      )}
-                      {entry.type === 'metric_count' && (
-                        <InlinePillSelect
-                          value={entry.metricKey?.startsWith('task_streak') ? 'task_streak_3' : entry.metricKey ?? 'trade_completed'}
-                          onChange={(v) =>
-                            updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                              metricKey: v,
-                              ...(v === 'task_streak_3'
-                                ? {
-                                    streakDaysMin: entry.streakDaysMin ?? 3,
-                                    streakDaysMax: entry.streakDaysMax ?? entry.streakDaysMin ?? 3,
-                                  }
-                                : { streakDaysMin: undefined, streakDaysMax: undefined }),
-                            })
-                          }
-                        >
-                          {Object.entries(QUEST_METRIC_COPY).map(([key, copy]) => (
-                            <option key={key} value={key}>{copy.adminLabel}</option>
-                          ))}
-                        </InlinePillSelect>
-                      )}
-                      {isStreakEntry && (
-                        <>
-                          <span className="text-sm font-medium text-muted-foreground">· streak length</span>
-                          <InlinePillNumber value={entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMin: v })} />
-                          <span className="text-sm font-medium text-muted-foreground">to</span>
-                          <InlinePillNumber value={entry.streakDaysMax ?? entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMax: v })} />
-                          <span className="text-sm font-medium text-muted-foreground">days, on</span>
-                        </>
-                      )}
-                      {(entry.type === 'count' || entry.type === 'focus_minutes') && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                                scaleFromHistory: !entry.scaleFromHistory,
-                                scaleFactor: entry.scaleFromHistory
-                                  ? undefined
-                                  : entry.scaleFactor ?? 1,
-                              })
-                            }
-                            className={cn(
-                              'rounded-full border px-2 py-0.5 text-[11px] font-bold transition',
-                              entry.scaleFromHistory
-                                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                : 'border-border/50 bg-background text-muted-foreground hover:text-foreground',
-                            )}
-                          >
-                            {entry.scaleFromHistory ? 'scale to user' : 'fixed range'}
-                          </button>
-                          {entry.scaleFromHistory && (
-                            <>
-                              <InlinePillNumber
-                                min={10}
-                                value={Math.round((entry.scaleFactor ?? 1) * 100)}
-                                onChange={(v) =>
-                                  updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
-                                    scaleFactor: Math.min(3, Math.max(0.1, v / 100)),
-                                  })
-                                }
-                              />
-                              <span className="text-sm font-medium text-muted-foreground">
-                                % of their usual day, clamped
-                              </span>
-                            </>
-                          )}
-                        </>
-                      )}
-                      <InlinePillNumber value={entry.minTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { minTarget: v })} />
-                      <span className="text-sm font-medium text-muted-foreground">to</span>
-                      <InlinePillNumber value={entry.maxTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { maxTarget: v })} />
-                      {isStreakEntry && (
-                        <span className="text-sm font-medium text-muted-foreground">repeating tasks</span>
-                      )}
-                      <span className="text-sm font-medium text-muted-foreground">· weight</span>
-                      <InlinePillNumber value={entry.weight} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { weight: v })} />
-                      {slot.pool.length > 1 && (
-                        <button onClick={() => removeRecipePoolEntry(r.recipeId, slot.id, entry.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => addRecipePoolEntry(r.recipeId, slot.id)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Pool option
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecipeRewardTarget({ recipeId: r.recipeId, slotId: slot.id, kind: 'rewards' })}
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-2.5 py-1 text-[11px] font-bold text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-400"
-                  >
-                    <Gift className="h-3 w-3" />
-                    Reward
-                  </button>
-                  {slot.rewards.length > 1 && (
-                    <span className="text-[12px] font-bold tracking-wide text-muted-foreground">
-                      rolls one of
-                    </span>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {slot.rewards.map((reward, ri) => (
-                      <RewardTile
-                        key={`${ri}-${reward.type}-${reward.itemId ?? reward.amount ?? ''}`}
-                        reward={reward}
-                        rewardCatalog={rewardCatalog}
-                        isPremium={false}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setRecipeRewardTarget({ recipeId: r.recipeId, slotId: slot.id, kind: 'bonus' })}
-                    className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/8 px-2.5 py-1 text-[11px] font-bold text-amber-600 transition hover:bg-amber-500/15 dark:text-amber-400"
-                  >
-                    <Gift className="h-3 w-3" />
-                    Bonus
-                  </button>
-                  {(slot.bonusRewards?.length ?? 0) > 0 ? (
-                    (slot.bonusRewards ?? []).map((bonus, bi) => (
-                      <div key={bi} className="flex items-center gap-1.5 leading-[30px]">
-                        <RewardTile
-                          reward={bonus.reward}
-                          rewardCatalog={rewardCatalog}
-                          isPremium={false}
-                        />
-                        <InlinePillNumber
-                          value={Math.round(bonus.chance * 100)}
-                          onChange={(v) =>
-                            updateRecipeBonusChance(r.recipeId, slot.id, bi, v)
-                          }
-                        />
-                        <span className="text-sm font-medium text-muted-foreground">% chance</span>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-[12px] font-bold tracking-wide text-muted-foreground">
-                      lands on top of the reward, at its own odds
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => addRecipeSlot(r.recipeId)}
-                className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add objective
-              </button>
-              <div className="flex items-center gap-2">
-                {confirmResetRecipeId === r.recipeId ? (
-                  <>
-                    <span className="text-xs font-bold text-red-500">
-                      Discard these objectives?
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmResetRecipeId(null)}
-                      className="rounded-xl border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:text-foreground"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void resetRecipeToDefault(r.recipeId)}
-                      disabled={resettingRecipeId === r.recipeId}
-                      className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-500/20 disabled:opacity-60"
-                    >
-                      {resettingRecipeId === r.recipeId
-                        ? 'Resetting…'
-                        : 'Reset to default'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmResetRecipeId(r.recipeId)}
-                    className="inline-flex items-center gap-1 rounded-xl border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-red-500/30 hover:text-red-500"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Reset to default
-                  </button>
-                )}
-                <Button size="sm" className="rounded-xl font-black" onClick={() => void saveRecipe(r.recipeId)} disabled={savingRecipeId === r.recipeId}>
-                  {savingRecipeId === r.recipeId ? 'Saving…' : 'Save recipe'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const recipeRewardDialogSlot = recipeRewardTarget
     ? adminRecipes
@@ -1837,7 +916,7 @@ export function AdminQuestManagerPage() {
   const renderSweepCard = () => {
     if (!sweepConfig) return null;
     return (
-      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+      <div className="rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] px-4 py-3.5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-bold text-foreground">
@@ -1865,7 +944,7 @@ export function AdminQuestManagerPage() {
           >
             <span
               className={cn(
-                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                'absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
                 sweepConfig.isActive ? 'translate-x-[22px]' : 'translate-x-0.5',
               )}
             />
@@ -2048,487 +1127,8 @@ export function AdminQuestManagerPage() {
     );
   };
 
-  const saveMoveToWebConfig = async () => {
-    if (!moveToWebConfig) return;
-    setSavingMoveToWeb(true);
-    setResult(null);
-    try {
-      const res = await fetch('/api/admin/quests/move-to-web', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          isActive: moveToWebConfig.isActive,
-          reward: moveToWebConfig.reward,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save move to web');
-      setMoveToWebConfig(data.moveToWeb);
-      setResult({ type: 'success', message: 'Move to web saved' });
-    } catch (error) {
-      setResult({
-        type: 'error',
-        message:
-          error instanceof Error ? error.message : 'Could not save move to web',
-      });
-    } finally {
-      setSavingMoveToWeb(false);
-    }
-  };
-
-  const renderMoveToWebCard = () => {
-    if (!moveToWebConfig) return null;
-    return (
-      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-foreground">Move to web</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Shows under the daily quests for users who play on their phone but
-              have never opened the web. They complete it by logging in on the
-              web, then claim the prize below. It never appears as “up next”.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={moveToWebConfig.isActive}
-            onClick={() =>
-              setMoveToWebConfig((prev) =>
-                prev ? { ...prev, isActive: !prev.isActive } : prev,
-              )
-            }
-            className={cn(
-              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-              moveToWebConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
-            )}
-          >
-            <span
-              className={cn(
-                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                moveToWebConfig.isActive
-                  ? 'translate-x-[22px]'
-                  : 'translate-x-0.5',
-              )}
-            />
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <div className="min-w-0 flex-1">
-            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Prize (every user gets this one)
-            </span>
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              {moveToWebConfig.reward ? (
-                <RewardTile
-                  reward={moveToWebConfig.reward}
-                  rewardCatalog={rewardCatalog}
-                  isPremium={false}
-                />
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  No prize yet.
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => setMoveToWebRewardPickerOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-              >
-                <Pencil className="h-3 w-3" />
-                {moveToWebConfig.reward ? 'Change prize' : 'Pick prize'}
-              </button>
-            </div>
-          </div>
-
-          <Button
-            size="sm"
-            className="rounded-xl font-black"
-            onClick={() => void saveMoveToWebConfig()}
-            disabled={savingMoveToWeb}
-          >
-            {savingMoveToWeb ? 'Saving…' : 'Save move to web'}
-          </Button>
-        </div>
-
-        <RewardPickerDialog
-          open={moveToWebRewardPickerOpen}
-          onOpenChange={setMoveToWebRewardPickerOpen}
-          rewards={moveToWebConfig.reward ? [moveToWebConfig.reward] : []}
-          rewardItems={rewardItems}
-          rewardCatalog={rewardCatalog}
-          singleSelect
-          onSave={(rewards) => {
-            setMoveToWebConfig((prev) =>
-              prev ? { ...prev, reward: rewards[0] ?? null } : prev,
-            );
-            setMoveToWebRewardPickerOpen(false);
-          }}
-        />
-      </div>
-    );
-  };
-
-  const saveLoginStreakConfig = async () => {
-    if (!loginStreakConfig) return;
-    setSavingLoginStreak(true);
-    setResult(null);
-    try {
-      const res = await fetch('/api/admin/streak/login', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          isActive: loginStreakConfig.isActive,
-          saverMinStreak: loginStreakConfig.saverMinStreak,
-          repeatPayoutPercents: loginStreakConfig.repeatPayoutPercents,
-          repeatPayoutFloorPercent: loginStreakConfig.repeatPayoutFloorPercent,
-          repeatItemsAtFullOnly: loginStreakConfig.repeatItemsAtFullOnly,
-          goalTiers: loginStreakConfig.goalTiers,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save login streak');
-      setLoginStreakConfig(data.loginStreak);
-      setResult({ type: 'success', message: 'Login streak saved' });
-    } catch (error) {
-      setResult({
-        type: 'error',
-        message:
-          error instanceof Error ? error.message : 'Could not save login streak',
-      });
-    } finally {
-      setSavingLoginStreak(false);
-    }
-  };
-
-  const isShieldReward = (reward: LoginStreakReward) =>
-    reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE';
-  const isSkinRollReward = (r: LoginStreakReward) =>
-    (r as { type?: string }).type === 'SKIN_ROLL';
-  const loginQuestRewards = (rewards: LoginStreakReward[]) =>
-    rewards.filter(
-      (r) => !isShieldReward(r) && !isSkinRollReward(r),
-    ) as QuestReward[];
-  const loginSkinRarity = (rewards: LoginStreakReward[]) =>
-    (rewards.find(isSkinRollReward) as { minRarity?: string } | undefined)
-      ?.minRarity ?? '';
-  const loginShieldCount = (rewards: LoginStreakReward[]) =>
-    rewards.reduce(
-      (sum, r) => (isShieldReward(r) ? sum + ((r as any).amount ?? 1) : sum),
-      0,
-    );
-  const setLoginTier = (
-    list: 'goalTiers',
-    days: number,
-    updater: (tier: AdminLoginStreakTier) => AdminLoginStreakTier | null,
-  ) => {
-    setLoginStreakConfig((prev) => {
-      if (!prev) return prev;
-      const tiers = prev[list]
-        .map((tier) => (tier.days === days ? updater(tier) : tier))
-        .filter(Boolean) as AdminLoginStreakTier[];
-      return { ...prev, [list]: tiers };
-    });
-  };
-  const mergeLoginRewards = (
-    quest: QuestReward[],
-    shields: number,
-    skinRarity = '',
-  ) => [
-    ...quest,
-    ...(shields > 0
-      ? [{ type: 'SHIELD', amount: shields } as LoginStreakReward]
-      : []),
-    ...(skinRarity
-      ? [{ type: 'SKIN_ROLL', minRarity: skinRarity } as unknown as LoginStreakReward]
-      : []),
-  ];
-
-  const renderLoginTierList = (
-    list: 'goalTiers',
-    tiers: AdminLoginStreakTier[],
-  ) => (
-    <div className="mt-2 space-y-2">
-      {tiers.map((tier) => (
-        <div
-          key={tier.days}
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-background px-3 py-2"
-        >
-          <span className="w-16 text-sm font-black text-foreground">
-            {tier.days}d
-          </span>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            {loginQuestRewards(tier.rewards).map((reward, ri) => (
-              <RewardTile
-                key={`${ri}-${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ''}`}
-                reward={reward}
-                rewardCatalog={rewardCatalog}
-                isPremium={false}
-              />
-            ))}
-            {loginShieldCount(tier.rewards) > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                <Icon name="lilyPad" className="h-3.5 w-3.5" />×
-                {loginShieldCount(tier.rewards)}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setLoginRewardTarget({ list, days: tier.days })}
-              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-            >
-              <Pencil className="h-3 w-3" />
-              Prizes
-            </button>
-          </div>
-          <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-            <span className="tracking-wide">Skin</span>
-            <select
-              value={loginSkinRarity(tier.rewards)}
-              onChange={(e) =>
-                setLoginTier(list, tier.days, (t) => ({
-                  ...t,
-                  rewards: mergeLoginRewards(
-                    loginQuestRewards(t.rewards),
-                    loginShieldCount(t.rewards),
-                    e.target.value,
-                  ),
-                }))
-              }
-              className="h-8 rounded-lg border border-border/50 bg-background px-1.5 text-xs font-bold text-foreground"
-            >
-              <option value="">none</option>
-              <option value="uncommon">Uncommon+</option>
-              <option value="rare">Rare+</option>
-              <option value="epic">Epic+</option>
-              <option value="legendary">Legendary</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-            <Icon name="lilyPad" label="Lily Pads" className="h-4 w-4" />
-            <input
-              type="number"
-              min={0}
-              max={3}
-              value={loginShieldCount(tier.rewards)}
-              onChange={(e) => {
-                const shields = Math.min(
-                  3,
-                  Math.max(0, Math.floor(Number(e.target.value) || 0)),
-                );
-                setLoginTier(list, tier.days, (t) => ({
-                  ...t,
-                  rewards: mergeLoginRewards(
-                    loginQuestRewards(t.rewards),
-                    shields,
-                    loginSkinRarity(t.rewards),
-                  ),
-                }));
-              }}
-              className="h-8 w-14 rounded-lg border border-border/50 bg-background px-2 text-sm font-bold text-foreground"
-            />
-          </label>
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderLoginStreakCard = () => {
-    if (!loginStreakConfig) return null;
-    const targetTier = loginRewardTarget
-      ? loginStreakConfig[loginRewardTarget.list].find(
-          (t) => t.days === loginRewardTarget.days,
-        )
-      : null;
-    return (
-      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-foreground">
-              Login streak (app entry)
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Opening the app daily grows the streak. Commitments grant the
-              prizes below. Missed days are covered by Lily Pads, tuned under
-              Shields.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={loginStreakConfig.isActive}
-            onClick={() =>
-              setLoginStreakConfig((prev) =>
-                prev ? { ...prev, isActive: !prev.isActive } : prev,
-              )
-            }
-            className={cn(
-              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-              loginStreakConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
-            )}
-          >
-            <span
-              className={cn(
-                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                loginStreakConfig.isActive
-                  ? 'translate-x-[22px]'
-                  : 'translate-x-0.5',
-              )}
-            />
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <label className="block">
-            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Saver push min streak
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={loginStreakConfig.saverMinStreak}
-              onChange={(e) =>
-                setLoginStreakConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        saverMinStreak: Math.min(
-                          10,
-                          Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                        ),
-                      }
-                    : prev,
-                )
-              }
-              className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Repeat payout %
-            </span>
-            <input
-              value={loginStreakConfig.repeatPayoutPercents.join(', ')}
-              onChange={(e) =>
-                setLoginStreakConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        repeatPayoutPercents: e.target.value
-                          .split(',')
-                          .map((part) => Math.floor(Number(part.trim())))
-                          .filter((n) => Number.isFinite(n) && n >= 1 && n <= 100),
-                      }
-                    : prev,
-                )
-              }
-              placeholder="100, 85, 70"
-              className="mt-1 block h-10 w-36 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Floor %
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={loginStreakConfig.repeatPayoutFloorPercent}
-              onChange={(e) =>
-                setLoginStreakConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        repeatPayoutFloorPercent: Math.min(
-                          100,
-                          Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                        ),
-                      }
-                    : prev,
-                )
-              }
-              className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              setLoginStreakConfig((prev) =>
-                prev
-                  ? { ...prev, repeatItemsAtFullOnly: !prev.repeatItemsAtFullOnly }
-                  : prev,
-              )
-            }
-            className={cn(
-              'h-10 rounded-xl border px-3 text-xs font-bold transition',
-              loginStreakConfig.repeatItemsAtFullOnly
-                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'border-border/50 bg-background text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {loginStreakConfig.repeatItemsAtFullOnly
-              ? 'Prizes only at 100%'
-              : 'Prizes on every repeat'}
-          </button>
-          <Button
-            size="sm"
-            className="ml-auto rounded-xl font-black"
-            onClick={() => void saveLoginStreakConfig()}
-            disabled={savingLoginStreak}
-          >
-            {savingLoginStreak ? 'Saving…' : 'Save login streak'}
-          </Button>
-        </div>
-
-        <p className="mt-3 text-[11px] font-semibold leading-snug text-muted-foreground">
-          Repeating the same rung pays the list in order, then the floor
-          forever. Stepping up to a longer pledge resets it to the first entry —
-          without that, everyone farms the shortest pledge and the ladder stops
-          pulling upward. Rescues are one Lily Pad per missed day, capped by the
-          rescue cooldown under Shields.
-        </p>
-
-        <div className="mt-4">
-          <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-            Commitment goals
-          </span>
-          {renderLoginTierList('goalTiers', loginStreakConfig.goalTiers)}
-        </div>
-
-        {loginRewardTarget && targetTier && (
-          <RewardPickerDialog
-            open
-            onOpenChange={(isOpen) => {
-              if (!isOpen) setLoginRewardTarget(null);
-            }}
-            rewards={loginQuestRewards(targetTier.rewards)}
-            rewardItems={rewardItems}
-            rewardCatalog={rewardCatalog}
-            onSave={(rewards) => {
-              setLoginTier(loginRewardTarget.list, loginRewardTarget.days, (t) => ({
-                ...t,
-                rewards: mergeLoginRewards(
-                  rewards,
-                  loginShieldCount(t.rewards),
-                  loginSkinRarity(t.rewards),
-                ),
-              }));
-              setLoginRewardTarget(null);
-            }}
-          />
-        )}
-      </div>
-    );
-  };
-
-  const renderPact = () => (
+  const renderAreas = () => (
     <div className="space-y-8">
-      <AdminStarterPlanConfigCard />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
@@ -2550,7 +1150,7 @@ export function AdminQuestManagerPage() {
           const confirmingDelete = confirmAction === deleteAction;
           const deletingCategory = deletingCategoryId === cat.id;
           return (
-            <div key={cat.id} className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5 transition hover:border-primary/20 hover:bg-primary/[0.03]">
+            <div key={cat.id} className="group flex items-center gap-4 rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] px-4 py-3.5 transition hover:border-primary/20 hover:bg-primary/[0.03]">
               <div
                 className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-muted/40 shadow-sm"
                 style={{
@@ -2611,7 +1211,7 @@ export function AdminQuestManagerPage() {
       </div>
       </div>
 
-      <AdminLeapManager />
+      <AdminStarterPlanConfigCard />
     </div>
   );
 
@@ -2786,7 +1386,7 @@ export function AdminQuestManagerPage() {
       <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
         <p className="flex-1 text-sm text-muted-foreground">{form.id ? 'Editing existing template.' : 'Creating a new template.'}</p>
         {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">{questDeleteButtonLabel}</Button>}
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setView('onboarding'); }} disabled={saving} className="rounded-xl">Cancel</Button>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setFormOpen(false); }} disabled={saving} className="rounded-xl">Cancel</Button>
         <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{questSaveButtonLabel}</Button>
       </div>
 
@@ -2814,81 +1414,64 @@ export function AdminQuestManagerPage() {
     </div>
   );
 
-  // ── Back button label ─────────────────────────────────────────────────────
-  const backLabel =
-    view === 'home' ? null : view === 'form' ? 'Onboarding' : 'Quest Manager';
+  const dirtyRecipeIds = adminRecipes
+    .filter((recipe) => {
+      const saved = savedRecipes.find((item) => item.recipeId === recipe.recipeId);
+      return !saved || JSON.stringify(saved) !== JSON.stringify(recipe);
+    })
+    .map((recipe) => recipe.recipeId);
 
-  const handleBack = () => {
-    setView(view === 'form' ? 'onboarding' : 'home');
+  const saveDirtyRecipes = async () => {
+    for (const recipeId of dirtyRecipeIds) {
+      await saveRecipe(recipeId);
+    }
   };
 
+  const copy = TAB_COPY[tab];
+  const editingQuest = tab === 'onboarding' && formOpen;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center gap-4">
-          {backLabel ? (
-            <button onClick={handleBack} className="flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-card text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-          ) : (
-            <Link href="/" className="flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-card text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          )}
-          <h1 className="text-2xl font-black tracking-tight text-foreground">
-            {view === 'home' && 'Quest Manager'}
-            {view === 'daily' && 'Daily Quests'}
-            {view === 'pact' && 'Areas & Leap'}
-            {view === 'onboarding' && 'Onboarding Quests'}
-            {view === 'streaks' && 'Streak Manager'}
-            {view === 'shields' && 'Shields'}
-            {view === 'moveToWeb' && 'Move to Web'}
-            {view === 'season' && 'Season'}
-            {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
-          </h1>
-        </div>
-
-        {/* Global result message */}
-        {result && view !== 'form' && (
-          <div className={cn(
-            'mb-6 flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium',
-            result.type === 'success'
-              ? 'bg-emerald-500/8 text-emerald-600 dark:text-emerald-400'
-              : 'bg-red-500/8 text-red-600 dark:text-red-400',
-          )}>
-            {result.type === 'success' ? <CheckCircle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+    <AdminPage
+      title={editingQuest ? (form.id ? 'Edit onboarding quest' : 'New onboarding quest') : copy.title}
+      subtitle={editingQuest ? 'Shown to new players in order, one at a time.' : copy.subtitle}
+      icon={copy.icon}
+      wide={tab === 'season'}
+      actions={
+        editingQuest ? (
+          <PondButton variant="secondary" size="sm" onClick={() => { resetForm(); setFormOpen(false); }}>
+            Back to the list
+          </PondButton>
+        ) : null
+      }
+    >
+        {result && !editingQuest ? (
+          <Notice type={result.type} className="mb-5">
             {result.message}
-          </div>
-        )}
+          </Notice>
+        ) : null}
 
-        {/* Content */}
-        {view === 'form' ? (
+        {editingQuest ? (
           renderForm()
         ) : (
           <>
-            {loading && view === 'home' ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
-            ) : (
-              <>
-                {view === 'home' && renderHome()}
-                {view === 'daily' && renderDaily()}
-                {view === 'onboarding' && renderOnboarding()}
-                {view === 'streaks' && renderStreaks()}
-                {view === 'shields' && renderShields()}
-                {view === 'pact' && renderPact()}
-                {view === 'moveToWeb' && renderMoveToWeb()}
-                {view === 'season' && (
-                  <AdminSeasonManager
-                    rewardItems={rewardItems}
-                    rewardCatalog={rewardCatalog}
-                  />
-                )}
-              </>
-            )}
+            {tab === 'daily' && renderDaily()}
+            {tab === 'asks' && <AdminPromptManager />}
+            {tab === 'onboarding' && renderOnboarding()}
+            {tab === 'season' && <AdminSeasonManager rewardItems={rewardItems} rewardCatalog={rewardCatalog} />}
+            {tab === 'areas' && renderAreas()}
+            {tab === 'leap' && <AdminLeapManager />}
+            {tab === 'streaks' && renderStreaks()}
           </>
         )}
+
+        <SaveBar
+          dirty={tab === 'daily' && dirtyRecipeIds.length > 0}
+          saving={savingRecipeId !== null}
+          onSave={() => void saveDirtyRecipes()}
+          onDiscard={() => setAdminRecipes(savedRecipes)}
+          label="Daily quests have unsaved changes"
+          saveLabel="Save lineup"
+        />
 
         {/* Category dialog */}
         <Dialog open={categoryDialogOpen} onOpenChange={(open) => { setCategoryDialogOpen(open); if (!open) setConfirmAction(null); }}>
@@ -2985,8 +1568,7 @@ export function AdminQuestManagerPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    </div>
+    </AdminPage>
   );
 }
 
@@ -3315,12 +1897,6 @@ function SweepTableEditor({
       />
     </div>
   );
-}
-
-function recipeSlotRole(index: number, total: number) {
-  if (index === 0) return 'start now';
-  if (index === total - 1 && total > 2) return 'close the day';
-  return 'come back later';
 }
 
 function InlinePillNumber({ value, onChange, min = 1, className }: { value: number; onChange: (v: number) => void; min?: number; className?: string }) {

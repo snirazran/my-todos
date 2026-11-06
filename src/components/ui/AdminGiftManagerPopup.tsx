@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { AdminPage } from '@/components/admin/kit';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CheckCircle,
@@ -117,13 +117,7 @@ const RARITY_TEXT: Record<ItemDef['rarity'], string> = {
   legendary: 'text-amber-700 dark:text-amber-400',
 };
 
-export function AdminGiftManagerPopup({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function AdminGiftManager() {
   const [gifts, setGifts] = useState<GiftConfig[]>([]);
   const [catalog, setCatalog] = useState<DbItem[]>([]);
   const [backgrounds, setBackgrounds] = useState<BackgroundPrize[]>([]);
@@ -154,9 +148,8 @@ export function AdminGiftManagerPopup({
   const [savingRules, setSavingRules] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
     loadData();
-  }, [open]);
+  }, []);
 
   const selectedGift = useMemo(
     () => gifts.find((config) => config.gift.id === selectedId) ?? null,
@@ -486,51 +479,14 @@ export function AdminGiftManagerPopup({
     }
   };
 
-  if (!open) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      <Fragment key="gift-manager-popup">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-md"
-      />
-      <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          onClick={(e) => e.stopPropagation()}
-          className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl"
-        >
-          <div className="shrink-0 border-b border-border/40 bg-gradient-to-br from-emerald-500/10 to-amber-500/10 px-6 py-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                  <Gift className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black tracking-tight text-foreground">
-                    Gift Manager
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Drop tables per gift, plus the shared pity and duplicate rules
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-
+  return (
+    <AdminPage
+      title="Gifts"
+      subtitle="Drop tables for each gift box, plus the shared Luck pity counter and duplicate rules."
+      icon={<Gift />}
+      wide
+    >
+      <div className="flex flex-col overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] md:h-[calc(100vh-12rem)]">
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="flex min-h-0 flex-col border-b border-border/50 p-4 md:border-b-0 md:border-r">
               <Button onClick={startAdd} className="mb-2 h-10 gap-2 font-bold">
@@ -1025,11 +981,8 @@ export function AdminGiftManagerPopup({
               )}
             </section>
           </div>
-        </motion.div>
       </div>
-      </Fragment>
-    </AnimatePresence>,
-    document.body,
+    </AdminPage>
   );
 }
 

@@ -1,866 +1,203 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { mutate } from 'swr';
+import { ArrowRight, Wrench } from 'lucide-react';
+import { AdminCard, AdminPage, IconTile, SectionLabel } from '@/components/admin/kit';
+import { ADMIN_NAV } from '@/components/admin/AdminShell';
 import {
-  ShieldCheck,
-  ChevronRight,
-  Image as ImageIcon,
-  Trash2,
-  DollarSign,
-  Sparkles,
-  AlertTriangle,
-  Gift,
-  Wind,
-  Bell,
-  RefreshCw,
-  Send,
-  CheckCircle,
-  XCircle,
-  Paintbrush,
-  ScrollText,
-  Bug,
-  CalendarCheck,
-  RefreshCcw,
-  UserPlus,
-  BarChart3,
-  MessageSquare,
-  Sliders,
-  Coins,
-  FlaskConical,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { useUIStore } from '@/lib/uiStore';
-import { AdminCosmeticsPopup } from '@/components/ui/AdminCosmeticsPopup';
-import { AdminGiftManagerPopup } from '@/components/ui/AdminGiftManagerPopup';
-import { AdminGuard } from '@/components/auth/AdminGuard';
-import { PlusWelcomeCelebration } from '@/components/ui/PlusWelcome';
-import { createPortal } from 'react-dom';
+  PROMPT_KIND_EMOJI,
+  entryMeta,
+  rewardLabel,
+  slotHeadline,
+  type AdminRecipe,
+} from '@/components/admin/quests/types';
+import type { QuestPromptKind } from '@/lib/quests/types';
 
-type Template = {
-  id: string;
-  label: string;
-  preview: string;
+type PromptLite = {
+  promptId: string;
+  kind: QuestPromptKind;
+  question: string;
+  isActive: boolean;
+  dateKey: string | null;
 };
 
-export default function AdminPage() {
-  return (
-    <AdminGuard>
-      <AdminPageContent />
-    </AdminGuard>
-  );
+const GROUP_BLURBS: Record<string, string> = {
+  Players: 'Who is playing, how they are doing, and handing someone a reward.',
+  'Quests page': 'The daily lineup, the question your frog asks, and the monthly pass.',
+  'New players': 'What someone sees in their first days: focus areas, starter plan and welcome quests.',
+  'Habits & streaks': 'The daily streak, the weekly Leap, and what a long task streak pays.',
+  'Closet & shop': 'What players can collect, and how the shop and trade-ups work.',
+  Flies: 'How many flies a day can pay, from where, and when an ad pays instead.',
+  Growth: 'Popups, offers and invites that bring players in and back.',
+  Testing: 'Tools for your own account. Nothing here touches players.',
+};
+
+function todayKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function AdminPageContent() {
-  const router = useRouter();
-  const { isDebugMode, setIsDebugMode } = useUIStore();
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
-  const [loading, setLoading] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+export default function AdminOverviewPage() {
+  const [recipe, setRecipe] = useState<AdminRecipe | null>(null);
+  const [prompts, setPrompts] = useState<PromptLite[] | null>(null);
 
-  // Notification test state
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [taskCount, setTaskCount] = useState(0);
-  const [hasTokens, setHasTokens] = useState(false);
-  const [tokenCount, setTokenCount] = useState(0);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [notifResult, setNotifResult] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-
-  // Popup managers
-  const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
-  const [giftManagerOpen, setGiftManagerOpen] = useState(false);
-
-  // Load notification data
   useEffect(() => {
-    async function loadNotifData() {
-      try {
-        const res = await fetch('/api/admin/test-notification', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setTemplates(data.templates);
-          setTaskCount(data.taskCount);
-          setHasTokens(data.hasTokens);
-          setTokenCount(data.tokenCount);
-          if (data.templates.length > 0) {
-            setSelectedTemplate((prev) => prev ?? data.templates[0].id);
-          }
-        }
-      } catch {
-        /* silent */
-      }
-    }
-    loadNotifData();
+    fetch('/api/admin/quest-recipes', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setRecipe((data?.recipes?.[0] as AdminRecipe | undefined) ?? null))
+      .catch(() => {});
+    fetch('/api/admin/quest-prompts', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setPrompts((data?.prompts as PromptLite[] | undefined) ?? []))
+      .catch(() => {});
   }, []);
 
-  const flash = (type: 'success' | 'error', text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 3500);
-  };
-
-  const handleSendTestNotification = async () => {
-    if (!selectedTemplate) return;
-    setLoading('test-notif');
-    setNotifResult(null);
-    try {
-      const res = await fetch('/api/admin/test-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ templateId: selectedTemplate }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNotifResult({
-          type: 'success',
-          message: `Sent to ${data.sent}/${data.totalTokens} device${data.totalTokens === 1 ? '' : 's'}`,
-        });
-      } else {
-        setNotifResult({ type: 'error', message: data.error || 'Failed to send' });
-      }
-    } catch {
-      setNotifResult({ type: 'error', message: 'Network error' });
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const runConfirmed = async (
-    key: string,
-    endpoint: string,
-    init: RequestInit,
-    onSuccess: () => void,
-  ) => {
-    if (confirmAction !== key) {
-      setConfirmAction(key);
-      return;
-    }
-    setLoading(key);
-    try {
-      const res = await fetch(endpoint, init);
-      if (res.ok) {
-        onSuccess();
-      } else {
-        flash('error', 'Action failed');
-      }
-    } catch {
-      flash('error', 'Network error');
-    } finally {
-      setLoading(null);
-      setConfirmAction(null);
-    }
-  };
-
-  const handleResetTasks = () =>
-    runConfirmed('reset-tasks', '/api/admin/reset-tasks', { method: 'POST' }, () =>
-      window.location.reload(),
-    );
-
-  const handleResetCash = () =>
-    runConfirmed('reset-cash', '/api/admin/reset-cash', { method: 'POST' }, () =>
-      window.location.reload(),
-    );
-
-  const handleResetDaily = () =>
-    runConfirmed('reset-daily', '/api/admin/reset-daily-reward', { method: 'POST' }, () =>
-      window.location.reload(),
-    );
-
-  const handleResetFlies = async () => {
-    setLoading('reset-flies');
-    try {
-      const res = await fetch('/api/admin/reset-flies');
-      if (res.ok) window.location.reload();
-      else flash('error', 'Failed to reset flies');
-    } catch {
-      flash('error', 'Network error');
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleAddFlies = async () => {
-    setLoading('add-flies');
-    try {
-      const res = await fetch('/api/admin/add-flies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 100000 }),
-      });
-      if (res.ok) window.location.reload();
-      else flash('error', 'Failed to add flies');
-    } catch {
-      flash('error', 'Network error');
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleResetPacts = () =>
-    runConfirmed(
-      'reset-pacts',
-      '/api/admin/reset-leap',
-      { method: 'POST', credentials: 'include' },
-      () => {
-        mutate((key) => typeof key === 'string' && key.startsWith('/api/leap'));
-        window.location.reload();
-      },
-    );
-
-  const handleRefreshQuests = () =>
-    runConfirmed(
-      'refresh-quests',
-      '/api/admin/reset-quests',
-      { method: 'POST', credentials: 'include' },
-      () => {
-        mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
-        window.location.reload();
-      },
-    );
+  const today = todayKey();
+  const activePrompts = (prompts ?? []).filter((prompt) => prompt.isActive);
+  const nextPinned = activePrompts
+    .filter((prompt) => prompt.dateKey && prompt.dateKey >= today)
+    .sort((a, b) => (a.dateKey ?? '').localeCompare(b.dateKey ?? ''))[0];
 
   return (
-    <div className="min-h-screen bg-background pb-16">
-      {/* Hero */}
-      <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-br from-amber-500/10 via-background to-orange-500/10">
-        <div className="max-w-5xl mx-auto px-6 md:px-12 pb-8 md:pb-10 pt-[calc(2rem+env(safe-area-inset-top))] md:pt-10">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                <ShieldCheck className="w-8 h-8" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black tracking-tight">Admin Dashboard</h1>
-                <p className="text-sm md:text-base text-muted-foreground font-medium">
-                  Internal tools, content managers, and developer utilities.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => router.push('/')}
-              className="text-xs md:text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ← Back to App
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-6 md:px-12 pt-6 md:pt-8 space-y-10">
-        {message && (
-          <div
-            className={`rounded-xl px-4 py-3 text-sm font-bold ${
-              message.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'bg-red-500/10 text-red-600 dark:text-red-400'
-            }`}
+    <AdminPage
+      title={`${greeting()}, pond keeper`}
+      subtitle="Everything that shapes a player's day, grouped by where they meet it."
+      icon={<span className="text-[24px]">🐸</span>}
+    >
+      <div className="space-y-8">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <AdminCard
+            title="Today's daily quests"
+            subtitle={
+              recipe
+                ? recipe.isActive
+                  ? `${recipe.slots.length} quests, live for everyone`
+                  : 'Switched off. Players see no daily quests.'
+                : 'Loading the lineup…'
+            }
+            icon={<span className="text-[20px]">✅</span>}
+            actions={<OpenLink href="/admin/quests?tab=daily" label="Edit" />}
+            bodyClassName="pt-3"
           >
-            {message.text}
-          </div>
-        )}
+            <ol className="space-y-2">
+              {(recipe?.slots ?? []).map((slot, index) => (
+                <li key={slot.id} className="flex items-center gap-3 rounded-2xl bg-muted/50 px-3 py-2.5">
+                  <span className="text-[18px]">{entryMeta(slot.pool[0]?.type ?? 'count').emoji}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+                      Quest {index + 1}
+                      {slot.pool.length > 1 ? ` · 1 of ${slot.pool.length}` : ''}
+                    </span>
+                    <span className="block truncate text-[14px] font-black">{slotHeadline(slot)}</span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-card px-2.5 py-1 text-[11px] font-black text-muted-foreground shadow-[0_2px_0_0_hsl(var(--border))]">
+                    {[...slot.pool].sort((a, b) => b.weight - a.weight)[0]?.type === 'season_step'
+                      ? 'Tier prize'
+                      : slot.rewards[0]
+                        ? rewardLabel(slot.rewards[0])
+                        : 'No reward'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </AdminCard>
 
-        {/* Players */}
-        <Section
-          title="Players"
-          subtitle="Look up any account and hand it something."
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ManagerLinkCard
-              href="/admin/grants"
-              icon={<Gift className="w-5 h-5" />}
-              accent="bg-pink-500/10 text-pink-600 dark:text-pink-400"
-              title="Player Grants"
-              description="Give flies, Plus days, a cosmetic or a background — logged with a reason and reversible."
-            />
-          </div>
-        </Section>
-
-        {/* Content Managers */}
-        <Section
-          title="Content Managers"
-          subtitle="Manage shop catalogs, gifts, quests, and game assets."
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ManagerLinkCard
-              href="/admin/statistics"
-              icon={<BarChart3 className="w-5 h-5" />}
-              accent="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-              title="Statistics"
-              description="Product health, retention, revenue, and ad performance."
-            />
-            <ManagerLinkCard
-              href="/admin/backgrounds"
-              icon={<ImageIcon className="w-5 h-5" />}
-              accent="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-              title="Background Manager"
-              description="Backgrounds with name, cost, rarity, and an image per screen size."
-            />
-            <ManagerLinkCard
-              href="/admin/quests"
-              icon={<ScrollText className="w-5 h-5" />}
-              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              title="Quest Manager"
-              description="Macro-categories, tag mappings, daily and category quests."
-            />
-            <ManagerLinkCard
-              href="/admin/leap-lab"
-              icon={<FlaskConical className="w-5 h-5" />}
-              accent="bg-teal-500/10 text-teal-600 dark:text-teal-400"
-              title="Leap Lab"
-              description="Every Leap surface, toast and recap with sample data. Read-only."
-            />
-            <ManagerLinkCard
-              href="/admin/popups"
-              icon={<MessageSquare className="w-5 h-5" />}
-              accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-              title="Popups & Offers"
-              description="Design popups, pick when they fire, and see who they reached."
-            />
-            <ManagerLinkCard
-              href="/admin/invites"
-              icon={<UserPlus className="w-5 h-5" />}
-              accent="bg-rose-500/10 text-rose-600 dark:text-rose-400"
-              title="Invite Manager"
-              description="Reward tiers per friend invited and the gifts users can send."
-            />
-            <ManagerActionCard
-              icon={<Paintbrush className="w-5 h-5" />}
-              accent="bg-purple-500/10 text-purple-600 dark:text-purple-400"
-              title="Cosmetics Manager"
-              description="View all skins and add new items to the DB."
-              onClick={() => setCosmeticsOpen(true)}
-            />
-            <ManagerActionCard
-              icon={<Gift className="w-5 h-5" />}
-              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              title="Gift Manager"
-              description="Create gifts and configure item drop chances."
-              onClick={() => setGiftManagerOpen(true)}
-            />
-          </div>
-        </Section>
-
-        {/* Modifiers */}
-        <Section
-          title="Modifiers"
-          subtitle="The tunable rules behind the economy loops."
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ManagerLinkCard
-              href="/admin/modifiers"
-              icon={<Sliders className="w-5 h-5" />}
-              accent="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-              title="Trade Modifiers"
-              description="Recipe ratios and fees, duplicate and Plus discounts, golden trades, draw weighting, wishlist slots."
-            />
-            <ManagerLinkCard
-              href="/admin/economy"
-              icon={<Coins className="w-5 h-5" />}
-              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              title="Fly Economy"
-              description="Task income and completion caps, the overflow jar, buddy and friend caps, ad limits, circuit breaker, and the ledger."
-            />
-          </div>
-        </Section>
-
-        {/* Quick Actions */}
-        <Section title="Quick Actions" subtitle="One-tap utilities for testing.">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ActionButton
-              icon={<Sparkles className="w-5 h-5" />}
-              accent="bg-emerald-600 hover:bg-emerald-700 text-white"
-              iconWrap="bg-white/20"
-              title="Add 100,000 Flies"
-              description="Instant currency boost for testing"
-              loading={loading === 'add-flies'}
-              onClick={handleAddFlies}
-              filled
-            />
-            <ActionButton
-              icon={<Wind className="w-5 h-5" />}
-              accent="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-              title="Reset Flies"
-              description="Reset collected flies to 0 for today"
-              loading={loading === 'reset-flies'}
-              onClick={handleResetFlies}
-            />
-          </div>
-        </Section>
-
-        {/* Destructive Resets */}
-        <Section
-          title="Destructive Resets"
-          subtitle="Two-step confirmation required. Use with care."
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ConfirmActionRow
-              icon={<Trash2 className="w-5 h-5" />}
-              accent="bg-red-500/10 text-red-600 dark:text-red-400"
-              warningAccent="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400"
-              title="Reset Tasks & Statistics"
-              description="Clear all tasks, history, and milestones"
-              isConfirming={confirmAction === 'reset-tasks'}
-              loading={loading === 'reset-tasks'}
-              warningText="Warning: This permanently deletes all your tasks and progress. Click again to confirm."
-              onClick={handleResetTasks}
-            />
-            <ConfirmActionRow
-              icon={<RefreshCw className="w-5 h-5" />}
-              accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-              warningAccent="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 text-amber-600 dark:text-amber-400"
-              title="Refresh Quests"
-              description="Wipe every quest, counter, and focus area — onboarding starts over"
-              isConfirming={confirmAction === 'refresh-quests'}
-              loading={loading === 'refresh-quests'}
-              warningText="Warning: This deletes all onboarding and daily quest progress, every quest counter, your focus areas and their tag links. Click again to confirm."
-              onClick={handleRefreshQuests}
-            />
-            <ConfirmActionRow
-              icon={<CalendarCheck className="w-5 h-5" />}
-              accent="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-              warningAccent="bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-900 text-sky-600 dark:text-sky-400"
-              title="Reset Leaps"
-              description="Clear your Leap streak, weeks and Lily progress"
-              isConfirming={confirmAction === 'reset-pacts'}
-              loading={loading === 'reset-pacts'}
-              warningText="Warning: This clears your Leap streak, every recorded Leap week, your Lily progress and old weekly-pact history. Your tasks stay. Click again to confirm."
-              onClick={handleResetPacts}
-            />
-            <ConfirmActionRow
-              icon={<DollarSign className="w-5 h-5" />}
-              accent="bg-orange-500/10 text-orange-600 dark:text-orange-400"
-              warningAccent="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900 text-orange-600 dark:text-orange-400"
-              title="Reset Cash"
-              description="Set flies balance to 0"
-              isConfirming={confirmAction === 'reset-cash'}
-              loading={loading === 'reset-cash'}
-              warningText="Warning: This sets your fly balance to 0. Click again to confirm."
-              onClick={handleResetCash}
-            />
-            <ConfirmActionRow
-              icon={<Gift className="w-5 h-5" />}
-              accent="bg-teal-500/10 text-teal-600 dark:text-teal-400"
-              warningAccent="bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-900 text-teal-600 dark:text-teal-400"
-              title="Reset Daily Reward"
-              description="Allow claiming today's reward again"
-              isConfirming={confirmAction === 'reset-daily'}
-              loading={loading === 'reset-daily'}
-              warningText="Confirm: This resets today's reward claim status. Click again to apply."
-              onClick={handleResetDaily}
-            />
-          </div>
-        </Section>
-
-        {/* Notifications */}
-        <Section
-          title="Push Notifications"
-          subtitle={
-            hasTokens
-              ? `${tokenCount} device${tokenCount === 1 ? '' : 's'} registered · ${taskCount} task${taskCount === 1 ? '' : 's'} left`
-              : 'No devices registered — open the app on mobile first.'
-          }
-        >
-          <div className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400">
-                <Bell className="w-4 h-4" />
-              </div>
-              <h3 className="text-sm font-black text-foreground">Test Templates</h3>
-            </div>
-
-            <div className="space-y-1.5">
-              {templates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No templates available.</p>
-              ) : (
-                templates.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setSelectedTemplate(t.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all text-xs ${
-                      selectedTemplate === t.id
-                        ? 'border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/20'
-                        : 'border-border/50 bg-muted/30 hover:bg-muted/50'
-                    }`}
-                  >
-                    <div className="font-semibold text-foreground mb-0.5">{t.label}</div>
-                    <div className="text-muted-foreground leading-snug">{t.preview}</div>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <Button
-              onClick={handleSendTestNotification}
-              disabled={loading !== null || !hasTokens || !selectedTemplate}
-              className="w-full gap-2 h-11 bg-violet-600 hover:bg-violet-700 text-white font-bold"
-            >
-              {loading === 'test-notif' ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-              Send Test Notification
-            </Button>
-
-            {notifResult && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium ${
-                  notifResult.type === 'success'
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                    : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
-                }`}
-              >
-                {notifResult.type === 'success' ? (
-                  <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                ) : (
-                  <XCircle className="w-3.5 h-3.5 shrink-0" />
-                )}
-                {notifResult.message}
-              </motion.div>
-            )}
-          </div>
-        </Section>
-
-        {/* Settings */}
-        <Section title="Developer Settings" subtitle="Toggle dev-only UI helpers.">
-          <div className="rounded-3xl border border-border bg-card shadow-sm p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                  <Bug className="w-5 h-5" />
-                </div>
-                <div>
-                  <Label htmlFor="debug-mode" className="font-bold cursor-pointer">
-                    Debug Mode
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Show Rive stats, quest priority scoring, and dev tools.
+          <AdminCard
+            title="Frog asks"
+            subtitle={prompts ? `${activePrompts.length} questions in rotation` : 'Counting questions…'}
+            icon={<span className="text-[20px]">🐸</span>}
+            tone="grape"
+            actions={<OpenLink href="/admin/quests?tab=asks" label="Library" />}
+            bodyClassName="space-y-3 pt-3"
+          >
+            <div className="grid grid-cols-4 gap-2">
+              {(['journal', 'poll', 'this_or_that', 'checkin'] as QuestPromptKind[]).map((kind) => (
+                <div key={kind} className="rounded-2xl bg-muted/50 py-2 text-center">
+                  <p className="text-[18px] leading-none">{PROMPT_KIND_EMOJI[kind]}</p>
+                  <p className="mt-1 text-[16px] font-black tabular-nums">
+                    {activePrompts.filter((prompt) => prompt.kind === kind).length}
                   </p>
                 </div>
-              </div>
-              <Checkbox
-                id="debug-mode"
-                checked={isDebugMode}
-                onCheckedChange={(checked) => setIsDebugMode(!!checked)}
-              />
+              ))}
             </div>
+            <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5">
+              <p className="text-[11px] font-black uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
+                {nextPinned ? (nextPinned.dateKey === today ? 'Pinned for today' : `Next pinned · ${nextPinned.dateKey}`) : 'Nothing pinned'}
+              </p>
+              <p className="mt-0.5 text-[13px] font-black">
+                {nextPinned ? nextPinned.question : 'Pin a question to a date for holidays and events.'}
+              </p>
+            </div>
+          </AdminCard>
+        </div>
+
+        <div className="space-y-3">
+          <SectionLabel>Everything in the pond</SectionLabel>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {ADMIN_NAV.filter((group) => group.title).map((group) => (
+              <AdminCard
+                key={group.title}
+                title={group.title}
+                subtitle={GROUP_BLURBS[group.title ?? ''] ?? undefined}
+                bodyClassName="pt-2"
+              >
+                <ul className="-mx-2">
+                  {group.items.map((item) => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className="group flex items-center gap-3 rounded-xl px-2 py-2 text-[14px] font-bold text-foreground transition hover:bg-muted/60"
+                      >
+                        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-muted-foreground group-hover:text-primary [&>svg]:h-[19px] [&>svg]:w-[19px]">
+                          {item.icon}
+                        </span>
+                        <span className="flex-1">{item.label}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </AdminCard>
+            ))}
           </div>
-        </Section>
+        </div>
 
-        {/* Premium Status */}
-        <Section
-          title="Premium Status"
-          subtitle="Grant or revoke premium on your own account for testing."
+        <Link
+          href="/admin/tools"
+          className="flex items-center gap-4 rounded-[24px] border border-dashed border-border bg-card/50 p-5 transition hover:border-primary/40 hover:bg-card"
         >
-          <div className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6">
-            <PremiumControls />
+          <IconTile tone="stone">
+            <Wrench />
+          </IconTile>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-black">My test account</p>
+            <p className="text-[13px] font-medium text-muted-foreground">
+              Add flies, toggle Plus, send a test push, or reset your own quests, Leaps and tasks.
+            </p>
           </div>
-        </Section>
+          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
       </div>
-
-      <AdminCosmeticsPopup open={cosmeticsOpen} onClose={() => setCosmeticsOpen(false)} />
-      <AdminGiftManagerPopup open={giftManagerOpen} onClose={() => setGiftManagerOpen(false)} />
-    </div>
+    </AdminPage>
   );
 }
 
-function PremiumControls() {
-  const [premiumUntil, setPremiumUntil] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [celebrating, setCelebrating] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/user')
-      .then((res) => res.json())
-      .then((data) => setPremiumUntil(data.premiumUntil))
-      .catch((err) => console.error('Failed to fetch user data', err));
-  }, []);
-
-  const handleUpdate = async (action: 'add' | 'remove', days?: number) => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/user/premium', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, days }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPremiumUntil(data.premiumUntil);
-        mutate(
-          (key) =>
-            typeof key === 'string' &&
-            (key.startsWith('/api/user') || key.startsWith('/api/quests')),
-        );
-        if (action === 'add') setCelebrating(true);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isPremium = premiumUntil && new Date(premiumUntil) > new Date();
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className={`text-[13px] font-black tracking-wide px-2.5 py-1 rounded-lg ${
- isPremium
- ? 'bg-indigo-500 text-white'
- : 'bg-muted text-muted-foreground'
- }`}
-        >
-          {isPremium ? 'Premium Active' : 'Free Plan'}
-        </span>
-        {isPremium && (
-          <span className="text-[11px] font-medium text-muted-foreground">
-            Expires {new Date(premiumUntil!).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          disabled={loading}
-          onClick={() => handleUpdate('add', 7)}
-          className="p-2.5 bg-muted/40 border border-border rounded-xl text-xs font-bold hover:bg-indigo-500/10 hover:border-indigo-500/50 transition-all disabled:opacity-50"
-        >
-          + 7 Days
-        </button>
-        <button
-          disabled={loading}
-          onClick={() => handleUpdate('add', 30)}
-          className="p-2.5 bg-muted/40 border border-border rounded-xl text-xs font-bold hover:bg-purple-500/10 hover:border-purple-500/50 transition-all disabled:opacity-50"
-        >
-          + 1 Month
-        </button>
-        <button
-          disabled={loading}
-          onClick={() => handleUpdate('add', 1 / 1440)}
-          className="p-2.5 bg-muted/40 border border-border rounded-xl text-xs font-bold hover:bg-yellow-500/10 hover:border-yellow-500/50 transition-all disabled:opacity-50"
-        >
-          + 1 Min (Test)
-        </button>
-        <button
-          disabled={loading}
-          onClick={() => handleUpdate('remove')}
-          className="col-span-2 p-2.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold hover:bg-red-500/20 hover:border-red-500/40 transition-all disabled:opacity-50"
-        >
-          Remove Premium
-        </button>
-      </div>
-
-      {celebrating &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <PlusWelcomeCelebration onDone={() => setCelebrating(false)} />,
-          document.body,
-        )}
-    </div>
-  );
-}
-
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-lg md:text-xl font-black tracking-tight">{title}</h2>
-        {subtitle && (
-          <p className="text-xs md:text-sm text-muted-foreground font-medium">{subtitle}</p>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function ManagerLinkCard({
-  href,
-  icon,
-  accent,
-  title,
-  description,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  accent: string;
-  title: string;
-  description: string;
-}) {
+function OpenLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 p-4 md:p-5 rounded-3xl border border-border bg-card shadow-sm hover:border-primary/40 transition-colors"
+      className="inline-flex h-8 items-center gap-1 rounded-xl border border-border bg-card px-3 text-[12px] font-black shadow-[0_2px_0_0_hsl(var(--border))] transition hover:bg-muted/50"
     >
-      <div className={`flex items-center justify-center w-10 h-10 rounded-full ${accent}`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="text-sm md:text-base font-black text-foreground tracking-tight">
-          {title}
-        </h3>
-        <p className="text-xs text-muted-foreground font-medium leading-snug">{description}</p>
-      </div>
-      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+      {label}
+      <ArrowRight className="h-3.5 w-3.5" />
     </Link>
-  );
-}
-
-function ManagerActionCard({
-  icon,
-  accent,
-  title,
-  description,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  accent: string;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="group flex items-center gap-3 p-4 md:p-5 rounded-3xl border border-border bg-card shadow-sm hover:border-primary/40 transition-colors text-left"
-    >
-      <div className={`flex items-center justify-center w-10 h-10 rounded-full ${accent}`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="text-sm md:text-base font-black text-foreground tracking-tight">
-          {title}
-        </h3>
-        <p className="text-xs text-muted-foreground font-medium leading-snug">{description}</p>
-      </div>
-      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-    </button>
-  );
-}
-
-function ActionButton({
-  icon,
-  accent,
-  iconWrap,
-  title,
-  description,
-  loading,
-  onClick,
-  filled = false,
-}: {
-  icon: React.ReactNode;
-  accent: string;
-  iconWrap?: string;
-  title: string;
-  description: string;
-  loading: boolean;
-  onClick: () => void;
-  filled?: boolean;
-}) {
-  return (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      variant={filled ? 'default' : 'outline'}
-      className={`w-full justify-start gap-3 h-auto py-4 px-4 rounded-2xl ${filled ? accent : ''}`}
-    >
-      <div
-        className={`flex items-center justify-center w-10 h-10 rounded-full ${
-          filled ? iconWrap || 'bg-white/20' : accent
-        }`}
-      >
-        {icon}
-      </div>
-      <div className="flex-1 text-left">
-        <div className="font-bold text-sm">{title}</div>
-        <div
-          className={`text-xs font-normal ${filled ? 'text-white/80' : 'text-muted-foreground'}`}
-        >
-          {description}
-        </div>
-      </div>
-      {loading && (
-        <div
-          className={`w-4 h-4 border-2 ${filled ? 'border-white' : 'border-current'} border-t-transparent rounded-full animate-spin`}
-        />
-      )}
-    </Button>
-  );
-}
-
-function ConfirmActionRow({
-  icon,
-  accent,
-  warningAccent,
-  title,
-  description,
-  isConfirming,
-  loading,
-  warningText,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  accent: string;
-  warningAccent: string;
-  title: string;
-  description: string;
-  isConfirming: boolean;
-  loading: boolean;
-  warningText: string;
-  onClick: () => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <Button
-        onClick={onClick}
-        disabled={loading}
-        variant={isConfirming ? 'destructive' : 'outline'}
-        className="w-full justify-start gap-3 h-auto py-4 px-4 rounded-2xl"
-      >
-        <div className={`flex items-center justify-center w-10 h-10 rounded-full ${accent}`}>
-          {icon}
-        </div>
-        <div className="flex-1 text-left">
-          <div className="font-bold text-sm">{title}</div>
-          <div className="text-xs text-muted-foreground font-normal">{description}</div>
-        </div>
-        {loading && (
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-        )}
-      </Button>
-      {isConfirming && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className={`flex items-start gap-2 p-3 border rounded-xl ${warningAccent}`}
-        >
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <div className="text-xs">
-            <strong>{warningText.split(':')[0]}:</strong>
-            {warningText.includes(':') ? warningText.slice(warningText.indexOf(':') + 1) : ''}
-          </div>
-        </motion.div>
-      )}
-    </div>
   );
 }

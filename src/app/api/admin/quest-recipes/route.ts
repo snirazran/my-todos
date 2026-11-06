@@ -8,7 +8,11 @@ import QuestRecipeModel, {
   type RecipePoolEntry,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
-import { ensureDefaultDailyRecipe } from '@/lib/quests/recipeDefaults';
+import {
+  DAILY_RECIPE_LAYOUT_VERSION,
+  ensureDefaultDailyRecipe,
+  resetDailyRecipeLayoutCheck,
+} from '@/lib/quests/recipeDefaults';
 import { isValidQuestMetricKey } from '@/lib/quests/metrics';
 import { sanitizeRewards } from '@/app/api/admin/quests/route';
 import {
@@ -24,7 +28,11 @@ const VALID_POOL_TYPES = new Set([
   'distinct_days',
   'deep_session',
   'day_parts',
+  'season_step',
+  'prompt',
 ]);
+
+const PROMPT_KIND_IDS = new Set(['journal', 'poll', 'this_or_that', 'checkin']);
 
 const SCALABLE_POOL_TYPES = new Set(['count', 'focus_minutes']);
 
@@ -47,6 +55,22 @@ function sanitizePoolEntry(input: any): RecipePoolEntry | null {
     maxTarget: Math.min(ceiling, maxTarget),
     weight: Number.isFinite(rawWeight) && rawWeight > 0 ? rawWeight : 1,
   };
+  if (entry.type === 'season_step' || entry.type === 'prompt') {
+    entry.minTarget = 1;
+    entry.maxTarget = 1;
+  }
+  if (entry.type === 'prompt') {
+    const categories = Array.isArray(input.promptCategories)
+      ? input.promptCategories
+          .filter((value: unknown) => typeof value === 'string' && value.trim())
+          .map((value: string) => value.trim().slice(0, 40))
+      : [];
+    if (categories.length > 0) entry.promptCategories = categories;
+    const kinds = Array.isArray(input.promptKinds)
+      ? input.promptKinds.filter((value: unknown) => PROMPT_KIND_IDS.has(value as string))
+      : [];
+    if (kinds.length > 0) entry.promptKinds = kinds;
+  }
   if (entry.type === 'count') {
     entry.action = input.action === 'add' ? 'add' : 'complete';
     if (entry.action === 'add' && input.requiresFollowThrough === true) {
@@ -109,7 +133,8 @@ function sanitizeSlot(input: any): RecipeSlot | null {
     ? (input.pool.map(sanitizePoolEntry).filter(Boolean) as RecipePoolEntry[])
     : [];
   const rewards = sanitizeRewards(input.rewards);
-  if (pool.length === 0 || rewards.length === 0) return null;
+  const seasonOnly = pool.every((entry) => entry.type === 'season_step');
+  if (pool.length === 0 || (rewards.length === 0 && !seasonOnly)) return null;
   const bonusRewards = Array.isArray(input.bonusRewards)
     ? (input.bonusRewards
         .map(sanitizeBonusReward)
@@ -150,6 +175,7 @@ function parseRecipeBody(body: any) {
       placement: 'daily' as const,
       isActive: body?.isActive !== false,
       slots,
+      layoutVersion: DAILY_RECIPE_LAYOUT_VERSION,
     },
   };
 }
@@ -248,6 +274,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'recipeId required' }, { status: 400 });
     }
     await QuestRecipeModel.deleteOne({ recipeId });
+    resetDailyRecipeLayoutCheck();
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -65,6 +65,7 @@ import { FrogSnapshot } from './FrogSnapshot';
 import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { QuestTrack } from './QuestTrack';
+import { FrogPromptSheet, type FrogPromptBlock } from '@/components/quests/FrogPromptSheet';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -282,6 +283,10 @@ export function QuestsPanel({
       else sessionStorage.removeItem(OPEN_SEASON_KEY);
     } catch {}
   };
+  const [promptTarget, setPromptTarget] = useState<{
+    questId: string;
+    block: FrogPromptBlock;
+  } | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('quests');
   const openPlus = (placement: string) => {
@@ -577,6 +582,13 @@ export function QuestsPanel({
                             swapsLeft={data.dailyRerollsLeft ?? 0}
                             swapping={swappingDailies}
                             onSwapQuests={handleSwapDailies}
+                            claimingSeason={claimingSeason}
+                            onClaimSeasonStep={(seasonId, tier) =>
+                              void handleClaimSeason(seasonId, tier)
+                            }
+                            onAnswerPrompt={(questId, block) =>
+                              setPromptTarget({ questId, block })
+                            }
                             paused={false}
                           />
                         );
@@ -687,6 +699,20 @@ export function QuestsPanel({
                 paused={false}
               />
               <PlusUpgradeModal open={plusOpen} placement={plusPlacement} onClose={() => setPlusOpen(false)} />
+              <FrogPromptSheet
+                open={!!promptTarget}
+                questId={promptTarget?.questId ?? null}
+                block={promptTarget?.block ?? null}
+                frogName={data?.frogName}
+                timezone={timezone}
+                onClose={() => setPromptTarget(null)}
+                onAnswered={async ({ rewardSummary }) => {
+                  if (rewardSummary) {
+                    queueRewardReveal(rewardSummary as QuestRewardSummary);
+                  }
+                  await refreshQuestData();
+                }}
+              />
       </>
     );
   };
@@ -1045,7 +1071,7 @@ function SeasonRewardPreview({
           hand_item: item.slot === 'hand_item' ? item.riveIndex : 0,
         }
       : null;
-  const frogSize = Math.round(box * 1.2);
+  const frogSize = Math.round(box * (dense ? 1.1 : 1.2));
 
   return (
     <div className={cn('relative h-full w-full', className)}>
@@ -1500,7 +1526,7 @@ function QuestSeasonEventOverlay({
       className="fixed inset-0 z-[1200] flex flex-col overflow-x-hidden bg-background md:overflow-hidden"
       style={seasonPaletteVars(palette)}
     >
-      <div className="relative h-[calc(210px+env(safe-area-inset-top))] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
+      <div className="relative h-[calc(236px+env(safe-area-inset-top))] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
         {hasSeasonCover(season.images) ? (
           <SeasonCoverImage
             images={season.images}
@@ -1510,7 +1536,7 @@ function QuestSeasonEventOverlay({
         ) : (
           <div className="h-full w-full bg-[linear-gradient(135deg,#22c55e_0%,#14b8a6_55%,#064e3b_100%)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/12" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent via-35% to-black/12 md:from-black/8" />
         <button
           type="button"
           onClick={onClose}
@@ -1519,16 +1545,16 @@ function QuestSeasonEventOverlay({
         >
           <X className="h-5 w-5" />
         </button>
-        <div className="pointer-events-none absolute inset-x-14 top-[calc(1.25rem+env(safe-area-inset-top))] flex flex-col items-center gap-1.5 px-2 md:inset-x-[15rem] md:top-14 md:px-4 [@media(max-height:820px)]:md:top-8 [@media(max-height:720px)]:md:top-5">
-          <span className="rounded-[8px] bg-black/35 px-2.5 py-1 text-[10.5px] font-black tracking-[0.14em] text-white/90 backdrop-blur-sm">
+        <div className="pointer-events-none absolute inset-x-14 top-[calc(0.5rem+env(safe-area-inset-top))] flex flex-col items-center gap-1 px-2 md:inset-x-[15rem] md:gap-1.5 md:top-14 md:px-4 [@media(max-height:820px)]:md:top-8 [@media(max-height:720px)]:md:top-5">
+          <span className="rounded-[7px] bg-black/35 px-2 py-0.5 text-[9.5px] font-black tracking-[0.14em] text-white/90 backdrop-blur-sm md:rounded-[8px] md:px-2.5 md:py-1 md:text-[10.5px]">
             {seasonMonth} SEASON
           </span>
           <h2
             id="season-pass-title"
-            className="max-w-[20rem] text-balance text-center text-3xl leading-none tracking-wide text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.95)] sm:text-4xl md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl"
+            className="max-w-[20rem] text-balance text-center text-[24px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.95)] md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl"
             style={{
               fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-              WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
+              WebkitTextStroke: '2.5px rgba(15, 23, 42, 0.95)',
               paintOrder: 'stroke fill',
             }}
           >

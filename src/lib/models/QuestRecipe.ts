@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
-import type { QuestReward, QuestRewards } from '@/lib/quests/types';
+import type { QuestPromptKind, QuestReward, QuestRewards } from '@/lib/quests/types';
 import type { QuestCoverImageFile } from './QuestTemplate';
 
 export type RecipePoolEntry = {
@@ -10,7 +10,11 @@ export type RecipePoolEntry = {
     | 'metric_count'
     | 'distinct_days'
     | 'deep_session'
-    | 'day_parts';
+    | 'day_parts'
+    | 'season_step'
+    | 'prompt';
+  promptCategories?: string[];
+  promptKinds?: QuestPromptKind[];
   action?: 'complete' | 'add';
   metricKey?: string;
   // deep_session only: minutes the single unbroken session must reach.
@@ -61,6 +65,7 @@ export interface QuestRecipeDoc {
   coverImageUrl?: string;
   coverImageFile?: QuestCoverImageFile | null;
   slots: RecipeSlot[];
+  layoutVersion?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -78,6 +83,7 @@ const QuestRecipeSchema = new Schema<QuestRecipeDoc>(
     coverImageUrl: { type: String, default: undefined },
     coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     slots: { type: [Schema.Types.Mixed], default: [] } as any,
+    layoutVersion: { type: Number, default: undefined },
   },
   {
     collection: 'quest_recipes',

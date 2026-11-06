@@ -52,10 +52,10 @@ async function ledgerSummary(days: number) {
   };
 }
 
-async function respond(days = 7) {
+async function respond(days = 7, withLedger = true) {
   const [config, ledger] = await Promise.all([
     loadFlyEconomyConfig(),
-    ledgerSummary(days).catch(() => null),
+    withLedger ? ledgerSummary(days).catch(() => null) : Promise.resolve(null),
   ]);
   return NextResponse.json({
     economy: config,
@@ -70,7 +70,8 @@ export async function GET(req: NextRequest) {
     await requireUserId();
     await connectMongo();
     const days = Number(req.nextUrl.searchParams.get('days')) || 7;
-    return await respond(Math.min(90, Math.max(1, days)));
+    const withLedger = req.nextUrl.searchParams.get('ledger') !== '0';
+    return await respond(Math.min(90, Math.max(1, days)), withLedger);
   } catch (error) {
     return NextResponse.json(
       {
@@ -101,7 +102,7 @@ export async function PUT(req: NextRequest) {
     ).lean();
 
     invalidateFlyEconomyConfig();
-    return await respond();
+    return await respond(7, req.nextUrl.searchParams.get('ledger') !== '0');
   } catch (error) {
     return NextResponse.json(
       {

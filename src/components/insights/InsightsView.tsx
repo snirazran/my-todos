@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowLeft, ChevronDown, CircleAlert, Moon, RotateCcw, Sun, Sunrise, Sunset, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleAlert, Lock, Moon, RotateCcw, Sun, Sunrise, Sunset, Trash2, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import Frog from '@/components/ui/frog';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
@@ -195,6 +195,7 @@ export function InsightsContent({ data, days, indices }: { data: InsightData; da
               <HabitSection habits={data.habits} period={period} />
               {data.tags.length > 0 ? <AreaSection tags={data.tags} period={period} /> : null}
             </div>
+            <JournalSection frogName={data.profile.frogName} />
           </div>
         ) : (
           <EmptyInsights />
@@ -694,6 +695,117 @@ function AreaSection({ tags, period }: { tags: InsightData['tags']; period: stri
         ))}
       </ul>
       {tags.length > 4 ? <ShowAllButton expanded={expanded} onToggle={() => setExpanded((value) => !value)} label={`Show all ${tags.length} areas`} /> : null}
+    </section>
+  );
+}
+
+type JournalEntry = {
+  id: string;
+  dayKey: string;
+  kind: 'journal' | 'checkin';
+  question: string;
+  text?: string;
+  optionId?: string;
+};
+
+const CHECKIN_FACES: Record<string, { emoji: string; label: string }> = {
+  '1': { emoji: '😣', label: 'Rough' },
+  '2': { emoji: '😕', label: 'Meh' },
+  '3': { emoji: '😐', label: 'Okay' },
+  '4': { emoji: '🙂', label: 'Good' },
+  '5': { emoji: '😄', label: 'Great' },
+};
+
+function JournalSection({ frogName }: { frogName: string | null }) {
+  const { data, mutate } = useSWR<{ entries: JournalEntry[] }>('/api/quests/journal', (url: string) => fetch(url).then((res) => res.json()), {
+    revalidateOnFocus: false,
+  });
+  const [expanded, setExpanded] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const entries = data?.entries ?? [];
+  if (entries.length === 0) return null;
+  const visible = expanded ? entries : entries.slice(0, 4);
+  const remove = async (id: string) => {
+    setConfirmId(null);
+    await mutate(
+      async (current) => {
+        await fetch(`/api/quests/journal?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+        return { entries: (current?.entries ?? []).filter((entry) => entry.id !== id) };
+      },
+      { optimisticData: { entries: entries.filter((entry) => entry.id !== id) }, revalidate: false },
+    );
+  };
+  return (
+    <section className={cn(CARD, 'p-5 md:p-6')} aria-labelledby="journal-heading">
+      <div className="flex items-center gap-3">
+        <Icon name="lilyPad" className="h-10 w-10 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <h2 id="journal-heading" className="text-[18px] font-black leading-tight tracking-[-0.02em] text-foreground">
+            Your answers to {frogName?.trim() || 'your frog'}
+          </h2>
+          <p className="inline-flex items-center gap-1 text-[12px] font-bold text-muted-foreground">
+            <Lock className="h-3 w-3" strokeWidth={2.75} aria-hidden="true" />
+            Only you can see these
+          </p>
+        </div>
+      </div>
+      <ul className="mt-2 divide-y divide-border/60">
+        {visible.map((entry) => {
+          const face = entry.kind === 'checkin' ? CHECKIN_FACES[entry.optionId ?? ''] : null;
+          return (
+            <li key={entry.id} className="group py-3 last:pb-1">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-bold text-muted-foreground">
+                    {formatDate(entry.dayKey, { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-black leading-snug text-foreground">{entry.question}</p>
+                  {face ? (
+                    <p className="mt-1 text-[15px] font-bold text-foreground/85">
+                      <span className="mr-1.5 text-[18px]">{face.emoji}</span>
+                      {face.label}
+                    </p>
+                  ) : (
+                    <p className="mt-1 whitespace-pre-line break-words text-[14.5px] font-semibold leading-relaxed text-foreground/85">
+                      {entry.text}
+                    </p>
+                  )}
+                </div>
+                {confirmId === entry.id ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmId(null)}
+                      className="h-8 rounded-[10px] px-2.5 text-[12px] font-black text-muted-foreground hover:bg-muted"
+                    >
+                      Keep
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void remove(entry.id)}
+                      className="h-8 rounded-[10px] bg-red-500/10 px-2.5 text-[12px] font-black text-red-600 hover:bg-red-500/15"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(entry.id)}
+                    aria-label="Delete this answer"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {entries.length > 4 ? (
+        <ShowAllButton expanded={expanded} onToggle={() => setExpanded((value) => !value)} label={`Show all ${entries.length} answers`} />
+      ) : null}
     </section>
   );
 }

@@ -36,7 +36,11 @@ export type QuestLogicType =
   | 'metric_count'
   | 'distinct_days'
   | 'deep_session'
-  | 'day_parts';
+  | 'day_parts'
+  | 'season_step'
+  | 'prompt';
+export type QuestPromptKind = 'journal' | 'poll' | 'this_or_that' | 'checkin';
+export type QuestPromptOption = { id: string; emoji?: string; label: string };
 export type QuestVisibilityMetric =
   | 'daily_tasks_count'
   | 'tags_count';
@@ -68,6 +72,18 @@ export type QuestLogicBlock = {
   // Work already on the board when the objective rolled that it refuses to
   // pay for, so a roll can never arrive already finished.
   baselineProgress?: number;
+  seasonId?: string;
+  seasonTier?: number;
+  seasonRewards?: QuestRewards;
+  seasonReady?: boolean;
+  seasonClaimed?: boolean;
+  promptId?: string;
+  promptKind?: QuestPromptKind;
+  promptQuestion?: string;
+  promptCategory?: string;
+  promptPlaceholder?: string;
+  promptOptions?: QuestPromptOption[];
+  promptAnswered?: boolean;
   rewards?: QuestRewards;
   // The authored reward, before scaling. `rewards` holds the resolved payout.
   baseRewards?: QuestRewards;

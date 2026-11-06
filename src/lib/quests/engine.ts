@@ -27,6 +27,27 @@ import QuestRecipeModel, {
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
 import { ensureDefaultOnboardingTemplates } from './onboardingQuests';
+import { createSeededRandom } from './random';
+import {
+  accrueSeasonSteps,
+  findRunningSeason,
+  getUserQuestSeasonState,
+  maxSeasonSteps,
+  readSeasonPassConfig,
+  readSeasonTierRewards,
+  seasonTierFromSteps,
+  tasksCompletedToday,
+} from './seasons';
+import {
+  PROMPT_RECENT_WINDOW_DAYS,
+  loadPromptLibrary,
+  loadRecentPromptAnswers,
+  pickPrompt,
+  type PromptLibraryEntry,
+  type RecentPromptAnswer,
+} from '@/lib/prompts/library';
+import PromptAnswerModel from '@/lib/models/PromptAnswer';
+import { ensureDefaultDailyRecipe } from './recipeDefaults';
 import type {
   DailyQuestProgressView,
   FocusCategoryTagMap,
@@ -43,26 +64,6 @@ import type {
   QuestVisibilityCondition,
   ResolvedQuestLogicBlock,
 } from './types';
-
-function hashString(value: string) {
-  let h = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    h ^= value.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function createSeededRandom(seed: string) {
-  let state = hashString(seed) || 1;
-  return () => {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function byTemplateOrder(a: QuestTemplateDoc, b: QuestTemplateDoc) {
   if (a.placement !== b.placement) {
@@ -434,6 +435,8 @@ function progressForLogicBlock(args: {
 }) {
   const { block, tasks, timezone, startDate, endDate, counters } = args;
 
+  if (block.type === 'season_step' || block.type === 'prompt') return 0;
+
   if (block.type === 'metric_count') {
     if (!block.metricKey) return 0;
     return sumCounters(counters ?? [], block.metricKey, startDate, endDate);
@@ -717,6 +720,7 @@ function backfillAuthoredRewards(args: {
 }): QuestLogicBlock[] {
   const { logic, slots, userId, templateId } = args;
   return logic.map((block) => {
+    if (block.type === 'season_step') return block;
     if (block.baseRewards?.length) return block;
     const match = /^slot-(\d+)$/.exec(block.id);
     const index = match ? Number(match[1]) - 1 : -1;
@@ -822,6 +826,8 @@ function retroactiveBaseline(args: {
 }
 
 function poolEntryFamily(entry: RecipePoolEntry): string {
+  if (entry.type === 'season_step') return 'season';
+  if (entry.type === 'prompt') return 'prompt';
   if (entry.type === 'metric_count') {
     return `metric:${entry.metricKey ?? 'unknown'}`;
   }
@@ -987,8 +993,11 @@ function isPoolEntryEligible(args: {
   windowDays: number;
   localHour?: number;
   tagIds?: string[];
+  special?: DailySpecialAvailability;
 }): boolean {
   const { entry, user, catalog, tasks, todayKey } = args;
+  if (entry.type === 'season_step') return !!args.special?.seasonAvailable;
+  if (entry.type === 'prompt') return !!args.special?.promptAvailable;
   if (!hasRunwayToday(entry, args.localHour)) return false;
   if (entry.type !== 'metric_count' || !entry.metricKey) return true;
   const metricKey = entry.metricKey;
@@ -1066,6 +1075,135 @@ function isPoolEntryEligible(args: {
   return true;
 }
 
+type DailySpecialAvailability = {
+  seasonAvailable: boolean;
+  promptAvailable: boolean;
+};
+
+export type DailySeasonContext = {
+  seasonId: string;
+  tasksPerStep: number;
+  maxed: boolean;
+  bankedToday: boolean;
+  tasksToday: number;
+  targetTier: number;
+  reachedTier: number;
+  rewards: QuestRewards;
+  ready: boolean;
+  claimed: boolean;
+};
+
+type DailyExtras = {
+  todayKey: string;
+  season: DailySeasonContext | null;
+  answeredPromptIds: Set<string>;
+};
+
+async function loadDailySeasonContext(
+  user: UserDoc,
+  todayKey: string,
+): Promise<DailySeasonContext | null> {
+  const season = await findRunningSeason();
+  if (!season) return null;
+  const config = readSeasonPassConfig(season);
+  const rewardsByTier = readSeasonTierRewards(season).filter(
+    (entry) => entry.tier <= config.tierCount,
+  );
+  const tasksToday = tasksCompletedToday(user, todayKey);
+  const { state } = accrueSeasonSteps({
+    state: getUserQuestSeasonState(user, season.seasonId, config.tierCount),
+    config,
+    tasksToday,
+    todayKey,
+    seasonRunning: true,
+  });
+  const perTier = Math.max(1, config.stepsPerTier);
+  const ceiling = maxSeasonSteps(config);
+  const bankedToday = state.stepDayKey === todayKey && state.stepsToday >= 1;
+  const stepsAfter = Math.min(ceiling, bankedToday ? state.steps : state.steps + 1);
+  const targetTier = Math.max(
+    1,
+    Math.min(config.tierCount, Math.ceil(stepsAfter / perTier)),
+  );
+  const reachedTier = seasonTierFromSteps(state.steps, config);
+  const tierEntry = rewardsByTier.find((entry) => entry.tier === targetTier);
+  const lanes = [
+    {
+      rewards: tierEntry?.freeRewards ?? [],
+      claimed: state.claimedFreeTiers.includes(targetTier),
+    },
+    ...(isPremiumUser(user)
+      ? [
+          {
+            rewards: tierEntry?.premiumRewards ?? [],
+            claimed: state.claimedPlusTiers.includes(targetTier),
+          },
+        ]
+      : []),
+  ].filter((lane) => lane.rewards.length > 0);
+  return {
+    seasonId: season.seasonId,
+    tasksPerStep: Math.max(1, config.tasksPerStep),
+    maxed: !bankedToday && state.steps >= ceiling,
+    bankedToday,
+    tasksToday,
+    targetTier,
+    reachedTier,
+    rewards: lanes.flatMap((lane) => lane.rewards),
+    ready: reachedTier >= targetTier && lanes.some((lane) => !lane.claimed),
+    claimed: lanes.length > 0 && lanes.every((lane) => lane.claimed),
+  };
+}
+
+export function promptBlockFields(prompt: PromptLibraryEntry): Partial<QuestLogicBlock> {
+  return {
+    promptId: prompt.promptId,
+    promptKind: prompt.kind,
+    promptQuestion: prompt.question,
+    promptCategory: prompt.category,
+    promptPlaceholder: prompt.placeholder || undefined,
+    promptOptions: (prompt.options ?? []).map((option) => ({
+      id: String(option.id),
+      emoji: option.emoji || undefined,
+      label: String(option.label ?? ''),
+    })),
+  };
+}
+
+export function pickPromptForEntry(args: {
+  entry: RecipePoolEntry;
+  prompts: PromptLibraryEntry[];
+  recent: RecentPromptAnswer[];
+  todayKey: string;
+  seed: string;
+  excludeIds: string[];
+}) {
+  return (
+    pickPrompt({
+      prompts: args.prompts,
+      categories: args.entry.promptCategories,
+      kinds: args.entry.promptKinds,
+      recent: args.recent,
+      todayKey: args.todayKey,
+      seed: args.seed,
+      excludeIds: args.excludeIds,
+    }) ??
+    pickPrompt({
+      prompts: args.prompts,
+      recent: args.recent,
+      todayKey: args.todayKey,
+      seed: args.seed,
+      excludeIds: args.excludeIds,
+    })
+  );
+}
+
+function shiftDayKey(dateKey: string, deltaDays: number) {
+  const base = new Date(dateKey + 'T00:00:00Z');
+  base.setUTCDate(base.getUTCDate() + deltaDays);
+  return base.toISOString().slice(0, 10);
+}
+
 // Eligible entries first; if none remain, fall back to the slot's universal
 // (task/focus) entries so a slot never vanishes from the quest.
 function buildEligiblePool(args: {
@@ -1079,6 +1217,7 @@ function buildEligiblePool(args: {
   windowDays: number;
   localHour?: number;
   tagIds?: string[];
+  special?: DailySpecialAvailability;
 }): RecipePoolEntry[] {
   const base = (args.slot.pool ?? []).filter(
     (entry) =>
@@ -1090,8 +1229,12 @@ function buildEligiblePool(args: {
     isPoolEntryEligible({ ...args, entry }),
   );
   if (eligible.length > 0) return eligible;
-  const universal = base.filter((entry) => entry.type !== 'metric_count');
-  return universal.length > 0 ? universal : base;
+  return base.filter(
+    (entry) =>
+      entry.type !== 'metric_count' &&
+      entry.type !== 'season_step' &&
+      entry.type !== 'prompt',
+  );
 }
 
 function pickWeighted<T extends { weight?: number }>(
@@ -1175,8 +1318,9 @@ async function syncQuestForTemplate(args: {
   timezone: string;
   counters?: QuestCounterEntry[];
   existingDoc?: InstanceType<typeof QuestModel> | null;
+  extras?: DailyExtras;
 }) {
-  const { template, userId, user, tasks, timezone, counters } = args;
+  const { template, userId, user, tasks, timezone, counters, extras } = args;
   const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
   const questId =
     template.placement === 'daily'
@@ -1268,13 +1412,45 @@ async function syncQuestForTemplate(args: {
         `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
       ),
     );
-    return {
+    const resolved: ResolvedQuestLogicBlock = {
       ...resolvedBlock,
       progress,
       baselineProgress,
       baseRewards: authoredRewards.length > 0 ? authoredRewards : undefined,
       rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
     };
+    if (block.type === 'season_step') {
+      const season =
+        extras?.season && extras.season.seasonId === block.seasonId
+          ? extras.season
+          : null;
+      return {
+        ...resolved,
+        baselineProgress: 0,
+        baseRewards: undefined,
+        rewards: undefined,
+        progress: season
+          ? season.bankedToday
+            ? target
+            : Math.min(target, season.tasksToday)
+          : Math.min(target, (block as Partial<ResolvedQuestLogicBlock>).progress ?? 0),
+        seasonTier: season?.targetTier ?? block.seasonTier,
+        seasonRewards: season?.rewards ?? block.seasonRewards ?? [],
+        seasonReady: season ? season.ready : false,
+        seasonClaimed: season ? season.claimed : !!block.seasonClaimed,
+      };
+    }
+    if (block.type === 'prompt') {
+      const answered =
+        !!block.promptId && !!extras?.answeredPromptIds.has(block.promptId);
+      return {
+        ...resolved,
+        baselineProgress: 0,
+        progress: answered ? target : 0,
+        promptAnswered: answered,
+      };
+    }
+    return resolved;
   });
 
   for (const block of resolvedLogic) {
@@ -1341,8 +1517,16 @@ function rollDailyLogic(args: {
   timezone: string;
   todayKey: string;
   hasFriends: boolean;
+  season: DailySeasonContext | null;
+  prompts: PromptLibraryEntry[];
+  recentAnswers: RecentPromptAnswer[];
 }): QuestLogicBlock[] {
   const { recipe, userId, templateId, tasks, timezone, todayKey } = args;
+  const special: DailySpecialAvailability = {
+    seasonAvailable: !!args.season && !args.season.maxed,
+    promptAvailable: args.prompts.length > 0,
+  };
+  const usedPromptIds: string[] = [];
   const seedBase = args.selectionSeed
     ? `${userId}:${templateId}:${args.selectionSeed}`
     : `${userId}:${templateId}`;
@@ -1352,7 +1536,8 @@ function rollDailyLogic(args: {
   const localHour = getZonedHour(new Date(), timezone) ?? undefined;
 
   (recipe.slots ?? []).forEach((slot, index) => {
-    if ((slot.rewards ?? []).length === 0) return;
+    const seasonSlot = (slot.pool ?? []).some((entry) => entry?.type === 'season_step');
+    if ((slot.rewards ?? []).length === 0 && !seasonSlot) return;
 
     const eligible = buildEligiblePool({
       slot,
@@ -1364,12 +1549,19 @@ function rollDailyLogic(args: {
       hasFriends: args.hasFriends,
       windowDays: 1,
       localHour,
+      special,
     });
+    const seasonOnly = eligible.filter((entry) => entry.type === 'season_step');
     const anchorOnly =
       index === 0
         ? eligible.filter((entry) => poolEntryFamily(entry) === ANCHOR_FAMILY)
         : [];
-    const candidates = anchorOnly.length > 0 ? anchorOnly : eligible;
+    const candidates =
+      seasonOnly.length > 0
+        ? seasonOnly
+        : anchorOnly.length > 0
+          ? anchorOnly
+          : eligible;
     const distinct = candidates.filter((entry) => {
       if (usedShapes.has(poolEntryShape(entry))) return false;
       const family = poolEntryFamily(entry);
@@ -1380,6 +1572,47 @@ function rollDailyLogic(args: {
     const slotSeed = `${seedBase}:slot:${index}`;
     const pick = pickWeighted(pool, createSeededRandom(slotSeed));
     if (!pick) return;
+
+    if (pick.type === 'season_step') {
+      if (!args.season) return;
+      usedFamilies.add(poolEntryFamily(pick));
+      usedShapes.add(poolEntryShape(pick));
+      blocks.push({
+        id: `slot-${index + 1}`,
+        type: 'season_step',
+        subject: 'task',
+        amountMode: 'fixed',
+        amount: args.season.tasksPerStep,
+        tagMode: 'ignore',
+        seasonId: args.season.seasonId,
+      });
+      return;
+    }
+
+    if (pick.type === 'prompt') {
+      const prompt = pickPromptForEntry({
+        entry: pick,
+        prompts: args.prompts,
+        recent: args.recentAnswers,
+        todayKey,
+        seed: `${slotSeed}:prompt`,
+        excludeIds: usedPromptIds,
+      });
+      if (!prompt) return;
+      usedPromptIds.push(prompt.promptId);
+      blocks.push({
+        id: `slot-${index + 1}`,
+        type: 'prompt',
+        subject: 'any',
+        amountMode: 'fixed',
+        amount: 1,
+        tagMode: 'ignore',
+        ...promptBlockFields(prompt),
+        rewards: rollSlotRewards(slot, slotSeed),
+      });
+      return;
+    }
+
     usedFamilies.add(poolEntryFamily(pick));
     usedShapes.add(poolEntryShape(pick));
 
@@ -1426,6 +1659,7 @@ export async function syncQuestState(args: {
   dailySelectionSeed?: string;
 }) {
   const { userId, timezone } = args;
+  await ensureDefaultDailyRecipe();
   const includeCatalog = args.includeCatalog ?? true;
   const includeCategories = args.includeCategories ?? true;
   const [user, tasks, catalog, templates, categories, loadedDocs, recipes] = await Promise.all([
@@ -1509,11 +1743,50 @@ export async function syncQuestState(args: {
   const dailyRecipe = recipes.find(
     (r) => r.placement === 'daily' && r.isActive && (r.slots ?? []).length > 0,
   );
+  let dailyExtras: DailyExtras | undefined;
   if (dailyRecipe) {
     const templateId = `gend:${todayKey}`;
-    const frozenDaily = allExistingDocs.find(
+    let frozenDaily = allExistingDocs.find(
       (doc) => doc.placement === 'daily' && doc.templateId === templateId,
     );
+    const recipeHasNewSlots = (dailyRecipe.slots ?? []).some((slot) =>
+      (slot.pool ?? []).some(
+        (entry) => entry?.type === 'season_step' || entry?.type === 'prompt',
+      ),
+    );
+    if (
+      frozenDaily &&
+      recipeHasNewSlots &&
+      !(frozenDaily.logic ?? []).some(
+        (block) => block.type === 'season_step' || block.type === 'prompt',
+      ) &&
+      !frozenDaily.claimedAt &&
+      (frozenDaily.claimedObjectiveIds ?? []).length === 0
+    ) {
+      const staleId = frozenDaily._id;
+      await QuestModel.deleteOne({ _id: staleId });
+      allExistingDocs = allExistingDocs.filter((doc) => doc._id !== staleId);
+      frozenDaily = undefined;
+    }
+    const needsRoll = !frozenDaily?.logic?.length;
+    const [season, answeredToday, prompts, recentAnswers] = await Promise.all([
+      loadDailySeasonContext(user, todayKey).catch(() => null),
+      PromptAnswerModel.find({ userId, dayKey: todayKey }, { promptId: 1 }).lean<
+        { promptId: string }[]
+      >(),
+      needsRoll ? loadPromptLibrary() : Promise.resolve([] as PromptLibraryEntry[]),
+      needsRoll
+        ? loadRecentPromptAnswers(
+            userId,
+            shiftDayKey(todayKey, -PROMPT_RECENT_WINDOW_DAYS),
+          )
+        : Promise.resolve([] as RecentPromptAnswer[]),
+    ]);
+    dailyExtras = {
+      todayKey,
+      season,
+      answeredPromptIds: new Set(answeredToday.map((answer) => answer.promptId)),
+    };
     const rolledLogic = frozenDaily?.logic?.length
       ? backfillAuthoredRewards({
           logic: frozenDaily.logic as QuestLogicBlock[],
@@ -1532,6 +1805,9 @@ export async function syncQuestState(args: {
           timezone,
           todayKey,
           hasFriends,
+          season,
+          prompts,
+          recentAnswers,
         });
     if (rolledLogic.length > 0) {
       selectedDailyTemplates = [
@@ -1637,7 +1913,16 @@ export async function syncQuestState(args: {
       eligibleTemplates.map((template) => {
         const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
         const existingDoc = existingDocMap.get(`${template.templateId}:${windowKey}`) ?? null;
-        return syncQuestForTemplate({ template, userId, user, tasks, timezone, counters, existingDoc });
+        return syncQuestForTemplate({
+          template,
+          userId,
+          user,
+          tasks,
+          timezone,
+          counters,
+          existingDoc,
+          extras: template.placement === 'daily' ? dailyExtras : undefined,
+        });
       }),
     ),
     deletePromise,
@@ -1779,14 +2064,11 @@ export async function syncQuestState(args: {
     user.dailyQuestReroll?.date === todayKey
       ? Math.max(0, user.dailyQuestReroll.count ?? 0)
       : 0;
-  const claimedAnythingToday = allExistingDocs.some(
-    (doc) =>
-      doc.placement === 'daily' &&
-      doc.windowKey === todayKey &&
-      (!!doc.claimedAt || (doc.claimedObjectiveIds ?? []).length > 0),
-  );
+  const promptBlock = dailyQuests
+    .flatMap((quest) => quest.logic)
+    .find((block) => block.type === 'prompt');
   const dailyRerollsLeft =
-    dailyQuestsGated || claimedAnythingToday
+    dailyQuestsGated || !promptBlock || promptBlock.promptAnswered
       ? 0
       : Math.max(0, DAILY_QUEST_REROLLS_PER_DAY - rerollsUsedToday);
 
@@ -1809,7 +2091,10 @@ export async function syncQuestState(args: {
           catalog,
           [
             ...dailyQuests.flatMap((quest) =>
-              quest.logic.map((block) => block.rewards ?? []),
+              quest.logic.map((block) => [
+                ...(block.rewards ?? []),
+                ...(block.seasonRewards ?? []),
+              ]),
             ),
             ...onboardingQuests.flatMap((quest) =>
               quest.logic.map((block) => block.rewards ?? []),

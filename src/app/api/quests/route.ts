@@ -61,6 +61,8 @@ type ObjectiveLabelBlock = {
 
 function objectiveSummaryLabel(block: ObjectiveLabelBlock): string {
   const target = Math.max(0, block.target ?? 0);
+  if (block.type === 'prompt') return 'Answer the frog’s question';
+  if (block.type === 'season_step') return `Finish ${target} ${target === 1 ? 'task' : 'tasks'} to climb the season`;
   if (block.type === 'metric_count') {
     return metricObjectiveLabel(block.metricKey, target);
   }
@@ -311,7 +313,7 @@ function objectiveRemainingLabel(
 ): string {
   const target = Math.max(1, block.target ?? 1);
   const progress = Math.max(0, block.progress ?? 0);
-  if (progress <= 0) return objectiveSummaryLabel(block);
+  if (progress <= 0 || block.type === 'prompt') return objectiveSummaryLabel(block);
   const remaining = Math.max(1, target - progress);
   if (block.type === 'metric_count') {
     return metricRemainingLabel(block.metricKey, remaining);

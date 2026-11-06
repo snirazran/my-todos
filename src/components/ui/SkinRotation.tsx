@@ -15,7 +15,6 @@ import useSWR, { mutate as mutateSWR } from 'swr';
 import { create } from 'zustand';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useNotification } from '@/components/providers/NotificationProvider';
 import { cn } from '@/lib/utils';
 import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { Icon } from '@/components/ui/Icon';
@@ -34,7 +33,7 @@ import { useLooks } from '@/hooks/useLooks';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { looksMatch } from '@/lib/skins/looks';
 import { useTryOnStore, type TryOnOffer } from '@/lib/tryOnStore';
-import { whenAutoPopupsAllowed, whenScreenIsFree } from '@/lib/popupGate';
+import { whenScreenIsFree } from '@/lib/popupGate';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import {
   ROTATION_INTERVAL_MS,
@@ -1110,7 +1109,6 @@ export function StyleShufflePill({
 export function GlobalSkinRotation() {
   const { user } = useAuth();
   const { value: interval, setValue, refresh } = useShuffleInterval();
-  const { showNotification } = useNotification();
   const migratedRef = useRef(false);
   const inFlightRef = useRef(false);
 
@@ -1140,21 +1138,6 @@ export function GlobalSkinRotation() {
         const result = await rotateOnce({ auto: true });
         if (!result.shuffled) return;
         void refresh();
-        if (result.tryOn) return;
-        whenAutoPopupsAllowed(
-          () =>
-            showNotification(
-              interval === '1d'
-                ? "Style Shuffle picked today's fit"
-                : 'Style Shuffle changed your look',
-              async () => {
-                await rotateOnce({ undo: true });
-                void refresh();
-              },
-              { actionLabel: 'Undo', durationMs: 6000 },
-            ),
-          { dropAfterMs: 30_000 },
-        );
       } finally {
         inFlightRef.current = false;
       }
@@ -1173,7 +1156,7 @@ export function GlobalSkinRotation() {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [user, interval, refresh, showNotification]);
+  }, [user, interval, refresh]);
 
   const open = useStyleShuffleOpen((state) => state.open);
   return (

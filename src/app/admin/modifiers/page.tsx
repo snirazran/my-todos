@@ -1,10 +1,10 @@
+import { Suspense } from 'react';
 import { AdminModifiersManager } from '@/components/ui/AdminModifiersManager';
-import { AdminGuard } from '@/components/auth/AdminGuard';
 
 export default function AdminModifiersPage() {
   return (
-    <AdminGuard>
+    <Suspense fallback={null}>
       <AdminModifiersManager />
-    </AdminGuard>
+    </Suspense>
   );
 }

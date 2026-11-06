@@ -1,10 +1,10 @@
+import { Suspense } from 'react';
 import { AdminQuestManagerPage } from '@/components/ui/AdminQuestManagerPage';
-import { AdminGuard } from '@/components/auth/AdminGuard';
 
 export default function AdminQuestsPage() {
   return (
-    <AdminGuard>
+    <Suspense fallback={null}>
       <AdminQuestManagerPage />
-    </AdminGuard>
+    </Suspense>
   );
 }

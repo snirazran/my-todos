@@ -1,33 +1,23 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import {
-  ChevronLeft,
-  UserPlus,
-  Save,
-  Plus,
-  Trash2,
-  Loader2,
-} from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, Trash2, UserPlus } from 'lucide-react';
 import type { QuestReward } from '@/lib/quests/types';
-import type { ItemDef } from '@/lib/skins/catalog';
-import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import { RewardTile, type QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import { RewardPickerDialog, normalizeRewardList, rewardSummary } from '@/components/ui/RewardPickerDialog';
 import {
-  RewardPickerDialog,
-  normalizeRewardList,
-  rewardSummary,
-} from '@/components/ui/RewardPickerDialog';
-
-type CatalogItem = {
-  id: string;
-  name: string;
-  slot: ItemDef['slot'];
-  rarity: ItemDef['rarity'];
-  riveIndex: number;
-  icon?: string;
-};
+  AdminCard,
+  AdminPage,
+  ConfigShell,
+  EmptyState,
+  Field,
+  NumberInput,
+  PondButton,
+  SaveBar,
+  inputClass,
+} from '@/components/admin/kit';
+import { useAdminConfig, useSaveAll } from '@/components/admin/useAdminConfig';
+import { useEconomy } from '@/components/admin/useEconomy';
 
 type RewardTier = {
   tier: number;
@@ -55,436 +45,277 @@ type Config = {
   giftOptions: GiftOption[];
 };
 
-const EMPTY_CONFIG: Config = {
-  headline: '',
-  subheading: '',
-  shareTitle: '',
-  shareMessage: '',
-  rewards: [],
-  giftOptions: [],
-};
-
 export function AdminInviteManager() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [config, setConfig] = useState<Config>(EMPTY_CONFIG);
-  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const invites = useAdminConfig<Config>({
+    url: '/api/admin/invite-config',
+    read: (payload) =>
+      payload?.config
+        ? {
+            headline: payload.config.headline ?? '',
+            subheading: payload.config.subheading ?? '',
+            shareTitle: payload.config.shareTitle ?? '',
+            shareMessage: payload.config.shareMessage ?? '',
+            rewards: payload.config.rewards ?? [],
+            giftOptions: payload.config.giftOptions ?? [],
+          }
+        : null,
+  });
+  const economy = useEconomy();
+  const all = useSaveAll([invites, economy]);
   const [rewardPickerIndex, setRewardPickerIndex] = useState<number | null>(null);
   const [giftPickerIndex, setGiftPickerIndex] = useState<number | null>(null);
 
-  const catalogById = useMemo(() => Object.fromEntries(catalog.map((c) => [c.id, c])), [catalog]);
+  const catalog = (invites.payload?.catalog ?? []) as QuestRewardCatalogItem[];
   const rewardCatalog = useMemo(
-    () =>
-      Object.fromEntries(
-        catalog.map((item) => [
-          item.id,
-          item as QuestRewardCatalogItem,
-        ]),
-      ) as Record<string, QuestRewardCatalogItem>,
+    () => Object.fromEntries(catalog.map((item) => [item.id, item])) as Record<string, QuestRewardCatalogItem>,
     [catalog],
   );
+  const config = invites.config;
 
-  useEffect(() => {
-    void load();
-  }, []);
+  const updateReward = (idx: number, patch: Partial<RewardTier>) =>
+    invites.set((prev) => ({ ...prev, rewards: prev.rewards.map((r, i) => (i === idx ? { ...r, ...patch } : r)) }));
+  const updateGift = (idx: number, patch: Partial<GiftOption>) =>
+    invites.set((prev) => ({ ...prev, giftOptions: prev.giftOptions.map((g, i) => (i === idx ? { ...g, ...patch } : g)) }));
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/invite-config');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      setConfig({
-        headline: data.config?.headline ?? '',
-        subheading: data.config?.subheading ?? '',
-        shareTitle: data.config?.shareTitle ?? '',
-        shareMessage: data.config?.shareMessage ?? '',
-        rewards: data.config?.rewards ?? [],
-        giftOptions: data.config?.giftOptions ?? [],
-      });
-      setCatalog(data.catalog ?? []);
-    } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const flash = (type: 'success' | 'error', text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 3500);
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch('/api/admin/invite-config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
-      flash('success', 'Saved');
-    } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateReward = (idx: number, patch: Partial<RewardTier>) => {
-    setConfig((c) => ({
-      ...c,
-      rewards: c.rewards.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
-    }));
-  };
-
-  const addReward = () => {
-    setConfig((c) => {
-      const tier = (c.rewards[c.rewards.length - 1]?.tier ?? 0) + 1;
+  const addReward = () =>
+    invites.set((prev) => {
+      const tier = (prev.rewards[prev.rewards.length - 1]?.tier ?? 0) + 1;
       return {
-        ...c,
-        rewards: [
-          ...c.rewards,
-          {
-            tier,
-            label: `${ordinal(tier)} friend`,
-            description: '',
-            itemId: null,
-            flies: 0,
-            imageUrl: '',
-            rewards: [],
-          },
-        ],
+        ...prev,
+        rewards: [...prev.rewards, { tier, label: `${ordinal(tier)} friend`, description: '', itemId: null, flies: 0, imageUrl: '', rewards: [] }],
       };
     });
-  };
 
-  const removeReward = (idx: number) => {
-    setConfig((c) => ({ ...c, rewards: c.rewards.filter((_, i) => i !== idx) }));
-  };
-
-  const addGift = () => {
-    setConfig((c) => ({
-      ...c,
+  const addGift = () =>
+    invites.set((prev) => ({
+      ...prev,
       giftOptions: [
-        ...c.giftOptions,
-        {
-          id: `gift_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          name: '',
-          itemId: '',
-          imageUrl: '',
-        },
+        ...prev.giftOptions,
+        { id: `gift_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name: '', itemId: '', imageUrl: '' },
       ],
     }));
-  };
 
-  const updateGift = (idx: number, patch: Partial<GiftOption>) => {
-    setConfig((c) => ({
-      ...c,
-      giftOptions: c.giftOptions.map((g, i) => (i === idx ? { ...g, ...patch } : g)),
-    }));
-  };
-
-  const removeGift = (idx: number) => {
-    setConfig((c) => ({ ...c, giftOptions: c.giftOptions.filter((_, i) => i !== idx) }));
-  };
+  const tileFor = (itemId: string): QuestReward => ({
+    type: rewardCatalog[itemId]?.slot === 'container' ? 'BOX' : 'ITEM',
+    itemId,
+    amount: 1,
+  });
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-12">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/admin"
-              className="p-2 rounded-full bg-muted text-muted-foreground hover:text-foreground transition-colors"
+    <AdminPage
+      title="Invites"
+      subtitle="What a player earns for each friend who joins, and the gifts they can send with an invite."
+      icon={<UserPlus />}
+    >
+      <ConfigShell loading={invites.loading || economy.loading} error={all.error}>
+        {config ? (
+          <div className="space-y-5">
+            <AdminCard
+              title="Rewards for each friend who joins"
+              subtitle="Paid in order. The first friend pays the first row, the second friend the second, and so on."
+              icon={<span className="text-[20px]">🏆</span>}
+              actions={
+                <PondButton variant="secondary" size="sm" onClick={addReward}>
+                  <Plus className="h-4 w-4" />
+                  Add a friend
+                </PondButton>
+              }
             >
-              <ChevronLeft className="w-4 h-4" />
-            </Link>
-            <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <UserPlus className="w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight">Invite Friends</h1>
-              <p className="text-sm text-muted-foreground font-medium">
-                Configure invite-tier rewards and the gifts users can send to friends.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-black inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save
-          </button>
-        </div>
-
-        {message && (
-          <div
-            className={`rounded-xl px-4 py-3 text-sm font-bold ${
-              message.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'bg-red-500/10 text-red-600 dark:text-red-400'
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="rounded-3xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Loading…
-          </div>
-        ) : (
-          <>
-            {/* Rewards */}
-            <section className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black tracking-tight">Your Rewards (per friend)</h2>
-                <button
-                  onClick={addReward}
-                  className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-black inline-flex items-center gap-1.5 hover:bg-primary/20 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add tier
-                </button>
-              </div>
-
               {config.rewards.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No reward tiers configured.</p>
+                <EmptyState>No rewards yet. Inviting pays nothing.</EmptyState>
               ) : (
-                config.rewards.map((reward, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-2xl border border-border/60 p-4 space-y-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[13px] font-black text-muted-foreground">
-                        Tier #{reward.tier}
-                      </span>
-                      <button
-                        onClick={() => removeReward(idx)}
-                        className="px-2 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-bold inline-flex items-center gap-1 hover:bg-red-500/20 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" /> Remove
-                      </button>
-                    </div>
-
-                    <Field
-                      label="Label"
-                      value={reward.label}
-                      onChange={(v) => updateReward(idx, { label: v })}
-                    />
-
-                    <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-black tracking-wide text-muted-foreground">
-                            Reward
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-foreground">
-                            {rewardSummaries(reward, rewardCatalog)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setRewardPickerIndex(idx)}
-                          className="shrink-0 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-black hover:bg-primary/20 transition-colors"
-                        >
-                          Pick reward
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </section>
-
-            {/* Gift options */}
-            <section className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black tracking-tight">
-                  Gift options (inviter picks one per invite)
-                </h2>
-                <button
-                  onClick={addGift}
-                  className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-black inline-flex items-center gap-1.5 hover:bg-primary/20 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add gift
-                </button>
-              </div>
-
-              {config.giftOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No gift options configured.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {config.giftOptions.map((gift, idx) => {
-                    const item = catalogById[gift.itemId];
+                <ol className="space-y-2">
+                  {config.rewards.map((reward, idx) => {
+                    const rewards = legacyRewardToRewards(reward);
                     return (
-                      <div
-                        key={gift.id}
-                        className="rounded-2xl border border-border/60 p-4 space-y-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[13px] font-black text-muted-foreground">
-                            {item?.name || 'Unnamed gift'}
-                          </span>
-                          <button
-                            onClick={() => removeGift(idx)}
-                            className="px-2 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-bold inline-flex items-center gap-1 hover:bg-red-500/20 transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" /> Remove
-                          </button>
-                        </div>
-
-                        <Field
-                          label="Display name (optional)"
-                          value={gift.name}
-                          onChange={(v) => updateGift(idx, { name: v })}
-                          placeholder={item?.name || ''}
+                      <li key={idx} className="flex flex-wrap items-center gap-3 rounded-2xl bg-muted/45 p-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-[14px] font-black text-primary-foreground shadow-[0_2px_0_0_#2c511a]">
+                          {reward.tier}
+                        </span>
+                        <input
+                          value={reward.label}
+                          onChange={(event) => updateReward(idx, { label: event.target.value })}
+                          className={`${inputClass} min-w-[9rem] flex-1`}
+                          aria-label="Reward label"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setRewardPickerIndex(idx)}
+                          className="flex items-center gap-2 rounded-2xl border border-border bg-card py-1 pl-1 pr-3 shadow-[0_2px_0_0_hsl(var(--border))] transition hover:bg-muted/50"
+                        >
+                          {rewards[0] ? (
+                            <RewardTile reward={rewards[0]} rewardCatalog={rewardCatalog} isPremium={false} still className="h-10 w-10 rounded-xl" />
+                          ) : (
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground">
+                              <Plus className="h-4 w-4" />
+                            </span>
+                          )}
+                          <span className="max-w-[10rem] truncate text-[13px] font-black">
+                            {rewards.length ? rewards.map((entry) => rewardSummary(entry, rewardCatalog)).join(', ') : 'Pick a reward'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => invites.set((prev) => ({ ...prev, rewards: prev.rewards.filter((_, i) => i !== idx) }))}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500"
+                          aria-label="Remove reward"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+              {economy.config ? (
+                <div className="mt-4 grid gap-3 rounded-2xl border border-dashed border-border p-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-center">
+                  <div>
+                    <p className="text-[14px] font-black">Paid invites a month</p>
+                    <p className="text-[12px] font-medium text-muted-foreground">
+                      Invites past this still make friends. They just stop paying.
+                    </p>
+                  </div>
+                  <NumberInput
+                    value={economy.config.invites.monthlyCap}
+                    max={1000}
+                    onChange={(monthlyCap) => economy.patchGroup('invites', { monthlyCap })}
+                  />
+                </div>
+              ) : null}
+            </AdminCard>
 
-                        <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-black tracking-wide text-muted-foreground">
-                                Gift item
-                              </p>
-                              <p className="mt-1 truncate text-sm font-bold text-foreground">
-                                {item?.name || 'No gift selected'}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => setGiftPickerIndex(idx)}
-                              className="shrink-0 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-black hover:bg-primary/20 transition-colors"
-                            >
-                              Pick gift
-                            </button>
-                          </div>
+            <AdminCard
+              title="Gifts to send"
+              subtitle="The inviter picks one of these for their friend. The first one is preselected."
+              icon={<span className="text-[20px]">💌</span>}
+              tone="berry"
+              actions={
+                <PondButton variant="secondary" size="sm" onClick={addGift}>
+                  <Plus className="h-4 w-4" />
+                  Add gift
+                </PondButton>
+              }
+            >
+              {config.giftOptions.length === 0 ? (
+                <EmptyState>No gifts yet. Invites go out empty-handed.</EmptyState>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {config.giftOptions.map((gift, idx) => {
+                    const item = rewardCatalog[gift.itemId];
+                    return (
+                      <div key={gift.id} className="relative rounded-2xl border border-border/70 bg-muted/30 p-3">
+                        {idx === 0 ? (
+                          <span className="absolute right-3 top-3 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black text-primary">
+                            Preselected
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setGiftPickerIndex(idx)}
+                          className="mb-3 flex items-center gap-3 text-left"
+                        >
+                          {gift.itemId ? (
+                            <RewardTile reward={tileFor(gift.itemId)} rewardCatalog={rewardCatalog} isPremium={false} still compact />
+                          ) : (
+                            <span className="flex h-16 w-16 items-center justify-center rounded-[20px] border-2 border-dashed border-border text-muted-foreground">
+                              <Plus className="h-5 w-5" />
+                            </span>
+                          )}
+                          <span className="min-w-0">
+                            <span className="block truncate text-[14px] font-black">{item?.name ?? 'Pick an item'}</span>
+                            <span className="block text-[12px] font-bold capitalize text-muted-foreground">
+                              {item ? item.rarity : 'Tap to choose'}
+                            </span>
+                          </span>
+                        </button>
+                        <div className="flex items-end gap-2">
+                          <Field label="Name players see" className="flex-1">
+                            <input
+                              value={gift.name}
+                              placeholder={item?.name || 'Same as the item'}
+                              onChange={(event) => updateGift(idx, { name: event.target.value })}
+                              className={inputClass}
+                            />
+                          </Field>
+                          <button
+                            type="button"
+                            onClick={() => invites.set((prev) => ({ ...prev, giftOptions: prev.giftOptions.filter((_, i) => i !== idx) }))}
+                            className="mb-1 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500"
+                            aria-label="Remove gift"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-            </section>
-          </>
-        )}
-
-        {rewardPickerIndex !== null && config.rewards[rewardPickerIndex] ? (
-          <RewardPickerDialog
-            open={rewardPickerIndex !== null}
-            onOpenChange={(isOpen) => {
-              if (!isOpen) setRewardPickerIndex(null);
-            }}
-            rewards={legacyRewardToRewards(config.rewards[rewardPickerIndex])}
-            rewardItems={catalog as QuestRewardCatalogItem[]}
-            rewardCatalog={rewardCatalog}
-            singleSelect
-            onSave={(rewards) => {
-              const normalized = normalizeRewardList(rewards).slice(0, 1);
-              updateReward(rewardPickerIndex, {
-                rewards: normalized,
-                flies: normalized[0]?.type === 'FLIES' ? normalized[0].amount ?? 0 : 0,
-                itemId:
-                  normalized[0]?.type === 'ITEM' || normalized[0]?.type === 'BOX'
-                    ? normalized[0].itemId ?? null
-                    : null,
-              });
-              setRewardPickerIndex(null);
-            }}
-          />
+            </AdminCard>
+          </div>
         ) : null}
+      </ConfigShell>
 
-        {giftPickerIndex !== null && config.giftOptions[giftPickerIndex] ? (
-          <RewardPickerDialog
-            open={giftPickerIndex !== null}
-            onOpenChange={(isOpen) => {
-              if (!isOpen) setGiftPickerIndex(null);
-            }}
-            rewards={
-              config.giftOptions[giftPickerIndex].itemId
-                ? [{ type: 'ITEM', itemId: config.giftOptions[giftPickerIndex].itemId }]
-                : []
-            }
-            rewardItems={catalog as QuestRewardCatalogItem[]}
-            rewardCatalog={rewardCatalog}
-            singleSelect
-            tabs={['item', 'box']}
-            onSave={(rewards) => {
-              const selected = normalizeRewardList(rewards).find(
-                (reward) => (reward.type === 'ITEM' || reward.type === 'BOX') && reward.itemId,
-              );
-              updateGift(giftPickerIndex, {
-                itemId: selected?.itemId ?? '',
-                imageUrl: '',
-              });
-              setGiftPickerIndex(null);
-            }}
-          />
-        ) : null}
+      {config && rewardPickerIndex !== null && config.rewards[rewardPickerIndex] ? (
+        <RewardPickerDialog
+          open
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setRewardPickerIndex(null);
+          }}
+          rewards={legacyRewardToRewards(config.rewards[rewardPickerIndex])}
+          rewardItems={catalog}
+          rewardCatalog={rewardCatalog}
+          singleSelect
+          onSave={(rewards) => {
+            const normalized = normalizeRewardList(rewards).slice(0, 1);
+            updateReward(rewardPickerIndex, {
+              rewards: normalized,
+              flies: normalized[0]?.type === 'FLIES' ? normalized[0].amount ?? 0 : 0,
+              itemId: normalized[0]?.type === 'ITEM' || normalized[0]?.type === 'BOX' ? normalized[0].itemId ?? null : null,
+            });
+            setRewardPickerIndex(null);
+          }}
+        />
+      ) : null}
 
-        <div className="pt-4 flex justify-center">
-          <button
-            onClick={() => router.push('/admin')}
-            className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ← Back to Admin
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+      {config && giftPickerIndex !== null && config.giftOptions[giftPickerIndex] ? (
+        <RewardPickerDialog
+          open
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setGiftPickerIndex(null);
+          }}
+          rewards={config.giftOptions[giftPickerIndex].itemId ? [{ type: 'ITEM', itemId: config.giftOptions[giftPickerIndex].itemId }] : []}
+          rewardItems={catalog}
+          rewardCatalog={rewardCatalog}
+          singleSelect
+          tabs={['item', 'box']}
+          onSave={(rewards) => {
+            const selected = normalizeRewardList(rewards).find(
+              (reward) => (reward.type === 'ITEM' || reward.type === 'BOX') && reward.itemId,
+            );
+            updateGift(giftPickerIndex, { itemId: selected?.itemId ?? '', imageUrl: '' });
+            setGiftPickerIndex(null);
+          }}
+        />
+      ) : null}
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-        {label}
-      </label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
+      <SaveBar
+        dirty={all.dirty}
+        saving={all.saving}
+        onSave={() => void all.save()}
+        onDiscard={all.discard}
+        label="Invites have unsaved changes"
       />
-    </div>
+    </AdminPage>
   );
 }
 
 function legacyRewardToRewards(reward: RewardTier): QuestReward[] {
   if (reward.rewards?.length) return normalizeRewardList(reward.rewards);
   const rewards: QuestReward[] = [];
-  if (reward.flies && reward.flies > 0) {
-    rewards.push({ type: 'FLIES', amountMode: 'fixed', amount: reward.flies });
-  }
-  if (reward.itemId) {
-    rewards.push({ type: 'ITEM', itemId: reward.itemId });
-  }
+  if (reward.flies && reward.flies > 0) rewards.push({ type: 'FLIES', amountMode: 'fixed', amount: reward.flies });
+  if (reward.itemId) rewards.push({ type: 'ITEM', itemId: reward.itemId });
   return normalizeRewardList(rewards);
-}
-
-function rewardSummaries(
-  reward: RewardTier,
-  rewardCatalog: Record<string, QuestRewardCatalogItem>,
-) {
-  const rewards = legacyRewardToRewards(reward);
-  if (!rewards.length) return 'No reward selected';
-  return rewards.map((entry) => rewardSummary(entry, rewardCatalog)).join(', ');
 }
 
 function ordinal(n: number) {

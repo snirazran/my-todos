@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   MAX_STARTER_TASKS_PER_CATEGORY,
-  STARTER_PLAN_DEFAULT_CONFIG,
   STARTER_PLAN_MAX_PER_AREA_LIMIT,
   STARTER_PLAN_MAX_TASKS_LIMIT,
   starterCadenceLabel,
@@ -17,6 +15,17 @@ import {
   type StarterTaskTemplate,
 } from '@/lib/quests/starterPlan';
 import { defaultStarterTasksFor } from '@/lib/quests/starterPlanDefaults';
+import {
+  AdminCard,
+  ConfigShell,
+  Field,
+  FieldGrid,
+  NumberInput,
+  SaveBar,
+  ToggleRow,
+  inputClass as kitInputClass,
+} from '@/components/admin/kit';
+import { useAdminConfig } from '@/components/admin/useAdminConfig';
 
 const inputClass =
   'h-9 rounded-lg border border-border/60 bg-background px-2.5 text-sm font-medium text-foreground outline-none focus:border-primary';
@@ -248,186 +257,75 @@ export function StarterTasksEditor({
 }
 
 export function AdminStarterPlanConfigCard() {
-  const [config, setConfig] = useState<StarterPlanConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch('/api/admin/starter-plan', {
-          credentials: 'include',
-        });
-        const data = await res.json();
-        setConfig(data.starterPlan ?? { ...STARTER_PLAN_DEFAULT_CONFIG });
-      } catch {
-        setConfig({ ...STARTER_PLAN_DEFAULT_CONFIG });
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const save = async () => {
-    if (!config) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch('/api/admin/starter-plan', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ starterPlan: config }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save');
-      setConfig(data.starterPlan);
-      setMessage('Saved');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading || !config) {
-    return (
-      <div className="flex items-center gap-2 rounded-2xl border border-border/40 bg-card/60 px-4 py-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading starter plan…
-      </div>
-    );
-  }
-
-  const patch = (next: Partial<StarterPlanConfig>) =>
-    setConfig((prev) => (prev ? { ...prev, ...next } : prev));
+  const plan = useAdminConfig<StarterPlanConfig>({
+    url: '/api/admin/starter-plan',
+    read: (payload) => payload?.starterPlan ?? null,
+    write: (starterPlan) => ({ starterPlan }),
+  });
+  const config = plan.config;
+  const fillPreview = (text: string) =>
+    text.replace(/{name}/g, 'Sam').replace(/{frog}/g, 'Pebble').replace(/{n}/g, String(config?.maxTasks ?? 5));
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border/40 bg-card/60 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-black text-foreground">Starter plan</p>
-          <p className="text-xs text-muted-foreground">
-            The ready-made week offered at the end of onboarding, built from the
-            areas each person picked.
-          </p>
-        </div>
-        <label className="flex shrink-0 items-center gap-2 text-xs font-bold text-foreground">
-          <input
-            type="checkbox"
-            checked={config.isActive}
-            onChange={(e) => patch({ isActive: e.target.checked })}
-          />
-          Live
-        </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-foreground">Tasks in a plan</span>
-          <input
-            type="number"
-            min={1}
-            max={STARTER_PLAN_MAX_TASKS_LIMIT}
-            value={config.maxTasks}
-            onChange={(e) => patch({ maxTasks: Number(e.target.value) })}
-            className={inputClass}
-          />
-          <span className="text-[11px] text-muted-foreground">
-            Keep it small — long plans get skipped.
-          </span>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-foreground">Max per area</span>
-          <input
-            type="number"
-            min={1}
-            max={STARTER_PLAN_MAX_PER_AREA_LIMIT}
-            value={config.maxPerArea}
-            onChange={(e) => patch({ maxPerArea: Number(e.target.value) })}
-            className={inputClass}
-          />
-          <span className="text-[11px] text-muted-foreground">
-            Areas take turns before any area gets a second task.
-          </span>
-        </label>
-        <label className="flex flex-col justify-center gap-1">
-          <span className="flex items-center gap-2 text-xs font-bold text-foreground">
-            <input
-              type="checkbox"
-              checked={config.linkTags}
-              onChange={(e) => patch({ linkTags: e.target.checked })}
-            />
-            Tag per area
-          </span>
-          <span className="text-[11px] text-muted-foreground">
-            Creates the area&apos;s tag in its own colour and links it, so the plan
-            already counts toward that area. Bounded by the user&apos;s tag limit
-            (10 free / 50 Plus) — any area past it still gets its tasks, untagged.
-          </span>
-        </label>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-foreground">Headline</span>
-          <input
-            value={config.headline}
-            onChange={(e) => patch({ headline: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-foreground">Subheadline</span>
-          <input
-            value={config.subheadline}
-            onChange={(e) => patch({ subheadline: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-foreground">Accept button</span>
-          <input
-            value={config.acceptLabel}
-            onChange={(e) => patch({ acceptLabel: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-foreground">Decline button</span>
-          <input
-            value={config.declineLabel}
-            onChange={(e) => patch({ declineLabel: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-        <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-xs font-bold text-foreground">Footnote</span>
-          <input
-            value={config.footnote}
-            onChange={(e) => patch({ footnote: e.target.value })}
-            className={inputClass}
-          />
-          <span className="text-[11px] text-muted-foreground">
-            {'Copy fields accept {n} (tasks picked), {name} and {frog}.'}
-          </span>
-        </label>
-      </div>
-
-      <div className="flex items-center justify-end gap-3">
-        {message && (
-          <span className="text-xs font-bold text-muted-foreground">{message}</span>
-        )}
-        <Button
-          size="sm"
-          className="rounded-xl font-black"
-          onClick={() => void save()}
-          disabled={saving}
+    <ConfigShell loading={plan.loading} error={plan.error}>
+      {config ? (
+        <AdminCard
+          title="Starter plan"
+          subtitle="The last onboarding screen: a few easy daily goals built from the areas each player picked."
+          icon={<span className="text-[20px]">🌱</span>}
         >
-          {saving ? 'Saving…' : 'Save starter plan'}
-        </Button>
-      </div>
-    </div>
+          <div className="space-y-5">
+            <ToggleRow
+              title={config.isActive ? 'Offered to new players' : 'Switched off'}
+              description="Off skips the starter plan screen entirely."
+              checked={config.isActive}
+              onChange={(isActive) => plan.patch({ isActive })}
+            />
+            <FieldGrid cols={2}>
+              <Field label="Goals in a plan" hint="Keep it small. Long plans get skipped.">
+                <NumberInput value={config.maxTasks} min={1} max={STARTER_PLAN_MAX_TASKS_LIMIT} onChange={(maxTasks) => plan.patch({ maxTasks })} />
+              </Field>
+              <Field label="Most goals per area" hint="Areas take turns before any area gets a second goal.">
+                <NumberInput value={config.maxPerArea} min={1} max={STARTER_PLAN_MAX_PER_AREA_LIMIT} onChange={(maxPerArea) => plan.patch({ maxPerArea })} />
+              </Field>
+            </FieldGrid>
+            <ToggleRow
+              title="Give each area its own tag"
+              description="Creates and links the area's tag, so the plan already counts toward it. Stops at the player's tag limit."
+              checked={config.linkTags}
+              onChange={(linkTags) => plan.patch({ linkTags })}
+            />
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+              <div className="space-y-3">
+                <Field label="Headline">
+                  <input value={config.headline} onChange={(event) => plan.patch({ headline: event.target.value })} className={kitInputClass} />
+                </Field>
+                <Field label="Subheadline">
+                  <input value={config.subheadline} onChange={(event) => plan.patch({ subheadline: event.target.value })} className={kitInputClass} />
+                </Field>
+                <Field label="Button" hint="{name} is the player, {frog} their frog, {n} the number of goals.">
+                  <input value={config.acceptLabel} onChange={(event) => plan.patch({ acceptLabel: event.target.value })} className={kitInputClass} />
+                </Field>
+              </div>
+              <div className="flex flex-col items-center justify-center gap-2 rounded-[22px] bg-gradient-to-b from-emerald-100 to-emerald-50 p-5 text-center dark:from-emerald-950 dark:to-emerald-900/40">
+                <p className="text-[11px] font-black uppercase tracking-[0.1em] text-emerald-700/70 dark:text-emerald-300/70">Players see</p>
+                <p className="text-[18px] font-black leading-tight text-emerald-950 dark:text-emerald-50">{fillPreview(config.headline || "{name}'s starter plan")}</p>
+                <p className="text-[13px] font-semibold text-emerald-900/70 dark:text-emerald-100/70">{fillPreview(config.subheadline || 'Try these easy goals with {frog}!')}</p>
+                <span className="mt-2 rounded-2xl bg-primary px-5 py-2.5 text-[14px] font-black text-primary-foreground shadow-[0_3px_0_0_#2c511a]">
+                  {fillPreview(config.acceptLabel || "Let's do it!")}
+                </span>
+              </div>
+            </div>
+          </div>
+        </AdminCard>
+      ) : null}
+      <SaveBar
+        dirty={plan.dirty}
+        saving={plan.saving}
+        onSave={() => void plan.save()}
+        onDiscard={plan.discard}
+        label="Starter plan has unsaved changes"
+      />
+    </ConfigShell>
   );
 }

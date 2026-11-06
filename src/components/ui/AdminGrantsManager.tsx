@@ -342,20 +342,14 @@ export function AdminGrantsManager() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-12">
+    <div className="px-4 pb-32 pt-5 md:px-8 md:pb-20 md:pt-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center gap-3">
-          <Link
-            href="/admin"
-            className="rounded-full bg-muted p-2 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-          <div className="rounded-2xl bg-pink-500/10 p-3 text-pink-600 dark:text-pink-400">
-            <Gift className="h-7 w-7" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-[0_3px_0_0_hsl(var(--primary)/0.22)]">
+            <Gift className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+            <h1 className="text-[26px] font-black leading-tight tracking-tight md:text-[30px]">
               Player grants
             </h1>
             <p className="text-sm font-medium text-muted-foreground">
