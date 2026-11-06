@@ -12,12 +12,13 @@ export type QuestSeasonTierReward = {
 };
 
 export type SeasonSkinSlot =
-  | 'tier6'
-  | 'tier12'
-  | 'tier16'
-  | 'tier24'
-  | 'finaleFree'
-  | 'finalePlus';
+  | 'plus1a'
+  | 'plus1b'
+  | 'plus2'
+  | 'plus3'
+  | 'plus4'
+  | 'plus5'
+  | 'plus6';
 
 export type SeasonSkinIds = Partial<Record<SeasonSkinSlot, string>>;
 export type SeasonSlotRarities = Record<SeasonSkinSlot, Rarity>;
@@ -29,12 +30,13 @@ export const SEASON_SKIN_SLOTS: Array<{
   lane: 'free' | 'plus';
   rarity: Rarity;
 }> = [
-  { key: 'tier6', tier: 6, finale: false, lane: 'plus', rarity: 'common' },
-  { key: 'tier12', tier: 12, finale: false, lane: 'free', rarity: 'rare' },
-  { key: 'tier16', tier: 16, finale: false, lane: 'plus', rarity: 'common' },
-  { key: 'tier24', tier: 24, finale: false, lane: 'plus', rarity: 'rare' },
-  { key: 'finaleFree', tier: 30, finale: true, lane: 'free', rarity: 'rare' },
-  { key: 'finalePlus', tier: 30, finale: true, lane: 'plus', rarity: 'epic' },
+  { key: 'plus1a', tier: 1, finale: false, lane: 'plus', rarity: 'epic' },
+  { key: 'plus1b', tier: 1, finale: false, lane: 'plus', rarity: 'epic' },
+  { key: 'plus2', tier: 2, finale: false, lane: 'plus', rarity: 'rare' },
+  { key: 'plus3', tier: 3, finale: false, lane: 'plus', rarity: 'rare' },
+  { key: 'plus4', tier: 4, finale: false, lane: 'plus', rarity: 'rare' },
+  { key: 'plus5', tier: 5, finale: false, lane: 'plus', rarity: 'rare' },
+  { key: 'plus6', tier: 6, finale: false, lane: 'plus', rarity: 'rare' },
 ];
 
 export const SEASON_SKIN_POOL_SLOTS: WardrobeSlot[] = [
@@ -158,11 +160,6 @@ const gift = (itemId: string): QuestReward => ({
   amount: 1,
   amountMode: 'fixed',
 });
-const shield = (amount = 1): QuestReward => ({
-  type: 'SHIELD',
-  amount,
-  amountMode: 'fixed',
-});
 const skinOr = (
   skinIds: SeasonSkinIds,
   slot: SeasonSkinSlot,
@@ -174,65 +171,63 @@ const skinOr = (
     : fallback;
 };
 
-/**
- * The 30-rung battle-pass shape: heavy free value up front to hook non-payers,
- * a free Rare skin at the midpoint so the free track has a real trophy, then a
- * taper where the Plus column visibly pulls ahead. Every tier pays something on
- * both columns — there are no dead rungs.
- *
- * Plus does not double the free column; the Plus column *is* the benefit.
- * Free totals 565 flies / 6 gifts / 1 Lily Pad / 2 skins; Plus adds 610 flies /
- * 10 gifts / 3 Lily Pads / 4 skins.
- */
+const basic = () => [gift(SIMPLE_GIFT_ID)];
+const rare = (extraFlies = 0) => [gift(FANCY_GIFT_ID), ...(extraFlies ? [flies(extraFlies)] : [])];
+const legendary = (extraFlies = 0) => [gift(AMAZING_GIFT_ID), ...(extraFlies ? [flies(extraFlies)] : [])];
+
+const FREE_LANE: QuestRewards[] = [
+  [flies(30)],
+  basic(), basic(), basic(), basic(), basic(), basic(), basic(),
+  [flies(30)],
+  basic(), basic(),
+  rare(),
+  [flies(30)],
+  basic(), basic(),
+  legendary(),
+  [flies(30)],
+  basic(), basic(), basic(),
+  legendary(),
+  [flies(30)],
+  basic(), basic(),
+  [flies(30)], [flies(30)],
+  rare(),
+  legendary(),
+  [flies(30)],
+  rare(),
+];
+
+const PLUS_LATE_LANE: QuestRewards[] = [
+  rare(), rare(30), rare(), rare(30), legendary(), rare(), rare(40), rare(),
+  legendary(30), rare(), rare(30), rare(), legendary(), rare(40), rare(), rare(30),
+  rare(40), legendary(30), rare(50), legendary(40), rare(50), legendary(30), rare(50), legendary(50),
+];
+
+function plusLane(tier: number, skinIds: SeasonSkinIds): QuestRewards {
+  if (tier === 1) {
+    return [
+      skinOr(skinIds, 'plus1a', gift(AMAZING_GIFT_ID)),
+      skinOr(skinIds, 'plus1b', gift(FANCY_GIFT_ID)),
+    ];
+  }
+  if (tier <= 6) {
+    return [skinOr(skinIds, `plus${tier}` as SeasonSkinSlot, gift(FANCY_GIFT_ID))];
+  }
+  return PLUS_LATE_LANE[(tier - 7) % PLUS_LATE_LANE.length];
+}
+
 export function buildSeasonPassLadder(
   tierCount: number,
   skinIds: SeasonSkinIds = {},
 ): QuestSeasonTierReward[] {
-  const base: Array<[QuestRewards, QuestRewards]> = [
-    [[flies(20)], [flies(30)]],
-    [[gift(SIMPLE_GIFT_ID)], [flies(30)]],
-    [[flies(20)], [gift(SIMPLE_GIFT_ID)]],
-    [[flies(20)], [flies(40)]],
-    [[gift(FANCY_GIFT_ID)], [gift(FANCY_GIFT_ID)]],
-    [[flies(15)], [skinOr(skinIds, 'tier6', gift(FANCY_GIFT_ID))]],
-    [[flies(20)], [flies(30)]],
-    [[gift(SIMPLE_GIFT_ID)], [flies(40)]],
-    [[flies(15)], [gift(SIMPLE_GIFT_ID)]],
-    [[flies(40), gift(FANCY_GIFT_ID)], [shield(), flies(45)]],
-    [[flies(15)], [flies(30)]],
-    [[skinOr(skinIds, 'tier12', gift(AMAZING_GIFT_ID))], [gift(FANCY_GIFT_ID)]],
-    [[flies(15)], [flies(40)]],
-    [[gift(SIMPLE_GIFT_ID)], [flies(30)]],
-    [[flies(25), shield()], [gift(AMAZING_GIFT_ID)]],
-    [[flies(15)], [skinOr(skinIds, 'tier16', gift(AMAZING_GIFT_ID))]],
-    [[flies(20)], [flies(40)]],
-    [[flies(15)], [gift(FANCY_GIFT_ID)]],
-    [[flies(15)], [flies(40)]],
-    [[flies(40), gift(FANCY_GIFT_ID)], [shield(), flies(45)]],
-    [[flies(15)], [flies(40)]],
-    [[flies(20)], [gift(FANCY_GIFT_ID)]],
-    [[flies(20)], [flies(40)]],
-    [[flies(20)], [skinOr(skinIds, 'tier24', gift(AMAZING_GIFT_ID))]],
-    [[flies(30), gift(AMAZING_GIFT_ID)], [gift(AMAZING_GIFT_ID)]],
-    [[flies(15)], [flies(45)]],
-    [[flies(20)], [gift(FANCY_GIFT_ID)]],
-    [[flies(15)], [flies(45)]],
-    [[flies(20)], [shield()]],
-  ];
-
-  const finale: [QuestRewards, QuestRewards] = [
-    [skinOr(skinIds, 'finaleFree', gift(AMAZING_GIFT_ID)), flies(80)],
-    [skinOr(skinIds, 'finalePlus', gift(AMAZING_GIFT_ID)), gift(AMAZING_GIFT_ID)],
-  ];
-
   const count = Math.max(1, Math.floor(tierCount));
   return Array.from({ length: count }, (_, index) => {
     const tier = index + 1;
-    const lanes = tier === count ? finale : base[(tier - 1) % base.length];
+    const free = FREE_LANE[index % FREE_LANE.length];
+    const plus = tier <= 30 ? plusLane(tier, skinIds) : rare(30);
     return {
       tier,
-      freeRewards: lanes[0].map((reward) => ({ ...reward })),
-      premiumRewards: lanes[1].map((reward) => ({ ...reward })),
+      freeRewards: free.map((reward) => ({ ...reward })),
+      premiumRewards: plus.map((reward) => ({ ...reward })),
     };
   });
 }

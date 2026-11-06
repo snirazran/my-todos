@@ -148,7 +148,11 @@ function skinAt(season: AdminSeason, slot: (typeof SEASON_SKIN_SLOTS)[number]) {
   const tier = slot.finale ? season.tierCount : slot.tier;
   const entry = season.tierRewards.find((row) => row.tier === tier);
   const rewards = slot.lane === 'free' ? entry?.freeRewards : entry?.premiumRewards;
-  return rewards?.find((reward) => reward.type === 'ITEM')?.itemId;
+  const sameTier = SEASON_SKIN_SLOTS.filter(
+    (other) => other.lane === slot.lane && (other.finale ? season.tierCount : other.tier) === tier,
+  );
+  const position = sameTier.findIndex((other) => other.key === slot.key);
+  return rewards?.filter((reward) => reward.type === 'ITEM')[position]?.itemId;
 }
 
 function readiness(season: AdminSeason) {

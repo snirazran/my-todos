@@ -1743,7 +1743,8 @@ function QuestSeasonEventOverlay({
                           rewardCatalog[reward.itemId ?? '']?.slot !== 'container';
                         const [main, ...extra] = [
                           ...sorted.filter(wearable),
-                          ...sorted.filter((reward) => !wearable(reward)),
+                          ...sorted.filter((reward) => !wearable(reward) && reward.type === 'BOX'),
+                          ...sorted.filter((reward) => !wearable(reward) && reward.type !== 'BOX'),
                         ];
                         const glow =
                           lane === 'plus' &&
