@@ -274,7 +274,7 @@ function StatisticsPageContent() {
               aria-current={view === item.id ? 'page' : undefined}
               onClick={() => open(item.id)}
               className={`h-8 shrink-0 rounded-md px-2.5 text-[12px] font-bold transition-colors ${
-                view === item.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                view === item.id ? 'bg-primary text-primary-foreground shadow-[0_2px_0_0_#2c511a]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               {item.label}
@@ -299,7 +299,7 @@ function StatisticsPageContent() {
                           aria-current={view === item.id ? 'page' : undefined}
                           onClick={() => open(item.id)}
                           className={`flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] font-semibold transition-colors ${
-                            view === item.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            view === item.id ? 'bg-primary text-primary-foreground shadow-[0_2px_0_0_#2c511a]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                           }`}
                         >
                           <span className="truncate">{item.label}</span>
@@ -500,7 +500,7 @@ function CopyForAi({ base }: { base: string }) {
       onClick={copy}
       disabled={state === 'busy'}
       title="Copy the AI brief (Markdown) to the clipboard, ready to paste into Claude or ChatGPT"
-      className="flex h-8 items-center gap-1.5 rounded-md bg-foreground px-2.5 text-[12px] font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+      className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-[12px] font-bold text-primary-foreground shadow-[0_2px_0_0_#2c511a] transition hover:brightness-105 disabled:opacity-60"
     >
       {state === 'done' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       {state === 'done' ? 'Copied' : state === 'failed' ? 'Copy failed' : state === 'busy' ? 'Preparing…' : 'Copy for AI'}

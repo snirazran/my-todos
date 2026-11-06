@@ -1,29 +1,37 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ChevronDown,
   Image as ImageIcon,
-  ChevronLeft,
-  Plus,
-  Save,
-  Trash2,
-  Eye,
-  EyeOff,
-  Smartphone,
-  Tablet,
+  Loader2,
   Monitor,
   MonitorSpeaker,
+  Plus,
+  Smartphone,
+  Tablet,
+  Trash2,
   Upload,
   X,
-  Loader2,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AdminPage,
+  EmptyState,
+  Field,
+  LoadingBlock,
+  Notice,
+  NumberInput,
+  PondButton,
+  Segmented,
+  ToggleRow,
+  inputClass,
+} from '@/components/admin/kit';
+import { RARITY_STYLE } from '@/components/admin/economy/rarity';
+import { cn } from '@/lib/utils';
 
 type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-
 type SizeKey = 'mobile' | 'tablet' | 'web' | 'webLarge';
-
 type BackgroundImages = Record<SizeKey, string>;
 
 type BackgroundItem = {
@@ -35,561 +43,586 @@ type BackgroundItem = {
   hidden: boolean;
 };
 
+type Filter = 'all' | 'shop' | 'hidden' | 'fix';
+
 const RARITIES: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
-const RARITY_STYLE: Record<Rarity, string> = {
-  common: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-  uncommon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
-  rare: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300',
-  epic: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
-  legendary: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-};
-
-const SIZE_FIELDS: {
-  key: SizeKey;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-}[] = [
-  { key: 'mobile', label: 'Mobile', hint: 'default (<768px)', icon: <Smartphone className="w-4 h-4" /> },
-  { key: 'tablet', label: 'Tablet', hint: '≥768px', icon: <Tablet className="w-4 h-4" /> },
-  { key: 'web', label: 'Web', hint: '≥1280px', icon: <Monitor className="w-4 h-4" /> },
-  { key: 'webLarge', label: 'Web Large', hint: '≥1920px', icon: <MonitorSpeaker className="w-4 h-4" /> },
+const SIZE_FIELDS: { key: SizeKey; label: string; hint: string; icon: React.ReactNode }[] = [
+  { key: 'mobile', label: 'Phone', hint: 'under 768px', icon: <Smartphone className="h-4 w-4" /> },
+  { key: 'tablet', label: 'Tablet', hint: '768px and up', icon: <Tablet className="h-4 w-4" /> },
+  { key: 'web', label: 'Desktop', hint: '1280px and up', icon: <Monitor className="h-4 w-4" /> },
+  { key: 'webLarge', label: 'Large desktop', hint: '1920px and up', icon: <MonitorSpeaker className="h-4 w-4" /> },
 ];
 
-function emptyImages(): BackgroundImages {
-  return { mobile: '', tablet: '', web: '', webLarge: '' };
+function normalizeItem(item: any): BackgroundItem {
+  return {
+    id: String(item.id),
+    name: String(item.name ?? ''),
+    rarity: RARITIES.includes(item.rarity) ? item.rarity : 'common',
+    priceFlies: Number(item.priceFlies ?? 0),
+    images: {
+      mobile: item.images?.mobile ?? '',
+      tablet: item.images?.tablet ?? '',
+      web: item.images?.web ?? '',
+      webLarge: item.images?.webLarge ?? '',
+    },
+    hidden: !!item.hidden,
+  };
 }
 
+const coverOf = (images: BackgroundImages) => images.web || images.tablet || images.mobile || images.webLarge;
+const missingSizes = (images: BackgroundImages) => SIZE_FIELDS.filter((field) => !images[field.key]);
+
 export function AdminBackgroundsManager() {
-  const router = useRouter();
   const [items, setItems] = useState<BackgroundItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [draft, setDraft] = useState<{ name: string; rarity: Rarity; priceFlies: number }>({
-    name: '',
-    rarity: 'common',
-    priceFlies: 200,
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    void load();
+    fetch('/api/admin/backgrounds', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setItems(Array.isArray(data.items) ? data.items.map(normalizeItem) : []))
+      .catch(() => setError('Could not load backgrounds'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/backgrounds');
-      const data = await res.json();
-      if (Array.isArray(data.items)) {
-        setItems(data.items.map(normalizeItem));
+  const counts = useMemo(
+    () => ({
+      all: items.length,
+      shop: items.filter((item) => !item.hidden).length,
+      hidden: items.filter((item) => item.hidden).length,
+      fix: items.filter((item) => missingSizes(item.images).length > 0).length,
+    }),
+    [items],
+  );
+
+  const shown = items.filter((item) =>
+    filter === 'shop'
+      ? !item.hidden
+      : filter === 'hidden'
+        ? item.hidden
+        : filter === 'fix'
+          ? missingSizes(item.images).length > 0
+          : true,
+  );
+
+  const open = items.find((item) => item.id === openId) ?? null;
+  const replaceItem = (next: BackgroundItem) =>
+    setItems((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+
+  return (
+    <AdminPage
+      title="Backgrounds"
+      subtitle="Scenes players buy in the shop and set behind their frog."
+      icon={<ImageIcon />}
+      actions={
+        <PondButton onClick={() => setCreating(true)}>
+          <Plus className="h-4 w-4" />
+          New background
+        </PondButton>
       }
-    } catch {
-      setMessage({ type: 'error', text: 'Failed to load backgrounds' });
-    } finally {
-      setLoading(false);
-    }
-  };
+    >
+      {loading ? (
+        <LoadingBlock rows={3} />
+      ) : error ? (
+        <Notice type="error">{error}</Notice>
+      ) : (
+        <div className="space-y-4">
+          <Segmented<Filter>
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: `All ${counts.all}` },
+              { value: 'shop', label: `In the shop ${counts.shop}` },
+              { value: 'hidden', label: `Hidden ${counts.hidden}` },
+              ...(counts.fix > 0 ? [{ value: 'fix' as Filter, label: `Missing sizes ${counts.fix}` }] : []),
+            ]}
+          />
+          {shown.length === 0 ? (
+            <EmptyState>Nothing here.</EmptyState>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {shown.map((item) => (
+                <BackgroundTile key={item.id} item={item} onOpen={() => setOpenId(item.id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-  function normalizeItem(item: any): BackgroundItem {
-    return {
-      id: String(item.id),
-      name: String(item.name ?? ''),
-      rarity: (item.rarity as Rarity) ?? 'common',
-      priceFlies: Number(item.priceFlies ?? 0),
-      images: {
-        mobile: item.images?.mobile ?? '',
-        tablet: item.images?.tablet ?? '',
-        web: item.images?.web ?? '',
-        webLarge: item.images?.webLarge ?? '',
-      },
-      hidden: !!item.hidden,
-    };
-  }
+      <BackgroundEditor
+        item={open}
+        onClose={() => setOpenId(null)}
+        onSaved={replaceItem}
+        onDeleted={(id) => {
+          setItems((prev) => prev.filter((item) => item.id !== id));
+          setOpenId(null);
+        }}
+      />
+      <CreateBackgroundDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(item) => {
+          setItems((prev) => [item, ...prev]);
+          setCreating(false);
+          setOpenId(item.id);
+        }}
+      />
+    </AdminPage>
+  );
+}
 
-  const flash = (type: 'success' | 'error', text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 3500);
-  };
+function BackgroundTile({ item, onOpen }: { item: BackgroundItem; onOpen: () => void }) {
+  const cover = coverOf(item.images);
+  const missing = missingSizes(item.images);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group overflow-hidden rounded-[22px] border border-border bg-card text-left shadow-[0_3px_0_0_hsl(var(--border))] transition hover:-translate-y-0.5 hover:border-primary/40"
+    >
+      <div className="relative aspect-[16/10] bg-muted">
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover} alt="" className={cn('h-full w-full object-cover', item.hidden && 'opacity-50 grayscale')} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[13px] font-black text-muted-foreground">
+            No image yet
+          </div>
+        )}
+        <span className="absolute left-2.5 top-2.5 flex gap-1.5">
+          {item.hidden ? (
+            <span className="rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur">Hidden</span>
+          ) : null}
+          {missing.length > 0 && cover ? (
+            <span className="rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-black text-amber-950">
+              {missing.length === 1 ? `No ${missing[0].label.toLowerCase()} size` : `${missing.length} sizes missing`}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 px-3.5 py-3">
+        <span className="min-w-0 flex-1 truncate text-[15px] font-black">{item.name || 'Untitled'}</span>
+        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-black capitalize', RARITY_STYLE[item.rarity]?.chip)}>
+          {item.rarity}
+        </span>
+        <span className="text-[13px] font-black tabular-nums text-muted-foreground">🪰 {item.priceFlies}</span>
+      </div>
+    </button>
+  );
+}
 
-  const updateLocal = (id: string, patch: Partial<BackgroundItem>) => {
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
-  };
+function RarityPicker({ value, onChange }: { value: Rarity; onChange: (next: Rarity) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {RARITIES.map((rarity) => (
+        <button
+          key={rarity}
+          type="button"
+          onClick={() => onChange(rarity)}
+          className={cn(
+            'rounded-full px-3 py-1.5 text-[12px] font-black capitalize transition',
+            value === rarity ? RARITY_STYLE[rarity]?.chip : 'bg-muted/60 text-muted-foreground hover:text-foreground',
+            value === rarity && 'shadow-[0_2px_0_0_rgba(0,0,0,0.12)]',
+          )}
+        >
+          {rarity}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-  const setImageUrl = (id: string, key: SizeKey, value: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, images: { ...item.images, [key]: value } } : item,
-      ),
-    );
-  };
+function BackgroundEditor({
+  item,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  item: BackgroundItem | null;
+  onClose: () => void;
+  onSaved: (item: BackgroundItem) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [draft, setDraft] = useState<BackgroundItem | null>(item);
+  const [saving, setSaving] = useState(false);
+  const [busySize, setBusySize] = useState<SizeKey | 'all' | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showSizes, setShowSizes] = useState(false);
 
-  const save = async (item: BackgroundItem) => {
-    setSavingId(item.id);
+  useEffect(() => {
+    setDraft(item);
+    setMessage(null);
+    setConfirmDelete(false);
+    setShowSizes(false);
+  }, [item?.id]);
+
+  if (!item || !draft) return null;
+
+  const dirty =
+    draft.name !== item.name ||
+    draft.rarity !== item.rarity ||
+    draft.priceFlies !== item.priceFlies ||
+    draft.hidden !== item.hidden;
+  const cover = coverOf(item.images);
+  const missing = missingSizes(item.images);
+
+  const save = async () => {
+    setSaving(true);
+    setMessage(null);
     try {
       const res = await fetch('/api/admin/backgrounds', {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: item.id,
-          name: item.name,
-          rarity: item.rarity,
-          priceFlies: item.priceFlies,
+          id: draft.id,
+          name: draft.name,
+          rarity: draft.rarity,
+          priceFlies: draft.priceFlies,
+          hidden: draft.hidden,
           images: item.images,
-          hidden: item.hidden,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
-      flash('success', `Saved "${item.name}"`);
+      onSaved({ ...item, name: draft.name, rarity: draft.rarity, priceFlies: draft.priceFlies, hidden: draft.hidden });
+      setMessage({ type: 'success', text: 'Saved' });
     } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Save failed');
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed' });
     } finally {
-      setSavingId(null);
+      setSaving(false);
     }
   };
 
-  const remove = async (item: BackgroundItem) => {
-    if (!confirm(`Delete "${item.name}"? This will also delete any uploaded images.`)) return;
-    setSavingId(item.id);
+  const upload = async (size: SizeKey | 'all', file: File) => {
+    setBusySize(size);
+    setMessage(null);
+    try {
+      const form = new FormData();
+      form.set('id', item.id);
+      form.set('size', size);
+      form.set('file', file);
+      const res = await fetch('/api/admin/backgrounds/upload', { method: 'POST', credentials: 'include', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const urls = (data.urls ?? { [size]: data.url }) as Partial<BackgroundImages>;
+      onSaved({ ...item, images: { ...item.images, ...urls } });
+      setMessage({ type: 'success', text: size === 'all' ? 'Image set for every screen size' : 'Image uploaded' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed' });
+    } finally {
+      setBusySize(null);
+    }
+  };
+
+  const removeImage = async (size: SizeKey) => {
+    setBusySize(size);
+    try {
+      const res = await fetch('/api/admin/backgrounds/upload', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, size }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Remove failed');
+      onSaved({ ...item, images: { ...item.images, [size]: '' } });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Remove failed' });
+    } finally {
+      setBusySize(null);
+    }
+  };
+
+  const remove = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setSaving(true);
     try {
       const res = await fetch('/api/admin/backgrounds', {
         method: 'DELETE',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item.id }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Delete failed');
-      setItems((prev) => prev.filter((it) => it.id !== item.id));
-      flash('success', 'Deleted');
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      onDeleted(item.id);
     } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Delete failed');
-    } finally {
-      setSavingId(null);
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Delete failed' });
+      setSaving(false);
     }
   };
 
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto rounded-[28px] p-0">
+        <div className="relative aspect-[16/7] bg-muted">
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cover} alt="" className="h-full w-full object-cover" />
+          ) : null}
+          <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-transparent to-transparent p-4">
+            <UploadButton
+              busy={busySize === 'all'}
+              disabled={busySize !== null}
+              onPick={(file) => void upload('all', file)}
+              label={cover ? 'Replace image' : 'Upload image'}
+              tone="light"
+            />
+          </div>
+        </div>
+        <div className="space-y-5 p-5">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-[22px] font-black">{item.name || 'Untitled'}</DialogTitle>
+            <DialogDescription className="text-[13px] font-medium">
+              One wide image fills every screen size. A 5120px-wide picture stays sharp on large desktops.
+            </DialogDescription>
+          </DialogHeader>
+
+          {message ? <Notice type={message.type}>{message.text}</Notice> : null}
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
+            <Field label="Name">
+              <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className={inputClass} />
+            </Field>
+            <Field label="Price">
+              <NumberInput value={draft.priceFlies} max={100000} suffix="flies" onChange={(priceFlies) => setDraft({ ...draft, priceFlies })} />
+            </Field>
+          </div>
+          <Field label="Rarity">
+            <RarityPicker value={draft.rarity} onChange={(rarity) => setDraft({ ...draft, rarity })} />
+          </Field>
+          <ToggleRow
+            title={draft.hidden ? 'Hidden from the shop' : 'In the shop'}
+            description="Hidden backgrounds stay with players who own them."
+            checked={!draft.hidden}
+            onChange={(on) => setDraft({ ...draft, hidden: !on })}
+          />
+
+          <div className="rounded-2xl bg-muted/40">
+            <button
+              type="button"
+              onClick={() => setShowSizes((prev) => !prev)}
+              className="flex w-full items-center gap-2 px-4 py-3 text-left"
+            >
+              <span className="flex-1 text-[13px] font-black">
+                Each screen size
+                <span className="ml-2 font-bold text-muted-foreground">
+                  {missing.length === 0 ? 'all 4 set' : `${4 - missing.length} of 4 set`}
+                </span>
+              </span>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition', showSizes && 'rotate-180')} />
+            </button>
+            {showSizes ? (
+              <ul className="space-y-2 px-3 pb-3">
+                {SIZE_FIELDS.map((field) => {
+                  const url = item.images[field.key];
+                  return (
+                    <li key={field.key} className="flex items-center gap-3 rounded-xl bg-card px-3 py-2">
+                      <span className="h-10 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                        {url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={url} alt="" className="h-full w-full object-cover" />
+                        ) : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5 text-[13px] font-black">
+                          {field.icon}
+                          {field.label}
+                        </span>
+                        <span className={cn('block text-[11px] font-bold', url ? 'text-muted-foreground' : 'text-amber-600')}>
+                          {url ? field.hint : 'Missing'}
+                        </span>
+                      </span>
+                      <UploadButton
+                        busy={busySize === field.key}
+                        disabled={busySize !== null}
+                        onPick={(file) => void upload(field.key, file)}
+                        label={url ? 'Replace' : 'Upload'}
+                        small
+                      />
+                      {url ? (
+                        <button
+                          type="button"
+                          disabled={busySize !== null}
+                          onClick={() => void removeImage(field.key)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                          aria-label={`Remove ${field.label} image`}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+            <PondButton variant={confirmDelete ? 'danger' : 'ghost'} onClick={() => void remove()} disabled={saving}>
+              <Trash2 className="h-4 w-4" />
+              {confirmDelete ? 'Delete for good' : 'Delete'}
+            </PondButton>
+            <span className="flex-1" />
+            <PondButton variant="secondary" onClick={onClose}>
+              {dirty ? 'Cancel' : 'Done'}
+            </PondButton>
+            {dirty ? (
+              <PondButton onClick={() => void save()} loading={saving}>
+                Save
+              </PondButton>
+            ) : null}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UploadButton({
+  onPick,
+  busy,
+  disabled,
+  label,
+  small,
+  tone,
+}: {
+  onPick: (file: File) => void;
+  busy: boolean;
+  disabled: boolean;
+  label: string;
+  small?: boolean;
+  tone?: 'light';
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) onPick(file);
+        }}
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-xl font-black transition disabled:opacity-50',
+          small ? 'h-8 px-3 text-[12px]' : 'h-10 px-4 text-[13px]',
+          tone === 'light'
+            ? 'bg-white/90 text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.25)] hover:bg-white'
+            : 'border border-border bg-card shadow-[0_2px_0_0_hsl(var(--border))] hover:bg-muted/50',
+        )}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {busy ? 'Uploading…' : label}
+      </button>
+    </>
+  );
+}
+
+function CreateBackgroundDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (item: BackgroundItem) => void;
+}) {
+  const [name, setName] = useState('');
+  const [rarity, setRarity] = useState<Rarity>('common');
+  const [priceFlies, setPriceFlies] = useState(200);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setName('');
+    setRarity('common');
+    setPriceFlies(200);
+    setError(null);
+  }, [open]);
+
   const create = async () => {
-    if (!draft.name.trim()) {
-      flash('error', 'Name is required');
+    if (!name.trim()) {
+      setError('Give it a name first.');
       return;
     }
-    setCreating(true);
+    setBusy(true);
+    setError(null);
     try {
       const res = await fetch('/api/admin/backgrounds', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: draft.name,
-          rarity: draft.rarity,
-          priceFlies: draft.priceFlies,
-          images: emptyImages(),
+          name: name.trim(),
+          rarity,
+          priceFlies,
+          images: { mobile: '', tablet: '', web: '', webLarge: '' },
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Create failed');
-      setItems((prev) => [normalizeItem(data.item), ...prev]);
-      setDraft({ name: '', rarity: 'common', priceFlies: 200 });
-      flash('success', 'Created. Upload images below.');
+      onCreated(normalizeItem(data.item));
     } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Create failed');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  return (
-    <div className="px-4 pb-32 pt-5 md:px-8 md:pb-20 md:pt-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-[0_3px_0_0_hsl(var(--primary)/0.22)]">
-              <ImageIcon className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-[26px] font-black leading-tight tracking-tight md:text-[30px]">Backgrounds</h1>
-              <p className="text-sm text-muted-foreground font-medium">
-                Upload an image per screen size. Users buy and equip these in the shop.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {message && (
-          <div
-            className={`rounded-xl px-4 py-3 text-sm font-bold ${
-              message.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'bg-red-500/10 text-red-600 dark:text-red-400'
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {/* Create new */}
-        <div className="rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] p-5 md:p-6 space-y-4">
-          <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-            <Plus className="w-5 h-5 text-primary" /> New Background
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-                Name
-              </label>
-              <input
-                value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                placeholder="Forest Glade"
-                className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-                Rarity
-              </label>
-              <select
-                value={draft.rarity}
-                onChange={(e) => setDraft({ ...draft, rarity: e.target.value as Rarity })}
-                className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
-              >
-                {RARITIES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-                Cost (flies)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={draft.priceFlies}
-                onChange={(e) =>
-                  setDraft({ ...draft, priceFlies: Number(e.target.value) || 0 })
-                }
-                className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
-              />
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            Create the background first, then upload an image for each screen size on its row.
-          </p>
-
-          <div className="flex justify-end">
-            <button
-              onClick={create}
-              disabled={creating}
-              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-black inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 transition-opacity"
-            >
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Create
-            </button>
-          </div>
-        </div>
-
-        {/* List */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-black tracking-tight">
-            All Backgrounds{' '}
-            {items.length > 0 && (
-              <span className="text-muted-foreground font-bold">({items.length})</span>
-            )}
-          </h2>
-
-          {loading ? (
-            <div className="rounded-3xl border border-border bg-card p-6 text-sm text-muted-foreground">
-              Loading...
-            </div>
-          ) : items.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
-              No backgrounds yet. Create one above.
-            </div>
-          ) : (
-            items.map((item) => (
-              <BackgroundRow
-                key={item.id}
-                item={item}
-                saving={savingId === item.id}
-                onChange={(patch) => updateLocal(item.id, patch)}
-                onImageUrl={(key, value) => setImageUrl(item.id, key, value)}
-                onSave={() => save(item)}
-                onDelete={() => remove(item)}
-                onFlash={flash}
-              />
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BackgroundRow({
-  item,
-  saving,
-  onChange,
-  onImageUrl,
-  onSave,
-  onDelete,
-  onFlash,
-}: {
-  item: BackgroundItem;
-  saving: boolean;
-  onChange: (patch: Partial<BackgroundItem>) => void;
-  onImageUrl: (key: SizeKey, value: string) => void;
-  onSave: () => void;
-  onDelete: () => void;
-  onFlash: (type: 'success' | 'error', text: string) => void;
-}) {
-  const preview =
-    item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
-  return (
-    <div className="rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] p-5 md:p-6 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-4">
-        <div className="aspect-[4/3] rounded-2xl bg-muted overflow-hidden flex items-center justify-center text-xs text-muted-foreground">
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt={item.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="opacity-60">No image</span>
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 content-start">
-          <div className="md:col-span-1">
-            <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Name
-            </label>
-            <input
-              value={item.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
-            />
-            <p className="mt-1 text-[10px] font-mono text-muted-foreground/70">{item.id}</p>
-          </div>
-          <div>
-            <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Rarity
-            </label>
-            <select
-              value={item.rarity}
-              onChange={(e) => onChange({ rarity: e.target.value as Rarity })}
-              className={`mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-bold focus:outline-none focus:border-primary ${RARITY_STYLE[item.rarity]}`}
-            >
-              {RARITIES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Cost (flies)
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={item.priceFlies}
-              onChange={(e) => onChange({ priceFlies: Number(e.target.value) || 0 })}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {SIZE_FIELDS.map((field) => (
-          <ImageUploader
-            key={field.key}
-            backgroundId={item.id}
-            sizeKey={field.key}
-            label={field.label}
-            hint={field.hint}
-            icon={field.icon}
-            value={item.images[field.key]}
-            onChange={(value) => onImageUrl(field.key, value)}
-            onFlash={onFlash}
-          />
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <button
-          onClick={() => onChange({ hidden: !item.hidden })}
-          className={`px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${
-            item.hidden
-              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
-              : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-          }`}
-        >
-          {item.hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-          {item.hidden ? 'Hidden from shop' : 'Visible in shop'}
-        </button>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onDelete}
-            disabled={saving}
-            className="px-3 py-2 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-black inline-flex items-center gap-1.5 hover:bg-red-500/20 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-3.5 h-3.5" /> Delete
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-black inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ImageUploader({
-  backgroundId,
-  sizeKey,
-  label,
-  hint,
-  icon,
-  value,
-  onChange,
-  onFlash,
-}: {
-  backgroundId: string;
-  sizeKey: SizeKey;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-  value: string;
-  onChange: (value: string) => void;
-  onFlash: (type: 'success' | 'error', text: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const triggerPick = () => inputRef.current?.click();
-
-  const handleFile = async (file: File) => {
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.set('id', backgroundId);
-      form.set('size', sizeKey);
-      form.set('file', file);
-      const res = await fetch('/api/admin/backgrounds/upload', {
-        method: 'POST',
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      onChange(data.url);
-      onFlash('success', `${label} image uploaded`);
-    } catch (err) {
-      onFlash('error', err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
-
-  const removeImage = async () => {
-    setBusy(true);
-    try {
-      const res = await fetch('/api/admin/backgrounds/upload', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: backgroundId, size: sizeKey }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Remove failed');
-      onChange('');
-      onFlash('success', `${label} image removed`);
-    } catch (err) {
-      onFlash('error', err instanceof Error ? err.message : 'Remove failed');
+      setError(err instanceof Error ? err.message : 'Create failed');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/40 p-3 space-y-2">
-      <label className="text-[13px] font-bold tracking-wide text-muted-foreground flex items-center gap-1.5">
-        {icon}
-        {label}
-        <span className="text-[10px] font-medium text-muted-foreground/70 normal-case tracking-normal">
-          ({hint})
-        </span>
-      </label>
-
-      <div className="flex items-stretch gap-2">
-        <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
-          {value ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={value} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span className="opacity-60">empty</span>
-          )}
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-md rounded-[28px]">
+        <DialogHeader className="text-left">
+          <DialogTitle className="text-[20px] font-black">New background</DialogTitle>
+          <DialogDescription className="text-[13px] font-medium">You add the image on the next screen.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {error ? <Notice type="error">{error}</Notice> : null}
+          <Field label="Name">
+            <input
+              autoFocus
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void create();
+              }}
+              placeholder="Forest Glade"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Rarity">
+            <RarityPicker value={rarity} onChange={setRarity} />
+          </Field>
+          <Field label="Price">
+            <NumberInput value={priceFlies} max={100000} suffix="flies" onChange={setPriceFlies} />
+          </Field>
+          <div className="flex justify-end gap-2 pt-1">
+            <PondButton variant="secondary" onClick={onClose}>
+              Cancel
+            </PondButton>
+            <PondButton onClick={() => void create()} loading={busy}>
+              Create
+            </PondButton>
+          </div>
         </div>
-
-        <div className="flex-1 flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={triggerPick}
-            disabled={uploading || busy}
-            className="w-full h-9 rounded-xl bg-primary/10 text-primary text-xs font-black inline-flex items-center justify-center gap-1.5 hover:bg-primary/20 transition-colors disabled:opacity-60"
-          >
-            {uploading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Upload className="w-3.5 h-3.5" />
-            )}
-            {uploading ? 'Uploading…' : value ? 'Replace' : 'Upload image'}
-          </button>
-
-          {value && (
-            <button
-              type="button"
-              onClick={removeImage}
-              disabled={uploading || busy}
-              className="w-full h-7 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-bold inline-flex items-center justify-center gap-1 hover:bg-red-500/20 transition-colors disabled:opacity-60"
-            >
-              <X className="w-3 h-3" /> Remove
-            </button>
-          )}
-        </div>
-      </div>
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFile(file);
-        }}
-      />
-
-      <details className="text-[10px] text-muted-foreground/70">
-        <summary className="cursor-pointer hover:text-muted-foreground">Use external URL instead</summary>
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://example.com/image.png"
-          className="mt-1 w-full px-2 py-1.5 rounded-lg border border-border bg-background text-[11px] font-mono focus:outline-none focus:border-primary"
-        />
-      </details>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

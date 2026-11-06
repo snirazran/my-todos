@@ -162,7 +162,7 @@ export function RewardEditor({
             className={cn(
               'flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors',
               picking === kind
-                ? 'bg-foreground text-background'
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:text-foreground',
             )}
           >

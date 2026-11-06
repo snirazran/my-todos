@@ -166,16 +166,21 @@ export function seasonHasStarted(season: Pick<QuestSeasonDoc, 'startsAt'>, now =
 
 export async function restampUpcomingSeason(
   seasonId: string,
-  input: { skinIds?: SeasonSkinIds; template?: SeasonTemplateView },
+  input: { skinIds?: SeasonSkinIds; template?: SeasonTemplateView; allowLive?: boolean },
 ) {
   const season = await QuestSeasonModel.findOne({ seasonId });
   if (!season) throw new Error('Season not found');
-  if (seasonHasStarted(season)) {
-    throw new Error('This season is live — its rewards are locked');
+  const started = seasonHasStarted(season);
+  if (new Date(season.endsAt).getTime() <= Date.now()) {
+    throw new Error('This season has ended. Its prizes are locked.');
   }
-  const config = input.template
-    ? normalizeSeasonPassConfig(input.template)
-    : normalizeSeasonPassConfig(season);
+  if (started && !input.allowLive) {
+    throw new Error('This season is live. Its prizes are locked.');
+  }
+  const config =
+    input.template && !started
+      ? normalizeSeasonPassConfig(input.template)
+      : normalizeSeasonPassConfig(season);
   const skinIds = input.skinIds ?? normalizeSeasonSkinIds(season.skinIds);
   season.set({
     ...config,

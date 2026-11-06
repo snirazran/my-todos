@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/QuestCards';
 import {
   AMAZING_GIFT_ID,
+  buildSeasonPassLadder,
   FANCY_GIFT_ID,
   SEASON_PASS_LIMITS,
   SEASON_SKIN_POOL_SLOTS,
@@ -48,6 +49,7 @@ import {
 } from '@/lib/quests/seasonCalendar';
 import { RARITY_ORDER, type Rarity, type WardrobeSlot } from '@/lib/skins/catalog';
 import type { QuestRewards } from '@/lib/quests/types';
+import { Notice } from '@/components/admin/kit';
 
 type SizeKey = 'mobile' | 'tablet' | 'web' | 'webLarge';
 type SeasonImages = Record<SizeKey, string>;
@@ -97,9 +99,9 @@ const RARITY_CHIP: Record<Rarity, string> = {
 };
 
 const NUMBER_FIELDS: Array<[keyof typeof SEASON_PASS_LIMITS, string, string]> = [
-  ['tierCount', 'Tiers', 'Rungs on the ladder.'],
+  ['tierCount', 'Days on the ladder', 'One prize day per step.'],
   ['tasksPerStep', 'Tasks per step', 'Completed tasks that earn one step.'],
-  ['stepsPerTier', 'Steps per tier', 'Steps needed to climb one tier.'],
+  ['stepsPerTier', 'Steps per day', 'Steps needed to reach the next prize day.'],
   ['graceHours', 'Grace window (hours)', 'How long an unfinished pass stays open after the month.'],
 ];
 
@@ -165,11 +167,19 @@ function readiness(season: AdminSeason) {
     },
     { label: 'Art', done: !!coverOf(season.images), hint: 'No background yet' },
     {
-      label: 'Skins',
+      label: 'Items',
       done: filled === SEASON_SKIN_SLOTS.length,
       hint: `${filled}/${SEASON_SKIN_SLOTS.length} rolled`,
     },
   ];
+}
+
+function stripLadder(tiers: QuestSeasonTierReward[]) {
+  return tiers.map((entry) => ({
+    tier: entry.tier,
+    free: entry.freeRewards.map((reward) => [reward.type, reward.itemId ?? '', reward.amount ?? 0]),
+    plus: entry.premiumRewards.map((reward) => [reward.type, reward.itemId ?? '', reward.amount ?? 0]),
+  }));
 }
 
 function laneTotals(tiers: QuestSeasonTierReward[], lane: 'free' | 'plus') {
@@ -218,6 +228,7 @@ export function AdminSeasonManager({
   const [rulesOpen, setRulesOpen] = useState(false);
   const [rulesDraft, setRulesDraft] = useState<AdminTemplate | null>(null);
   const [pastOpen, setPastOpen] = useState(false);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const applyPayload = (data: CalendarPayload) => {
     setSeasons(data.seasons);
@@ -282,7 +293,16 @@ export function AdminSeasonManager({
   const activeKey = selectedKey ?? months[1];
   const selected = seasonForMonth(activeKey);
   const selectedStatus = selected ? seasonStatus(selected, now) : null;
-  const locked = selectedStatus !== 'upcoming';
+  const locked = selectedStatus === 'ended';
+  const live = selectedStatus === 'live';
+  const confirmLive = (key: string, action: () => void) => {
+    if (live && confirming !== key) {
+      setConfirming(key);
+      return;
+    }
+    setConfirming(null);
+    action();
+  };
 
   useEffect(() => {
     setNameDraft(selected?.name ?? '');
@@ -323,12 +343,16 @@ export function AdminSeasonManager({
     run(
       slot ? `reroll:${slot}` : 'reroll',
       () => post({ action: 'reroll', id: selected.id, slot }),
-      slot ? 'Rolled a new skin' : 'Rolled all six skins',
+      slot ? 'Rolled a new item' : 'Rolled every item',
     );
+
+  const restamp = () =>
+    selected &&
+    run('restamp', () => post({ action: 'restamp', id: selected.id }), 'Latest prize recipe applied');
 
   const setSkin = (slot: SeasonSkinSlot, itemId: string) =>
     selected &&
-    run(`reroll:${slot}`, () => post({ action: 'setSkin', id: selected.id, slot, itemId }), 'Skin set');
+    run(`reroll:${slot}`, () => post({ action: 'setSkin', id: selected.id, slot, itemId }), 'Item set');
 
   const planMonth = (monthKey: string) =>
     run(`plan:${monthKey}`, async () => {
@@ -484,11 +508,11 @@ export function AdminSeasonManager({
     <div className={cardClass}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-black text-foreground">Season skins</h2>
+          <h2 className="text-lg font-black text-foreground">Plus items</h2>
           <p className="text-xs text-muted-foreground">
             {locked
-              ? 'Locked — players are already climbing toward these.'
-              : 'Rolled at random from each rung’s rarity, never repeating a recent season. Reroll or choose one yourself until the 1st.'}
+              ? 'This season has ended.'
+              : 'Drawn at random from each slot’s rarity, never repeating a recent season. Reroll one or choose it yourself.'}
           </p>
         </div>
         {locked ? (
@@ -501,13 +525,18 @@ export function AdminSeasonManager({
             variant="outline"
             className="shrink-0 gap-1.5 rounded-xl font-black"
             disabled={busy !== null || !season.monthKey}
-            onClick={() => void reroll()}
+            onClick={() => confirmLive('reroll', () => void reroll())}
           >
             <Dices className="h-4 w-4" />
-            {busy === 'reroll' ? 'Rolling…' : 'Reroll all'}
+            {busy === 'reroll' ? 'Rolling…' : confirming === 'reroll' ? 'Yes, reroll the live season' : 'Reroll all'}
           </Button>
         )}
       </div>
+      {live ? (
+        <Notice type="info" className="mb-3">
+          This season is live. Changes reach only the days a player has not collected yet. Collected days stay as they were.
+        </Notice>
+      ) : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {SEASON_SKIN_SLOTS.map((slot) => {
           const itemId = skinAt(season, slot);
@@ -518,7 +547,7 @@ export function AdminSeasonManager({
             <div key={slot.key} className="rounded-2xl border border-border/40 bg-background/70 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[12px] font-black text-muted-foreground">
-                  {slot.finale ? `Finale · T${season.tierCount}` : `Tier ${slot.tier}`}
+                  {`Day ${slot.finale ? season.tierCount : slot.tier}`}
                 </span>
                 <span className="flex gap-1">
                   <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-black capitalize', RARITY_CHIP[rarity])}>
@@ -554,17 +583,17 @@ export function AdminSeasonManager({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-black text-foreground">
-                    {item?.name ?? 'Amazing Gift fallback'}
+                    {item?.name ?? 'Empty · a gift box stands in'}
                   </p>
                   {!locked && (
                     <div className="mt-1.5 flex gap-1.5">
                       <button
                         type="button"
                         disabled={busy !== null || !season.monthKey}
-                        onClick={() => void reroll(slot.key)}
+                        onClick={() => confirmLive(`reroll:${slot.key}`, () => void reroll(slot.key))}
                         className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[11px] font-black text-primary transition hover:bg-primary/20 disabled:opacity-50"
                       >
-                        <Dices className="h-3 w-3" /> Reroll
+                        <Dices className="h-3 w-3" /> {confirming === `reroll:${slot.key}` ? 'Sure?' : 'Reroll'}
                       </button>
                       <button
                         type="button"
@@ -599,22 +628,43 @@ export function AdminSeasonManager({
         t.fancy && `${t.fancy} rare gift${t.fancy === 1 ? '' : 's'}`,
         t.amazing && `${t.amazing} legendary gift${t.amazing === 1 ? '' : 's'}`,
         t.lilyPads && `${t.lilyPads} Lily Pad${t.lilyPads === 1 ? '' : 's'}`,
-        `${t.skins} skin${t.skins === 1 ? '' : 's'}`,
+        t.skins && `${t.skins} item${t.skins === 1 ? '' : 's'}`,
       ]
         .filter(Boolean)
         .join(' · ');
 
+    const outdated =
+      !locked &&
+      JSON.stringify(stripLadder(buildSeasonPassLadder(season.tierCount, season.skinIds))) !==
+        JSON.stringify(stripLadder(season.tierRewards));
+
     return (
       <div className={cardClass}>
+        {outdated ? (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <p className="min-w-0 flex-1 text-[13px] font-bold text-amber-800 dark:text-amber-300">
+              This season still pays an older prize recipe.
+              {live ? ' Applying it changes the days players have not collected yet.' : ''}
+            </p>
+            <Button
+              size="sm"
+              className="shrink-0 rounded-xl font-black"
+              disabled={busy !== null}
+              onClick={() => confirmLive('restamp', () => void restamp())}
+            >
+              {busy === 'restamp' ? 'Applying…' : confirming === 'restamp' ? 'Yes, apply to the live season' : 'Apply latest recipe'}
+            </Button>
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={() => setShowLadder((open) => !open)}
           className="flex w-full items-start justify-between gap-3 text-left"
         >
           <div>
-            <h2 className="text-lg font-black text-foreground">Tier ladder</h2>
+            <h2 className="text-lg font-black text-foreground">Daily prizes</h2>
             <p className="text-xs text-muted-foreground">
-              The standard {season.tierCount}-tier ladder, the same every month.
+              {season.tierCount} prize days, one per day climbed. The same recipe every month.
             </p>
           </div>
           <ChevronDown className={cn('mt-1 h-5 w-5 shrink-0 text-muted-foreground transition', showLadder && 'rotate-180')} />
@@ -632,14 +682,14 @@ export function AdminSeasonManager({
         {showLadder && (
           <div className="mt-3 divide-y divide-border/30 overflow-hidden rounded-2xl border border-border/40">
             <div className="grid grid-cols-[56px_1fr_1fr] gap-2 bg-muted/40 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-              <span>Tier</span>
+              <span>Day</span>
               <span>Free</span>
               <span>Plus</span>
             </div>
             {season.tierRewards.map((entry) => (
               <div key={entry.tier} className="grid grid-cols-[56px_1fr_1fr] items-center gap-2 px-3 py-1.5">
                 <span className="text-xs font-black text-muted-foreground">
-                  {entry.tier === season.tierCount ? 'Final' : `T${entry.tier}`}
+                  {entry.tier}
                 </span>
                 {(['free', 'plus'] as const).map((lane) => {
                   const rewards = lane === 'free' ? entry.freeRewards : entry.premiumRewards;
@@ -743,7 +793,7 @@ export function AdminSeasonManager({
                 {(
                   [
                     { value: 'climb' as const, title: 'Keep climbing', body: 'Tasks credit the old pass and the new one during the grace window.' },
-                    { value: 'claim' as const, title: 'Collect only', body: 'The old ladder freezes; the window only collects tiers already reached.' },
+                    { value: 'claim' as const, title: 'Collect only', body: 'The old ladder freezes; the window only collects days already reached.' },
                   ]
                 ).map((option) => (
                   <button
@@ -765,12 +815,12 @@ export function AdminSeasonManager({
             </div>
 
             <div className="grid gap-2">
-              <span className="text-[13px] font-black text-muted-foreground">Skin rung rarities</span>
+              <span className="text-[13px] font-black text-muted-foreground">Item rarities</span>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {SEASON_SKIN_SLOTS.map((slot) => (
                   <label key={slot.key} className="flex items-center justify-between gap-2 rounded-2xl border border-border/40 bg-background/70 px-3 py-2">
                     <span className="text-xs font-black text-foreground">
-                      {slot.finale ? 'Finale' : `Tier ${slot.tier}`} · {slot.lane === 'free' ? 'Free' : 'Plus'}
+                      Day {slot.finale ? 'final' : slot.tier} · {slot.lane === 'free' ? 'Free' : 'Plus'}
                     </span>
                     <select
                       value={rulesDraft.slotRarities[slot.key]}
@@ -795,7 +845,7 @@ export function AdminSeasonManager({
             </div>
 
             <div className="grid gap-2">
-              <span className="text-[13px] font-black text-muted-foreground">Skins can come from</span>
+              <span className="text-[13px] font-black text-muted-foreground">Items can come from</span>
               <div className="flex flex-wrap gap-2">
                 {SEASON_SKIN_POOL_SLOTS.map((poolSlot) => {
                   const on = rulesDraft.skinPool.includes(poolSlot);
@@ -869,7 +919,7 @@ export function AdminSeasonManager({
       <div className={cardClass}>
         <h2 className="text-lg font-black text-foreground">Monthly seasons</h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          A new pass starts on the 1st of every month at 00:00 UTC. Next month is drafted automatically with a name and random skins, so give it art and a name whenever you like.
+          A new pass starts on the 1st of every month at 00:00 UTC. Next month is drafted automatically with a name and random items, so give it art and a name whenever you like.
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {months.map(renderMonthCard)}

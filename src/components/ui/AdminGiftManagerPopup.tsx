@@ -486,10 +486,11 @@ export function AdminGiftManager() {
       icon={<Gift />}
       wide
     >
-      <div className="flex flex-col overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] md:h-[calc(100vh-12rem)]">
-          <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]">
-            <aside className="flex min-h-0 flex-col border-b border-border/50 p-4 md:border-b-0 md:border-r">
-              <Button onClick={startAdd} className="mb-2 h-10 gap-2 font-bold">
+      <div className="rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))]">
+          <div className="grid grid-cols-1 md:grid-cols-[250px_minmax(0,1fr)]">
+            <aside className="border-b border-border/50 p-4 md:border-b-0 md:border-r">
+              <div className="md:sticky md:top-4">
+              <Button onClick={startAdd} className="mb-2 h-10 w-full gap-2 font-bold">
                 <Plus className="h-4 w-4" />
                 Add Gift
               </Button>
@@ -516,7 +517,7 @@ export function AdminGiftManager() {
                   </div>
                 </div>
               </button>
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              <div className="space-y-2">
                 {gifts.map((config) => {
                   const active = view === 'gift' && selectedId === config.gift.id;
                   return (
@@ -547,9 +548,10 @@ export function AdminGiftManager() {
                   );
                 })}
               </div>
+              </div>
             </aside>
 
-            <section className="min-h-0 overflow-y-auto p-4 md:p-5">
+            <section className="min-w-0 p-4 md:p-6">
               {result && (
                 <motion.div
                   initial={{ opacity: 0, y: -5 }}
@@ -585,19 +587,22 @@ export function AdminGiftManager() {
                   Pick a gift or add a new one.
                 </div>
               ) : (
-                <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-                  <div className="space-y-3">
-                    <div className="rounded-3xl border border-border/50 bg-card p-4">
-                      <div className="mx-auto h-40 w-40">
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-center gap-3 rounded-3xl bg-muted/30 p-3">
+                    <div className="flex flex-1 items-center gap-3">
+                      <div className="h-24 w-24 shrink-0">
                         <GiftPreview
                           key={`preview-${selectedId ?? 'new'}-${form.riveIndex}`}
                           color={Number(form.riveIndex) || 0}
                           className="h-full w-full rounded-2xl"
                         />
                       </div>
-                      <p className="text-center text-[13px] font-bold text-muted-foreground">
-                        Rive color {Number(form.riveIndex) || 0}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="truncate text-[18px] font-black text-foreground">{form.name || 'New gift'}</p>
+                        <p className={cn('text-[13px] font-black capitalize', RARITY_TEXT[form.rarity as keyof typeof RARITY_TEXT])}>
+                          {form.rarity} · {form.hidden ? 'hidden' : 'live'}
+                        </p>
+                      </div>
                     </div>
                     {!addingNew && (
                       <Button
@@ -606,27 +611,27 @@ export function AdminGiftManager() {
                           setForm((prev) => ({ ...prev, hidden: !prev.hidden }));
                         }}
                         variant="outline"
-                        className="w-full gap-2"
+                        className="gap-2"
                       >
                         {form.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                        {form.hidden ? 'Show Gift' : 'Hide Gift'}
+                        {form.hidden ? 'Show' : 'Hide'}
                       </Button>
                     )}
                     {!addingNew && (
                       <Button
                         onClick={deleteGift}
                         variant={confirmDelete ? 'destructive' : 'outline'}
-                        className="w-full gap-2"
+                        className="gap-2"
                         disabled={saving}
                       >
                         <Trash2 className="h-4 w-4" />
-                        {confirmDelete ? 'Confirm Delete' : 'Delete Gift'}
+                        {confirmDelete ? 'Delete for good' : 'Delete'}
                       </Button>
                     )}
                   </div>
 
                   <div className="space-y-5">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <Field label="Name">
                         <input
                           value={form.name}
@@ -929,7 +934,7 @@ export function AdminGiftManager() {
                                 key={rarity}
                                 className="grid grid-cols-[minmax(0,1fr)_88px_56px] items-center gap-2 rounded-2xl border border-border/50 bg-background p-2"
                               >
-                                <div className={cn('px-2 text-sm font-black', RARITY_TEXT[rarity])}>
+                                <div className={cn('px-2 text-sm font-black capitalize', RARITY_TEXT[rarity])}>
                                   {rarity}
                                 </div>
                                 <input

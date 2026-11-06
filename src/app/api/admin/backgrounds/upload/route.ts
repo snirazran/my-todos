@@ -46,11 +46,13 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData();
     const id = String(form.get('id') ?? '').trim();
-    const size = String(form.get('size') ?? '').trim() as BackgroundSizeKey;
+    const sizeField = String(form.get('size') ?? '').trim();
     const file = form.get('file');
 
     if (!id) return json({ error: 'Missing background id' }, 400);
-    if (!SIZES.includes(size)) return json({ error: 'Invalid size' }, 400);
+    const targets: BackgroundSizeKey[] =
+      sizeField === 'all' ? SIZES : SIZES.filter((size) => size === sizeField);
+    if (targets.length === 0) return json({ error: 'Invalid size' }, 400);
     if (!(file instanceof File)) return json({ error: 'Missing file' }, 400);
 
     const contentType = (file.type || '').toLowerCase();
@@ -67,44 +69,42 @@ export async function POST(req: NextRequest) {
     if (!bg) return json({ error: 'Background not found' }, 404);
 
     const rawBytes = Buffer.from(await file.arrayBuffer());
-
-    // Compress/resize to WebP at upload time so every user downloads a small
-    // file regardless of what was uploaded (a 10 MB PNG becomes ~150 KB).
-    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size, quality: 85 });
-    const bytes = optimized.buffer;
-    const storedContentType = optimized.contentType;
-
-    const ext = optimized.ext || extensionFor(contentType, file.name);
-    const destPath = storagePathFor(id, size, ext);
-
     const bucket = getAdminStorage();
-
-    // If there's an existing file for this size with a different path, delete it
-    const previous = bg.imageFiles?.[size];
-    if (previous?.storagePath && previous.storagePath !== destPath) {
-      await bucket
-        .file(previous.storagePath)
-        .delete({ ignoreNotFound: true })
-        .catch(() => {});
-    }
-
-    await bucket.file(destPath).save(bytes, {
-      metadata: { contentType: storedContentType, cacheControl: 'public, max-age=31536000, immutable' },
-    });
-
     const cacheBuster = Date.now();
-    const publicUrl = `/api/background-files/${encodeURIComponent(id)}/${size}?v=${cacheBuster}`;
+    const urls: Partial<Record<BackgroundSizeKey, string>> = {};
 
-    bg.set(`imageFiles.${size}`, {
-      storagePath: destPath,
-      contentType: storedContentType,
-      size: bytes.byteLength,
-      updatedAt: new Date(),
-    });
-    bg.set(`images.${size}`, publicUrl);
+    for (const size of targets) {
+      const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size, quality: 85 });
+      const bytes = optimized.buffer;
+      const storedContentType = optimized.contentType;
+      const ext = optimized.ext || extensionFor(contentType, file.name);
+      const destPath = storagePathFor(id, size, ext);
+
+      const previous = bg.imageFiles?.[size];
+      if (previous?.storagePath && previous.storagePath !== destPath) {
+        await bucket
+          .file(previous.storagePath)
+          .delete({ ignoreNotFound: true })
+          .catch(() => {});
+      }
+
+      await bucket.file(destPath).save(bytes, {
+        metadata: { contentType: storedContentType, cacheControl: 'public, max-age=31536000, immutable' },
+      });
+
+      const publicUrl = `/api/background-files/${encodeURIComponent(id)}/${size}?v=${cacheBuster}`;
+      bg.set(`imageFiles.${size}`, {
+        storagePath: destPath,
+        contentType: storedContentType,
+        size: bytes.byteLength,
+        updatedAt: new Date(),
+      });
+      bg.set(`images.${size}`, publicUrl);
+      urls[size] = publicUrl;
+    }
     await bg.save();
 
-    return json({ ok: true, url: publicUrl, size: bytes.byteLength });
+    return json({ ok: true, url: urls[targets[0]], urls });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Upload failed';
     return json({ error: message }, 500);

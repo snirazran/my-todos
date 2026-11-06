@@ -946,7 +946,7 @@ export function AdminCampaignsManager() {
               onClick={() => setPreviewOpen((open) => !open)}
               className={cn(
                 'hidden h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-black lg:flex',
-                previewOpen ? 'bg-foreground text-background' : 'bg-muted',
+                previewOpen ? 'bg-primary text-primary-foreground shadow-[0_2px_0_0_#2c511a]' : 'bg-muted',
               )}
             >
               <Eye className="h-4 w-4" />
@@ -1194,8 +1194,9 @@ export function AdminCampaignsManager() {
                       key={starter.key}
                       type="button"
                       onClick={() => openDraft(starter.build(blank()))}
-                      className="rounded-2xl bg-card p-3 text-left ring-1 ring-border transition-all hover:ring-foreground/20"
+                      className="rounded-2xl border border-border bg-card p-3.5 text-left shadow-[0_3px_0_0_hsl(var(--border))] transition hover:-translate-y-0.5 hover:border-primary/40"
                     >
+                      <span className="mb-1.5 block text-[22px] leading-none">{STARTER_EMOJI[starter.key] ?? '✨'}</span>
                       <span className="block text-[13px] font-black">{starter.label}</span>
                       <span className="mt-0.5 block text-[11px] font-medium leading-snug text-muted-foreground">
                         {starter.description}
@@ -1205,8 +1206,9 @@ export function AdminCampaignsManager() {
                   <button
                     type="button"
                     onClick={() => openDraft(blank())}
-                    className="rounded-2xl border border-dashed border-border p-3 text-left transition-colors hover:border-foreground/30"
+                    className="rounded-2xl border-2 border-dashed border-border p-3.5 text-left transition hover:border-primary/40"
                   >
+                    <span className="mb-1.5 block text-[22px] leading-none">🖼️</span>
                     <span className="block text-[13px] font-black">Blank</span>
                     <span className="mt-0.5 block text-[11px] font-medium leading-snug text-muted-foreground">
                       An empty canvas, for artwork you already have.
@@ -1498,6 +1500,14 @@ function StarterMenu({
   );
 }
 
+const STARTER_EMOJI: Record<string, string> = {
+  sale: '🏷️',
+  bundle: '🎁',
+  plus: '👑',
+  announcement: '📣',
+  nudge: '👉',
+};
+
 function Thumb({ row }: { row: CampaignRow }) {
   if (row.imageUrl) {
     return (
@@ -1512,10 +1522,10 @@ function Thumb({ row }: { row: CampaignRow }) {
         'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
         animated
           ? 'bg-violet-500/15 text-violet-500'
-          : 'bg-muted text-muted-foreground',
+          : 'bg-primary/10 text-primary',
       )}
     >
-      <Zap className="h-4.5 w-4.5" />
+      <Zap className="h-[18px] w-[18px]" />
     </span>
   );
 }
@@ -2490,7 +2500,7 @@ function LaunchTab({
                 className={cn(
                   'rounded-xl px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                   draft.status === status
-                    ? 'bg-foreground text-background'
+                    ? 'bg-primary text-primary-foreground shadow-[0_2px_0_0_#2c511a]'
                     : 'bg-background hover:bg-muted',
                 )}
               >

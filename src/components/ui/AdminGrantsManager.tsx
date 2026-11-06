@@ -350,7 +350,7 @@ export function AdminGrantsManager() {
           </div>
           <div>
             <h1 className="text-[26px] font-black leading-tight tracking-tight md:text-[30px]">
-              Player grants
+              Give rewards
             </h1>
             <p className="text-sm font-medium text-muted-foreground">
               Hand a player flies, Plus, a cosmetic or a background — every grant

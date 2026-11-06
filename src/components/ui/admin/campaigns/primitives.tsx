@@ -367,7 +367,7 @@ export function ColorInput({
           onClick={onClear}
           className={cn(
             'rounded-md px-1.5 py-1 text-[10px] font-black transition-colors',
-            cleared ? 'bg-foreground text-background' : 'bg-background text-muted-foreground',
+            cleared ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground',
           )}
         >
           none

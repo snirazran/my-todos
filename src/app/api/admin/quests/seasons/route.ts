@@ -112,7 +112,24 @@ export async function POST(req: NextRequest) {
         slots: slot ? [slot as SeasonSkinSlot] : undefined,
         excludeSeasonId: season.seasonId,
       });
-      await restampUpcomingSeason(season.seasonId, { skinIds });
+      await restampUpcomingSeason(season.seasonId, { skinIds, allowLive: true });
+      return json(await calendarPayload());
+    }
+
+    if (action === 'restamp') {
+      const current = normalizeSeasonSkinIds(season.skinIds);
+      const missing = SEASON_SKIN_SLOTS.filter((slot) => !current[slot.key]).map((slot) => slot.key);
+      const skinIds =
+        season.monthKey && missing.length > 0
+          ? await pickSeasonSkins({
+              monthKey: season.monthKey,
+              template: await loadSeasonTemplate(),
+              keep: current,
+              slots: missing,
+              excludeSeasonId: season.seasonId,
+            })
+          : current;
+      await restampUpcomingSeason(season.seasonId, { skinIds, allowLive: true });
       return json(await calendarPayload());
     }
 
@@ -130,7 +147,7 @@ export async function POST(req: NextRequest) {
         ...normalizeSeasonSkinIds(season.skinIds),
         [slot]: itemId,
       };
-      await restampUpcomingSeason(season.seasonId, { skinIds });
+      await restampUpcomingSeason(season.seasonId, { skinIds, allowLive: true });
       return json(await calendarPayload());
     }
 
