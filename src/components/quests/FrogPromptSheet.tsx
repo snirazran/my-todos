@@ -750,7 +750,7 @@ export function FrogPromptSheet({
               <path d="M2 0 H42 C32 5 26 14 22 30 C18 14 12 5 2 0 Z" />
             </svg>
           </div>
-          <div className="pointer-events-none relative z-10 flex shrink-0 justify-center" style={{ marginTop: -106 }}>
+          <div className="pointer-events-none relative z-10 flex shrink-0 justify-center" style={{ marginTop: -109 }}>
             <Frog width={196} height={221} indices={look} arrive="rise" greet="hop" />
           </div>
           <div className="relative flex min-h-0 shrink flex-col rounded-[30px] bg-[hsl(var(--board-list))] shadow-[0_14px_34px_-14px_rgba(0,0,0,0.45)] dark:bg-background" style={{ marginTop: -10 }}>
