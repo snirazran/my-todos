@@ -26,7 +26,7 @@ export const SEASON_REWARDS_PER_LANE = 2;
 
 export type SeasonLane = 'free' | 'plus';
 
-export type QuestPlacement = 'daily' | 'onboarding';
+export type QuestPlacement = 'daily';
 export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';
 export type QuestAmountMode = 'fixed' | 'random';

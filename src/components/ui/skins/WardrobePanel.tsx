@@ -884,7 +884,7 @@ function WardrobeManagerContent({
       return false;
     }
     if (!data?.wardrobe || buyingId) return false;
-    if (isTradeOnlyRarity(item.rarity)) {
+    if (isTradeOnlyRarity(item.rarity) && !buyableToday.has(item.id)) {
       setNotif({ msg: 'This one is trade-only.', type: 'error' });
       return false;
     }
@@ -1043,6 +1043,7 @@ function WardrobeManagerContent({
           purchaseDealPrice != null ? (purchaseItem.priceFlies ?? 0) : undefined,
         slotLabel: SLOT_LABEL[purchaseItem.slot],
         kind: 'item',
+        inShopToday: buyableToday.has(purchaseItem.id),
       }
     : purchaseBg
       ? {
@@ -1093,7 +1094,8 @@ function WardrobeManagerContent({
       !isGuest &&
       data?.everydayItemIds &&
       !ownedNow &&
-      !isTradeOnlyRarity(item.rarity) &&
+      (!isTradeOnlyRarity(item.rarity) ||
+        !!data.dailyDeals?.some((deal) => deal.itemId === item.id)) &&
       !buyableToday.has(item.id)
     ) {
       const locked = data.dailyDeals?.find((deal) => deal.itemId === item.id && deal.plusOnly);
@@ -1855,7 +1857,10 @@ function WardrobeManagerContent({
             rarity={rarity}
             price={price}
             originalPrice={isItem && tryTarget.dealPrice != null ? basePrice : null}
-            locked={isTradeOnlyRarity(rarity) || !(basePrice > 0)}
+            locked={
+              (isTradeOnlyRarity(rarity) && !(isItem && buyableToday.has(tryTarget.item.id))) ||
+              !(basePrice > 0)
+            }
             balance={balance}
             busy={tryBuying}
             onBuy={() => void buyTriedOn()}

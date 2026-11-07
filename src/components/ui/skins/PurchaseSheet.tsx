@@ -53,6 +53,7 @@ export type PurchaseTarget = {
   originalPrice?: number;
   slotLabel?: string;
   kind?: WishlistKind;
+  inShopToday?: boolean;
 };
 
 export function PurchaseSheet({
@@ -153,7 +154,7 @@ export function PurchaseSheet({
   const price = target?.price ?? 0;
   const balance = buying ? buying.balance : liveBalance;
   const owned = (buying ? buying.ownedCount : ownedCount) > 0;
-  const tradeOnly = !!target && isTradeOnlyRarity(target.rarity);
+  const tradeOnly = !!target && isTradeOnlyRarity(target.rarity) && !target.inShopToday;
   const canAfford = !isGuest && balance >= price;
   const shortBy = Math.max(0, price - balance);
   const onDeal = !!target?.originalPrice && target.originalPrice > price;

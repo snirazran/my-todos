@@ -72,19 +72,14 @@ export async function bridgeFlyEarnedToLedger(input: {
   const amount = Number(input.properties?.fly_amount);
   if (!Number.isFinite(amount) || amount === 0) return;
 
-  const welcome =
-    rawSource === 'quest_objective' &&
-    input.properties?.quest_placement === 'onboarding';
   const dayKey = getZonedToday(await storedEconomyTimezone(input.userId));
   await logFlyGrant({
     userId: input.userId,
     source,
-    occurrenceKey: welcome
-      ? `rollup:onboarding:${dayKey}`
-      : `rollup:${rawSource}:${dayKey}`,
+    occurrenceKey: `rollup:${rawSource}:${dayKey}`,
     dayKey,
     amount,
-    meta: { rollup: true, reported: rawSource, ...(welcome ? { welcome: true } : {}) },
+    meta: { rollup: true, reported: rawSource },
   });
 }
 

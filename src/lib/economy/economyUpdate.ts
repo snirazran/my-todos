@@ -55,7 +55,7 @@ export const RECOMMENDED_ECONOMY_UPDATE: {
   pity: { softPityLuck: 70, softPityBonusPoints: 5, hardPityLuck: 100, epicPityLuck: 30 },
   dailySlotFlies: [10, 20, 30],
   cleanSweepFlies: 20,
-  itemPrices: { common: 150, uncommon: 350, rare: 700, epic: 1600 },
+  itemPrices: { common: 150, uncommon: 350, rare: 700, epic: 1600, legendary: 5000 },
   backgroundPrices: {},
 };
 
@@ -106,11 +106,11 @@ const pickPity = (rules: GiftRules): PityValues => ({
   epicPityLuck: rules.epicPityLuck,
 });
 
-function readPrices(input: unknown, label: string): RarityPrices {
+function readPrices(input: unknown, label: string, lockTradeOnly: boolean): RarityPrices {
   const src = (input ?? {}) as Record<string, unknown>;
   const out: RarityPrices = {};
   for (const rarity of RARITY_ORDER) {
-    if (isTradeOnlyRarity(rarity)) continue;
+    if (lockTradeOnly && isTradeOnlyRarity(rarity)) continue;
     const raw = src[rarity];
     if (raw === undefined || raw === null || raw === '') continue;
     const price = whole(raw, MAX_PRICE);
@@ -164,8 +164,8 @@ export function readEconomyUpdateInput(body: unknown): EconomyUpdateInput {
     pity,
     dailySlotFlies,
     cleanSweepFlies,
-    itemPrices: readPrices(src.itemPrices, 'outfit'),
-    backgroundPrices: readPrices(src.backgroundPrices, 'background'),
+    itemPrices: readPrices(src.itemPrices, 'outfit', false),
+    backgroundPrices: readPrices(src.backgroundPrices, 'background', true),
   };
 }
 
@@ -216,7 +216,7 @@ function slotsWithFlies(slots: RecipeSlot[], flies: number[]): RecipeSlot[] {
   );
 }
 
-function priceStats(rows: PricedRow[]): RarityPriceStats[] {
+function priceStats(rows: PricedRow[], lockTradeOnly: boolean): RarityPriceStats[] {
   return RARITY_ORDER.map((rarity) => {
     const prices = rows.filter((row) => row.rarity === rarity).map((row) => row.priceFlies);
     const counts = new Map<number, number>();
@@ -230,7 +230,7 @@ function priceStats(rows: PricedRow[]): RarityPriceStats[] {
       min: prices.length ? Math.min(...prices) : null,
       max: prices.length ? Math.max(...prices) : null,
       typical,
-      tradeOnly: isTradeOnlyRarity(rarity),
+      tradeOnly: lockTradeOnly && isTradeOnlyRarity(rarity),
     };
   });
 }
@@ -362,8 +362,8 @@ export async function readEconomyUpdateState() {
       pity: pickPity(current.rules),
       cleanSweepFlies: current.sweep.cleanSweepFlies,
       dailySlotFlies: recipe ? (recipe.slots ?? []).map(slotFlies) : [],
-      itemPrices: priceStats(current.items),
-      backgroundPrices: priceStats(current.backgrounds),
+      itemPrices: priceStats(current.items, false),
+      backgroundPrices: priceStats(current.backgrounds, true),
     },
     recommended: RECOMMENDED_ECONOMY_UPDATE,
     lastUpdate: last

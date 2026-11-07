@@ -10,9 +10,10 @@ import {
   Clapperboard,
   Coins,
   FlaskConical,
-  Footprints,
+  Monitor,
   HandHeart,
   ListChecks,
+  Medal,
   Menu,
   MessageCircleQuestionMark,
   MessageSquare,
@@ -56,13 +57,14 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: '/admin/quests?tab=daily', label: 'Daily quests', icon: appIcon('quests') },
       { href: '/admin/quests?tab=asks', label: 'Frog asks', icon: <MessageCircleQuestionMark /> },
+      { href: '/admin/quests?tab=milestones', label: 'Milestones', icon: <Medal /> },
       { href: '/admin/quests?tab=season', label: 'Season pass', icon: <Trophy /> },
     ],
   },
   {
     title: 'New players',
     items: [
-      { href: '/admin/quests?tab=onboarding', label: 'Welcome quests', icon: <Footprints /> },
+      { href: '/admin/quests?tab=web', label: 'Try it on the web', icon: <Monitor /> },
       { href: '/admin/quests?tab=areas', label: 'Focus areas', icon: appIcon('compass') },
     ],
   },
@@ -154,6 +156,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('admin-root');
+    return () => root.classList.remove('admin-root');
+  }, []);
+
+  useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
 
@@ -190,7 +198,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </aside>
       ) : null}
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-x-clip">
         <div className="sticky top-0 z-40 flex items-center gap-3 border-b border-border/70 bg-background/95 px-4 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))] backdrop-blur lg:hidden">
           <button
             type="button"

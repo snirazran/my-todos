@@ -4,22 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Camera,
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  Clock,
   Edit2,
-  Eye,
   Compass,
-  Footprints,
-  Gift,
-  Layers3,
+  Medal,
   MessageCircleQuestionMark,
-  Pencil,
   Plus,
   Trash2,
   Trophy,
-  XCircle,
+  Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/Icon';
@@ -44,28 +36,18 @@ import {
   AdminPage,
   LoadingBlock,
   Notice,
-  PondButton,
   SaveBar,
-  SectionLabel,
 } from '@/components/admin/kit';
 import { DailyQuestEditor } from '@/components/admin/quests/DailyQuestEditor';
 import { DailyStreakPage } from '@/components/admin/streak/DailyStreakPage';
 import { MoveToWebCard } from '@/components/admin/quests/MoveToWebCard';
+import { MilestonesPage } from '@/components/admin/quests/MilestonesPage';
 import type { AdminRecipe, AdminRecipeSlot } from '@/components/admin/quests/types';
-import { QUEST_METRIC_COPY } from '@/lib/quests/metricLabels';
 import type {
-  QuestLogicBlock,
-  QuestPlacement,
   QuestReward,
   QuestRewardType,
-  QuestSubject,
-  QuestVisibilityCondition,
-  QuestVisibilityMetric,
-  QuestVisibilityOperator,
 } from '@/lib/quests/types';
 import {
-  formatQuestObjective,
-  type QuestCardLogicBlock,
   type QuestRewardCatalogItem,
   RewardTile,
   SweepRewardTile,
@@ -73,18 +55,6 @@ import {
   type SweepRewardInfo,
   type SweepRollEntryInfo,
 } from './QuestCards';
-
-type AdminQuestTemplate = {
-  id: string;
-  name: string;
-  description: string;
-  coverImageUrl?: string;
-  placement: QuestPlacement;
-  logic: QuestLogicBlock[];
-  visibilityConditions: QuestVisibilityCondition[];
-  isActive: boolean;
-  createdAt?: string;
-};
 
 type MetaRewardItem = QuestRewardCatalogItem;
 
@@ -125,7 +95,7 @@ type CategoryFormState = {
   starterTasks: StarterTaskTemplate[];
 };
 
-const QUEST_TABS = ['daily', 'asks', 'onboarding', 'areas', 'season', 'leap', 'streaks'] as const;
+const QUEST_TABS = ['daily', 'asks', 'milestones', 'web', 'areas', 'season', 'leap', 'streaks'] as const;
 type QuestTab = (typeof QUEST_TABS)[number];
 
 const TAB_COPY: Record<QuestTab, { title: string; subtitle: string; icon: React.ReactNode }> = {
@@ -139,10 +109,15 @@ const TAB_COPY: Record<QuestTab, { title: string; subtitle: string; icon: React.
     subtitle: 'The daily question your frog asks. Journals and check-ins stay private; polls show how everyone answered.',
     icon: <MessageCircleQuestionMark />,
   },
-  onboarding: {
-    title: 'Welcome quests',
-    subtitle: 'One-time quests that walk new players through the app, plus the nudge to try it on the web.',
-    icon: <Footprints />,
+  milestones: {
+    title: 'Milestones',
+    subtitle: 'Lifetime goals that level up: finish 3 tasks, then 10, then 25.',
+    icon: <Medal />,
+  },
+  web: {
+    title: 'Try it on the web',
+    subtitle: 'The nudge that invites players to open Frogress on a computer.',
+    icon: <Monitor />,
   },
   areas: {
     title: 'Focus areas',
@@ -166,17 +141,6 @@ const TAB_COPY: Record<QuestTab, { title: string; subtitle: string; icon: React.
   },
 };
 
-type FormState = {
-  id?: string;
-  name: string;
-  description: string;
-  coverImageUrl?: string;
-  placement: QuestPlacement;
-  logic: QuestLogicBlock[];
-  visibilityConditions: QuestVisibilityCondition[];
-  isActive: boolean;
-};
-
 type RewardPickerTab = 'flies' | 'shield' | 'item' | 'box' | 'background';
 
 const ALL_REWARD_PICKER_TABS = [
@@ -187,38 +151,8 @@ const ALL_REWARD_PICKER_TABS = [
   'background',
 ] as const satisfies readonly RewardPickerTab[];
 type ConfirmAction =
-  | 'save-quest'
-  | 'delete-quest'
   | 'save-category'
   | `delete-category:${string}`;
-
-const createLogic = (): QuestLogicBlock => ({
-  id: crypto.randomUUID(),
-  type: 'count',
-  subject: 'task',
-  action: 'complete',
-  amountMode: 'fixed',
-  amount: 3,
-  minAmount: undefined,
-  maxAmount: undefined,
-  tagMode: 'ignore',
-});
-const createVisibilityCondition = (): QuestVisibilityCondition => ({
-  id: crypto.randomUUID(),
-  metric: 'daily_tasks_count',
-  operator: 'gt',
-  value: 0,
-});
-
-const emptyForm = (): FormState => ({
-  name: '',
-  description: '',
-  coverImageUrl: undefined,
-  placement: 'onboarding',
-  logic: [createLogic()],
-  visibilityConditions: [],
-  isActive: true,
-});
 
 function positiveNumber(value: number | undefined, fallback: number) {
   const numeric = Number(value);
@@ -229,35 +163,6 @@ function amountRangeLabel(min: number | undefined, max: number | undefined) {
   const safeMin = positiveNumber(min, 1);
   const safeMax = Math.max(safeMin, positiveNumber(max, safeMin));
   return safeMin === safeMax ? String(safeMax) : `${safeMin}-${safeMax}`;
-}
-
-function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
-  const isRandom = block.amountMode === 'random';
-  const target = isRandom
-    ? Math.max(
-        positiveNumber(block.minAmount, 1),
-        positiveNumber(block.maxAmount, positiveNumber(block.minAmount, 1)),
-      )
-    : positiveNumber(block.amount, 1);
-
-  return {
-    id: block.id,
-    type: block.type,
-    subject: block.subject,
-    action: block.action,
-    target,
-    progress: 0,
-    tagMode: block.tagMode,
-    metricKey: block.metricKey,
-    targetLabel: isRandom
-      ? amountRangeLabel(block.minAmount, block.maxAmount)
-      : String(target),
-    resolvedTagName:
-      block.tagMode === 'random_user_tag' ? 'Random user tag' : undefined,
-    previewTagLabel:
-      block.tagMode === 'random_user_tag' ? 'Random user tag' : undefined,
-    rewards: block.rewards,
-  };
 }
 
 function rewardSummary(
@@ -318,16 +223,9 @@ function rewardTypeLabel(type: QuestRewardType) {
 
 export function AdminQuestManagerPage() {
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [templates, setTemplates] = useState<AdminQuestTemplate[]>([]);
   const [rewardItems, setRewardItems] = useState<MetaRewardItem[]>([]);
   const [adminCategories, setAdminCategories] = useState<AdminCategory[]>([]);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [conditionsPopupOpen, setConditionsPopupOpen] = useState(false);
-  const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
-  const [coverFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [categoryFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
-  const [editingTitle, setEditingTitle] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
@@ -335,11 +233,9 @@ export function AdminQuestManagerPage() {
   const searchParams = useSearchParams();
   const rawTab = searchParams?.get('tab') ?? 'daily';
   const tab: QuestTab = (QUEST_TABS as readonly string[]).indexOf(rawTab) >= 0 ? (rawTab as QuestTab) : 'daily';
-  const [formOpen, setFormOpen] = useState(false);
   const goTab = (next: QuestTab) => router.replace(`/admin/quests?tab=${next}`, { scroll: false });
 
   useEffect(() => {
-    setFormOpen(false);
     setResult(null);
   }, [tab]);
 
@@ -382,26 +278,19 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, recipesRes, streakRes] = await Promise.all([
-        fetch('/api/admin/quests', { credentials: 'include' }),
+      const [metaRes, categoriesRes, recipesRes, streakRes] = await Promise.all([
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
         fetch('/api/admin/quest-recipes', { credentials: 'include' }),
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
       ]);
-      const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
       const categoriesData = await categoriesRes.json();
       const recipesData = await recipesRes.json();
       const streakData = await streakRes.json();
-      if (!templatesRes.ok || !metaRes.ok) {
-        throw new Error(
-          templatesData.error ||
-            metaData.error ||
-            'Could not load quest manager',
-        );
+      if (!metaRes.ok) {
+        throw new Error(metaData.error || 'Could not load quest manager');
       }
-      setTemplates(templatesData.templates ?? []);
       setRewardItems(metaData.rewardsCatalog ?? []);
       setAdminCategories(categoriesData.categories ?? []);
       setAdminRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
@@ -417,29 +306,6 @@ export function AdminQuestManagerPage() {
     }
   };
 
-  const resetForm = () => {
-    setForm(emptyForm());
-    setResult(null);
-    setConfirmAction(null);
-  };
-
-  const startEditing = (template: AdminQuestTemplate) => {
-    setForm({
-      id: template.id,
-      name: template.name,
-      description: template.description,
-      coverImageUrl: template.coverImageUrl,
-      placement: template.placement,
-      logic: template.logic.map((block) => ({ ...block })),
-      visibilityConditions: (template.visibilityConditions ?? []).map((condition) => ({
-        ...condition,
-      })),
-      isActive: template.isActive,
-    });
-    setResult(null);
-    setConfirmAction(null);
-  };
-
   const confirmBeforeAction = (action: ConfirmAction) => {
     if (confirmAction !== action) {
       setConfirmAction(action);
@@ -447,78 +313,6 @@ export function AdminQuestManagerPage() {
     }
     setConfirmAction(null);
     return true;
-  };
-
-  const updateLogic = (id: string, patch: Partial<QuestLogicBlock>) => {
-    setForm((prev) => ({
-      ...prev,
-      logic: prev.logic.map((block) =>
-        block.id === id ? { ...block, ...patch } : block,
-      ),
-    }));
-  };
-
-  const updateVisibilityCondition = (id: string, patch: Partial<QuestVisibilityCondition>) => {
-    setForm((prev) => ({
-      ...prev,
-      visibilityConditions: prev.visibilityConditions.map((condition) =>
-        condition.id === id ? { ...condition, ...patch } : condition,
-      ),
-    }));
-  };
-
-  const saveQuest = async () => {
-    if (!confirmBeforeAction('save-quest')) return;
-    setSaving(true);
-    setResult(null);
-    try {
-      const res = await fetch('/api/admin/quests', {
-        method: form.id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ id: form.id, ...form }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save quest');
-      await loadData();
-      if (data.template) startEditing(data.template);
-      setResult({ type: 'success', message: form.id ? 'Quest updated' : 'Quest created' });
-    } catch (error) {
-      setResult({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Could not save quest',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteQuest = async () => {
-    if (!form.id) return;
-    if (!confirmBeforeAction('delete-quest')) return;
-    setSaving(true);
-    setResult(null);
-    try {
-      const res = await fetch('/api/admin/quests', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ id: form.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not delete quest');
-      await loadData();
-      resetForm();
-      setFormOpen(false);
-      setResult({ type: 'success', message: 'Quest deleted' });
-    } catch (error) {
-      setResult({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Could not delete quest',
-      });
-    } finally {
-      setSaving(false);
-    }
   };
 
   const openCategoryDialog = (cat?: AdminCategory) => {
@@ -592,26 +386,6 @@ export function AdminQuestManagerPage() {
     [rewardItems],
   );
 
-  const previewLogic = useMemo(() => form.logic.map(buildPreviewLogicBlock), [form.logic]);
-
-
-
-  const formTimeLabel = 'One-time';
-  const questSaveButtonLabel = saving
-    ? 'Saving...'
-    : confirmAction === 'save-quest'
-      ? form.id
-        ? 'Tap Again to Save'
-        : 'Tap Again to Create'
-      : form.id
-        ? 'Save Changes'
-        : 'Create Quest';
-  const questDeleteButtonLabel =
-    confirmAction === 'delete-quest' ? 'Tap Again to Delete' : 'Delete';
-  const dailyRecipeSlotCount = adminRecipes.reduce(
-    (sum, recipe) => sum + recipe.slots.length,
-    0,
-  );
   const categorySaveButtonLabel = savingCategory
     ? 'Saving...'
     : confirmAction === 'save-category'
@@ -621,81 +395,6 @@ export function AdminQuestManagerPage() {
       : editingCategory
         ? 'Save Changes'
         : 'Create Category';
-  const onboardingTemplates = templates
-    .filter((t) => t.placement === 'onboarding')
-    .sort(
-      (a, b) =>
-        new Date(a.createdAt ?? 0).getTime() -
-        new Date(b.createdAt ?? 0).getTime(),
-    );
-  const navigateToQuestForm = (template?: AdminQuestTemplate) => {
-    if (template) {
-      startEditing(template);
-    } else {
-      const newForm = emptyForm();
-      newForm.placement = 'onboarding';
-      setForm(newForm);
-      setResult(null);
-    }
-    setFormOpen(true);
-  };
-
-  // ── Quest list (shared by Daily and Category views) ───────────────────────
-  const renderQuestList = (questTemplates: AdminQuestTemplate[]) => (
-    <div className="space-y-2">
-      {loading && <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>}
-      {!loading && questTemplates.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border/40 py-10 text-center text-sm text-muted-foreground">
-          No quests yet. Add one to get started.
-        </div>
-      )}
-      {questTemplates.map((template) => (
-        <button
-          key={template.id}
-          onClick={() => navigateToQuestForm(template)}
-          className="group flex w-full items-center gap-5 rounded-[24px] border border-border/70 bg-card shadow-[0_3px_0_0_hsl(var(--border))] p-4 text-left transition hover:border-primary/20 hover:bg-primary/[0.03]"
-        >
-          {/* Cover thumbnail */}
-          <div className="h-20 w-28 shrink-0 overflow-hidden rounded-xl bg-muted/40">
-            {template.coverImageUrl ? (
-              <img src={template.coverImageUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="h-full w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2.5">
-              <p className="truncate text-sm font-bold text-foreground">{template.name}</p>
-              <span className={cn(
-                'shrink-0 rounded-full px-2 py-0.5 text-[12px] font-black',
-                template.isActive
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-muted text-muted-foreground',
-              )}>
-                {template.isActive ? 'Active' : 'Paused'}
-              </span>
-            </div>
-            {template.description && (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{template.description}</p>
-            )}
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-              <span>{template.logic.length} block{template.logic.length !== 1 ? 's' : ''}</span>
-              {template.visibilityConditions.length > 0 && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>{template.visibilityConditions.length} condition{template.visibilityConditions.length !== 1 ? 's' : ''}</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
-        </button>
-      ))}
-    </div>
-  );
-
   const renderDaily = () => (
     <div className="space-y-6">
       {loading && adminRecipes.length === 0 ? <LoadingBlock rows={2} /> : null}
@@ -716,28 +415,7 @@ export function AdminQuestManagerPage() {
     </div>
   );
 
-  const renderOnboarding = () => (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <SectionLabel>First-week quests</SectionLabel>
-          <p className="mt-0.5 max-w-xl text-[13px] font-medium text-muted-foreground">
-            New players see one at a time, oldest first. The next one appears once every reward in the previous one
-            is claimed.
-          </p>
-        </div>
-        <PondButton size="sm" onClick={() => navigateToQuestForm()}>
-          <Plus className="h-3.5 w-3.5" />
-          New quest
-        </PondButton>
-      </div>
-      {renderQuestList(onboardingTemplates)}
-      <div className="space-y-2 pt-2">
-        <SectionLabel>Try it on the web</SectionLabel>
-        <MoveToWebCard />
-      </div>
-    </div>
-  );
+  const renderWeb = () => <MoveToWebCard />;
 
   const renderStreaks = () => <DailyStreakPage />;
 
@@ -924,8 +602,7 @@ export function AdminQuestManagerPage() {
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Finishing all three daily quests pays the Clean Sweep flies and
-              earns one Reward Roll. Every Nth sweep day in a row rolls the
-              golden table instead, and the mega bonus lands on top of that.
+              earns one Reward Roll from the table below.
             </p>
           </div>
           <button
@@ -977,65 +654,6 @@ export function AdminQuestManagerPage() {
               className="mt-1 block h-10 w-24 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
             />
           </label>
-          <label className="block">
-            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Golden roll every
-            </span>
-            <input
-              type="number"
-              min={sweepConfig.limits.goldenMin}
-              max={sweepConfig.limits.goldenMax}
-              value={sweepConfig.goldenEveryDays}
-              onChange={(e) =>
-                setSweepConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        goldenEveryDays: Math.min(
-                          prev.limits.goldenMax,
-                          Math.max(
-                            prev.limits.goldenMin,
-                            Math.floor(Number(e.target.value) || prev.limits.goldenMin),
-                          ),
-                        ),
-                      }
-                    : prev,
-                )
-              }
-              className="mt-1 block h-10 w-24 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              sweep days in a row
-            </span>
-          </label>
-          <label className="block">
-            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
-              Mega bonus every
-            </span>
-            <input
-              type="number"
-              min={0}
-              max={sweepConfig.limits.megaMax}
-              value={sweepConfig.megaEveryDays}
-              onChange={(e) =>
-                setSweepConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        megaEveryDays: Math.min(
-                          prev.limits.megaMax,
-                          Math.max(0, Math.floor(Number(e.target.value) || 0)),
-                        ),
-                      }
-                    : prev,
-                )
-              }
-              className="mt-1 block h-10 w-24 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              sweep days · 0 = off
-            </span>
-          </label>
           <Button
             size="sm"
             className="ml-auto rounded-xl font-black"
@@ -1046,81 +664,14 @@ export function AdminQuestManagerPage() {
           </Button>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4">
           <SweepTableEditor
-            title="Standard roll"
-            hint="Rolled on every Clean Sweep day."
+            title="Reward roll"
+            hint="Rolled once every day all daily quests are finished."
             entries={sweepConfig.standardRoll}
             onChange={(entries) => setSweepTable('standardRoll', entries)}
             rewardItems={rewardItems}
             rewardCatalog={rewardCatalog}
-          />
-          <SweepTableEditor
-            title="Golden roll"
-            hint={`Replaces the standard roll every ${sweepConfig.goldenEveryDays} sweep days in a row.`}
-            entries={sweepConfig.goldenRoll}
-            onChange={(entries) => setSweepTable('goldenRoll', entries)}
-            rewardItems={rewardItems}
-            rewardCatalog={rewardCatalog}
-            golden
-          />
-        </div>
-
-        <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-50/60 px-3 py-3 dark:bg-amber-500/5">
-          <p className="text-[13px] font-black tracking-wide text-amber-700 dark:text-amber-300">
-            Mega bonus
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {sweepConfig.megaEveryDays > 0
-              ? `Granted on top of the golden roll every ${sweepConfig.megaEveryDays} sweep days in a row.`
-              : 'Off — set a cadence above to use it.'}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {sweepConfig.megaRewards.map((reward, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background py-1 pl-1 pr-2"
-              >
-                <SweepRewardTile
-                  reward={reward}
-                  rewardCatalog={rewardCatalog}
-                  isPremium={false}
-                  className="h-8 w-8 rounded-lg"
-                />
-                <span className="text-xs font-bold text-foreground">
-                  {sweepRewardLabel(reward, rewardCatalog)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSweepConfig((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            megaRewards: prev.megaRewards.filter(
-                              (_, i) => i !== index,
-                            ),
-                          }
-                        : prev,
-                    )
-                  }
-                  className="text-muted-foreground transition hover:text-red-500"
-                  aria-label="Remove mega reward"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <SweepRewardAdder
-            rewardItems={rewardItems}
-            onAdd={(reward) =>
-              setSweepConfig((prev) =>
-                prev
-                  ? { ...prev, megaRewards: [...prev.megaRewards, reward] }
-                  : prev,
-              )
-            }
           />
         </div>
       </div>
@@ -1216,204 +767,6 @@ export function AdminQuestManagerPage() {
   );
 
   // ── Interactive preview-centered quest editor ─────────────────────────────
-  const renderForm = () => (
-    <div className="mx-auto w-full max-w-xl space-y-6">
-      {result && (
-        <div className={cn(
-          'flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium',
-          result.type === 'success'
-            ? 'bg-emerald-500/8 text-emerald-600 dark:text-emerald-400'
-            : 'bg-red-500/8 text-red-600 dark:text-red-400',
-        )}>
-          {result.type === 'success' ? <CheckCircle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
-          {result.message}
-        </div>
-      )}
-
-      {/* Interactive quest card */}
-      <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
-        {/* ── Cover photo area ── */}
-        <div className="relative overflow-hidden">
-          {/* Photo background (visual only) */}
-          {form.coverImageUrl ? (
-            <img src={form.coverImageUrl} alt="Quest cover" className="h-[220px] w-full object-cover" />
-          ) : (
-            <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent pointer-events-none" />
-
-          <input
-            ref={(el) => { coverFileInputRef.current = el; }}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={async (event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              const coverImageUrl = await readFileAsDataUrl(file);
-              setForm((prev) => ({ ...prev, coverImageUrl }));
-            }}
-          />
-
-          {/* Top bar: badge + cover actions */}
-          <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
-            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[13px] font-black leading-none text-white backdrop-blur-md">
-              <Clock className="h-3 w-3 shrink-0" />
-              <span className="leading-none">{formTimeLabel}</span>
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => coverFileInputRef.current?.click()}
-                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-sm transition hover:bg-black/70"
-              >
-                <Camera className="h-3.5 w-3.5" />
-                {form.coverImageUrl ? 'Change' : 'Add photo'}
-              </button>
-              {form.coverImageUrl && (
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, coverImageUrl: undefined }))}
-                  className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-sm transition hover:bg-black/70"
-                >
-                  <XCircle className="h-3.5 w-3.5" />
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Internal name (admin-only, not shown to users) */}
-          <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-3">
-            {editingTitle ? (
-              <input
-                autoFocus
-                value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                onBlur={() => setEditingTitle(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                placeholder="Internal name (admin only)"
-                className="w-full rounded-md bg-black/40 px-2 py-1 text-xs font-bold tracking-tight text-white placeholder-white/50 outline-none ring-1 ring-white/20 backdrop-blur-sm"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingTitle(true)}
-                className="group/title inline-flex max-w-full items-center gap-1.5 rounded-md bg-black/35 px-2 py-1 text-left text-xs font-bold tracking-tight text-white/85 ring-1 ring-white/15 backdrop-blur-sm transition hover:bg-black/50"
-                title="Internal name — not shown to players"
-              >
-                <span className="truncate">
-                  {form.name || <span className="text-white/50">Internal name…</span>}
-                </span>
-                <Pencil className="h-3 w-3 shrink-0 text-white/60 transition group-hover/title:text-white" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── Objectives / progress blocks - clickable ── */}
-        <div className="px-4 pt-4 pb-4 space-y-4">
-          <button
-            type="button"
-            onClick={() => setConditionsPopupOpen(true)}
-            className="group/cond w-full text-left"
-          >
-            <div>
-              {previewLogic.length > 0 ? (
-                previewLogic.map((block, i) => (
-                  <div key={block.id} className={cn('py-3', i < previewLogic.length - 1 && 'border-b border-border/20')}>
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[14px] font-black leading-snug text-foreground">
-                        {formatQuestObjective(block)}
-                      </p>
-                      <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
-                        0/{block.targetLabel ?? block.target}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted/50">
-                      <div className="h-full rounded-full bg-red-400 dark:bg-red-500" style={{ width: '0%' }} />
-                    </div>
-                    {(block.rewards?.length ?? 0) > 0 && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          {block.rewards!.map((r, ri) => (
-                            <RewardTile key={`${ri}-${r.type}-${r.itemId ?? r.amount ?? ''}`} reward={r} rewardCatalog={rewardCatalog} isPremium={false} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-border/50 bg-background/60 px-4 py-5 text-center text-sm text-muted-foreground">
-                  <Layers3 className="mx-auto mb-2 h-5 w-5" />
-                  Click to add objectives
-                </div>
-              )}
-            </div>
-            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold text-muted-foreground opacity-0 transition group-hover/cond:opacity-100">
-              <Pencil className="h-3 w-3" />
-              Edit objectives
-            </div>
-          </button>
-
-          {/* Action buttons row */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setAvailabilityPopupOpen(true)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition hover:bg-muted/60',
-                form.visibilityConditions.length > 0
-                  ? 'border-primary/30 bg-primary/10 text-primary'
-                  : 'border-border/50 bg-background/80 text-muted-foreground',
-              )}
-            >
-              <Eye className="h-3 w-3" />
-              {form.visibilityConditions.length > 0
-                ? `${form.visibilityConditions.length} rule${form.visibilityConditions.length > 1 ? 's' : ''}`
-                : 'Availability'}
-            </button>
-            <label className="ml-auto flex cursor-pointer items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:bg-muted/60">
-              <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))} className="h-3 w-3" />
-              Active
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Save / Cancel / Delete bar */}
-      <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
-        <p className="flex-1 text-sm text-muted-foreground">{form.id ? 'Editing existing template.' : 'Creating a new template.'}</p>
-        {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">{questDeleteButtonLabel}</Button>}
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setFormOpen(false); }} disabled={saving} className="rounded-xl">Cancel</Button>
-        <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{questSaveButtonLabel}</Button>
-      </div>
-
-      {/* Popups */}
-      <ObjectivesEditorDialog
-        open={conditionsPopupOpen}
-        onOpenChange={setConditionsPopupOpen}
-        logic={form.logic}
-        placement={form.placement}
-        rewardItems={rewardItems}
-        rewardCatalog={rewardCatalog}
-        onUpdate={updateLogic}
-        onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic()] }))}
-        onRemove={(id) => setForm((prev) => ({ ...prev, logic: prev.logic.filter((b) => b.id !== id) }))}
-      />
-
-      <AvailabilityEditorDialog
-        open={availabilityPopupOpen}
-        onOpenChange={setAvailabilityPopupOpen}
-        conditions={form.visibilityConditions}
-        onUpdate={updateVisibilityCondition}
-        onAdd={() => setForm((prev) => ({ ...prev, visibilityConditions: [...prev.visibilityConditions, createVisibilityCondition()] }))}
-        onRemove={(id) => setForm((prev) => ({ ...prev, visibilityConditions: prev.visibilityConditions.filter((c) => c.id !== id) }))}
-      />
-    </div>
-  );
-
   const dirtyRecipeIds = adminRecipes
     .filter((recipe) => {
       const saved = savedRecipes.find((item) => item.recipeId === recipe.recipeId);
@@ -1428,41 +781,23 @@ export function AdminQuestManagerPage() {
   };
 
   const copy = TAB_COPY[tab];
-  const editingQuest = tab === 'onboarding' && formOpen;
 
   return (
-    <AdminPage
-      title={editingQuest ? (form.id ? 'Edit onboarding quest' : 'New onboarding quest') : copy.title}
-      subtitle={editingQuest ? 'Shown to new players in order, one at a time.' : copy.subtitle}
-      icon={copy.icon}
-      wide={tab === 'season'}
-      actions={
-        editingQuest ? (
-          <PondButton variant="secondary" size="sm" onClick={() => { resetForm(); setFormOpen(false); }}>
-            Back to the list
-          </PondButton>
-        ) : null
-      }
-    >
-        {result && !editingQuest ? (
+    <AdminPage title={copy.title} subtitle={copy.subtitle} icon={copy.icon} wide={tab === 'season'}>
+        {result ? (
           <Notice type={result.type} className="mb-5">
             {result.message}
           </Notice>
         ) : null}
 
-        {editingQuest ? (
-          renderForm()
-        ) : (
-          <>
-            {tab === 'daily' && renderDaily()}
-            {tab === 'asks' && <AdminPromptManager />}
-            {tab === 'onboarding' && renderOnboarding()}
-            {tab === 'season' && <AdminSeasonManager rewardItems={rewardItems} rewardCatalog={rewardCatalog} />}
-            {tab === 'areas' && renderAreas()}
-            {tab === 'leap' && <AdminLeapManager />}
-            {tab === 'streaks' && renderStreaks()}
-          </>
-        )}
+        {tab === 'daily' && renderDaily()}
+        {tab === 'asks' && <AdminPromptManager />}
+        {tab === 'milestones' && <MilestonesPage />}
+        {tab === 'web' && renderWeb()}
+        {tab === 'season' && <AdminSeasonManager rewardItems={rewardItems} rewardCatalog={rewardCatalog} />}
+        {tab === 'areas' && renderAreas()}
+        {tab === 'leap' && <AdminLeapManager />}
+        {tab === 'streaks' && renderStreaks()}
 
         <SaveBar
           dirty={tab === 'daily' && dirtyRecipeIds.length > 0}
@@ -1569,24 +904,6 @@ export function AdminQuestManagerPage() {
           </DialogContent>
         </Dialog>
     </AdminPage>
-  );
-}
-
-function InlinePillSelect({ value, onChange, children, className }: { value: string; onChange: (value: string) => void; children: React.ReactNode; className?: string }) {
-  return (
-    <span className="relative inline-flex">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          "h-[30px] cursor-pointer appearance-none rounded-full border border-primary/25 bg-primary/8 pl-2.5 pr-7 text-[13px] font-bold text-primary outline-none transition hover:bg-primary/15 focus:ring-2 focus:ring-primary/20",
-          className,
-        )}
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-primary/60" />
-    </span>
   );
 }
 
@@ -1911,332 +1228,6 @@ function InlinePillNumber({ value, onChange, min = 1, className }: { value: numb
         className,
       )}
     />
-  );
-}
-
-function ObjectivesEditorDialog({
-  open,
-  onOpenChange,
-  logic,
-  placement,
-  rewardItems,
-  rewardCatalog,
-  onUpdate,
-  onAdd,
-  onRemove,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  logic: QuestLogicBlock[];
-  placement: QuestPlacement;
-  rewardItems: MetaRewardItem[];
-  rewardCatalog: Record<string, QuestRewardCatalogItem>;
-  onUpdate: (id: string, patch: Partial<QuestLogicBlock>) => void;
-  onAdd: () => void;
-  onRemove: (id: string) => void;
-}) {
-  const word = "text-[13px] font-medium text-foreground";
-  const [rewardPickerForBlockId, setRewardPickerForBlockId] = useState<string | null>(null);
-  const rewardPickerBlock = rewardPickerForBlockId ? logic.find((b) => b.id === rewardPickerForBlockId) : null;
-  const allHaveRewards = logic.length > 0 && logic.every((b) => (b.rewards?.length ?? 0) > 0);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-lg !rounded-[28px] !p-0 overflow-hidden">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Objectives</DialogTitle>
-          <DialogDescription>What the user needs to do.</DialogDescription>
-        </DialogHeader>
-
-        <div className="px-5 pt-5 pb-1">
-          <p className="text-base font-black text-foreground">Quest Objectives</p>
-        </div>
-
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-3 space-y-3">
-          {logic.map((block, index) => (
-            <div key={block.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
-              {/* Delete row */}
-              <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-[12px] font-black text-muted-foreground">Objective {index + 1}</span>
-                {logic.length > 1 && (
-                  <button onClick={() => onRemove(block.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-
-              {/* Sentence builder */}
-              {block.type === 'count' ? (
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
-                  <InlinePillSelect value={block.action ?? 'complete'} onChange={(v) => onUpdate(block.id, { action: v as QuestLogicBlock['action'] })}>
-                    <option value="complete">Complete</option>
-                    <option value="add">Add</option>
-                  </InlinePillSelect>
-
-                  {block.amountMode === 'fixed' ? (
-                    <InlinePillNumber value={block.amount ?? 1} onChange={(v) => onUpdate(block.id, { amount: v })} />
-                  ) : (
-                    <>
-                      <InlinePillNumber value={block.minAmount ?? 1} onChange={(v) => onUpdate(block.id, { minAmount: v })} />
-                      <span className={word}>to</span>
-                      <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
-                    </>
-                  )}
-
-                  <InlinePillSelect value={block.subject} onChange={(v) => onUpdate(block.id, { subject: v as QuestSubject })}>
-                    <option value="task">tasks</option>
-                    <option value="any">any task</option>
-                  </InlinePillSelect>
-
-                  {block.tagMode !== 'ignore' && (
-                    <span className={word}>tagged with a random tag</span>
-                  )}
-                </div>
-              ) : block.type === 'metric_count' ? (
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
-                  <InlinePillSelect
-                    value={block.metricKey ?? 'trade_completed'}
-                    onChange={(v) => onUpdate(block.id, { metricKey: v })}
-                  >
-                    {Object.entries(QUEST_METRIC_COPY).map(([key, copy]) => (
-                      <option key={key} value={key}>
-                        {copy.adminLabel}
-                      </option>
-                    ))}
-                  </InlinePillSelect>
-                  <span className={word}>×</span>
-                  {block.amountMode === 'fixed' ? (
-                    <InlinePillNumber value={block.amount ?? 1} onChange={(v) => onUpdate(block.id, { amount: v })} />
-                  ) : (
-                    <>
-                      <InlinePillNumber value={block.minAmount ?? 1} onChange={(v) => onUpdate(block.id, { minAmount: v })} />
-                      <span className={word}>to</span>
-                      <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
-                  <span className={word}>Focus on tasks for</span>
-                  {block.amountMode === 'fixed' ? (
-                    <InlinePillNumber value={block.amount ?? 1} onChange={(v) => onUpdate(block.id, { amount: v })} />
-                  ) : (
-                    <>
-                      <InlinePillNumber value={block.minAmount ?? 1} onChange={(v) => onUpdate(block.id, { minAmount: v })} />
-                      <span className={word}>to</span>
-                      <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
-                    </>
-                  )}
-                  <span className={word}>minutes</span>
-                </div>
-              )}
-
-              {placement === 'onboarding' && (
-                <input
-                  value={block.helpText ?? ''}
-                  onChange={(e) =>
-                    onUpdate(block.id, { helpText: e.target.value || undefined })
-                  }
-                  placeholder="Help tip shown behind the ? on this objective (optional)"
-                  className="mt-2.5 h-9 w-full rounded-xl border border-border/50 bg-background px-3 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-primary/30"
-                />
-              )}
-
-              {/* Objective rewards */}
-              {(block.rewards?.length ?? 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setRewardPickerForBlockId(block.id)}
-                  className="mt-2.5 flex w-full items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-left transition hover:bg-emerald-500/10"
-                >
-                  <span className="text-[12px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">Reward</span>
-                  <div className="flex flex-wrap gap-2">
-                    {block.rewards!.map((reward, ri) => (
-                      <RewardTile
-                        key={`${ri}-${reward.type}-${reward.itemId ?? reward.amount ?? ''}`}
-                        reward={reward}
-                        rewardCatalog={rewardCatalog}
-                        isPremium={false}
-                      />
-                    ))}
-                  </div>
-                  <Pencil className="ml-auto h-3 w-3 shrink-0 text-emerald-600/40 dark:text-emerald-400/40" />
-                </button>
-              )}
-
-              {/* Bottom options row */}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    onUpdate(
-                      block.id,
-                      block.type === 'count'
-                        ? { type: 'focus_minutes', subject: 'task', action: undefined, metricKey: undefined }
-                        : block.type === 'focus_minutes'
-                          ? { type: 'metric_count', subject: 'task', action: undefined, metricKey: 'trade_completed', tagMode: 'ignore' }
-                          : { type: 'count', subject: 'task', action: 'complete', metricKey: undefined, tagMode: 'ignore' as const },
-                    )
-                  }
-                  className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-                >
-                  {block.type === 'count'
-                    ? 'Switch to focus time'
-                    : block.type === 'focus_minutes'
-                      ? 'Switch to app action'
-                      : 'Switch to count'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUpdate(block.id, block.amountMode === 'fixed' ? { amountMode: 'random', amount: undefined, minAmount: block.minAmount ?? 1, maxAmount: block.maxAmount ?? Math.max(block.amount ?? 3, 1) } : { amountMode: 'fixed', amount: block.amount ?? block.maxAmount ?? 1, minAmount: undefined, maxAmount: undefined })}
-                  className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-                >
-                  {block.amountMode === 'fixed' ? 'Use random range' : 'Use fixed amount'}
-                </button>
-                {block.type === 'count' && (
-                  <button
-                    type="button"
-                    onClick={() => onUpdate(block.id, { tagMode: block.tagMode === 'ignore' ? 'random_user_tag' : 'ignore' })}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                      block.tagMode !== 'ignore' ? 'border-primary/25 bg-primary/8 text-primary hover:bg-primary/15' : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground',
-                    )}
-                  >
-                    {block.tagMode !== 'ignore' ? 'Tag filter on' : 'Add tag filter'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setRewardPickerForBlockId(block.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                    (block.rewards?.length ?? 0) > 0
-                      ? 'border-emerald-500/25 bg-emerald-500/8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15'
-                      : 'border-border/50 bg-background text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-400',
-                  )}
-                >
-                  <Gift className="h-3 w-3" />
-                  {(block.rewards?.length ?? 0) > 0 ? 'Edit reward' : 'Add reward'}
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 py-3 text-xs font-bold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add another objective
-          </button>
-        </div>
-
-        <div className="border-t border-border/40 px-5 py-3 flex items-center justify-between gap-3">
-          {!allHaveRewards && (
-            <p className="text-xs font-medium text-red-500">Every objective needs a reward.</p>
-          )}
-          <div className="ml-auto">
-            <Button size="sm" className="rounded-xl font-bold" onClick={() => onOpenChange(false)} disabled={!allHaveRewards}>Done</Button>
-          </div>
-        </div>
-      </DialogContent>
-
-      {rewardPickerBlock && (
-        <RewardPickerDialog
-          open={!!rewardPickerForBlockId}
-          onOpenChange={(isOpen) => { if (!isOpen) setRewardPickerForBlockId(null); }}
-          rewards={rewardPickerBlock.rewards ?? []}
-          rewardItems={rewardItems}
-          rewardCatalog={rewardCatalog}
-          maxSelect={2}
-          onSave={(rewards) => {
-            const next = normalizeRewardList(rewards).slice(0, 2);
-            onUpdate(rewardPickerForBlockId!, {
-              rewards: next.length > 0 ? next : undefined,
-            });
-            setRewardPickerForBlockId(null);
-          }}
-        />
-      )}
-    </Dialog>
-  );
-}
-
-function AvailabilityEditorDialog({
-  open,
-  onOpenChange,
-  conditions,
-  onUpdate,
-  onAdd,
-  onRemove,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  conditions: QuestVisibilityCondition[];
-  onUpdate: (id: string, patch: Partial<QuestVisibilityCondition>) => void;
-  onAdd: () => void;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-lg !rounded-[28px] !p-0 overflow-hidden">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Availability</DialogTitle>
-          <DialogDescription>Control when this quest can appear.</DialogDescription>
-        </DialogHeader>
-
-        <div className="px-5 pt-5 pb-1">
-          <p className="text-base font-black text-foreground">Who can see this quest?</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">All rules must pass before the quest appears for a user.</p>
-        </div>
-
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-3 space-y-3">
-          {conditions.length === 0 ? (
-            <div className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-6 text-center">
-              <p className="text-sm font-bold text-foreground">Everyone</p>
-              <p className="mt-1 text-xs text-muted-foreground">No restrictions. Add a rule below to limit visibility.</p>
-            </div>
-          ) : (
-            conditions.map((condition) => (
-              <div key={condition.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
-                    <span className="text-[13px] font-medium text-foreground">Only show when</span>
-                    <InlinePillSelect value={condition.metric} onChange={(v) => onUpdate(condition.id, { metric: v as QuestVisibilityMetric })}>
-                      <option value="daily_tasks_count">tasks today</option>
-                      <option value="tags_count">tags count</option>
-                    </InlinePillSelect>
-                    <span className="text-[13px] font-medium text-foreground">is</span>
-                    <InlinePillSelect value={condition.operator} onChange={(v) => onUpdate(condition.id, { operator: v as QuestVisibilityOperator })}>
-                      <option value="gt">more than</option>
-                      <option value="lt">less than</option>
-                    </InlinePillSelect>
-                    <InlinePillNumber value={condition.value} onChange={(v) => onUpdate(condition.id, { value: v })} min={0} />
-                  </div>
-                  <button onClick={() => onRemove(condition.id)} className="mt-0.5 shrink-0 rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 py-3 text-xs font-bold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add rule
-          </button>
-        </div>
-
-        <div className="border-t border-border/40 px-5 py-3 text-right">
-          <Button size="sm" className="rounded-xl font-bold" onClick={() => onOpenChange(false)}>Done</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

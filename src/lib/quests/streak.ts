@@ -195,12 +195,9 @@ export function rollTierForDay(
   dayNumber: number,
   config: SweepConfigView,
 ): { tier: SweepRollTier; mega: boolean } {
-  const mega =
-    config.megaEveryDays > 0 && dayNumber % config.megaEveryDays === 0;
-  const golden =
-    mega ||
-    (config.goldenEveryDays > 0 && dayNumber % config.goldenEveryDays === 0);
-  return { tier: golden ? 'golden' : 'standard', mega };
+  void dayNumber;
+  void config;
+  return { tier: 'standard', mega: false };
 }
 
 /** Counted inclusively from the next sweep, so 1 means "sweep today and it is
@@ -395,12 +392,8 @@ export async function claimSweepRoll(args: {
   if (!roll) throw new Error('No reward roll ready yet');
 
   const isPremium = isPremiumUser(user.toObject());
-  const table = roll.tier === 'golden' ? config.goldenRoll : config.standardRoll;
-  const drawn = drawRollReward(table);
-  const rewards: SweepReward[] = [
-    ...(drawn ? [drawn] : []),
-    ...(roll.mega ? config.megaRewards : []),
-  ];
+  const drawn = drawRollReward(config.standardRoll);
+  const rewards: SweepReward[] = drawn ? [drawn] : [];
 
   const shieldConfig = await loadShieldConfig();
   const flyBalanceBefore = Math.max(0, Number(user.wardrobe?.flies) || 0);
@@ -422,11 +415,11 @@ export async function claimSweepRoll(args: {
     grantedBackgroundIds: bonus.grantedBackgroundIds,
     shieldsGranted: bonus.shieldsGranted,
     rolled: {
-      tier: roll.tier,
-      mega: roll.mega,
+      tier: 'standard',
+      mega: false,
       reward: drawn,
-      megaRewards: roll.mega ? config.megaRewards : [],
-      table,
+      megaRewards: [],
+      table: config.standardRoll,
     },
   };
   recordDoubleableClaim(user, summary);

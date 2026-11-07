@@ -54,20 +54,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const withCover = <T extends { templateId?: string; coverImageUrl?: string }>(
-      quest: T,
-    ): T =>
-      quest.templateId && dashboard.templatesWithCover.has(quest.templateId)
-        ? {
-            ...quest,
-            coverImageUrl: `/api/quests/cover?type=template&id=${encodeURIComponent(quest.templateId)}`,
-          }
-        : quest;
-
     return NextResponse.json({
       ok: true,
       rerollsLeft: Math.max(0, DAILY_QUEST_REROLLS_PER_DAY - nextCount),
-      dailyQuests: dashboard.dailyQuests.map(withCover),
+      dailyQuests: dashboard.dailyQuests,
     });
   } catch (error) {
     return NextResponse.json(

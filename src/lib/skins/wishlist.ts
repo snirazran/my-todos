@@ -202,7 +202,9 @@ export function buildWishlistEntries(
       discountPercent: 0,
       onDeal: false,
     };
-    const tradeOnly = isTradeOnlyRarity(view.rarity);
+    const tradeOnly =
+      isTradeOnlyRarity(view.rarity) &&
+      !(view.kind === 'item' && deals?.some((deal) => deal.itemId === view.itemId));
     const progress = wishlistProgress(pricing.price, balance);
     return {
       view,

@@ -271,30 +271,6 @@ function QuestSectionHeaderSkeleton({
   );
 }
 
-function QuestObjectiveRowSkeleton({
-  width,
-  divider = false,
-}: {
-  width: string;
-  divider?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-3 py-3 pl-3.5 pr-3',
-        divider && 'border-t border-border/50',
-      )}
-    >
-      <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        <Skeleton className={cn('h-3.5 rounded-full', width)} />
-        <Skeleton className="h-2.5 w-full rounded-full" />
-      </div>
-      <Skeleton className="h-11 w-12 shrink-0 rounded-[14px]" />
-    </div>
-  );
-}
-
 function QuestPathRowSkeleton({
   width,
   prize = false,
@@ -303,10 +279,7 @@ function QuestPathRowSkeleton({
   prize?: boolean;
 }) {
   return (
-    <div className="flex items-stretch gap-1.5">
-      <div className="flex w-8 shrink-0 items-center justify-center">
-        <Skeleton className={cn('rounded-full', prize ? 'h-8 w-8' : 'h-[26px] w-[26px]')} />
-      </div>
+    <div className="flex items-stretch">
       <div className={cn('flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 pr-3', HOME_CARD_SURFACE)}>
         <Skeleton className="h-11 w-11 shrink-0 rounded-xl min-[400px]:h-12 min-[400px]:w-12" />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -319,27 +292,6 @@ function QuestPathRowSkeleton({
         </div>
         {!prize && <Skeleton className="h-11 w-12 shrink-0 rounded-[14px]" />}
       </div>
-    </div>
-  );
-}
-
-function LeapRailSkeleton() {
-  return (
-    <div className="flex items-end justify-between px-3 pb-1 pt-6">
-      {Array.from({ length: 5 }, (_, index) => (
-        <React.Fragment key={index}>
-          {index > 0 && (
-            <div className="flex flex-1 justify-center gap-1.5 self-center">
-              {Array.from({ length: 3 }, (_, dot) => (
-                <Skeleton key={dot} className="h-1.5 w-1.5 rounded-full" />
-              ))}
-            </div>
-          )}
-          <div className="flex aspect-[500/430] w-[70px] shrink-0 items-end">
-            <Skeleton className="h-[62%] w-full rounded-[50%]" />
-          </div>
-        </React.Fragment>
-      ))}
     </div>
   );
 }
@@ -362,8 +314,29 @@ export function QuestsPageSkeleton() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto -mt-7 flex w-full max-w-3xl flex-col gap-7 rounded-t-[28px] bg-[hsl(var(--board-list))] dark:bg-background px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:-mt-8 md:gap-9 md:rounded-none md:bg-transparent md:px-6 md:pb-12 md:pt-8 md:shadow-none md:dark:bg-transparent md:dark:shadow-none">
-        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-[hsl(var(--board-list))] dark:bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+      <div className="relative z-10 mx-auto -mt-6 flex w-full max-w-3xl flex-col gap-7 bg-[hsl(var(--board-list))] px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-4 dark:bg-background md:-mt-8 md:gap-9 md:bg-transparent md:px-6 md:pb-12 md:pt-8 md:dark:bg-transparent">
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block" />
+        <div>
+          <QuestSectionHeaderSkeleton
+            titleWidth="w-32"
+            right={<Skeleton className="mr-1 h-3.5 w-14 rounded-full" />}
+          />
+          <div className={QUEST_CARD_SKELETON}>
+            <div className="flex items-center gap-3 px-3.5 py-3">
+              <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <Skeleton className="h-4 w-2/5 rounded-full" />
+                <Skeleton className="h-2.5 w-full rounded-full" />
+                <Skeleton className="h-3 w-1/2 rounded-full" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 border-t border-border/50 px-3.5 py-2.5">
+              <Skeleton className="h-6 w-14 rounded-full" />
+              <Skeleton className="h-3 w-1/2 rounded-full" />
+            </div>
+          </div>
+        </div>
+
         <div>
           <QuestSectionHeaderSkeleton
             titleWidth="w-36"
@@ -378,24 +351,12 @@ export function QuestsPageSkeleton() {
             <QuestPathRowSkeleton width="w-2/5" />
             <QuestPathRowSkeleton width="w-1/2" />
             <QuestPathRowSkeleton width="w-1/3" />
-            <QuestPathRowSkeleton width="w-1/2" prize />
-          </div>
-        </div>
-
-        <div>
-          <QuestSectionHeaderSkeleton
-            titleWidth="w-32"
-            right={<Skeleton className="mr-1 h-3.5 w-14 rounded-full" />}
-          />
-          <div className={QUEST_CARD_SKELETON}>
-            <LeapRailSkeleton />
-            <div className="flex flex-col items-center gap-2.5 px-4 pb-4 pt-3">
-              <Skeleton className="h-5 w-40 rounded-full" />
-              <Skeleton className="h-3 w-56 max-w-full rounded-full" />
-            </div>
-            <QuestObjectiveRowSkeleton width="w-1/2" divider />
-            <div className="px-3 pb-3">
-              <Skeleton className="h-[58px] w-full rounded-2xl" />
+            <div className="flex items-center gap-3 rounded-[18px] border-2 border-dashed border-foreground/[0.12] px-3 py-2.5">
+              <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-3.5 w-2/5 rounded-full" />
+                <Skeleton className="h-3 w-1/2 rounded-full" />
+              </div>
             </div>
           </div>
         </div>

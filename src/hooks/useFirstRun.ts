@@ -15,8 +15,7 @@ export type FirstRunPhase =
   | 'off'
   | 'hungry'
   | 'yum'
-  | 'streak'
-  | 'finale';
+  | 'streak';
 
 export const FIRST_RUN_HOLD = 'first-run';
 
@@ -45,8 +44,6 @@ export function readFirstRunPending() {
 const STREAK_WAIT_MS = 6000;
 const YUM_MIN_MS = 1900;
 const AFTER_STREAK_MS = 450;
-const FINALE_MAX_MS = 2 * 60_000;
-const AFTER_OWN_TASK_MS = 1200;
 const RELEASE_GRACE_MS = 2500;
 
 const GUIDED: ReadonlySet<FirstRunPhase> = new Set<FirstRunPhase>([
@@ -59,20 +56,17 @@ export const FIRST_RUN_SPEECH: Partial<Record<FirstRunPhase, string>> = {
   hungry: 'I’m so hungry!\nFinish a task to feed me.',
   yum: 'Yum! First task done!',
   streak: 'Yum! First task done!',
-  finale: 'What else is on your list?\nTap + to add it.',
 };
 
 export function useFirstRun({
   pending,
   ready,
   starterDone,
-  taskCount,
   onFinish,
 }: {
   pending: boolean;
   ready: boolean;
   starterDone: boolean;
-  taskCount: number;
   onFinish: () => void;
 }) {
   const [phase, setPhase] = useState<FirstRunPhase>('off');
@@ -88,10 +82,22 @@ export function useFirstRun({
   const sheetOpen = useSheetStore((state) => state.count > 0);
   const setFirstRunGuided = useUIStore((state) => state.setFirstRunGuided);
 
+  const finish = () => {
+    if (!finishedRef.current) {
+      finishedRef.current = true;
+      trackAnalyticsEvent('first_run_step', { step: 'finale' });
+      onFinishRef.current();
+    }
+    setPhase('off');
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+
   useEffect(() => {
     if (startedRef.current || !pending || !ready) return;
     startedRef.current = true;
-    setPhase(!starterDone ? 'hungry' : 'finale');
+    if (starterDone) finishRef.current();
+    else setPhase('hungry');
   }, [pending, ready, starterDone]);
 
   useEffect(() => {
@@ -110,40 +116,15 @@ export function useFirstRun({
       const timer = window.setTimeout(() => setPhase('streak'), wait);
       return () => window.clearTimeout(timer);
     }
-    const timer = window.setTimeout(() => setPhase('finale'), STREAK_WAIT_MS);
+    const timer = window.setTimeout(() => finishRef.current(), STREAK_WAIT_MS);
     return () => window.clearTimeout(timer);
   }, [phase, streakHeld]);
 
   useEffect(() => {
     if (phase !== 'streak' || streakHeld || sheetOpen) return;
-    const timer = window.setTimeout(() => setPhase('finale'), AFTER_STREAK_MS);
+    const timer = window.setTimeout(() => finishRef.current(), AFTER_STREAK_MS);
     return () => window.clearTimeout(timer);
   }, [phase, streakHeld, sheetOpen]);
-
-  useEffect(() => {
-    if (phase !== 'finale') return;
-    if (!finishedRef.current) {
-      finishedRef.current = true;
-      onFinishRef.current();
-    }
-    const timer = window.setTimeout(() => setPhase('off'), FINALE_MAX_MS);
-    return () => window.clearTimeout(timer);
-  }, [phase]);
-
-  const finaleTaskCountRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (phase !== 'finale') {
-      finaleTaskCountRef.current = null;
-      return;
-    }
-    if (finaleTaskCountRef.current === null) {
-      finaleTaskCountRef.current = taskCount;
-      return;
-    }
-    if (taskCount <= finaleTaskCountRef.current) return;
-    const timer = window.setTimeout(() => setPhase('off'), AFTER_OWN_TASK_MS);
-    return () => window.clearTimeout(timer);
-  }, [phase, taskCount]);
 
   useEffect(() => {
     if (phase === 'off' || trackedPhasesRef.current.has(phase)) return;

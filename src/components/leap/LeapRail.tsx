@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -422,12 +422,18 @@ export function LeapRail({
   focusIndex,
   onSelect,
   className,
+  edgeMask = false,
+  hereMarker,
+  captions = false,
 }: {
   stops: LeapStop[];
   progress: number;
   focusIndex?: number;
   onSelect?: (index: number) => void;
   className?: string;
+  edgeMask?: boolean;
+  hereMarker?: ReactNode;
+  captions?: boolean;
 }) {
   const { ref, edges, onPointerDown, wasDrag } = useRailScroll();
 
@@ -445,6 +451,10 @@ export function LeapRail({
   const nextIndex = stops.findIndex((stop) => stop.state === 'next');
 
   const cell = { width: PAD_COL, maxWidth: PAD_COL_MAX };
+  const mask =
+    edgeMask && (edges.start || edges.end)
+      ? `linear-gradient(to right, ${edges.start ? 'transparent 0, #000 28px' : '#000 0'}, ${edges.end ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})`
+      : undefined;
   const railFloor = stops.length * FLOOR_PAD + (stops.length - 1) * FLOOR_GAP;
   // The weeks a hop actually spans, minus the two pads at its ends: four
   // weeks from "Now" to "4 wk" is three waits in between, not five decorative
@@ -476,8 +486,12 @@ export function LeapRail({
       <div
         ref={ref}
         onPointerDown={onPointerDown}
+        style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
         className={cn(
-          '-mx-1 -mt-3 select-none overflow-x-auto overscroll-x-contain px-1 pb-1 pt-3 [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          '-mx-1 select-none overflow-x-auto overscroll-x-contain px-1 [-ms-overflow-style:none]',
+          hereMarker ? '-mt-8 pt-8' : '-mt-3 pt-3',
+          captions ? 'pb-9' : 'pb-1',
+          ' [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
           (edges.start || edges.end) && 'cursor-grab active:cursor-grabbing',
         )}
       >
@@ -504,7 +518,10 @@ export function LeapRail({
                   onClick={() => {
                     if (!wasDrag()) onSelect?.(index);
                   }}
-                  className="relative aspect-[500/430] shrink-0 rounded-2xl outline-none transition-transform duration-150 enabled:active:scale-95 disabled:cursor-default focus-visible:ring-2 focus-visible:ring-primary/50"
+                  className={cn(
+                    'relative aspect-[500/430] shrink-0 rounded-2xl outline-none transition-transform duration-150 enabled:active:scale-95 disabled:cursor-default focus-visible:ring-2 focus-visible:ring-primary/50',
+                    hereMarker && stop.isHere && 'scale-[1.12] enabled:active:scale-105',
+                  )}
                   style={cell}
                 >
                   <Pad stop={stop} turn={PAD_TURN[index % PAD_TURN.length]} />
@@ -519,7 +536,29 @@ export function LeapRail({
                       earning" everywhere else on this card, and a marker that
                       borrows the reward colour reads as a reward. A position is
                       not a prize. */}
-                  {stop.isHere && (
+                  {stop.isHere && hereMarker && (
+                    <span
+                      aria-label="You are here"
+                      style={{ top: `calc(${artTop(stop) * 100}% + 4px)` }}
+                      className="absolute left-1/2 z-20 -translate-x-1/2 -translate-y-full"
+                    >
+                      {hereMarker}
+                    </span>
+                  )}
+                  {captions && (stop.isHere || stop.state === 'next') && (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full px-2 text-[10.5px] font-black uppercase leading-[18px] tracking-[0.06em]',
+                        stop.isHere
+                          ? 'bg-[#4f9149] text-white shadow-[0_2px_0_#2f6b2c]'
+                          : 'bg-amber-400/25 text-amber-800 dark:text-amber-200',
+                      )}
+                    >
+                      {stop.isHere ? 'You' : 'Next'}
+                    </span>
+                  )}
+                  {stop.isHere && !hereMarker && (
                     <span
                       aria-label="You are here"
                       style={{ top: `calc(${artTop(stop) * 100}% - 8px)` }}
@@ -547,8 +586,12 @@ export function LeapRail({
         </div>
       </div>
 
-      <EdgeFade side="left" shown={edges.start} />
-      <EdgeFade side="right" shown={edges.end} />
+      {!edgeMask && (
+        <>
+          <EdgeFade side="left" shown={edges.start} />
+          <EdgeFade side="right" shown={edges.end} />
+        </>
+      )}
     </div>
   );
 }

@@ -112,6 +112,31 @@ export const preloadFrogFile = (): Promise<RiveFile | null> => {
 
 export const getFrogFile = () => frogFile;
 
+let giftFile: RiveFile | null = null;
+let giftFileLoad: Promise<RiveFile | null> | null = null;
+
+export const preloadGiftFile = (): Promise<RiveFile | null> => {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (giftFile) return Promise.resolve(giftFile);
+  giftFileLoad ??= preloadRiveAsset('/idle_gift.riv')
+    .then((url) => {
+      const file = new RiveFile({ src: url });
+      return file.init().then(() => {
+        file.getInstance();
+        giftFile = file;
+        return file;
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      giftFileLoad = null;
+      return null;
+    });
+  return giftFileLoad;
+};
+
+export const getGiftFile = () => giftFile;
+
 export const riveDevicePixelRatio = (cap = 2) => {
   if (typeof window === 'undefined') return 1;
   return Math.min(window.devicePixelRatio || 1, cap);

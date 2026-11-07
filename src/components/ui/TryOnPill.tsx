@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Icon } from '@/components/ui/Icon';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { useTryOnStore } from '@/lib/tryOnStore';
 import { useInventory } from '@/hooks/useInventory';
@@ -15,13 +16,9 @@ import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const AUTO_DISMISS_MS = 14_000;
 
-/**
- * The "keep it?" offer for a shuffle try-on. Renders inline under the frog —
- * never as a modal and never over the task list — so it can be ignored
- * completely without blocking anything.
- */
 export function TryOnPill({ className }: { className?: string }) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const offer = useTryOnStore((s) => s.offer);
   const clear = useTryOnStore((s) => s.clear);
   const { data } = useInventory(!!offer, true);
@@ -42,11 +39,8 @@ export function TryOnPill({ className }: { className?: string }) {
     return () => window.clearTimeout(timer);
   }, [offer, clear]);
 
-  if (!offer) return null;
-
-  const config = RARITY_CONFIG[offer.rarity];
-
   const dismiss = () => {
+    if (!offer) return;
     hapticTick();
     trackAnalyticsEvent('tryon_dismissed', {
       item_id: offer.itemId,
@@ -56,6 +50,8 @@ export function TryOnPill({ className }: { className?: string }) {
   };
 
   const keep = async () => {
+    if (!offer) return;
+    hapticTick();
     if (!canAfford) {
       trackAnalyticsEvent('tryon_kept', {
         item_id: offer.itemId,
@@ -65,69 +61,73 @@ export function TryOnPill({ className }: { className?: string }) {
       clear();
       return;
     }
-    hapticTick();
     trackAnalyticsEvent('tryon_kept', {
       item_id: offer.itemId,
       outcome: 'shop_opened',
       price: offer.price,
     });
     clear();
-    router.push(
-      `/shop?item=${encodeURIComponent(offer.itemId)}&kind=item`,
-    );
+    router.push(`/shop?item=${encodeURIComponent(offer.itemId)}&kind=item`);
   };
 
+  const config = offer ? RARITY_CONFIG[offer.rarity] : null;
+
   return (
-    <AnimatePresence>
-      <motion.div
-        key={offer.itemId}
-        initial={{ opacity: 0, y: 8, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 6, scale: 0.97 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-        className={cn(
-          'pointer-events-auto relative flex w-[min(340px,92vw)] items-center gap-2.5 rounded-2xl border-2 bg-card/95 py-2 pl-3 pr-9 shadow-lg backdrop-blur-xl',
-          config.border,
-          className,
-        )}
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-black leading-tight tracking-tight text-foreground">
-            Trying on: {offer.name}
-          </span>
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-            {canAfford ? (
-              <>
-                Keep it for
-                <FlyAmount amount={offer.price} size={11} className="text-foreground" />
-                ?
-              </>
-            ) : (
-              <>
-                <FlyAmount amount={offer.price} size={11} className="text-foreground" />
-                — save up for it?
-              </>
-            )}
-          </span>
-        </span>
-
-        <button
-          type="button"
-          onClick={keep}
-          className="flex h-9 shrink-0 items-center justify-center rounded-xl bg-[#447d3f] px-3 text-xs font-black tracking-wide text-white shadow-[0_3px_0_0_#2c511a] transition-all active:translate-y-0.5 active:shadow-none"
+    <AnimatePresence initial={false}>
+      {offer && config && (
+        <motion.div
+          key={offer.itemId}
+          data-dock-row
+          initial={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+          animate={reduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+          exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+          className={cn('w-full min-w-0 overflow-hidden rounded-b-[19px] md:basis-full', className)}
         >
-          {canAfford ? 'Keep it' : 'Save for it'}
-        </button>
-
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss try-on"
-          className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground"
-        >
-          <X className="h-3.5 w-3.5" strokeWidth={2.5} />
-        </button>
-      </motion.div>
+          <div className="flex items-center gap-3 border-t border-border/50 py-2.5 pl-3 pr-1.5">
+            <span
+              className={cn(
+                'grid h-11 w-11 shrink-0 place-items-center rounded-xl',
+                config.bg,
+              )}
+            >
+              <Icon name="shuffle" className="h-7 w-7" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] font-bold leading-tight text-foreground">
+                {offer.name}
+              </span>
+              <span className="mt-1 flex min-w-0 items-center gap-1 text-[12px] font-semibold text-muted-foreground">
+                <span className={cn('shrink-0 font-black', config.text)}>{config.label}</span>
+                <span aria-hidden>·</span>
+                <span className="truncate">Trying it on</span>
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={keep}
+              className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#447d3f] px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none"
+            >
+              {canAfford ? (
+                <>
+                  Keep
+                  <FlyAmount amount={offer.price} size={14} className="text-white" />
+                </>
+              ) : (
+                'Save for it'
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={dismiss}
+              aria-label="Take it off"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition-colors active:bg-foreground/5 [@media(hover:hover)]:hover:bg-foreground/5 [@media(hover:hover)]:hover:text-foreground"
+            >
+              <X className="h-4 w-4" strokeWidth={2.75} />
+            </button>
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }

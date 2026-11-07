@@ -15,7 +15,7 @@ import {
 } from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
-import { riveDevicePixelRatio } from '@/lib/riveLoader';
+import { getGiftFile, preloadGiftFile, riveDevicePixelRatio } from '@/lib/riveLoader';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
 
 // Define layout outside component to maintain reference stability
@@ -73,9 +73,25 @@ export const GiftRive = React.memo(
     oversample?: number;
   }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [giftFile, setGiftFile] = useState(getGiftFile);
+    const [giftFileFailed, setGiftFileFailed] = useState(false);
+    useEffect(() => {
+      if (giftFile) return;
+      let alive = true;
+      void preloadGiftFile().then((loaded) => {
+        if (!alive) return;
+        if (loaded) setGiftFile(loaded);
+        else setGiftFileFailed(true);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [giftFile]);
     const riveUrl = useRiveAsset('/idle_gift.riv');
+    const fallbackSrc = !giftFile && giftFileFailed ? riveUrl || undefined : undefined;
+    const hasSource = !!giftFile || !!fallbackSrc;
     const { rive, RiveComponent } = useRive({
-      src: riveUrl || undefined,
+      ...(giftFile ? { riveFile: giftFile } : { src: fallbackSrc }),
       stateMachines: 'State Machine 1',
       autoplay: true,
       autoBind: true,
@@ -281,7 +297,7 @@ export const GiftRive = React.memo(
           display: 'block', // Ensures no inline alignment issues
         }}
       >
-        {riveUrl && (
+        {hasSource && (
           <RiveComponent
             style={{ width: '100%', height: '100%', display: 'block' }}
           />

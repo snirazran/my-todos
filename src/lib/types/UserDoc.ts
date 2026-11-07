@@ -254,6 +254,7 @@ export type UserDoc = {
     claimedAt: Date | string;
   };
   quests?: unknown;
+  milestones?: unknown;
   dailyRewards?: DailyRewardProgress;
   notificationPrefs?: NotificationPrefs;
   styleShuffle?: StyleShufflePrefs | null;

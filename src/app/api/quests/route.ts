@@ -11,6 +11,7 @@ import {
 import { parseTaskStreakDays } from '@/lib/quests/metrics';
 import { rewardWorth } from '@/lib/quests/priority';
 import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
+import { buildMilestoneBoard } from '@/lib/quests/milestonesServer';
 import { getQuestSeasonViews } from '@/lib/quests/seasons';
 import { getZonedToday } from '@/lib/utils';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
@@ -25,19 +26,8 @@ import { FREE_TAG_LIMIT } from '@/lib/tags/limits';
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
 
-const templateCoverRef = (templateId: string) =>
-  `/api/quests/cover?type=template&id=${encodeURIComponent(templateId)}`;
-
 const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
-
-function withTemplateCover<T extends { templateId?: string; coverImageUrl?: string }>(
-  quest: T,
-  templatesWithCover: Set<string>,
-): T {
-  if (!quest.templateId || !templatesWithCover.has(quest.templateId)) return quest;
-  return { ...quest, coverImageUrl: templateCoverRef(quest.templateId) };
-}
 
 function lightenCategory<T extends { id?: string; coverImageUrl?: string }>(
   category: T,
@@ -117,7 +107,7 @@ type ClaimableEntry = {
   questId?: string;
   objectiveId?: string;
   kind: 'objective' | 'season' | 'sweep';
-  placement?: 'daily' | 'onboarding';
+  placement?: 'daily';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
@@ -135,7 +125,7 @@ type ClaimableEntry = {
 type TrackableEntry = {
   id: string;
   questId: string;
-  placement: 'daily' | 'onboarding';
+  placement: 'daily';
   categoryId?: string;
   categoryName?: string;
   objectiveLabel: string;
@@ -443,13 +433,15 @@ export async function GET(req: Request) {
       user: dashboard.user,
       config: moveToWebConfig,
     });
-    const moveToWeb = dashboard.firstOnboardingComplete
-      ? moveToWebSynced
-      : null;
+    const moveToWeb = moveToWebSynced;
+    const milestones = await buildMilestoneBoard(dashboard.user, timezone).catch((err) => {
+      console.error('Milestones failed to load:', err);
+      return null;
+    });
     // Count prizes ready to collect. Quests no longer have an end-reward —
     // only per-objective rewards are claimable, so count one per completed
     // objective with unclaimed rewards.
-    const questClaimable = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests].reduce(
+    const questClaimable = dashboard.dailyQuests.reduce(
       (sum, quest) => {
         if (quest.claimed) return sum;
         let count = 0;
@@ -471,7 +463,11 @@ export async function GET(req: Request) {
     const streakClaimable = dailySweep?.claimable ? dailySweep.pendingRolls : 0;
     const moveToWebClaimable = moveToWeb?.claimable ? 1 : 0;
     const claimableCount =
-      questClaimable + seasonDailyClaimable + streakClaimable + moveToWebClaimable;
+      questClaimable +
+      seasonDailyClaimable +
+      streakClaimable +
+      moveToWebClaimable +
+      (milestones?.claimableCount ?? 0);
 
     const tagChipById = new Map<string, ObjectiveTagChip>();
     for (const tag of (dashboard.user.tags ?? []) as unknown[]) {
@@ -499,23 +495,9 @@ export async function GET(req: Request) {
       tagChipById.set(id, { id, name, color });
     }
     const claimables: ClaimableEntry[] = [];
-    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests]) {
+    for (const quest of dashboard.dailyQuests) {
       if (quest.claimed) continue;
-      const activeOnboardingObjectiveId =
-        quest.placement === 'onboarding'
-          ? quest.logic.find(
-              (block) =>
-                (block.rewards?.length ?? 0) > 0 &&
-                !quest.claimedObjectiveIds.includes(block.id),
-            )?.id
-          : null;
       for (const block of quest.logic) {
-        if (
-          quest.placement === 'onboarding' &&
-          block.id !== activeOnboardingObjectiveId
-        ) {
-          continue;
-        }
         if (
           (block.rewards?.length ?? 0) > 0 &&
           block.progress >= block.target &&
@@ -581,24 +563,10 @@ export async function GET(req: Request) {
     const hasHabits = dashboard.tasks.some(
       (task) => task.type === 'weekly' && !task.isTutorial,
     );
-    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests]) {
+    for (const quest of dashboard.dailyQuests) {
       if (quest.claimed) continue;
-      const activeOnboardingObjectiveId =
-        quest.placement === 'onboarding'
-          ? quest.logic.find(
-              (block) =>
-                (block.rewards?.length ?? 0) > 0 &&
-                !quest.claimedObjectiveIds.includes(block.id),
-            )?.id
-          : null;
       for (let tierIndex = 0; tierIndex < quest.logic.length; tierIndex++) {
         const block = quest.logic[tierIndex];
-        if (
-          quest.placement === 'onboarding' &&
-          block.id !== activeOnboardingObjectiveId
-        ) {
-          continue;
-        }
         const target = Math.max(1, block.target);
         if ((block.rewards?.length ?? 0) === 0) continue;
         if (block.progress >= target) continue;
@@ -686,7 +654,7 @@ export async function GET(req: Request) {
     }
 
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
-    const openQuests = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests];
+    const openQuests = dashboard.dailyQuests;
     const activeCount = openQuests.filter(
       (quest) => !quest.claimed && !quest.claimable,
     ).length;
@@ -758,6 +726,12 @@ export async function GET(req: Request) {
     const moveToWebRewardCatalog = moveToWeb?.reward
       ? buildRewardCatalog(dashboard.catalog, [[moveToWeb.reward]])
       : {};
+    const milestoneRewardCatalog = milestones?.rows.length
+      ? buildRewardCatalog(
+          dashboard.catalog,
+          milestones.rows.map((row) => row.rewards),
+        )
+      : {};
 
     return NextResponse.json(
       {
@@ -768,6 +742,7 @@ export async function GET(req: Request) {
         frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
         dailySweep,
         moveToWeb,
+        milestones,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,
           selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
@@ -778,20 +753,15 @@ export async function GET(req: Request) {
         activeSeason,
         graceSeason,
         dailyQuests: dashboard.dailyQuests.map((q) =>
-          withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
+          withBlockEffort(q),
         ),
-        dailyQuestsGated: dashboard.dailyQuestsGated,
         dailyRerollsLeft: dashboard.dailyRerollsLeft,
-        firstOnboardingComplete: dashboard.firstOnboardingComplete,
-        earlyObjectiveSteps: dashboard.earlyObjectiveSteps,
-        onboardingQuests: (dashboard.onboardingQuests ?? []).map((q) =>
-          withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
-        ),
         rewardCatalog: {
           ...dashboard.rewardCatalog,
           ...seasonRewardCatalog,
           ...sweepRewardCatalog,
           ...moveToWebRewardCatalog,
+          ...milestoneRewardCatalog,
         },
       },
       {

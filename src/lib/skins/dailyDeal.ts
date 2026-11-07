@@ -155,6 +155,15 @@ export function isShopBuyable(item: ItemDef, now: Date = new Date()): boolean {
   );
 }
 
+export function isLegendaryOffer(item: ItemDef, now: Date = new Date()): boolean {
+  return (
+    item.slot !== 'container' &&
+    isTradeOnlyRarity(item.rarity) &&
+    (item.priceFlies ?? 0) > 0 &&
+    isAvailableAt(item, now)
+  );
+}
+
 export function isEverydayItem(
   item: Pick<ItemDef, 'id' | 'rarity'>,
   config: ShopSalesConfig = DEFAULT_SHOP_SALES,
@@ -201,7 +210,13 @@ export function getShopRotation({
   const eligible = catalog.filter(
     (item) => isShopBuyable(item, now) && !owned.has(item.id),
   );
-  if (eligible.length === 0) return [];
+  const free = Math.max(1, Math.floor(config.freeSlots));
+  const plusSlots = Math.max(0, Math.floor(config.plusSlots));
+  const legendaries =
+    plusSlots > 0
+      ? catalog.filter((item) => isLegendaryOffer(item, now) && !owned.has(item.id))
+      : [];
+  if (eligible.length === 0 && legendaries.length === 0) return [];
 
   const { dayKey, endsAt } = shopDay(now, timezone, config);
   const roll = rerollCount > 0 ? `:r${rerollCount}` : '';
@@ -211,6 +226,7 @@ export function getShopRotation({
       .map((item) => ({ item, rank: hashString(`${key}:${item.id}`) }))
       .sort((a, b) => a.rank - b.rank || a.item.id.localeCompare(b.item.id))
       .map(({ item }) => item);
+  const legendaryItem = ranked(legendaries, `shop-legendary:${dayKey}`)[0] ?? null;
 
   const specialTier = (item: ItemDef) => rarityRank[item.rarity] >= rarityRank.rare;
   const inSpecial = (item: ItemDef) => specialTier(item) && !isEverydayItem(item, config);
@@ -246,11 +262,10 @@ export function getShopRotation({
     return fill.shift() ?? null;
   };
 
-  const free = Math.max(1, Math.floor(config.freeSlots));
-  const total = free + Math.max(0, Math.floor(config.plusSlots));
+  const total = free + plusSlots;
   const rand = mulberry32(hashString(`shop-slots:${seed}`));
   const picks: ItemDef[] = [];
-  const openSlots = saleItem ? total - 1 : total;
+  const openSlots = total - (saleItem ? 1 : 0) - (legendaryItem ? 1 : 0);
   const offsetSlots = saleItem ? 1 : 0;
   for (let i = 0; i < openSlots; i++) {
     const epicPercent =
@@ -321,6 +336,20 @@ export function getShopRotation({
       endsAt,
     });
   });
+  if (legendaryItem) {
+    const price = legendaryItem.priceFlies ?? 0;
+    deals.splice(Math.min(free, deals.length), 0, {
+      itemId: legendaryItem.id,
+      priceFlies: price,
+      dealPrice: price,
+      discountPercent: 0,
+      onSale: false,
+      wishlistSlot: false,
+      sale: false,
+      plusOnly: true,
+      endsAt,
+    });
+  }
   return deals;
 }
 

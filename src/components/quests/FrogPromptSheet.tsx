@@ -64,6 +64,7 @@ function PondScene({
   image,
   className,
   children,
+  showFrog = true,
 }: {
   look: FrogLook;
   frogWidth: number;
@@ -71,6 +72,7 @@ function PondScene({
   image: 'mobile' | 'tablet';
   className?: string;
   children?: React.ReactNode;
+  showFrog?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const src = useMemo(() => {
@@ -97,6 +99,7 @@ function PondScene({
         <div className="absolute inset-0 dark:bg-black/25" />
       </div>
       {children}
+      {showFrog && (
       <div
         className="pointer-events-none absolute inset-x-0 flex justify-center"
         style={{ bottom: seat }}
@@ -115,6 +118,7 @@ function PondScene({
           />
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -604,6 +608,20 @@ export function FrogPromptSheet({
     </div>
   );
 
+  const choiceOptions = (
+    <>
+      <OptionList
+          kind={kind}
+          options={options}
+          picked={picked}
+          disabled={answered || saving}
+          onPick={pick}
+        />
+      {kind === 'checkin' && <div className="mt-3 flex justify-center">{privacyNote}</div>}
+      {errorLine}
+    </>
+  );
+
   const choiceBody = (
     <>
       <div className="flex flex-col items-center text-center">
@@ -615,17 +633,7 @@ export function FrogPromptSheet({
           {question}
         </h2>
       </div>
-      <div className="mt-5">
-        <OptionList
-          kind={kind}
-          options={options}
-          picked={picked}
-          disabled={answered || saving}
-          onPick={pick}
-        />
-      </div>
-      {kind === 'checkin' && <div className="mt-3 flex justify-center">{privacyNote}</div>}
-      {errorLine}
+      <div className="mt-5">{choiceOptions}</div>
     </>
   );
 
@@ -717,27 +725,40 @@ export function FrogPromptSheet({
         look={look}
         frogWidth={200}
         image="mobile"
-        seat="calc(env(safe-area-inset-bottom) + 10px)"
+        seat="0px"
+        showFrog={false}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="relative z-10 flex min-h-0 shrink flex-col">
-          <div className="flex min-h-0 flex-col rounded-b-[34px] bg-[hsl(var(--board-list))] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)] dark:bg-background">
-            <div className="flex shrink-0 justify-end px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
-              {roundClose('dark')}
+        <div className="absolute right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-20">
+          {roundClose('light')}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+4rem)] [justify-content:safe_center]">
+          <div className="relative z-20 mx-auto w-full max-w-[22rem] shrink-0 px-2">
+            <div className="rounded-[26px] bg-white px-5 py-4 shadow-[0_12px_28px_-14px_rgba(0,0,0,0.45)] dark:bg-card">
+              <h2
+                id="frog-prompt-question"
+                className="text-balance text-center text-[21px] font-black leading-[1.2] text-foreground"
+              >
+                {question}
+              </h2>
             </div>
-            <div className="no-scrollbar min-h-0 overflow-y-auto px-5 pb-2">{choiceBody}</div>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 44 30"
+              className="absolute -bottom-[22px] left-1/2 h-6 w-9 -translate-x-1/2 fill-white dark:fill-card"
+            >
+              <path d="M2 0 H42 C32 5 26 14 22 30 C18 14 12 5 2 0 Z" />
+            </svg>
+          </div>
+          <div className="pointer-events-none relative z-10 flex shrink-0 justify-center" style={{ marginTop: -106 }}>
+            <Frog width={196} height={221} indices={look} arrive="rise" greet="hop" />
+          </div>
+          <div className="relative flex min-h-0 shrink flex-col rounded-[30px] bg-[hsl(var(--board-list))] shadow-[0_14px_34px_-14px_rgba(0,0,0,0.45)] dark:bg-background" style={{ marginTop: -10 }}>
+            <div className="no-scrollbar min-h-0 overflow-y-auto px-5 pb-2 pt-6">{choiceOptions}</div>
             {submitButton && <div className="shrink-0 px-5 pb-5 pt-3">{submitButton}</div>}
             {!submitButton && <div className="h-5 shrink-0" />}
           </div>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 40 26"
-            className="absolute -bottom-[23px] left-[54%] h-[26px] w-10 fill-[hsl(var(--board-list))] dark:fill-background"
-          >
-            <path d="M0 0 H40 C30 6 22 14 10 26 C14 14 10 6 0 0 Z" />
-          </svg>
         </div>
-        <div className="min-h-[calc(env(safe-area-inset-bottom)+9.5rem)] flex-1" />
       </PondScene>
     </motion.div>
   );

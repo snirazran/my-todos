@@ -25,7 +25,7 @@ type PromptLite = {
 const GROUP_BLURBS: Record<string, string> = {
   Players: 'Who is playing, how they are doing, and handing someone a reward.',
   'Quests page': 'The daily lineup, the question your frog asks, and the monthly pass.',
-  'New players': 'What someone sees in their first days: focus areas, starter plan and welcome quests.',
+  'New players': 'What someone sees in their first days: focus areas, the starter plan and the nudge to try the web.',
   'Habits & streaks': 'The daily streak, the weekly Leap, and what a long task streak pays.',
   'Closet & shop': 'What players can collect, and how the shop and trade-ups work.',
   Flies: 'How many flies a day can pay, from where, and when an ad pays instead.',

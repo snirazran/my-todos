@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic';
 import { mutate } from 'swr';
 import { Lightbulb, Play } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
-import { leapViewKey } from '@/lib/leap/viewKey';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
@@ -35,7 +34,7 @@ export type Claimable = {
   questId?: string;
   objectiveId?: string;
   kind: 'objective' | 'season' | 'sweep';
-  placement?: 'daily' | 'onboarding';
+  placement?: 'daily';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
@@ -53,7 +52,7 @@ export type Claimable = {
 export type Trackable = {
   id: string;
   questId?: string;
-  placement: 'daily' | 'onboarding';
+  placement: 'daily';
   categoryId?: string;
   categoryName?: string;
   objectiveLabel: string;
@@ -114,17 +113,8 @@ async function fetchHome(): Promise<HomeData | null> {
   }
 }
 
-function syncLeapUnlock(data: HomeData): void {
-  const rosterRunning =
-    data.claimables.some((entry) => entry.placement === 'onboarding') ||
-    data.trackables.some((entry) => entry.placement === 'onboarding');
-  if (!rosterRunning) return;
-  void mutate(leapViewKey());
-}
-
 export async function refreshQuestHomeView(): Promise<void> {
-  const data = await fetchHome();
-  if (data) syncLeapUnlock(data);
+  await fetchHome();
 }
 
 // Keep the full quests-page cache in step with the home view. Without this,

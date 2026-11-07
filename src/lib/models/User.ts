@@ -122,6 +122,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    milestones: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     dailyRewards: {
       lastClaimDate: { type: Date },
       claimedDays: { type: [Number], default: [] },

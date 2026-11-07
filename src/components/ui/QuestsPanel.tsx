@@ -26,26 +26,21 @@ import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
   MacroCategoryId,
-  QuestProgressView,
   QuestReward,
 } from '@/lib/quests/types';
 import {
   DailyChecklistCard,
   getRewardQuantityLabel,
-  JourneyCard,
   MoveToWebCard,
-  QUEST_CARD_CLASS,
   QUEST_ROW_CARD,
   QuestGoButton,
   QuestSectionHeader,
   RewardTile,
-  SideQuestsCard,
   sortStreakPrizes,
   type DailySweepInfo,
   type MoveToWebInfo,
 } from './QuestCards';
 import { GiftRive } from './gift-box/GiftBox';
-import { FlyAmount } from './FlyAmount';
 import { useInventory } from '@/hooks/useInventory';
 import {
   enqueueQuestRewardReveal,
@@ -64,8 +59,9 @@ import Fly from './fly';
 import { FrogSnapshot } from './FrogSnapshot';
 import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
-import { QuestTrack } from './QuestTrack';
 import { FrogPromptSheet, type FrogPromptBlock } from '@/components/quests/FrogPromptSheet';
+import { MilestonesCard } from '@/components/quests/MilestonesCard';
+import type { MilestoneBoardView } from '@/lib/quests/milestones';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -75,6 +71,7 @@ type QuestsResponse = {
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
   dailySweep?: DailySweepInfo | null;
   moveToWeb?: MoveToWebInfo | null;
+  milestones?: MilestoneBoardView | null;
   onboarding: {
     complete: boolean;
     selectedCategoryIds: MacroCategoryId[];
@@ -82,11 +79,7 @@ type QuestsResponse = {
   };
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
-  dailyQuestsGated?: boolean;
   dailyRerollsLeft?: number;
-  firstOnboardingComplete?: boolean;
-  earlyObjectiveSteps?: number;
-  onboardingQuests?: QuestProgressView[];
   activeSeason?: QuestSeasonView | null;
   graceSeason?: QuestSeasonView | null;
   rewardCatalog: Record<string, ItemDef>;
@@ -213,48 +206,6 @@ export function prefetchQuests() {
 // reward objectives) or simply complete (for objectives with no reward). This
 // mirrors the card's own "all objectives done" state (see ObjectiveRow's
 // `stepDone`), so the sort matches what the user sees.
-function isQuestFinished(quest: QuestProgressView): boolean {
-  if (quest.logic.length === 0) return quest.claimed;
-  return quest.logic.every((block) => {
-    const complete = block.progress >= Math.max(1, block.target);
-    const hasRewards = (block.rewards?.length ?? 0) > 0;
-    const claimed = quest.claimedObjectiveIds.includes(block.id);
-    return claimed || (complete && !hasRewards);
-  });
-}
-
-const EARLY_UNLOCK_STEP_TARGET = 5;
-
-function DailyQuestsLockedCard({
-  completedSteps,
-  targetSteps,
-}: {
-  completedSteps: number;
-  targetSteps: number;
-}) {
-  const safeTotal = Math.max(1, targetSteps);
-  const shown = Math.max(0, Math.min(completedSteps, safeTotal));
-  const remaining = Math.max(0, safeTotal - shown);
-  return (
-    <div>
-      <QuestSectionHeader title="Daily quests" count="Locked" />
-      <div className={cn(QUEST_ROW_CARD, 'flex items-center gap-3 py-3 pl-3 pr-3.5')}>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/[0.12] text-primary">
-          <Lock className="h-5 w-5" strokeWidth={2.75} />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <span className="text-[15px] font-bold leading-tight text-foreground">
-            {remaining === 1
-              ? 'One step from daily quests'
-              : 'Finish your starter quests'}
-          </span>
-          <QuestTrack progress={shown} target={safeTotal} size="lg" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function QuestsPanel({
   isGuest,
   onQuestsChanged,
@@ -325,26 +276,6 @@ export function QuestsPanel({
     void refreshQuestHomeView();
   };
 
-  const handleSwapDailies = async () => {
-    if (swappingDailies) return;
-    setSwappingDailies(true);
-    try {
-      const res = await fetch('/api/quests/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone }),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setClaimMessage(payload?.error ?? 'Could not swap today’s quests');
-        return;
-      }
-      await refreshQuestData();
-    } finally {
-      setSwappingDailies(false);
-    }
-  };
-
   const queueRewardReveal = (
     summary?: QuestRewardSummary,
     moment?: RatingMoment,
@@ -377,7 +308,6 @@ export function QuestsPanel({
   }, [data, isLoading]);
 
   const [claimingStreak, setClaimingStreak] = useState(false);
-  const [swappingDailies, setSwappingDailies] = useState(false);
   const handleClaimStreak = async () => {
     if (claimingStreak) return;
     setClaimingStreak(true);
@@ -433,6 +363,30 @@ export function QuestsPanel({
     } finally {
       releaseAutoPopups(QUEST_CLAIM_HOLD);
       setClaimingMoveToWeb(false);
+    }
+  };
+
+  const [claimingMilestoneId, setClaimingMilestoneId] = useState<string | null>(null);
+  const handleClaimMilestone = async (trackId: string) => {
+    if (claimingMilestoneId) return;
+    setClaimingMilestoneId(trackId);
+    setClaimMessage(null);
+    holdAutoPopups(QUEST_CLAIM_HOLD);
+    try {
+      const res = await fetch('/api/quests/milestones/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackId, timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      queueRewardReveal(payload.rewardSummary, 'quest_reward');
+      await refreshQuestData();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Claim failed');
+    } finally {
+      releaseAutoPopups(QUEST_CLAIM_HOLD);
+      setClaimingMilestoneId(null);
     }
   };
 
@@ -540,36 +494,7 @@ export function QuestsPanel({
                     >
                       {(() => {
                         const dailyQuests = data.dailyQuests ?? [];
-                        const onboardingQuests = (data.onboardingQuests ?? []).filter(
-                          (quest) => !isQuestFinished(quest),
-                        );
-                        const completedEarlyObjectives =
-                          data.earlyObjectiveSteps ??
-                          [
-                            ...(data.onboardingQuests ?? []),
-                            ...dailyQuests,
-                          ].reduce(
-                            (sum, quest) =>
-                              sum +
-                              quest.logic.filter(
-                                (block) =>
-                                  block.progress >= Math.max(1, block.target),
-                              ).length,
-                            0,
-                          );
-                        const leapUnlocked =
-                          data.firstOnboardingComplete ?? !data.dailyQuestsGated;
-                        const journeyMode =
-                          onboardingQuests.length > 0 &&
-                          (!!data.dailyQuestsGated || !leapUnlocked);
-                        const dailyCard = data.dailyQuestsGated ? (
-                          journeyMode ? null : (
-                            <DailyQuestsLockedCard
-                              completedSteps={completedEarlyObjectives}
-                              targetSteps={EARLY_UNLOCK_STEP_TARGET}
-                            />
-                          )
-                        ) : dailyQuests.length === 0 ? null : (
+                        const dailyCard = dailyQuests.length === 0 ? null : (
                           <DailyChecklistCard
                             quests={dailyQuests}
                             rewardCatalog={data.rewardCatalog}
@@ -579,9 +504,7 @@ export function QuestsPanel({
                             sweep={data.dailySweep}
                             claimingSweep={claimingStreak}
                             onClaimSweep={handleClaimStreak}
-                            swapsLeft={data.dailyRerollsLeft ?? 0}
-                            swapping={swappingDailies}
-                            onSwapQuests={handleSwapDailies}
+                            onOpenSeason={data.activeSeason ? () => setOpenSeasonKind('active') : undefined}
                             claimingSeason={claimingSeason}
                             onClaimSeasonStep={(seasonId, tier) =>
                               void handleClaimSeason(seasonId, tier)
@@ -606,11 +529,14 @@ export function QuestsPanel({
                             className={cn(
                               'mx-auto flex w-full max-w-3xl flex-col gap-7 md:gap-9',
                               data.activeSeason &&
-                                'relative z-10 -mt-7 rounded-t-[28px] bg-[hsl(var(--board-list))] dark:bg-background px-3 pt-5 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:-mt-8 md:rounded-none md:bg-transparent md:px-6 md:pt-8 md:shadow-none md:dark:bg-transparent md:dark:shadow-none',
+                                'relative z-10 -mt-6 bg-[hsl(var(--board-list))] px-3 pt-4 dark:bg-background md:-mt-8 md:bg-transparent md:px-6 md:pt-8 md:dark:bg-transparent',
                             )}
                           >
                             {data.activeSeason && (
-                              <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-[hsl(var(--board-list))] dark:bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+                              <>
+                                <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block" />
+                                <PondWaveEdge />
+                              </>
                             )}
                             {!data.activeSeason && (
                               <div className="flex items-end justify-between gap-3 px-3.5">
@@ -635,20 +561,17 @@ export function QuestsPanel({
                                 }
                               />
                             )}
-                            {journeyMode && (
-                              <JourneyCard
-                                quests={onboardingQuests}
-                                earlyObjectiveSteps={completedEarlyObjectives}
-                                unlockTarget={EARLY_UNLOCK_STEP_TARGET}
-                                dailyGated={!!data.dailyQuestsGated}
+                            <LeapLeagueCard />
+                            {dailyCard}
+                            {data.milestones?.rows.length ? (
+                              <MilestonesCard
+                                rows={data.milestones.rows}
                                 rewardCatalog={data.rewardCatalog}
                                 isPremium={data.isPremium}
-                                claimingObjectiveId={claimingObjectiveId}
-                                onClaimObjective={handleClaimObjective}
+                                claimingTrackId={claimingMilestoneId}
+                                onClaim={(trackId) => void handleClaimMilestone(trackId)}
                               />
-                            )}
-                            {dailyCard}
-                            <LeapLeagueCard />
+                            ) : null}
                             {data.moveToWeb && (
                               <MoveToWebCard
                                 moveToWeb={data.moveToWeb}
@@ -656,15 +579,6 @@ export function QuestsPanel({
                                 isPremium={data.isPremium}
                                 claiming={claimingMoveToWeb}
                                 onClaim={handleClaimMoveToWeb}
-                              />
-                            )}
-                            {!journeyMode && onboardingQuests.length > 0 && (
-                              <SideQuestsCard
-                                quests={onboardingQuests}
-                                rewardCatalog={data.rewardCatalog}
-                                isPremium={data.isPremium}
-                                claimingObjectiveId={claimingObjectiveId}
-                                onClaimObjective={handleClaimObjective}
                               />
                             )}
                           </div>
@@ -786,7 +700,7 @@ function seasonLaneStatus(
   return tier <= season.tier ? 'READY' : 'LOCKED';
 }
 
-function SeasonLanePill({
+export function SeasonLanePill({
   lane,
   isPremium = false,
   onUpgrade,
@@ -833,7 +747,7 @@ const SEASON_SPARKLES = [
   { className: '-right-2 bottom-3 h-2.5 w-2.5', delay: '1.1s' },
 ];
 
-function SeasonSparkles() {
+export function SeasonSparkles() {
   return (
     <>
       {SEASON_SPARKLES.map((sparkle) => (
@@ -853,6 +767,17 @@ function SeasonSparkles() {
         </svg>
       ))}
     </>
+  );
+}
+
+function PondWaveEdge() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute bottom-[calc(100%-1px)] left-1/2 h-[14px] w-screen -translate-x-1/2 overflow-hidden md:h-[20px]"
+    >
+      <div className="pond-wave bg-[hsl(var(--board-list))] dark:bg-background" />
+    </div>
   );
 }
 
@@ -895,7 +820,7 @@ function QuestSeasonBanner({
             {season.name}
           </h2>
         </div>
-        <div className="absolute inset-x-0 bottom-12 flex justify-center md:bottom-14">
+        <div className="absolute inset-x-0 bottom-[4rem] flex justify-center md:bottom-[5rem]">
           <button
             type="button"
             onClick={onView}
@@ -1201,7 +1126,7 @@ function seasonRewardName(
   return 'Reward';
 }
 
-function SeasonRewardTile({
+export function SeasonRewardTile({
   reward,
   rewardCatalog,
   lane,
@@ -1746,20 +1671,20 @@ function QuestSeasonEventOverlay({
                           ...sorted.filter((reward) => !wearable(reward) && reward.type === 'BOX'),
                           ...sorted.filter((reward) => !wearable(reward) && reward.type !== 'BOX'),
                         ];
+                        const sparkle =
+                          lane === 'plus' && (ready || status === 'LOCKED_PREMIUM');
                         const glow =
                           lane === 'plus' &&
                           (ready || (status === 'LOCKED_PREMIUM' && unlocked));
                         const body = (
                           <>
                             {glow && (
-                              <>
-                                <span
-                                  aria-hidden="true"
-                                  className="absolute -inset-1.5 rounded-[20px] bg-amber-300/45 animate-ping-ring motion-reduce:hidden"
-                                />
-                                <SeasonSparkles />
-                              </>
+                              <span
+                                aria-hidden="true"
+                                className="absolute -inset-1.5 rounded-[20px] bg-amber-300/45 animate-ping-ring motion-reduce:hidden dark:hidden"
+                              />
                             )}
+                            {sparkle && <SeasonSparkles />}
                             <SeasonRewardTile
                               reward={main}
                               rewardCatalog={rewardCatalog}

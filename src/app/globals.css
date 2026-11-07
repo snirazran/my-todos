@@ -3543,3 +3543,95 @@ body.dragging {
     animation: none;
   }
 }
+
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+  .admin-root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  .admin-root select,
+  .admin-root textarea {
+    font-size: 16px;
+  }
+}
+
+.pond-wave {
+  --pond-wave-w: 240px;
+  position: absolute;
+  inset: 0 calc(var(--pond-wave-w) * -1) 0 0;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 20' preserveAspectRatio='none'%3E%3Cpath d='M0 10C25 0 75 0 100 10S175 20 200 10V20H0Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 20' preserveAspectRatio='none'%3E%3Cpath d='M0 10C25 0 75 0 100 10S175 20 200 10V20H0Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: var(--pond-wave-w) 100%;
+  mask-size: var(--pond-wave-w) 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  animation: pond-wave-drift 14s linear infinite;
+  will-change: transform;
+}
+@media (min-width: 768px) {
+  .pond-wave {
+    --pond-wave-w: 400px;
+    animation-duration: 22s;
+  }
+}
+@keyframes pond-wave-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(calc(var(--pond-wave-w) * -1), 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pond-wave {
+    animation: none;
+  }
+}
+
+.leap-pond {
+  --leap-water:
+    radial-gradient(120% 70% at 50% -12%, rgba(196, 255, 238, 0.32), transparent 62%),
+    radial-gradient(90% 60% at 100% 100%, rgba(10, 40, 60, 0.45), transparent 70%),
+    linear-gradient(180deg, #2f8f98 0%, #237583 46%, #195e70 100%);
+  --leap-glow: rgba(255, 236, 170, 0.38);
+  --leap-ring: rgba(255, 255, 255, 0.22);
+  --leap-burst: rgba(255, 255, 255, 0.55);
+  --leap-ink: #ffffff;
+  --leap-ink-muted: rgba(235, 252, 250, 0.82);
+  --leap-eyebrow: #ffffff;
+  --leap-note: #fde68a;
+  --leap-card: rgba(255, 255, 255, 0.16);
+  --leap-card-line: rgba(255, 255, 255, 0.1);
+  --leap-card-shadow: rgba(8, 40, 50, 0.25);
+  --leap-track: rgba(255, 255, 255, 0.2);
+  --leap-divider: rgba(255, 255, 255, 0.15);
+  --leap-tick: #ffffff;
+  --leap-chip: rgba(8, 40, 50, 0.22);
+  --leap-tab-ink: #14505f;
+  isolation: isolate;
+}
+
+.dark .leap-pond {
+  --leap-tab-ink: #ffffff;
+  --leap-water:
+    radial-gradient(120% 70% at 50% -12%, rgba(150, 230, 215, 0.16), transparent 62%),
+    radial-gradient(90% 60% at 100% 100%, rgba(0, 15, 25, 0.5), transparent 70%),
+    linear-gradient(180deg, #1c5c66 0%, #154a57 46%, #10394a 100%);
+}
+
+.leap-pond-bob {
+  animation: leap-pond-bob 4.8s ease-in-out infinite;
+}
+
+@keyframes leap-pond-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leap-pond-bob {
+    animation: none;
+  }
+}

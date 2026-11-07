@@ -586,7 +586,7 @@ export function ShopWindow({
               side
               name={SELLER_NAME}
               fixedMessage="I've got new things every day!"
-              className="!left-[178px] !top-[70px] md:!left-[198px] [--bubble-max:min(calc(100vw-210px),15rem)]"
+              className="!z-[26] !left-[178px] !top-[70px] md:!left-[198px] [--bubble-max:min(calc(100vw-210px),15rem)]"
             />
           </div>
         </div>

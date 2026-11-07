@@ -53,6 +53,7 @@ const LeapWeekSchema = new Schema<LeapWeekDoc>(
 );
 
 LeapWeekSchema.index({ userId: 1, weekKey: 1 }, { unique: true });
+LeapWeekSchema.index({ weekKey: 1, league: 1 });
 
 if (process.env.NODE_ENV === 'development') {
   delete mongoose.models.LeapWeek;

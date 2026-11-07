@@ -14,7 +14,7 @@ import {
   resetDailyRecipeLayoutCheck,
 } from '@/lib/quests/recipeDefaults';
 import { isValidQuestMetricKey } from '@/lib/quests/metrics';
-import { sanitizeRewards } from '@/app/api/admin/quests/route';
+import { sanitizeRewards } from '@/lib/quests/sanitizeRewards';
 import {
   isCoverDataUrl,
   isCoverProxyUrl,

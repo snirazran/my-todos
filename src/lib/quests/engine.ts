@@ -1,7 +1,5 @@
 import QuestModel, { type QuestDoc } from '@/lib/models/Quest';
-import QuestTemplateModel, {
-  type QuestTemplateDoc,
-} from '@/lib/models/QuestTemplate';
+import type { QuestTemplateDoc } from '@/lib/models/QuestTemplate';
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import QuestCategoryModel, { type QuestCategoryDoc } from '@/lib/models/QuestCategory';
@@ -26,7 +24,6 @@ import QuestRecipeModel, {
   type RecipePoolEntry,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
-import { ensureDefaultOnboardingTemplates } from './onboardingQuests';
 import { createSeededRandom } from './random';
 import {
   accrueSeasonSteps,
@@ -61,19 +58,8 @@ import type {
   QuestRewards,
   QuestSubject,
   QuestTemplateView,
-  QuestVisibilityCondition,
   ResolvedQuestLogicBlock,
 } from './types';
-
-function byTemplateOrder(a: QuestTemplateDoc, b: QuestTemplateDoc) {
-  if (a.placement !== b.placement) {
-    return a.placement.localeCompare(b.placement);
-  }
-
-  return (
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-}
 
 export function isPremiumUser(user: UserDoc) {
   return user.premiumUntil ? new Date(user.premiumUntil) > new Date() : false;
@@ -88,8 +74,6 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
       user.focusProfile?.suggestedContentCreatedAt ?? null,
   };
 }
-
-export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
 
 /**
  * Put on the user's list for them — the tutorial fly task and the onboarding
@@ -555,32 +539,6 @@ function resolveReward(reward: QuestReward, seed: string): QuestReward {
   return sanitizeReward(reward);
 }
 
-function buildVisibilityMetrics(
-  user: UserDoc,
-  tasks: TaskDoc[],
-  todayKey: string,
-) {
-  return {
-    daily_tasks_count: tasks.filter(
-      (task) => task.type === 'regular' && task.date === todayKey,
-    ).length,
-    tags_count: user.tags?.length ?? 0,
-  };
-}
-
-function matchesVisibilityConditions(
-  conditions: QuestVisibilityCondition[] | undefined,
-  metrics: ReturnType<typeof buildVisibilityMetrics>,
-) {
-  if (!conditions?.length) return true;
-
-  return conditions.every((condition) => {
-    const current = metrics[condition.metric];
-    if (condition.operator === 'gt') return current > condition.value;
-    return current < condition.value;
-  });
-}
-
 type RewardCatalogBackground = {
   id: string;
   name: string;
@@ -769,49 +727,6 @@ function recipePickModifiers(pick: RecipePoolEntry): Partial<QuestLogicBlock> {
     modifiers.beforeHour = Math.min(23, Math.max(1, Math.floor(pick.beforeHour)));
   }
   return modifiers;
-}
-
-/**
- * Dailies sync (hidden) while they are still locked, so on the day they
- * unlock they would otherwise appear with the morning's tasks already counted.
- * At the unlock moment every unclaimed objective is re-based on its current
- * raw count, so only work done from now on moves it.
- */
-async function startDailiesFromNow(
-  docs: InstanceType<typeof QuestModel>[],
-): Promise<boolean> {
-  let any = false;
-  await Promise.all(
-    docs.map(async (doc) => {
-      const claimed = new Set(doc.claimedObjectiveIds ?? []);
-      if (doc.claimedAt) return;
-      let changed = false;
-      const logic = (doc.logic ?? []).map((block: any) => {
-        if (block.preCredited || claimed.has(block.id) || !(block.progress > 0)) {
-          return block;
-        }
-        changed = true;
-        return {
-          ...block,
-          baselineProgress: Math.max(0, block.baselineProgress ?? 0) + block.progress,
-          progress: 0,
-        };
-      });
-      if (!changed) return;
-      any = true;
-      doc.logic = logic as any;
-      doc.progress = logic.reduce(
-        (sum: number, block: any) => sum + Math.min(block.progress ?? 0, block.target ?? 0),
-        0,
-      );
-      doc.completedAt = null as any;
-      doc.markModified('logic');
-      await doc.save().catch((err: unknown) => {
-        console.error('Re-basing daily quest at unlock failed', err);
-      });
-    }),
-  );
-  return any;
 }
 
 function retroactiveBaseline(args: {
@@ -1257,23 +1172,7 @@ function placementWindowKey(
   timezone: string,
 ) {
   if (placement === 'daily') return getZonedToday(timezone);
-  if (placement === 'onboarding') return 'onboarding';
   return `category:${templateId}`;
-}
-
-function isQuestDocFullyClaimed(doc: {
-  logic?: ResolvedQuestLogicBlock[];
-  claimedObjectiveIds?: string[];
-}): boolean {
-  const rewardBlocks = (doc.logic ?? []).filter(
-    (block) => (block.rewards?.length ?? 0) > 0,
-  );
-  return (
-    rewardBlocks.length > 0 &&
-    rewardBlocks.every((block) =>
-      (doc.claimedObjectiveIds ?? []).includes(block.id),
-    )
-  );
 }
 
 function comparableQuestValue(value: unknown): unknown {
@@ -1662,7 +1561,7 @@ export async function syncQuestState(args: {
   await ensureDefaultDailyRecipe();
   const includeCatalog = args.includeCatalog ?? true;
   const includeCategories = args.includeCategories ?? true;
-  const [user, tasks, catalog, templates, categories, loadedDocs, recipes] = await Promise.all([
+  const [user, tasks, catalog, categories, loadedDocs, recipes] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find(
       { userId, deletedAt: { $exists: false } },
@@ -1687,10 +1586,6 @@ export async function syncQuestState(args: {
         ? Promise.resolve(args.catalog)
         : getFullCatalog()
       : Promise.resolve([] as ItemDef[]),
-    QuestTemplateModel.find({
-      isActive: true,
-      placement: 'onboarding',
-    }).lean<QuestTemplateDoc[]>(),
     includeCategories
       ? QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>()
       : QuestCategoryModel.find({}, { categoryId: 1, name: 1, shortLabel: 1 })
@@ -1708,7 +1603,6 @@ export async function syncQuestState(args: {
 
   const profile = normalizeFocusProfile(user);
   const todayKey = getZonedToday(timezone);
-  const visibilityMetrics = buildVisibilityMetrics(user, tasks, todayKey);
 
   // Refresh scopes delete the live docs AND drop them from the in-memory
   // list, otherwise the stale docs would be treated as frozen rolls and the
@@ -1724,15 +1618,6 @@ export async function syncQuestState(args: {
       (doc) => !(doc.placement === 'daily' && doc.windowKey === todayKey),
     );
   }
-  const filteredTemplates = [...templates]
-    .sort(byTemplateOrder)
-    .filter((template) =>
-    matchesVisibilityConditions(
-      template.visibilityConditions,
-      visibilityMetrics,
-    ),
-  );
-
   let selectedDailyTemplates: QuestTemplateDoc[] = [];
 
   // The day's quests are ONE quest holding an objective per recipe slot (slot
@@ -1824,43 +1709,7 @@ export async function syncQuestState(args: {
     }
   }
 
-  // Onboarding quests: admin-managed templates shown one at a time, oldest
-  // first; the next appears once the previous is fully claimed. Fully-claimed
-  // docs stay in the DB (never re-emitted) so these one-time quests never
-  // repeat.
-  const onboardingTemplates: QuestTemplateDoc[] = [];
-  let onboardingCandidates = filteredTemplates.filter(
-    (template) => template.placement === 'onboarding',
-  );
-  if (onboardingCandidates.length === 0) {
-    const seeded = await ensureDefaultOnboardingTemplates();
-    templates.push(...seeded);
-    onboardingCandidates = seeded.filter(
-      (template) =>
-        template.isActive &&
-        matchesVisibilityConditions(
-          template.visibilityConditions,
-          visibilityMetrics,
-        ),
-    );
-  }
-  onboardingCandidates.sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
-  const onboardingDocFor = (templateId: string) =>
-    allExistingDocs.find((doc) => doc.templateId === templateId);
-  for (const template of onboardingCandidates) {
-    const doc = onboardingDocFor(template.templateId);
-    if (!doc || !isQuestDocFullyClaimed(doc)) {
-      onboardingTemplates.push(template);
-      break;
-    }
-  }
-
-  const eligibleTemplates = [
-    ...selectedDailyTemplates,
-    ...onboardingTemplates,
-  ];
+  const eligibleTemplates = selectedDailyTemplates;
   const eligibleDailyTemplateIds = new Set(
     selectedDailyTemplates.map((t) => t.templateId),
   );
@@ -1928,8 +1777,8 @@ export async function syncQuestState(args: {
     deletePromise,
   ]);
 
-  let questViews = docs.map(questDocToView);
-  let dailyQuests = questViews
+  const questViews = docs.map(questDocToView);
+  const dailyQuests = questViews
     .filter((quest): quest is DailyQuestProgressView => quest.placement === 'daily')
     .sort((a, b) => a.title.localeCompare(b.title))
     .map((quest) =>
@@ -1937,125 +1786,6 @@ export async function syncQuestState(args: {
         ? { ...quest, coverImageUrl: dailyRecipe.coverImageUrl }
         : quest,
     );
-  const onboardingQuests = questViews.filter(
-    (quest) => quest.placement === 'onboarding',
-  );
-
-  // New users see one goal at a time: daily quests stay hidden until 5
-  // objectives are complete (or every early onboarding quest is done, so a
-  // short onboarding roster can't gate dailies forever).
-  // Displayed quests carry fresh progress; finished ones fall back to their
-  // stored doc (a candidate with no doc yet hasn't even been reached).
-  const onboardingProgressComplete = (templateId: string) => {
-    const view = onboardingQuests.find(
-      (quest) => quest.templateId === templateId,
-    );
-    if (view) {
-      return view.logic.every(
-        (block) => block.progress >= Math.max(1, block.target),
-      );
-    }
-    const doc = onboardingDocFor(templateId);
-    return (
-      !!doc &&
-      (doc.logic ?? []).every(
-        (block) => (block.progress ?? 0) >= Math.max(1, block.target ?? 1),
-      )
-    );
-  };
-  const firstOnboardingComplete = onboardingCandidates[0]
-    ? onboardingProgressComplete(onboardingCandidates[0].templateId)
-    : true;
-
-  // Lifetime completed objectives across starter + daily quests — drives the
-  // daily-quest and "Your areas" unlocks. Counted from the stored docs of
-  // PAST onboarding quests too (the display drops each one once fully
-  // claimed; without this the teaser's progress visibly reset when First
-  // Hops finished).
-  const displayedOnboardingIds = new Set(
-    onboardingQuests.map((quest) => quest.templateId),
-  );
-  const pastOnboardingSteps = allExistingDocs
-    .filter(
-      (doc) =>
-        doc.placement === 'onboarding' &&
-        !displayedOnboardingIds.has(doc.templateId),
-    )
-    .reduce(
-      (sum, doc) =>
-        sum +
-        (doc.logic ?? []).filter(
-          (block) =>
-            (block.progress ?? 0) >= Math.max(1, block.target ?? 1),
-        ).length,
-      0,
-    );
-  const earlyObjectiveSteps =
-    pastOnboardingSteps +
-    [...onboardingQuests, ...dailyQuests].reduce(
-      (sum, quest) =>
-        sum +
-        quest.logic.filter(
-          (block) => block.progress >= Math.max(1, block.target),
-        ).length,
-      0,
-    );
-
-  const dailyGate = (user as any).quests?.dailyGate as
-    | 'locked'
-    | 'unlocked'
-    | undefined;
-  const gateComputed =
-    earlyObjectiveSteps < DAILY_QUESTS_UNLOCK_STEP_TARGET &&
-    onboardingCandidates
-      .slice(0, 2)
-      .some((template) => !onboardingProgressComplete(template.templateId));
-  const dailyQuestsGated = dailyGate === 'unlocked' ? false : gateComputed;
-  if (gateComputed && dailyGate === undefined) {
-    await UserModel.updateOne(
-      { _id: userId, 'quests.dailyGate': { $exists: false } },
-      { $set: { 'quests.dailyGate': 'locked' } },
-    );
-  } else if (!gateComputed && dailyGate !== 'unlocked') {
-    const transition = await UserModel.updateOne(
-      {
-        _id: userId,
-        'quests.dailyGate':
-          dailyGate === 'locked' ? 'locked' : { $exists: false },
-      },
-      {
-        $set: {
-          'quests.dailyGate': 'unlocked',
-          'quests.dailyUnlockedAt': new Date(),
-        },
-      },
-    );
-    if (dailyGate === 'locked' && transition.modifiedCount === 1) {
-      const rebased = await startDailiesFromNow(
-        docs.filter(
-          (doc) => doc.placement === 'daily' && doc.windowKey === todayKey,
-        ),
-      );
-      if (rebased) {
-        questViews = docs.map(questDocToView);
-        dailyQuests = questViews
-          .filter((quest): quest is DailyQuestProgressView => quest.placement === 'daily')
-          .sort((a, b) => a.title.localeCompare(b.title))
-          .map((quest) =>
-            quest.templateId.startsWith('gend:') && dailyRecipe?.coverImageUrl
-              ? { ...quest, coverImageUrl: dailyRecipe.coverImageUrl }
-              : quest,
-          );
-      }
-    }
-  }
-  const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
-
-  const templatesWithCover = new Set(
-    templates
-      .filter((t) => typeof t.coverImageUrl === 'string' && t.coverImageUrl.length > 0)
-      .map((t) => t.templateId),
-  );
 
   const premium = isPremiumUser(user);
   const rewardBackgrounds = includeCatalog ? await loadBackgroundPrizes() : [];
@@ -2068,7 +1798,7 @@ export async function syncQuestState(args: {
     .flatMap((quest) => quest.logic)
     .find((block) => block.type === 'prompt');
   const dailyRerollsLeft =
-    dailyQuestsGated || !promptBlock || promptBlock.promptAnswered
+    !promptBlock || promptBlock.promptAnswered
       ? 0
       : Math.max(0, DAILY_QUEST_REROLLS_PER_DAY - rerollsUsedToday);
 
@@ -2079,13 +1809,8 @@ export async function syncQuestState(args: {
     isPremium: premium,
     focusProfile: profile,
     macroCategories: categories.map(categoryDocToDefinition),
-    templatesWithCover,
-    dailyQuests: visibleDailyQuests,
-    dailyQuestsGated,
+    dailyQuests,
     dailyRerollsLeft,
-    firstOnboardingComplete,
-    earlyObjectiveSteps,
-    onboardingQuests,
     rewardCatalog: includeCatalog
       ? buildRewardCatalog(
           catalog,
@@ -2095,9 +1820,6 @@ export async function syncQuestState(args: {
                 ...(block.rewards ?? []),
                 ...(block.seasonRewards ?? []),
               ]),
-            ),
-            ...onboardingQuests.flatMap((quest) =>
-              quest.logic.map((block) => block.rewards ?? []),
             ),
           ],
           rewardBackgrounds,

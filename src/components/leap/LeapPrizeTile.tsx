@@ -165,6 +165,7 @@ export function LeapPrizeTile({
             rewardCatalog={catalog}
             isPremium={view.isPremium}
             paused
+            still
             hideBadge
             flySize={spec.fly}
             flyOversample={1.25}
@@ -184,7 +185,11 @@ export function LeapPrizeTile({
         </span>
       )}
       {!done && !rarity && amount && (
-        <span className="absolute -right-1.5 -top-1.5 z-20 whitespace-nowrap rounded-md border border-white/15 bg-black/65 px-1 text-[9.5px] font-black leading-[15px] tabular-nums text-white shadow-sm">
+        <span
+          className={cn(
+            'absolute -right-1.5 -top-1.5 z-20 whitespace-nowrap rounded-md border border-white/15 bg-black/65 px-1 text-[9.5px] font-black leading-[15px] tabular-nums text-white shadow-sm',
+          )}
+        >
           {amount}
         </span>
       )}
@@ -199,7 +204,11 @@ export function LeapPrizeTile({
         </span>
       )}
       {done && (
-        <span className="absolute -right-1 -top-1 z-20 grid h-4 w-4 place-items-center rounded-full bg-[#4f9149] text-white ring-2 ring-card">
+        <span
+          className={cn(
+            'absolute -right-1 -top-1 z-20 grid h-4 w-4 place-items-center rounded-full bg-[#4f9149] text-white ring-2 ring-card',
+          )}
+        >
           <Check className="h-2.5 w-2.5" strokeWidth={4} />
         </span>
       )}

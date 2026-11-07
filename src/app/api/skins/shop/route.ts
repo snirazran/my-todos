@@ -34,9 +34,7 @@ export async function POST(req: NextRequest) {
     const fullCatalog = await getFullCatalog();
     const byId = buildById(fullCatalog);
     if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
-    if (isTradeOnlyRarity(byId[itemId].rarity)) {
-      return json({ error: 'This item can only be earned by trading up' }, 400);
-    }
+    const tradeOnly = isTradeOnlyRarity(byId[itemId].rarity);
     const state = availabilityStateAt(byId[itemId]);
     if (state !== 'active') {
       return json(
@@ -54,6 +52,9 @@ export async function POST(req: NextRequest) {
 
     // init if missing
     if (!user.wardrobe) {
+      if (tradeOnly) {
+        return json({ error: "This item isn't in the shop today" }, 400);
+      }
       const init: UserWardrobe = {
         equipped: {},
         inventory: { [itemId]: 1 },
@@ -78,6 +79,9 @@ export async function POST(req: NextRequest) {
       isPlus,
     });
     const deal = rotation.deals.find((d) => d.itemId === itemId);
+    if (tradeOnly && !deal) {
+      return json({ error: 'This item can only be earned by trading up' }, 400);
+    }
     if (!rotation.everydayIds.includes(itemId)) {
       if (!deal) return json({ error: "This item isn't in the shop today" }, 400);
       if (deal.plusOnly && !isPlus) {

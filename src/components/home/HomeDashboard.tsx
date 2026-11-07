@@ -599,7 +599,6 @@ export default function HomeDashboard() {
       !!user && (seenIntros ? seenIntros.firstRun === false : firstRunFlagged),
     ready: !!user && !isLoading && (questsData !== undefined || !!questsError),
     starterDone: !starterTask || !!starterTask.completed,
-    taskCount: tasks.length,
     onFinish: () => {
       clearFirstRunPending();
       markIntroSeen('firstRun');
@@ -909,15 +908,10 @@ export default function HomeDashboard() {
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
-              className="rounded-[19px] md:h-auto md:w-full md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none md:group-has-[[data-dock-row]]/dock:rounded-bl-[19px] md:group-has-[[data-dock-row]]/dock:rounded-r-none"
+              className="rounded-[19px] md:h-auto md:w-full md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none"
             />
+            {user && !guided && !cinematic && !taskCinematic && <TryOnPill />}
           </StatusDock>
-
-          {user && !guided && !isAnyPanelOpen && !cinematic && !taskCinematic && (
-            <div className="pointer-events-none relative z-30 flex justify-center empty:hidden">
-              <TryOnPill />
-            </div>
-          )}
 
           <div
             data-fly-sheet
@@ -1467,12 +1461,6 @@ export default function HomeDashboard() {
           }}
           className="relative grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.12)] transition-transform hover:brightness-105 active:scale-95"
         >
-          {firstRun.phase === 'finale' && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -inset-1 rounded-full ring-[3px] ring-primary animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
-            />
-          )}
           <Plus className="h-6 w-6 stroke-[3]" />
         </button>
       </div>
