@@ -11,9 +11,10 @@ import { isFlyCounterHeld, subscribeFlyCounterHold } from '@/lib/flyFlight';
 import { hapticTick } from '@/lib/haptics';
 import { useWishlist } from '@/hooks/useWishlist';
 import { HEADER_CONTROL_SURFACE } from '@/components/ui/MobileHeaderActions';
+import { SHOP_CHIP } from '@/components/ui/shop/shopKit';
 import { cn } from '@/lib/utils';
 
-type Variant = 'mobile' | 'desktop';
+type Variant = 'mobile' | 'desktop' | 'shop';
 
 interface Props {
   balance: number;
@@ -157,7 +158,8 @@ export function FlyCounter({
     celebrate(delta);
   }, [anySheetOpen, celebrate]);
 
-  const isMobile = variant === 'mobile';
+  const isShop = variant === 'shop';
+  const isMobile = variant === 'mobile' || isShop;
   const ringRatio = showGoal && wishlist && progress ? progress.ratio : null;
   const RING = 2 * Math.PI * 15;
 
@@ -172,9 +174,9 @@ export function FlyCounter({
       }
       className={cn(
         'relative flex h-10 shrink-0 items-center gap-1.5 pl-1 pr-3',
-        HEADER_CONTROL_SURFACE,
+        isShop ? SHOP_CHIP : HEADER_CONTROL_SURFACE,
         goalReached && 'border-amber-400/60',
-        onClick && 'cursor-pointer transition-transform active:scale-95',
+        onClick && (isShop ? 'cursor-pointer' : 'cursor-pointer transition-transform active:scale-95'),
       )}
     >
       <span
@@ -224,7 +226,9 @@ export function FlyCounter({
             ringRatio !== null ? 'h-[25px] w-[25px]' : 'h-8 w-8',
             goalReached
               ? 'bg-amber-400/20 ring-amber-500/30'
-              : 'bg-primary/[0.16] ring-primary/25',
+              : isShop
+                ? 'bg-white ring-[color:var(--shop-tag-edge)] dark:bg-white/10'
+                : 'bg-primary/[0.16] ring-primary/25',
           )}
         >
           <Fly
@@ -239,11 +243,11 @@ export function FlyCounter({
       <AnimatedNumber
         value={balance}
         haptics
-        className="relative text-[15px] font-black leading-none tabular-nums text-foreground"
+        className={cn('relative text-[15px] font-black leading-none tabular-nums', isShop ? 'text-[color:var(--shop-heading)]' : 'text-foreground')}
       />
 
       {onClick && (
-        <span className="absolute -right-0.5 -top-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background">
+        <span className={cn("absolute -right-0.5 -top-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background", isShop && 'ring-[color:var(--shop-awning-a)]')}>
           <Plus className="h-2.5 w-2.5 stroke-[3.5]" />
         </span>
       )}

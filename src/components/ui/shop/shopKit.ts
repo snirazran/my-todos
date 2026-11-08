@@ -21,3 +21,6 @@ export const SHOP_PLANK =
 
 export const SHOP_TAG =
   'inline-flex items-center whitespace-nowrap rounded-[8px] bg-[color:var(--shop-tag)] font-black leading-none text-foreground shadow-[0_2px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)]';
+
+export const SHOP_CHIP =
+  'rounded-full border-2 border-[color:var(--shop-ink)] bg-[color:var(--shop-awning-a)] shadow-[0_3px_0_0_var(--shop-ink)] transition-[transform,box-shadow] duration-150 ease-out active:translate-y-[2px] active:shadow-[0_1px_0_0_var(--shop-ink)]';

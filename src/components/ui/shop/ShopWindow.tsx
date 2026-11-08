@@ -8,7 +8,6 @@ import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { rewardedAdsAvailable } from '@/lib/ads';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import { HEADER_CONTROL_SURFACE } from '@/components/ui/MobileHeaderActions';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { EMOTE_MS, onFrogReact, pickEmote, type FrogEmote } from '@/lib/frogEmotes';
@@ -31,7 +30,7 @@ import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import type { ShopGiftStatus } from '@/lib/economy/shopGift';
 import { warmFrogStamps, type FrogStampIndices } from '@/lib/frogStampEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
-import { SHOP_CUBBY, SHOP_GEM, SHOP_PLANK } from '@/components/ui/shop/shopKit';
+import { SHOP_CHIP, SHOP_CUBBY, SHOP_PLANK } from '@/components/ui/shop/shopKit';
 
 type ShopEntry =
   | { kind: 'item'; key: string; item: ItemDef; rarity: Rarity; price: number }
@@ -69,12 +68,10 @@ function stableRank(id: string, seed = 0) {
 const TAG_ROW = 'h-[36px]';
 
 function PriceTag({
-  rarity,
   owned,
   price,
   plusPrice,
 }: {
-  rarity: Rarity;
   owned: boolean;
   price: number;
   plusPrice?: boolean;
@@ -82,14 +79,13 @@ function PriceTag({
   return (
     <span
       className={cn(
-        'relative inline-flex h-[25px] max-w-full items-center gap-[5px] whitespace-nowrap rounded-[8px] pl-[7px] pr-2 text-[13.5px] font-black leading-none tabular-nums',
+        'relative inline-flex h-[25px] max-w-full items-center gap-[5px] whitespace-nowrap rounded-[8px] px-2 text-[13.5px] font-black leading-none tabular-nums',
         'shadow-[0_2px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)]',
         owned
           ? 'bg-[color:var(--pond-accent)] text-[color:var(--pond-accent-ink)]'
-          : 'bg-[color:var(--shop-tag)] text-foreground',
+          : 'bg-[color:var(--shop-tag)] text-[color:var(--shop-heading)]',
       )}
     >
-      <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', SHOP_GEM[rarity])} />
       {owned ? (
         <>
           <Check className="h-3.5 w-3.5" strokeWidth={4} />
@@ -174,7 +170,7 @@ function ShopTile({
         ) : null}
       </span>
       <span className={cn('flex w-full justify-center px-0.5 pt-[2px]', TAG_ROW)}>
-        <PriceTag rarity={entry.rarity} owned={owned} price={entry.price} plusPrice={plusPrice} />
+        <PriceTag owned={owned} price={entry.price} plusPrice={plusPrice} />
       </span>
     </button>
   );
@@ -591,8 +587,8 @@ export function ShopWindow({
       type="button"
       onClick={onOpenCatalog}
       className={cn(
-        'flex h-10 shrink-0 items-center gap-1.5 pl-1.5 pr-3.5 text-[13px] font-black text-foreground transition-transform duration-150 ease-out active:scale-[0.97]',
-        HEADER_CONTROL_SURFACE,
+        'flex h-10 shrink-0 items-center gap-1.5 pl-1 pr-3.5 text-[13px] font-black text-[color:var(--shop-heading)]',
+        SHOP_CHIP,
         className,
       )}
     >
@@ -616,7 +612,7 @@ export function ShopWindow({
           <FlyCounter
             key={balance === undefined ? 'pending' : 'ready'}
             balance={balance ?? 0}
-            variant="mobile"
+            variant="shop"
             onClick={onGetFlies}
             flyTarget
           />
@@ -710,11 +706,16 @@ export function ShopWindow({
                 {freePicks.length > 0 && <Shelves cols={cols}>{freePicks.map(pickTile)}</Shelves>}
                 {plusPicks.length > 0 && (
                   <>
-                    <div className={cn('mb-3 flex items-center gap-1.5', freePicks.length > 0 && 'mt-7 md:mt-9')}>
-                      <Icon name="frogPlus" className="h-7 w-7 shrink-0" />
-                      <span className="text-[15px] font-black text-[color:var(--shop-plus-ink)] md:text-[17px]">
+                    <div className={cn('mb-4 flex items-center', freePicks.length > 0 && 'mt-7 md:mt-9')}>
+                      <button
+                        type="button"
+                        disabled={isPremium}
+                        onClick={() => onPlus('shop_plus_slot')}
+                        className="plus-club plus-upgrade-button inline-flex h-9 items-center gap-1.5 rounded-full pl-1 pr-3.5 text-[14px] font-black disabled:cursor-default disabled:shadow-[0_4px_0_#3b1a86] md:h-10 md:text-[15px]"
+                      >
+                        <Icon name="frogPlus" className="h-7 w-7 shrink-0" />
                         Plus picks
-                      </span>
+                      </button>
                     </div>
                     <Shelves cols={cols}>
                       {plusPicks.map((pick, i) => pickTile(pick, freePicks.length + i))}

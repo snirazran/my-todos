@@ -255,14 +255,14 @@ export function PurchaseSheet({
 
               <div
                 ref={bindScroll}
-                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-px sm:pt-3"
+                className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 pb-4 pt-px sm:pt-3"
               >
-                <div className="relative px-1 pb-[11px]">
-                <span aria-hidden className={cn(SHOP_PLANK, '-inset-x-0.5 bottom-0')} />
+                <div className="relative overflow-hidden px-1 pb-[15px]">
+                <span aria-hidden className={cn(SHOP_PLANK, 'inset-x-0 bottom-[4px]')} />
                 <div
                   ref={tileRef}
                   className={cn(
-                    'relative flex w-full shrink-0 items-center justify-center rounded-b-[6px] rounded-t-[22px]',
+                    'relative flex w-full shrink-0 items-center justify-center rounded-b-none rounded-t-[22px]',
                     previewWide ? 'overflow-hidden' : '[clip-path:inset(0_0_-12px_0_round_22px_22px_0_0)]',
                     previewWide ? 'aspect-[16/10]' : 'h-[min(232px,27dvh)]',
                     SHOP_CUBBY[target.rarity],
@@ -289,7 +289,7 @@ export function PurchaseSheet({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.25 }}
-                        className={cn('flex h-full w-full items-center justify-center', !previewWide && 'translate-y-[5px]')}
+                        className={cn('flex h-full w-full items-center justify-center', !previewWide && 'translate-y-[2px]')}
                       >
                         {preview}
                       </motion.div>
@@ -505,7 +505,11 @@ export function PurchaseSheet({
                 <>
                   <PrimaryButton ref={primaryRef} onClick={handleBuy} busy={busy}>
                     Buy
-                    <FlyPriceChip amount={price} size={16} />
+                    <FlyPriceChip
+                      amount={price}
+                      size={16}
+                      className="bg-white text-[#24451f] shadow-[inset_0_-2px_0_rgba(36,69,31,0.14),0_1px_0_rgba(0,0,0,0.16)] [text-shadow:none]"
+                    />
                   </PrimaryButton>
                   {wishlistButton('Save for later', 'On your wishlist')}
                   {hint(wishlistHint)}
@@ -613,7 +617,7 @@ const PrimaryButton = React.forwardRef<
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="flex h-14 w-full items-center justify-center gap-2.5 rounded-[22px] bg-[#447d3f] px-4 text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-[transform,box-shadow,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]/40 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-80 short:h-12 short:text-[15px] [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:bg-[#3d7038] [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#2c511a]"
+      className="flex h-14 w-full items-center justify-center gap-3 rounded-[20px] bg-gradient-to-b from-[#5ea857] to-[#4a8b44] px-4 text-[17px] font-black tracking-tight text-white shadow-[inset_0_1.5px_0_rgba(255,255,255,0.35),0_4px_0_0_#2f5e2a,0_10px_20px_-10px_rgba(47,94,42,0.55)] transition-[transform,box-shadow,filter] duration-150 ease-out [text-shadow:0_1px_0_rgba(0,0,0,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/45 focus-visible:ring-offset-2 active:translate-y-1 active:shadow-[inset_0_1.5px_0_rgba(255,255,255,0.35),0_0_0_0_#2f5e2a,0_4px_10px_-6px_rgba(47,94,42,0.5)] disabled:pointer-events-none disabled:opacity-80 short:h-12 short:text-[15px] [@media(hover:hover)]:hover:brightness-105"
     >
       {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : children}
     </button>
@@ -637,8 +641,7 @@ function SecondaryButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'relative flex h-12 w-full items-center justify-center gap-2 rounded-[20px] text-[15px] font-black text-foreground transition-[transform,box-shadow] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-60 short:h-11 short:text-[14px]',
-        CARD_SURFACE,
+        'relative flex h-12 w-full items-center justify-center gap-2 rounded-[20px] bg-[color:var(--shop-tag)] text-[15px] font-black text-[color:var(--shop-heading)] shadow-[0_3px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)] transition-[transform,box-shadow] duration-150 ease-out active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-60 short:h-11 short:text-[14px]',
         className,
       )}
     >
