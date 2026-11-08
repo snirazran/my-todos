@@ -79,7 +79,7 @@ function PriceTag({
   return (
     <span
       className={cn(
-        'relative inline-flex h-[25px] max-w-full items-center gap-[5px] whitespace-nowrap rounded-[8px] px-2 text-[13.5px] font-black leading-none tabular-nums',
+        'relative inline-flex h-[29px] max-w-full items-center gap-[5px] whitespace-nowrap rounded-[9px] px-2 text-[14px] font-black leading-none tabular-nums',
         'shadow-[0_2px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)]',
         owned
           ? 'bg-[color:var(--pond-accent)] text-[color:var(--pond-accent-ink)]'
