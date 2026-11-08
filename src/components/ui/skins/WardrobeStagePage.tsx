@@ -143,7 +143,7 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
 
   return (
     <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col overflow-x-clip">
-      <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
+      <div className={`relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] mx-auto px-4 md:px-6 ${section === 'shop' ? 'max-w-3xl md:max-w-6xl' : 'max-w-3xl'}`}>
         <section data-fly-sheet className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
           <WardrobePageContent
             section={section}

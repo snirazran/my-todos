@@ -13,7 +13,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { CloseButton } from '@/components/ui/CloseButton';
 import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
-import { TILE_TONE } from '@/components/ui/skins/DressingRoom';
+import { SHOP_CUBBY, SHOP_GEM, SHOP_PLANK, SHOP_TAG } from '@/components/ui/shop/shopKit';
 import { PurchaseBurst } from '@/components/ui/skins/PurchaseBurst';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
@@ -233,7 +233,7 @@ export function PurchaseSheet({
     >
       {({ entered, bindScroll, dragControls }) =>
         target ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-1 sm:px-1.5 sm:pb-3">
+          <div className="shop-surface flex min-h-0 flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-1 sm:px-1.5 sm:pb-3">
             <div
               className={cn(
                 'relative flex min-h-0 flex-col overflow-hidden rounded-[28px] sm:shadow-[0_3px_0_0_rgba(0,0,0,0.18),0_24px_56px_-18px_rgba(0,0,0,0.45)]',
@@ -256,14 +256,16 @@ export function PurchaseSheet({
                 ref={bindScroll}
                 className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-px sm:pt-3"
               >
+                <div className="relative px-1 pb-[11px]">
+                <span aria-hidden className={cn(SHOP_PLANK, '-inset-x-0.5 bottom-0')} />
                 <div
                   ref={tileRef}
                   className={cn(
-                    'relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-[22px] ring-1',
+                    'relative flex w-full shrink-0 items-center justify-center rounded-b-[6px] rounded-t-[22px]',
+                    previewWide ? 'overflow-hidden' : '[clip-path:inset(0_0_-12px_0_round_22px_22px_0_0)]',
                     previewWide ? 'aspect-[16/10]' : 'h-[min(232px,27dvh)]',
-                    TILE_TONE[target.rarity],
+                    SHOP_CUBBY[target.rarity],
                     showFoil && phase === 'confirm' && 'closet-foil',
-                    target.rarity === 'legendary' && 'closet-foil-gold',
                   )}
                 >
                   {phase === 'success' && (
@@ -286,7 +288,7 @@ export function PurchaseSheet({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.25 }}
-                        className="flex h-full w-full items-center justify-center"
+                        className={cn('flex h-full w-full items-center justify-center', !previewWide && 'translate-y-[5px]')}
                       >
                         {preview}
                       </motion.div>
@@ -306,6 +308,7 @@ export function PurchaseSheet({
                     )}
                   </AnimatePresence>
                 </div>
+                </div>
 
                 <div className="px-1.5 pt-3.5">
                   <motion.h2
@@ -318,16 +321,12 @@ export function PurchaseSheet({
                   </motion.h2>
 
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={cn(
-                        'rounded-full px-2.5 py-0.5 text-[12px] font-black',
-                        rarity.chip,
-                      )}
-                    >
+                    <span className={cn(SHOP_TAG, 'h-6 gap-1.5 pl-2 pr-2.5 text-[12.5px]')}>
+                      <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', SHOP_GEM[target.rarity])} />
                       {rarity.label}
                     </span>
                     {target.slotLabel && (
-                      <span className="rounded-full bg-foreground/[0.06] px-2.5 py-0.5 text-[12px] font-bold text-muted-foreground">
+                      <span className={cn(SHOP_TAG, 'h-6 px-2.5 text-[12.5px] font-bold text-muted-foreground')}>
                         {target.slotLabel}
                       </span>
                     )}
