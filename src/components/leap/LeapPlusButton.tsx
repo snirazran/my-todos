@@ -33,7 +33,7 @@ export function LeapPlusButton({
         className="plus-cta-frog pointer-events-none absolute -left-1 -top-5 h-14 w-14 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
       />
       <span className="relative min-w-0 flex-1">
-        <span className="block text-[15px] font-black leading-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">{title}</span>
+        <span className="block text-[15px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">{title}</span>
         <span className="plus-club-sub mt-0.5 block text-[11.5px] font-bold leading-tight">
           {subtitle}
         </span>

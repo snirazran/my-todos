@@ -1588,7 +1588,7 @@ function MainView({
             <Icon name="frogPlus" className="h-[58px] w-[58px]" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-1.5 text-[16px] font-black leading-tight tracking-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
+            <span className="flex items-center gap-1.5 text-[16px] font-black leading-tight tracking-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
               Frogress
               <span className="plus-club-chip rounded-full px-1.5 py-[2px] text-[10px] tracking-wide [text-shadow:none]">PLUS</span>
             </span>

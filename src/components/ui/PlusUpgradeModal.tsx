@@ -642,7 +642,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                   <PaywallEnteredContext.Provider value={entered}>
                   <PaywallLookContext.Provider value={look}>
                   <div inert={needsAccount || undefined} className="flex min-h-0 flex-1 flex-col">
-                    <header className={cn('relative flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] short:pb-1 md:px-7 md:pt-4', !isDesktop && view === 'offer' && step === 'offer' && 'absolute inset-x-0 top-0 z-20')}>
+                    <header className={cn('relative flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] short:pb-1 md:px-7 md:pt-4')}>
                       {showBack ? (
                         <button type="button" onClick={goBack} disabled={purchasing} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl pr-3 text-sm font-bold hover:bg-muted disabled:opacity-50">
                           <ChevronLeft className="h-5 w-5" aria-hidden /> Back
@@ -800,11 +800,9 @@ function CoverHero({ context }: { context: PaywallContext }) {
   return (
     <section className="flex flex-col items-center text-center">
       <div className="relative -mx-5 self-stretch">
-        <PlusCover className="aspect-[16/10] bg-[hsl(var(--plus-band))] short:aspect-[2/1]" imageClassName="object-[50%_70%]" />
-        <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[calc(max(0.75rem,env(safe-area-inset-top))+72px)] bg-gradient-to-b from-[rgba(22,8,48,0.7)] to-transparent" />
-        <span aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-px h-24 bg-gradient-to-t from-background via-background/70 to-transparent short:h-20" />
+        <PlusCover className="aspect-video [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_82%,transparent)] short:aspect-[2/1]" imageClassName="object-[50%_70%]" />
       </div>
-      <h2 className="relative -mt-9 text-balance text-[26px] font-black leading-[1.08] tracking-tight short:-mt-8 short:text-[22px]">
+      <h2 className="relative -mt-2 text-balance text-[26px] font-black leading-[1.08] tracking-tight short:-mt-3 short:text-[22px]">
         {context.headline}<br /><span className="text-primary">{context.accent}</span>
       </h2>
     </section>
@@ -884,9 +882,6 @@ function PrimaryButton({ onClick, children, disabled, loading, className }: {
   );
 }
 
-const CARD_INK = '#230d52';
-const CARD_OUTLINE = [[2, 0], [-2, 0], [0, 2], [0, -2], [1.5, 1.5], [-1.5, 1.5], [1.5, -1.5], [-1.5, -1.5], [0, 3.5]].map(([x, y]) => `${x}px ${y}px 0 ${CARD_INK}`).join(', ');
-
 function MemberCard({ name, plan }: { name?: string; plan: PlanId }) {
   const reduceMotion = useReducedMotion();
   const look = React.useContext(PaywallLookContext);
@@ -907,12 +902,11 @@ function MemberCard({ name, plan }: { name?: string; plan: PlanId }) {
         initial={reduceMotion ? false : { opacity: 0, y: 14, rotate: -2 }}
         animate={{ opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: 'spring', duration: 0.5, bounce: 0.25, delay: 0.05 }}
-        style={{ borderColor: CARD_INK }}
-        className="relative isolate h-[140px] w-[min(100%,316px)] overflow-hidden rounded-[22px] border-[3px] bg-[#6a3bd6] shadow-[0_5px_0_0_#230d52] short:h-[120px]"
+        className="plus-club-card relative isolate h-[140px] w-[min(100%,316px)] overflow-hidden rounded-[24px] short:h-[120px]"
       >
-        <span className="absolute inset-0 -z-10 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.06)_0_10px,transparent_10px_20px)]" />
-        <span className="absolute inset-x-2 top-1.5 -z-10 h-[44%] rounded-[16px] bg-gradient-to-b from-white/30 to-white/0" />
-        <span style={{ borderColor: CARD_INK }} className="absolute bottom-2 left-2 top-2 w-[106px] overflow-hidden rounded-[15px] border-[3px] bg-[repeating-conic-gradient(from_0deg_at_50%_62%,#ffe58f_0deg_12deg,#f8cf55_12deg_24deg)] short:w-[92px]">
+        <span className="absolute -right-10 -top-16 -z-10 h-44 w-44 rounded-full bg-white/[0.07]" />
+        <span className="absolute -bottom-20 right-16 -z-10 h-36 w-36 rounded-full bg-white/[0.05]" />
+        <span className="absolute bottom-2.5 left-2.5 top-2.5 w-[104px] overflow-hidden rounded-[18px] bg-[repeating-conic-gradient(from_0deg_at_50%_62%,#ffe58f_0deg_12deg,#f8cf55_12deg_24deg)] shadow-[inset_0_-3px_0_rgba(150,90,0,0.22),0_3px_0_0_#3b1a86] short:w-[90px]">
           <span className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-white/0" />
           <span className="absolute bottom-[7px] left-1/2 h-3 w-[70px] -translate-x-1/2 rounded-[50%] bg-[rgba(120,70,0,0.28)] short:w-[60px]" />
           <span className="absolute -bottom-[6px] left-1/2 h-[150px] w-[124px] -translate-x-1/2 short:h-[128px] short:w-[106px]">
@@ -932,11 +926,11 @@ function MemberCard({ name, plan }: { name?: string; plan: PlanId }) {
         <span className="absolute left-[128px] right-[60px] top-[22px] short:left-[112px] short:right-[52px] short:top-[16px]">
           <span
             className="-mx-[3px] -my-[3px] block truncate px-[3px] pb-[5px] pt-[3px] text-[24px] font-black leading-none tracking-[-0.01em] text-white short:text-[21px]"
-            style={{ textShadow: CARD_OUTLINE }}
+            style={{ textShadow: '0 1px 2px rgba(35,13,82,0.4)' }}
           >
             {member}
           </span>
-          <span style={{ borderColor: CARD_INK }} className="mt-2 inline-flex items-center gap-1 rounded-full border-2 bg-[var(--plus-cta)] py-[3px] pl-1.5 pr-2 text-[11px] font-black leading-none tracking-wide text-[var(--plus-cta-ink)] shadow-[0_2px_0_0_#230d52]">
+          <span className="plus-club-chip mt-2 gap-1 rounded-full py-[4px] pl-1.5 pr-2 text-[11px] leading-none tracking-wide">
             <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor"><path d="M8 .8l2.1 4.5 4.9.6-3.6 3.4.9 4.9L8 11.8l-4.3 2.4.9-4.9L1 5.9l4.9-.6z" /></svg>
             PLUS MEMBER
           </span>

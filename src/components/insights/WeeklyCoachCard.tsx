@@ -210,7 +210,7 @@ function LockedPreview({
       >
         <Icon name="frogPlus" className="-my-4 h-[72px] w-[72px] shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-black tracking-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
+          <span className="block text-sm font-black tracking-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
             Unlock your weekly read
           </span>
           <span className="plus-club-sub block text-[11px] font-bold">

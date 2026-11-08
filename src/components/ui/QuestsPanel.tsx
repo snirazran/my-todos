@@ -1517,7 +1517,7 @@ function QuestSeasonEventOverlay({
                 name="frogPlus"
                 className="plus-cta-frog pointer-events-none absolute -left-1 -top-5 h-14 w-14 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
               />
-              <span className="relative block text-[15px] font-black leading-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
+              <span className="relative block text-[15px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
                 Unlock Plus
               </span>
               <span className="plus-club-sub relative mt-0.5 block truncate text-[11px] font-bold leading-tight">
@@ -2155,7 +2155,7 @@ function LockedPlusPreview({
               name="frogPlus"
               className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
             />
-            <span className="relative text-[16px] font-black leading-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">Unlock Plus</span>
+            <span className="relative text-[16px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">Unlock Plus</span>
             <span className="plus-club-sub relative mt-0.5 text-[11.5px] font-bold leading-tight">
               {ctaLine}
             </span>
