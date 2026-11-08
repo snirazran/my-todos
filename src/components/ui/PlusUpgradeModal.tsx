@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from 'framer-motion';
+import { animate, motion, AnimatePresence, useAnimationControls, useMotionValue, useReducedMotion } from 'framer-motion';
 import { mutate } from 'swr';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { Capacitor } from '@capacitor/core';
@@ -588,24 +588,43 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
     freeWeek,
   } = usePlusPaywall(props);
   const [entered, setEntered] = useState(false);
+  const [present, setPresent] = useState(open);
+  const fade = useMotionValue(0);
+  const lift = useMotionValue(0);
   useEffect(() => {
-    if (!open) setEntered(false);
+    if (open) setPresent(true);
+    else setEntered(false);
   }, [open]);
+  useEffect(() => {
+    if (!open && fade.get() === 0) return;
+    if (open && fade.get() === 0) lift.set(reduceMotion ? 0 : 32);
+    let cancelled = false;
+    const easing = { duration: 0.22, ease: 'easeOut' } as const;
+    const fading = animate(fade, open ? 1 : 0, easing);
+    const lifting = animate(lift, open || reduceMotion ? 0 : 24, easing);
+    fading.then(() => {
+      if (cancelled) return;
+      if (open) setEntered(true);
+      else setPresent(false);
+    });
+    return () => {
+      cancelled = true;
+      fading.stop();
+      lifting.stop();
+    };
+  }, [open, fade, lift, reduceMotion]);
 
   if (!mounted) return null;
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next && !purchasing && !linking) onClose(); }}>
       <Dialog.Portal forceMount>
-        <AnimatePresence>
-          {open && (
+          {(open || present) && (
             <>
               <Dialog.Overlay forceMount asChild>
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[10008] bg-black/50 md:backdrop-blur-sm"
+                  style={{ opacity: fade }}
+                  className={cn('fixed inset-0 z-[10008] bg-black/50 md:backdrop-blur-sm', !open && 'pointer-events-none')}
                 />
               </Dialog.Overlay>
               <Dialog.Content
@@ -627,12 +646,8 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                 onPointerDownOutside={() => markClose('outside')}
               >
                 <motion.div
-                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 32 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
-                  transition={{ duration: 0.22, ease: 'easeOut' }}
-                  onAnimationComplete={() => { if (open) setEntered(true); }}
-                  className="plus-paywall fixed inset-0 z-[10009] m-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground shadow-2xl outline-none md:h-[min(760px,calc(100dvh-3rem))] md:w-[min(940px,calc(100vw-3rem))] md:rounded-[32px]"
+                  style={{ opacity: fade, y: lift }}
+                  className={cn('plus-paywall fixed inset-0 z-[10009] m-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground shadow-2xl outline-none md:h-[min(760px,calc(100dvh-3rem))] md:w-[min(940px,calc(100vw-3rem))] md:rounded-[32px]', !open && 'pointer-events-none')}
                 >
                   <Dialog.Title className="sr-only">Frogress Plus</Dialog.Title>
                   <Dialog.Description id="plus-description" className="sr-only">
@@ -739,14 +754,13 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
               </Dialog.Content>
             </>
           )}
-        </AnimatePresence>
       </Dialog.Portal>
     </Dialog.Root>
   );
 }
 
 
-export type PaywallPreviewItem = { slot: WardrobeSlot; riveIndex: number };
+export type PaywallPreviewItem ={ slot: WardrobeSlot; riveIndex: number };
 
 const BARE_LOOK: FrogStampIndices = { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
 const PaywallLookContext = React.createContext<FrogStampIndices>(BARE_LOOK);

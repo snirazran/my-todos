@@ -16,6 +16,7 @@ import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
 import { ImageWarmup } from '@/components/providers/ImageWarmup';
 import { CampaignHost } from '@/components/campaigns/CampaignHost';
 import { PremiumModalHost } from '@/components/providers/PremiumModalHost';
+import { StatusTapScroll } from '@/components/providers/StatusTapScroll';
 import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
 import { MainScroll } from '@/components/providers/MainScroll';
 import { FlyCatchOverlay } from '@/components/fly-game/FlyCatchOverlay';
@@ -247,6 +248,7 @@ export default function RootLayout({
               <ImageWarmup />
               <CampaignHost />
               <PremiumModalHost />
+              <StatusTapScroll />
             </div>
           </Providers>
         </AuthContext>
