@@ -200,39 +200,24 @@ function LockedPreview({
         ))}
         <span className="absolute inset-0 bg-gradient-to-b from-transparent via-card/40 to-card" />
       </div>
-      {/* The app's Plus surfaces all wear the same gold plate and mascot — a
-          plain green CTA here would read as an ordinary action instead of an
-          upgrade. */}
       <button
         type="button"
         onClick={onUpgrade}
         aria-label="Unlock Frogress Plus"
         className={cn(
-          'plus-upgrade-button group relative isolate mx-auto mt-5 flex w-full max-w-md items-center gap-2 rounded-2xl py-3 pl-2 pr-4',
-          'text-left ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]',
+          'plus-upgrade-button plus-club group relative isolate mx-auto mt-5 flex w-full max-w-md items-center gap-2 rounded-[20px] py-3 pl-2 pr-3 text-left',
         )}
       >
-        <span
-          aria-hidden
-          className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-        />
-        <span
-          aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent"
-        />
-        <Icon
-          name="frogPlus"
-          className="-my-4 h-20 w-20 shrink-0 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)] animate-wiggle"
-        />
+        <Icon name="frogPlus" className="-my-4 h-[72px] w-[72px] shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-black tracking-tight text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+          <span className="block text-sm font-black tracking-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
             Unlock your weekly read
           </span>
-          <span className="block text-[11px] font-bold text-emerald-900/75">
+          <span className="plus-club-sub block text-[11px] font-bold">
             A new one every week, from your own numbers
           </span>
         </span>
-        <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+        <span className="plus-club-chip shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] leading-none">
           Plus
         </span>
       </button>

@@ -421,9 +421,9 @@ export function SavedOutfitsGrid({
         <button
           type="button"
           onClick={onUpgrade}
-          className="plus-upgrade-button flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-amber-400/60 bg-amber-50 px-1 text-center text-amber-700 transition-transform active:scale-95 dark:bg-amber-950/30 dark:text-amber-400"
+          className="plus-upgrade-button plus-club-soft flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 text-center"
         >
-          <Icon name="frogPlus" label="Plus" className="h-8 w-8" />
+          <Icon name="frogPlus" label="Plus" className="h-10 w-10" />
           <span className="text-[10px] font-black leading-tight">
             {SAVED_LOOKS_PLUS} outfits
             <br />

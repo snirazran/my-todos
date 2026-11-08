@@ -192,14 +192,14 @@ export function WishlistSheet({
                   <button
                     type="button"
                     onClick={onUpgrade}
-                    className="plus-upgrade-button mt-2 flex w-full items-center gap-2 rounded-2xl border border-amber-400/60 bg-amber-50 px-4 py-3 text-left transition-colors hover:bg-amber-100 dark:bg-amber-950/30"
+                    className="plus-upgrade-button plus-club-soft mt-2 flex w-full items-center gap-2.5 rounded-2xl py-2.5 pl-3 pr-4 text-left"
                   >
                     <Icon
                       name="frogPlus"
                       label="Plus"
-                      className="h-6 w-6 shrink-0"
+                      className="h-9 w-9 shrink-0"
                     />
-                    <span className="min-w-0 text-xs font-bold text-amber-700 dark:text-amber-400">
+                    <span className="min-w-0 text-xs font-bold">
                       Wishlist full — Plus gives you{' '}
                       {modifiers.wishlistSlotsPlus} slots.
                     </span>

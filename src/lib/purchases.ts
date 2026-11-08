@@ -865,5 +865,5 @@ export async function getPlusPricing(offeringId?: string): Promise<
 }
 
 export function formatPlusPrice(amount: number, currency: string): string {
-  return formatMoney(amount, currency);
+  return formatMoney(amount, currency, Capacitor.isNativePlatform() ? undefined : 'en-US');
 }

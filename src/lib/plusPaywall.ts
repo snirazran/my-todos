@@ -32,18 +32,23 @@ export function afterAdPlacement(placement: string): string {
 
 const COACH: PlusBenefit = {
   icon: 'patterns',
-  title: 'A weekly coach for your habits',
-  body: 'See what worked, plus one thing to try next.',
+  title: 'Know what keeps you going',
+  body: 'A weekly coach read, with one thing to try.',
 };
 const DOUBLE: PlusBenefit = {
   icon: 'x2',
-  title: 'Double flies and gift prizes',
-  body: 'From quests, habits and every gift.',
+  title: 'New outfits 2× faster',
+  body: 'Double flies and two prizes in every gift.',
 };
 const SUPPORT: PlusBenefit = {
   icon: 'community',
   title: 'Support a small indie team',
   body: 'Help us keep making Frogress better.',
+};
+const SHOP: PlusBenefit = {
+  icon: 'wardrobe',
+  title: `Shop all ${DEFAULT_SHOP_SALES.freeSlots + DEFAULT_SHOP_SALES.plusSlots} Special items`,
+  body: `Plus a new ${DEFAULT_SHOP_SALES.saleDiscountPercent}% off pick every day.`,
 };
 const REWARDS: PlusBenefit = {
   icon: 'x2',
@@ -66,10 +71,10 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   if (base !== placement) return getPlusContext(base, frogName);
   const name = frogName?.trim() || 'your frog';
   const context: PaywallContext = {
-    headline: 'Commit to your goals.',
-    accent: 'Get 2× the rewards.',
-    sub: `A weekly coach, double rewards and more outfits for ${name}.`,
-    benefits: [COACH, DOUBLE, SUPPORT],
+    headline: `Dress ${name} up`,
+    accent: 'twice as fast.',
+    sub: `Double rewards, every Special item and a weekly coach for ${name}.`,
+    benefits: [DOUBLE, SHOP, COACH],
   };
   if (placement === 'onboarding') return {
     ...context,
@@ -79,8 +84,8 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     ...context,
     headline: 'Loved that gift?',
     accent: 'Get two prizes every time.',
-    sub: 'Two prizes in every gift, double flies and a weekly coach.',
-    benefits: [GIFTS, COACH, SUPPORT],
+    sub: 'Two prizes in every gift, double flies and every Special item.',
+    benefits: [GIFTS, REWARDS, SHOP],
   };
   if (placement === 'wardrobe_looks') return {
     ...context,
@@ -166,7 +171,7 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     headline: 'Double every reward.',
     accent: 'Instantly, every time.',
     sub: 'Plus doubles your quest rewards and gifts for you.',
-    benefits: [DOUBLE, COACH, SUPPORT],
+    benefits: [DOUBLE, SHOP, COACH],
   };
   return context;
 }

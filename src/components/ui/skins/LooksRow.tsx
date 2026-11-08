@@ -125,9 +125,9 @@ export function SaveFitButton({
       <button
         type="button"
         onClick={onUpgrade}
-        className="plus-upgrade-button ml-auto inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-100 px-3 text-[12px] font-black tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+        className="plus-upgrade-button plus-club-soft ml-auto inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-[12px] font-black tracking-wide"
       >
-        <Icon name="frogPlus" label="Plus" className="h-3.5 w-3.5" />
+        <Icon name="frogPlus" label="Plus" className="-my-1 h-6 w-6" />
         {SAVED_LOOKS_PLUS} look slots
       </button>
     );
@@ -309,10 +309,10 @@ export function LooksRow({
           <button
             type="button"
             onClick={onUpgrade}
-            className={cn('plus-upgrade-button flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/60 bg-amber-50 px-1 text-center text-amber-700 transition-transform active:scale-[0.97] dark:bg-amber-950/30 dark:text-amber-400', inDialog ? 'aspect-square w-full' : 'h-[104px] w-[84px]')}
+            className={cn('plus-upgrade-button plus-club-soft flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl px-1 text-center', inDialog ? 'aspect-square w-full' : 'h-[104px] w-[84px]')}
           >
-            <Icon name="frogPlus" label="Plus" className="h-8 w-8" />
-            <span className="text-[9px] font-black leading-tight">
+            <Icon name="frogPlus" label="Plus" className="h-10 w-10" />
+            <span className="text-[10px] font-black leading-tight">
               {SAVED_LOOKS_PLUS} slots
               <br />
               with Plus

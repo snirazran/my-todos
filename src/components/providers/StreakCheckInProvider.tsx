@@ -87,23 +87,6 @@ function queueShieldOffer(offer: ShieldOffer) {
 
 const WIDGET_AFTER_RESCUE_MS = 450;
 
-const PREVIEW_RESCUE = process.env.NODE_ENV !== 'production';
-const PREVIEW_RESCUE_OFFER: LoginStreakRescue = {
-  id: 'preview-rescue',
-  previousCount: 12,
-  taskStreaks: [
-    { taskId: 'preview-1', text: 'Drink a glass of water', count: 9, fliesPerTask: 3 },
-    { taskId: 'preview-2', text: 'Read 5 pages', count: 4, fliesPerTask: 2 },
-  ],
-  goal: { days: 7, startCount: 8, startDayKey: '2026-11-03' },
-  missedDayKey: '2026-11-07',
-  offeredDayKey: '2026-11-08',
-  adsRequired: 1,
-  adsWatched: 0,
-  adEligible: true,
-  priceFlies: 500,
-};
-
 const AFTER_CATCH_DELAY_MS = 1400;
 const FIRST_RUN_CATCH_DELAY_MS = 2600;
 
@@ -254,12 +237,6 @@ function StreakSheetHost() {
   const [widgetAfter, setWidgetAfter] = useState(false);
   const widgetPinState = useWidgetPinStore((s) => s.pinState);
   const requestWidgetPrompt = useWidgetPinStore((s) => s.requestPrompt);
-
-  useEffect(() => {
-    if (!PREVIEW_RESCUE) return;
-    setRescue(PREVIEW_RESCUE_OFFER);
-    setRescueOpen(true);
-  }, []);
 
   const { view: streakView } = useLoginStreak(rescueOpen);
 

@@ -33,8 +33,6 @@ import {
   SkinRotationRow,
   SkinRotationDialog,
   StyleShuffleHeaderButton,
-  useShuffleInterval,
-  labelForInterval,
 } from '@/components/ui/SkinRotation';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
@@ -317,7 +315,6 @@ import {
   Laptop,
   Moon,
   Sun,
-  User,
   Settings,
   Bell,
   BellRing,
@@ -334,6 +331,8 @@ import {
   Vibrate,
   Volume2,
   Blocks,
+  UserPlus,
+  Users,
 } from 'lucide-react';
 import {
   useHapticsEnabled,
@@ -811,7 +810,7 @@ function MobileSheet({
   const goBack = () => setView(view === 'contact' ? contactBack : 'main');
 
   const viewTitles: Record<string, string> = {
-    main: 'Settings',
+    main: 'Overview',
     preferences: 'Preferences',
     notifications: 'Notifications',
     community: 'Community',
@@ -1010,68 +1009,81 @@ function MobileSheet({
   );
 
   if (!isMobile) {
+    const railItem = (id: typeof view) => ({
+      active: view === id,
+      onSelect: () => setView(id),
+    });
     const railGroups: {
-      heading: string;
+      heading: string | null;
       items: {
-        id: typeof view;
+        key: string;
         label: string;
         icon: React.ReactNode;
         trailing?: React.ReactNode;
+        active: boolean;
+        onSelect: () => void;
       }[];
     }[] = [
       {
-        heading: 'General',
+        heading: null,
         items: [
           {
-            id: 'main',
+            key: 'main',
             label: 'Overview',
-            icon: <Settings className="h-[18px] w-[18px] text-emerald-500" />,
-          },
-          {
-            id: 'preferences',
-            label: 'Preferences',
-            icon: <SlidersHorizontal className="h-[18px] w-[18px] text-emerald-500" />,
-          },
-          ...((isNative || isWeb)
-            ? [
-                {
-                  id: 'notifications' as typeof view,
-                  label: 'Notifications',
-                  icon: <Bell className="h-[18px] w-[18px] text-amber-500" />,
-                  trailing: (
-                    <span className="text-[11px] font-bold text-muted-foreground">
-                      {notifsEnabled ? 'On' : 'Off'}
-                    </span>
-                  ),
-                },
-              ]
-            : []),
-          {
-            id: 'integrations',
-            label: 'Integrations',
-            icon: <Blocks className="h-[18px] w-[18px] text-emerald-500" />,
-            trailing: calendarNeedsAttention ? (
-              <span className="text-[11px] font-bold text-amber-600">!</span>
-            ) : (
-              <span className="text-[11px] font-bold text-muted-foreground">
-                {activeConnections > 0 ? activeConnections : 'Off'}
-              </span>
+            icon: (
+              <RowIcon size="sm" className="bg-[#447d3f]">
+                <Settings />
+              </RowIcon>
             ),
+            active: view === 'main' || view === 'community',
+            onSelect: () => setView('main'),
           },
         ],
       },
       {
-        heading: 'Account',
+        heading: 'Settings',
         items: [
+          ...((isNative || isWeb)
+            ? [
+                {
+                  key: 'notifications',
+                  label: 'Notifications',
+                  icon: (
+                    <RowIcon size="sm" className="bg-rose-500">
+                      <Bell />
+                    </RowIcon>
+                  ),
+                  trailing: <MenuValue>{notifsEnabled ? 'On' : 'Off'}</MenuValue>,
+                  ...railItem('notifications'),
+                },
+              ]
+            : []),
           {
-            id: 'profile',
-            label: 'Profile',
-            icon: <User className="h-[18px] w-[18px] text-sky-500" />,
+            key: 'preferences',
+            label: 'Preferences',
+            icon: (
+              <RowIcon size="sm" className="bg-slate-500">
+                <SlidersHorizontal />
+              </RowIcon>
+            ),
+            ...railItem('preferences'),
           },
           {
-            id: 'community',
-            label: 'Community',
-            icon: <Icon name="community" className="h-[18px] w-[18px]" />,
+            key: 'integrations',
+            label: 'Integrations',
+            icon: (
+              <RowIcon size="sm" className="bg-sky-600">
+                <Blocks />
+              </RowIcon>
+            ),
+            trailing: calendarNeedsAttention ? (
+              <span className="h-2 w-2 rounded-full bg-amber-500">
+                <span className="sr-only">Needs reconnecting</span>
+              </span>
+            ) : (
+              <MenuValue>{activeConnections > 0 ? activeConnections : 'Off'}</MenuValue>
+            ),
+            ...railItem('integrations'),
           },
         ],
       },
@@ -1079,17 +1091,56 @@ function MobileSheet({
         heading: 'Support',
         items: [
           {
-            id: 'helpCenter',
+            key: 'helpCenter',
             label: 'Help center',
-            icon: <HelpCircle className="h-[18px] w-[18px] text-sky-500" />,
+            icon: (
+              <RowIcon size="sm" className="bg-sky-500">
+                <HelpCircle />
+              </RowIcon>
+            ),
+            active: view === 'helpCenter' || (view === 'contact' && contactBack === 'helpCenter'),
+            onSelect: () => setView('helpCenter'),
           },
           {
-            id: 'contact',
-            label: 'Report an issue',
-            icon: <AlertTriangle className="h-[18px] w-[18px] text-red-500" />,
+            key: 'contact',
+            label: 'Report a problem',
+            icon: (
+              <RowIcon size="sm" className="bg-orange-500">
+                <AlertTriangle />
+              </RowIcon>
+            ),
+            active: view === 'contact' && contactBack === 'main',
+            onSelect: () => {
+              setContactTopic('bug');
+              setContactBack('main');
+              setView('contact');
+            },
           },
         ],
       },
+      ...(isAdmin
+        ? [
+            {
+              heading: 'Admin',
+              items: [
+                {
+                  key: 'admin',
+                  label: 'Admin panel',
+                  icon: (
+                    <RowIcon size="sm" className="bg-slate-700">
+                      <Settings />
+                    </RowIcon>
+                  ),
+                  active: false,
+                  onSelect: () => {
+                    router.push('/admin');
+                    onClose();
+                  },
+                },
+              ],
+            },
+          ]
+        : []),
     ];
 
     return createPortal(
@@ -1112,86 +1163,73 @@ function MobileSheet({
               aria-label="Settings"
               initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              exit={{ opacity: 0, scale: 0.98, y: 6, transition: { duration: 0.12 } }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               style={{ height: 'min(86vh, 760px)' }}
               className="flex w-full max-w-5xl max-h-full overflow-hidden rounded-3xl bg-card shadow-2xl ring-1 ring-border/60"
             >
-              {/* Section rail */}
-              <aside className="flex w-60 shrink-0 flex-col border-r border-border/60 bg-muted/30">
-                <div className="px-5 pb-4 pt-5">
-                  <p className="truncate text-base font-black tracking-tight">
-                    <span>{displayName}</span>
-                    <span className="mx-1.5 text-muted-foreground">&amp;</span>
-                    <span>{frogName}</span>
-                  </p>
-                  {userInfo?.isPremium && (
-                    <span className="mt-1.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
-                      Plus
-                    </span>
+              <aside className="flex w-64 shrink-0 flex-col border-r border-border/60 bg-muted/30">
+                <div className="p-3">
+                  {showAuth && user ? (
+                    <button
+                      type="button"
+                      onClick={() => setView('profile')}
+                      aria-current={view === 'profile' ? 'page' : undefined}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-colors',
+                        view === 'profile'
+                          ? 'bg-card shadow-sm ring-1 ring-border/60'
+                          : 'hover:bg-card/60',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-base font-black tracking-tight">
+                          {displayName}
+                          <span className="mx-1.5 text-muted-foreground">&amp;</span>
+                          {frogName}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1.5 text-[12.5px] font-bold text-muted-foreground">
+                          {userInfo?.isPremium && <PlusBadge />}
+                          Edit profile
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </button>
+                  ) : (
+                    <p className="truncate px-3 py-2.5 text-base font-black tracking-tight">Settings</p>
                   )}
                 </div>
 
-                <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-3">
+                <nav aria-label="Settings sections" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-3">
                   {railGroups.map((group) => (
-                    <div key={group.heading}>
-                      <p className="px-2 pb-1 text-[12px] font-black text-muted-foreground/70">
-                        {group.heading}
-                      </p>
+                    <div key={group.heading ?? 'top'}>
+                      {group.heading && (
+                        <h3 className="px-3 pb-1.5 text-[12px] font-black text-muted-foreground">
+                          {group.heading}
+                        </h3>
+                      )}
                       <div className="space-y-0.5">
-                        {group.items.map((item) => {
-                          const isActive =
-                            view === item.id ||
-                            (item.id === 'helpCenter' &&
-                              view === 'contact' &&
-                              contactBack === 'helpCenter');
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                if (item.id === 'contact') {
-                                  setContactTopic('bug');
-                                  setContactBack('main');
-                                }
-                                setView(item.id);
-                              }}
-                              aria-current={isActive ? 'page' : undefined}
-                              className={cn(
-                                'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-bold transition-colors',
-                                isActive
-                                  ? 'bg-card text-foreground shadow-sm ring-1 ring-border/60'
-                                  : 'text-muted-foreground hover:bg-card/60 hover:text-foreground',
-                              )}
-                            >
-                              <span className="shrink-0">{item.icon}</span>
-                              <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                              {item.trailing}
-                            </button>
-                          );
-                        })}
+                        {group.items.map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={item.onSelect}
+                            aria-current={item.active ? 'page' : undefined}
+                            className={cn(
+                              'flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-1.5 text-left text-sm font-bold transition-colors',
+                              item.active
+                                ? 'bg-card text-foreground shadow-sm ring-1 ring-border/60'
+                                : 'text-foreground/80 hover:bg-card/60 hover:text-foreground',
+                            )}
+                          >
+                            {item.icon}
+                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                            {item.trailing}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   ))}
-
-                  {isAdmin && (
-                    <div>
-                      <p className="px-2 pb-1 text-[12px] font-black text-muted-foreground/70">
-                        Admin
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          router.push('/admin');
-                          onClose();
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-bold text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground"
-                      >
-                        <Settings className="h-[18px] w-[18px] shrink-0 text-amber-500" />
-                        <span className="min-w-0 flex-1 truncate">Admin settings</span>
-                      </button>
-                    </div>
-                  )}
                 </nav>
 
                 {showAuth && user && (
@@ -1206,7 +1244,7 @@ function MobileSheet({
                         onSignOut();
                         onClose();
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
+                      className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-1.5 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-500/10 dark:text-rose-400"
                     >
                       <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={2.5} />
                       Sign out
@@ -1286,6 +1324,9 @@ function MobileSheet({
               >
                 <ArrowRight className="w-6 h-6" />
               </button>
+              <h2 className="min-w-0 flex-1 truncate text-center text-base font-black tracking-tight">
+                Settings
+              </h2>
               <div className="w-10 shrink-0" aria-hidden />
             </div>
           </div>
@@ -1464,27 +1505,37 @@ function MainView({
     if (isNative) void refreshWidgetPinState();
   }, [isNative, refreshWidgetPinState]);
 
+  const promo = isGuest
+    ? 'guest'
+    : (isNative || isWeb) && canEnableNotifs && !notifsEnabled
+      ? 'reminders'
+      : isNative && widgetPinState === 'available'
+        ? 'widget'
+        : null;
+
+  const integrationsValue = needsAttention ? (
+    <span className="text-[13px] font-bold text-amber-600 dark:text-amber-400">Reconnect</span>
+  ) : (
+    <MenuValue>{activeConnections > 0 ? `${activeConnections} connected` : 'Off'}</MenuValue>
+  );
+
   return (
-    <div className="settings-stagger space-y-5">
+    <div className="settings-stagger space-y-6">
       {!isDesktop && (
         <button
           type="button"
           onClick={onOpenProfile}
           aria-label="Edit profile"
-          className="flex w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-5 py-4 text-left shadow-sm transition-[background-color,transform] hover:bg-accent/50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="flex w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3.5 text-left transition-[background-color,transform] duration-150 ease-out hover:bg-accent/50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <div className="min-w-0 flex-1">
-            <p className="text-xl font-black tracking-tight truncate">
+            <p className="truncate text-lg font-black tracking-tight">
               <span>{displayName}</span>
-              <span className="text-muted-foreground mx-1.5">&amp;</span>
+              <span className="mx-1.5 text-muted-foreground">&amp;</span>
               <span>{frogName}</span>
             </p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-              {isPremium && (
-                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[11px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
-                  Plus
-                </span>
-              )}
+            <p className="mt-0.5 flex items-center gap-1.5 text-[13px] font-bold text-muted-foreground">
+              {isPremium && <PlusBadge />}
               Edit profile
             </p>
           </div>
@@ -1492,7 +1543,7 @@ function MainView({
         </button>
       )}
 
-      {isGuest && (
+      {promo === 'guest' && (
         <PromoCard
           icon={<ShieldAlert className="w-7 h-7 text-amber-200" strokeWidth={2.5} />}
           title={`Keep ${frogName} safe`}
@@ -1502,18 +1553,7 @@ function MainView({
         />
       )}
 
-      {isNative && widgetPinState === 'available' && (
-        <PromoCard
-          icon={<WidgetPromoIcon />}
-          bareIcon
-          title="Add the widget"
-          subtitle={`Tap a fly to finish a task, with ${frogName} on your home screen.`}
-          actionLabel="Add"
-          onAction={requestWidgetPrompt}
-        />
-      )}
-
-      {(isNative || isWeb) && canEnableNotifs && !notifsEnabled && (
+      {promo === 'reminders' && (
         <PromoCard
           icon={<Bell className="w-7 h-7 text-amber-200" strokeWidth={2.5} />}
           title="Turn on reminders"
@@ -1524,80 +1564,80 @@ function MainView({
         />
       )}
 
-      <QuickTilesGrid
-        theme={theme}
-        setTheme={setTheme}
-        onOpenQuestFocus={onOpenQuestFocus}
-        onOpenPreferences={onOpenPreferences}
-        onOpenIntegrations={onOpenIntegrations}
-        onOpenFocusTimer={onOpenFocusTimer}
-        calendarSubtitle={
-          needsAttention
-            ? 'Action needed'
-            : activeConnections > 0
-              ? [
-                  activeCalendars > 0 ? 'Calendar' : null,
-                  aiConnections > 0 ? 'AI assistant' : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : 'Calendar & AI'
-        }
-      />
+      {promo === 'widget' && (
+        <PromoCard
+          icon={<WidgetPromoIcon />}
+          bareIcon
+          title="Add the widget"
+          subtitle={`Tap a fly to finish a task, with ${frogName} on your home screen.`}
+          actionLabel="Add"
+          onAction={requestWidgetPrompt}
+        />
+      )}
+
+      <ShortcutGrid onOpenFocusTimer={onOpenFocusTimer} onOpenQuestFocus={onOpenQuestFocus} />
 
       {!isPremium && (
         <button
           type="button"
           onClick={onOpenPlus}
           aria-label="Unlock Frogress Plus"
-          className="plus-upgrade-button group relative isolate w-full text-left rounded-2xl bg-amber-400 px-4 py-4 flex items-center gap-3 text-emerald-950 [--plus-button-base:#d38a0c] transition-transform duration-150 ease-out hover:bg-amber-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-primary"
+          className="plus-upgrade-button plus-club group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-[20px] py-3 pl-2.5 pr-3 text-left focus-visible:outline-none"
         >
-          <span className="-my-4 -ml-1 shrink-0 inline-flex">
-            <Icon
-              name="frogPlus"
-              className="w-16 h-16 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)] animate-wiggle"
-            />
+          <span className="-my-3 shrink-0 transition-transform duration-200 ease-out group-hover:-rotate-6 group-hover:scale-105">
+            <Icon name="frogPlus" className="h-[58px] w-[58px]" />
           </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-base font-black tracking-tight flex items-center gap-2 text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5 text-[16px] font-black leading-tight tracking-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
               Frogress
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
-                Plus
-              </span>
-            </p>
-            <p className="mt-0.5 text-xs font-bold leading-snug text-emerald-900/80">
-              More outfits. More gift prizes. More reasons to keep going.
-            </p>
-          </div>
-          <span
-            aria-hidden
-            className="relative inline-flex narrow:hidden shrink-0 items-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3.5 py-2 text-[13px] font-black text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_3px_0_0_rgba(20,83,45,0.55)] ring-1 ring-emerald-900/40 transition-[transform,box-shadow] duration-150 group-active:translate-y-0.5 group-active:shadow-none"
-          >
-            <span className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-promo-shine" />
-            <span className="relative">Try Plus</span>
+              <span className="plus-club-chip rounded-full px-1.5 py-[2px] text-[10px] tracking-wide [text-shadow:none]">PLUS</span>
+            </span>
+            <span className="plus-club-sub mt-1 block text-[12.5px] font-bold leading-snug">
+              New outfits <span className="text-[#f5c84c]">2×</span> faster, every Special item
+            </span>
+          </span>
+          <span aria-hidden className="plus-club-chip shrink-0 rounded-xl px-3 py-2 text-[13px] transition-transform duration-150 ease-out group-active:translate-y-0.5 narrow:hidden">
+            Try Plus
           </span>
         </button>
       )}
 
-      {!isDesktop && (
-        <MenuSection title="Settings">
+      {isDesktop ? (
+        <MenuSection title="Appearance">
+          <DarkModeRow theme={theme} setTheme={setTheme} />
+        </MenuSection>
+      ) : (
+        <MenuSection title="General">
           {(isNative || isWeb) && (
             <MenuRow
-              icon={<Bell className="w-7 h-7 text-amber-500" />}
-              label="Notifications"
-              description="Reminders and focus timer alerts"
-              trailing={
-                <span className="text-[11px] font-bold text-muted-foreground">
-                  {notifsEnabled ? 'On' : 'Off'}
-                </span>
+              icon={
+                <RowIcon className="bg-rose-500">
+                  <Bell />
+                </RowIcon>
               }
+              label="Notifications"
+              trailing={<MenuValue>{notifsEnabled ? 'On' : 'Off'}</MenuValue>}
               onClick={onOpenNotifications}
             />
           )}
+          <DarkModeRow theme={theme} setTheme={setTheme} />
           <MenuRow
-            icon={<SlidersHorizontal className="w-7 h-7 text-emerald-500" />}
+            icon={
+              <RowIcon className="bg-sky-600">
+                <Blocks />
+              </RowIcon>
+            }
+            label="Integrations"
+            trailing={integrationsValue}
+            onClick={onOpenIntegrations}
+          />
+          <MenuRow
+            icon={
+              <RowIcon className="bg-slate-500">
+                <SlidersHorizontal />
+              </RowIcon>
+            }
             label="Preferences"
-            description="Theme, week start, sounds & more"
             onClick={onOpenPreferences}
           />
         </MenuSection>
@@ -1606,14 +1646,13 @@ function MainView({
       {isPremium && (
         <MenuSection title="Membership">
           <MenuRow
-            icon={<Icon name="frogPlus" className="w-9 h-9" />}
-            label="Frogress Plus"
-            description="Manage your membership"
-            trailing={
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
-                Active
-              </span>
+            icon={
+              <RowIcon className="bg-amber-400">
+                <Icon name="frogPlus" className="h-7 w-7" />
+              </RowIcon>
             }
+            label="Frogress Plus"
+            trailing={<MenuValue>Active</MenuValue>}
             onClick={() => setPlusInfoOpen(true)}
           />
         </MenuSection>
@@ -1621,27 +1660,33 @@ function MainView({
 
       <MenuSection title="Community">
         <MenuRow
-          icon={<Icon name="inviteFriends" label="Invite friends" className="w-10 h-10" />}
+          icon={
+            <RowIcon className="bg-emerald-600">
+              <UserPlus />
+            </RowIcon>
+          }
           label="Invite friends"
-          description="Team up and keep each other going"
+          description="Keep each other going"
           onClick={onInviteFriends}
         />
-        {!isDesktop && (
-          <MenuRow
-            icon={<Icon name="community" label="Community" className="w-10 h-10" />}
-            label="Join the frog community"
-            description="Tips, sneak peeks and fellow frogs"
-            onClick={onOpenCommunity}
-          />
-        )}
         <MenuRow
           icon={
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
-              <Fly size={28} interactive={false} alwaysPlay />
-            </span>
+            <RowIcon className="bg-violet-500">
+              <Users />
+            </RowIcon>
+          }
+          label="Frog community"
+          description="Tips, sneak peeks and fellow frogs"
+          onClick={onOpenCommunity}
+        />
+        <MenuRow
+          icon={
+            <RowIcon className="bg-[#d4efc4] dark:bg-[#cfe9bd]">
+              <Fly size={26} interactive={false} alwaysPlay />
+            </RowIcon>
           }
           label="Fly Catch"
-          description="30 seconds. Beat your best score."
+          description="30 seconds. Beat your best."
           onClick={() => window.location.assign('/fly-catch')}
         />
       </MenuSection>
@@ -1655,15 +1700,21 @@ function MainView({
       {!isDesktop && (
         <MenuSection title="Support">
           <MenuRow
-            icon={<HelpCircle className="w-7 h-7 text-sky-500" />}
+            icon={
+              <RowIcon className="bg-sky-500">
+                <HelpCircle />
+              </RowIcon>
+            }
             label="Help center"
-            description="Quick answers and how-tos"
             onClick={onHelpCenter}
           />
           <MenuRow
-            icon={<AlertTriangle className="w-7 h-7 text-red-500" />}
+            icon={
+              <RowIcon className="bg-orange-500">
+                <AlertTriangle />
+              </RowIcon>
+            }
             label="Report a problem"
-            description="We read every report"
             onClick={onReportIssue}
           />
         </MenuSection>
@@ -1672,21 +1723,26 @@ function MainView({
       {isAdmin && !isDesktop && (
         <MenuSection title="Admin">
           <MenuRow
-            icon={<Settings className="w-7 h-7 text-amber-500" />}
-            label="Admin Settings"
+            icon={
+              <RowIcon className="bg-slate-700">
+                <Settings />
+              </RowIcon>
+            }
+            label="Admin panel"
             onClick={onGoAdmin}
           />
         </MenuSection>
       )}
 
       {!isDesktop && (
-      <button
-        onClick={isGuest ? () => setConfirmGuestSignOut(true) : onSignOut}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border/50 bg-card p-4 text-sm font-black text-rose-600 transition-[background-color,transform] hover:bg-rose-50 active:scale-[0.99] dark:text-rose-400 dark:hover:bg-rose-500/10"
-      >
-        <LogOut className="h-5 w-5" strokeWidth={2.5} />
-        Sign out
-      </button>
+        <button
+          type="button"
+          onClick={isGuest ? () => setConfirmGuestSignOut(true) : onSignOut}
+          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-border/50 bg-card px-4 text-[15px] font-black text-rose-600 transition-[background-color,transform] duration-150 ease-out hover:bg-rose-50 active:scale-[0.99] dark:text-rose-400 dark:hover:bg-rose-500/10"
+        >
+          <LogOut className="h-5 w-5" strokeWidth={2.5} />
+          Sign out
+        </button>
       )}
 
       {confirmGuestSignOut && (
@@ -1774,22 +1830,7 @@ function PreferencesView({
   return (
     <div className="space-y-3">
       <MenuSection title="Appearance">
-        <motion.button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          whileTap={{ scale: 0.985 }}
-          transition={{ type: 'spring', stiffness: 600, damping: 30, mass: 0.6 }}
-          className="flex w-full items-center justify-between bg-card px-4 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-accent/50"
-        >
-          <span className="flex items-center gap-3">
-            <div className="flex h-9 w-12 items-center justify-center">
-              <AnimatedThemeIcon dark={theme === 'dark'} />
-            </div>
-            <span className="font-bold text-sm">Color mode</span>
-          </span>
-          <span className="text-[11px] font-bold text-muted-foreground capitalize">
-            {theme === 'dark' ? 'Dark' : 'Light'}
-          </span>
-        </motion.button>
+        <DarkModeRow theme={theme} setTheme={setTheme} />
       </MenuSection>
 
       <MenuSection title="Calendar">
@@ -2191,40 +2232,40 @@ function WidgetPromoIcon() {
   );
 }
 
-function QuickTile({
-  icon,
-  title,
-  subtitle,
-  onClick,
+function RowIcon({
   className,
+  size = 'md',
+  children,
 }: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  onClick: () => void;
   className?: string;
+  size?: 'sm' | 'md';
+  children: React.ReactNode;
 }) {
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      whileTap={{ scale: 0.96 }}
-      transition={{ type: 'spring', stiffness: 600, damping: 30, mass: 0.6 }}
+    <span
+      aria-hidden
       className={cn(
-        'flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-colors duration-150 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary narrow:gap-2 narrow:px-3',
+        'grid shrink-0 place-items-center text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.16)]',
+        size === 'sm'
+          ? 'h-6 w-6 rounded-[7px] [&>svg]:h-[14px] [&>svg]:w-[14px] [&>svg]:stroke-[2.5]'
+          : 'h-8 w-8 rounded-[10px] [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:stroke-[2.5]',
         className,
       )}
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center">{icon}</div>
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-sm font-black leading-tight">{title}</p>
-        {subtitle && (
-          <p className="mt-0.5 line-clamp-2 text-[11px] font-bold leading-tight text-muted-foreground">
-            {subtitle}
-          </p>
-        )}
-      </div>
-    </motion.button>
+      {children}
+    </span>
+  );
+}
+
+function MenuValue({ children }: { children: React.ReactNode }) {
+  return <span className="text-[13px] font-bold text-muted-foreground">{children}</span>;
+}
+
+function PlusBadge() {
+  return (
+    <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[11px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+      Plus
+    </span>
   );
 }
 
@@ -2272,82 +2313,72 @@ function AnimatedThemeIcon({ dark }: { dark: boolean }) {
   );
 }
 
-function QuickTilesGrid({
-  theme,
-  setTheme,
-  onOpenQuestFocus,
-  onOpenPreferences,
-  onOpenIntegrations,
+function ShortcutGrid({
   onOpenFocusTimer,
-  calendarSubtitle,
+  onOpenQuestFocus,
 }: {
-  theme?: string;
-  setTheme: (t: string) => void;
-  onOpenQuestFocus: () => void;
-  onOpenPreferences: () => void;
-  onOpenIntegrations: () => void;
   onOpenFocusTimer: () => void;
-  calendarSubtitle: string;
+  onOpenQuestFocus: () => void;
 }) {
-  const { value: rotation } = useShuffleInterval();
   const [rotationOpen, setRotationOpen] = useState(false);
+  const shortcuts: { icon: Parameters<typeof Icon>[0]['name']; label: string; onClick: () => void }[] = [
+    { icon: 'clock', label: 'Focus timer', onClick: onOpenFocusTimer },
+    { icon: 'patterns', label: 'Your patterns', onClick: () => window.location.assign('/insights') },
+    { icon: 'shuffle', label: 'Style Shuffle', onClick: () => setRotationOpen(true) },
+    { icon: 'compass', label: 'Areas', onClick: onOpenQuestFocus },
+  ];
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <QuickTile
-        icon={<Icon name="patterns" label="Your patterns" className="h-[52px] w-[52px]" />}
-        title="Your patterns"
-        subtitle="See what’s working"
-        onClick={() => window.location.assign('/insights')}
-      />
-      <QuickTile
-        icon={<Icon name="shuffle" label="Style Shuffle" className="h-[52px] w-[52px]" />}
-        title="Style Shuffle"
-        subtitle={rotation === 'disabled' ? 'Auto-change outfits' : `New look ${labelForInterval(rotation).toLowerCase()}`}
-        onClick={() => setRotationOpen(true)}
-      />
-      <QuickTile
-        icon={<Icon name="compass" label="Areas" className="h-[52px] w-[52px]" />}
-        title="Areas"
-        subtitle="Pick your focus"
-        onClick={onOpenQuestFocus}
-      />
-      <QuickTile
-        icon={<Icon name="clock" label="Focus timer" className="h-[52px] w-[52px]" />}
-        title="Focus timer"
-        subtitle="Focus to earn flies"
-        onClick={onOpenFocusTimer}
-      />
-      <QuickTile
-        icon={<Blocks className="h-[30px] w-[30px] text-emerald-500" />}
-        title="Integrations"
-        subtitle={calendarSubtitle}
-        onClick={onOpenIntegrations}
-      />
-      <QuickTile
-        icon={<AnimatedThemeIcon dark={theme === 'dark'} />}
-        title="Color mode"
-        subtitle={theme === 'dark' ? 'Dark' : 'Light'}
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      />
-      <SkinRotationDialog
-        open={rotationOpen}
-        onClose={() => setRotationOpen(false)}
-      />
+    <div className="grid grid-cols-4 gap-1 rounded-2xl border border-border/50 bg-card p-1.5">
+      {shortcuts.map((shortcut) => (
+        <button
+          key={shortcut.label}
+          type="button"
+          onClick={shortcut.onClick}
+          className="group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 pb-2.5 pt-3 transition-colors duration-150 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span className="transition-transform duration-150 ease-out group-active:scale-[0.92]">
+            <Icon name={shortcut.icon} className="h-11 w-11 md:h-12 md:w-12" />
+          </span>
+          <span className="line-clamp-2 text-center text-[12px] font-black leading-tight text-foreground md:text-[13px]">
+            {shortcut.label}
+          </span>
+        </button>
+      ))}
+      <SkinRotationDialog open={rotationOpen} onClose={() => setRotationOpen(false)} />
     </div>
+  );
+}
+
+function DarkModeRow({ theme, setTheme }: { theme?: string; setTheme: (t: string) => void }) {
+  const dark = theme === 'dark';
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={dark}
+      onClick={() => setTheme(dark ? 'light' : 'dark')}
+      className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/50 active:bg-accent/70 focus-visible:outline-none focus-visible:bg-accent/60"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center">
+        <RowIcon className="bg-indigo-500">
+          <Moon />
+        </RowIcon>
+      </span>
+      <span className="min-w-0 flex-1 text-[15px] font-bold leading-tight">Dark mode</span>
+      <AnimatedThemeIcon dark={dark} />
+    </button>
   );
 }
 
 function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      <p className="text-[13px] font-black text-muted-foreground px-1">
-        {title}
-      </p>
-      <div className="rounded-2xl bg-card border border-border/50 overflow-hidden divide-y divide-border/50">
+    <section className="space-y-2">
+      <h3 className="px-1 text-[13px] font-black text-muted-foreground">{title}</h3>
+      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card divide-y divide-border/50">
         {children}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -2368,21 +2399,20 @@ function MenuRow({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex min-h-[60px] items-center gap-3 px-4 py-3 hover:bg-accent/50 active:bg-accent/70 transition-colors text-left focus-visible:outline-none focus-visible:bg-accent/60"
+      className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/50 active:bg-accent/70 focus-visible:outline-none focus-visible:bg-accent/60"
     >
-      <div className="h-9 w-9 flex items-center justify-center shrink-0">
-        {icon}
-      </div>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold line-clamp-2 leading-tight">{label}</span>
+        <span className="block line-clamp-2 text-[15px] font-bold leading-tight">{label}</span>
         {description && (
-          <span className="mt-0.5 block truncate text-[12px] font-semibold text-muted-foreground">
+          <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-muted-foreground">
             {description}
           </span>
         )}
       </span>
       {trailing && <span className="shrink-0">{trailing}</span>}
-      <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </button>
   );
 }
+

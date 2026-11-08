@@ -264,24 +264,16 @@ function FocusTagLimitDialog({
               type="button"
               onClick={onUpgrade}
               aria-label="Unlock multiple focus tags with Frog Plus"
-              className="plus-upgrade-button group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+              className="plus-upgrade-button plus-club group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-[20px] px-4"
             >
-              <span
-                aria-hidden
-                className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-              />
-              <span
-                aria-hidden
-                className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent"
-              />
               <Icon
                 name="frogPlus"
-                className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
+                className="-my-8 -ml-1 h-[72px] w-[72px]"
               />
-              <span className="text-sm font-black text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+              <span className="text-sm font-black [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
                 Connect more with
               </span>
-              <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[13px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+              <span className="plus-club-chip rounded-lg px-2.5 py-1.5 text-[13px] leading-none">
                 Plus
               </span>
             </button>

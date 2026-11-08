@@ -697,7 +697,7 @@ body {
 @keyframes settings-rise {
   from {
     opacity: 0;
-    transform: translate3d(0, 12px, 0) scale(0.985);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
@@ -706,7 +706,7 @@ body {
 }
 
 .settings-stagger > * {
-  animation: settings-rise 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: settings-rise 320ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
 }
 
 .settings-stagger > :nth-child(1) {
@@ -1309,6 +1309,17 @@ body.dragging {
   --streak-glass: rgba(255, 255, 255, 0.2);
   --streak-ink-shadow: rgba(22, 64, 28, 0.45);
   --streak-dim: rgba(0, 0, 0, 0.18);
+  --streak-sun: radial-gradient(
+    circle at center,
+    rgba(255, 246, 204, 1) 0%,
+    rgba(255, 216, 118, 0.85) 20%,
+    rgba(255, 186, 72, 0.38) 40%,
+    rgba(255, 190, 80, 0) 64%
+  );
+  --streak-numeral: #fff8e4;
+  --streak-sun-ray: rgba(255, 230, 150, 1);
+  --streak-sun-ray-opacity: 0.45;
+  --streak-numeral-glow: rgba(255, 210, 110, 0.75);
 }
 
 .dark .streak-stage {
@@ -1329,6 +1340,17 @@ body.dragging {
   --streak-glass: rgba(255, 255, 255, 0.08);
   --streak-ink-shadow: rgba(0, 0, 0, 0.55);
   --streak-dim: rgba(0, 0, 0, 0.3);
+  --streak-sun: radial-gradient(
+    circle at center,
+    rgba(255, 214, 130, 0.5) 0%,
+    rgba(255, 180, 70, 0.28) 24%,
+    rgba(255, 170, 60, 0.08) 46%,
+    rgba(255, 170, 60, 0) 64%
+  );
+  --streak-numeral: #ffe9b8;
+  --streak-sun-ray: rgba(255, 200, 100, 1);
+  --streak-sun-ray-opacity: 0.16;
+  --streak-numeral-glow: rgba(255, 190, 80, 0.45);
 }
 
 .leap-stage {
@@ -1738,18 +1760,82 @@ body.dragging {
 }
 
 .plus-paywall {
-  --background: 115 36% 36%;
+  --background: 263 55% 22%;
   --foreground: 0 0% 100%;
-  --card: 115 38% 30%;
+  --card: 263 44% 31%;
   --card-foreground: 0 0% 100%;
-  --muted: 115 32% 31%;
-  --muted-foreground: 105 35% 88%;
-  --border: 113 26% 48%;
-  --input: 113 26% 48%;
-  --primary: 45 96% 64%;
+  --muted: 263 44% 28%;
+  --muted-foreground: 266 80% 89%;
+  --border: 263 36% 44%;
+  --input: 263 36% 44%;
+  --primary: 44 92% 66%;
   --primary-foreground: 36 76% 13%;
-  --ring: 45 96% 64%;
-  --plus-band: 115 33% 31%;
+  --ring: 44 92% 66%;
+  --plus-band: 263 52% 28%;
+  --plus-cta: #f5c84c;
+  --plus-cta-hover: #f8d36b;
+  --plus-cta-edge: #a87a0e;
+  --plus-cta-ink: #3a2700;
+}
+
+.dark .plus-paywall {
+  --background: 264 50% 13%;
+  --card: 264 38% 21%;
+  --muted: 264 38% 18%;
+  --border: 264 30% 33%;
+  --input: 264 30% 33%;
+  --plus-band: 264 46% 19%;
+}
+
+.plus-icon-tone :is([fill="#70B548" i], [fill="#7EBF5C" i], [fill="#76B34B" i]) {
+  fill: #f5c84c;
+}
+
+.plus-icon-tone :is([stroke="#70B548" i], [stroke="#76B34B" i]) {
+  stroke: #f5c84c;
+}
+
+.plus-icon-tone [fill="#1F621C" i] {
+  fill: #4b1fa3;
+}
+
+.plus-icon-tone [stroke="#1F621C" i] {
+  stroke: #4b1fa3;
+}
+
+.plus-icon-tone [stroke="#6C6C6C" i] {
+  stroke: #3a1a78;
+}
+
+.plus-icon-tone [fill="#6C6C6C" i] {
+  fill: #3a1a78;
+}
+
+.plus-icon-tone [fill="#D9D9D9" i] {
+  fill: #d8cbf6;
+}
+
+@keyframes plus-card-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-12deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(520%) skewX(-12deg);
+  }
+}
+
+@keyframes plus-rail-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .plus-paywall :is(button, a):focus-visible {
@@ -1979,7 +2065,7 @@ body.dragging {
 /* The same solid, raised edge as our account-backup card, shared by Plus CTAs. */
 .plus-upgrade-button:not(:disabled) {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
-    var(--tw-ring-shadow, 0 0 #0000), 0 4px 0 var(--plus-button-base, #a97627);
+    var(--tw-ring-shadow, 0 0 #0000), 0 4px 0 var(--plus-button-base, #230d52);
   transition-property: transform, box-shadow, filter, background-color;
   transition-duration: 150ms;
 }
@@ -1987,7 +2073,7 @@ body.dragging {
 .plus-upgrade-button:not(:disabled):active {
   transform: translateY(3px);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
-    var(--tw-ring-shadow, 0 0 #0000), 0 1px 0 var(--plus-button-base, #a97627);
+    var(--tw-ring-shadow, 0 0 #0000), 0 1px 0 var(--plus-button-base, #230d52);
 }
 
 .plus-upgrade-button:focus-visible {
@@ -1997,6 +2083,51 @@ body.dragging {
 
 @media (prefers-reduced-motion: reduce) {
   .plus-upgrade-button { transition: none; }
+}
+
+.plus-club {
+  --plus-button-base: #230d52;
+  border: 2.5px solid #230d52;
+  background-color: #6a3bd6;
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 52%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 10px, transparent 10px 20px);
+  color: #fff;
+}
+
+.plus-club:hover:not(:disabled) {
+  background-color: #7347e0;
+}
+
+.plus-club-sub {
+  color: #e6dcff;
+}
+
+.plus-club-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 2px solid #230d52;
+  background-color: #f5c84c;
+  color: #3a2700;
+  font-weight: 900;
+  box-shadow: 0 2px 0 #230d52;
+}
+
+.plus-club-soft {
+  --plus-button-base: #c9b3f7;
+  border: 2px solid #d9c9fb;
+  background-color: #f4eeff;
+  color: #4b1fa3;
+}
+
+.plus-club-soft:hover:not(:disabled) {
+  background-color: #ece2ff;
+}
+
+.dark .plus-club-soft {
+  --plus-button-base: rgba(20, 6, 45, 0.9);
+  border-color: rgba(167, 139, 250, 0.35);
+  background-color: rgba(106, 59, 214, 0.2);
+  color: #dccdff;
 }
 
 @keyframes plus-cta-sway {
@@ -3209,6 +3340,27 @@ body.dragging {
   .ad-offer-badge,
   .decision-icon,
   .bonus-plus-shake {
+    animation: none;
+  }
+}
+
+.rescue-star {
+  opacity: 0.55;
+  animation: rescue-star-twinkle 3.4s ease-in-out infinite;
+}
+
+@keyframes rescue-star-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.18;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rescue-star {
     animation: none;
   }
 }

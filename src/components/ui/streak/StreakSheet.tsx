@@ -14,7 +14,6 @@ import { hapticCelebrate, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWideStage } from '@/hooks/useWideStage';
-import { useSettled } from '@/hooks/useSettled';
 import { SheetEnteredContext } from '@/lib/sheetEntered';
 import {
   useLoginStreak,
@@ -37,7 +36,7 @@ import { announcePledgeMade } from '@/lib/widget/prompt';
 import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
-import { PrizeMedal, SolidFlame } from './StreakIcons';
+import { SolidFlame } from './StreakIcons';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { pledgeFrogLine, streakRevealMessage } from '@/lib/streak/revealMessage';
 import { PondBackdrop } from '@/components/ui/PondBackdrop';
@@ -485,13 +484,13 @@ function WeekStrip({
   );
 }
 
-const SPARKS = Array.from({ length: 10 }, (_, i) => {
-  const angle = (i / 10) * Math.PI * 2 + 0.3;
-  const distance = 54 + (i % 3) * 14;
+const SPARKS = Array.from({ length: 12 }, (_, i) => {
+  const angle = (i / 12) * Math.PI * 2 + 0.3;
+  const distance = 92 + (i % 3) * 22;
   return {
     x: Math.cos(angle) * distance,
     y: Math.sin(angle) * distance,
-    size: i % 2 ? 6 : 8,
+    size: i % 2 ? 7 : 10,
   };
 });
 
@@ -549,7 +548,7 @@ function weekRunState(view: LoginStreakView) {
 }
 
 /**
- * The week as one chain: kept days are joined by a band that draws itself in,
+ * The week as one chain: kept days sit in a warm band that draws itself in,
  * and today's link lands last.
  */
 function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
@@ -573,8 +572,8 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
           <span
             key={dayKey}
             className={cn(
-              'text-center text-[12px] font-black',
-              dayKey === today ? 'text-white' : 'text-white/70',
+              'text-center text-[11px] font-black',
+              dayKey === today ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
             {new Date(`${dayKey}T12:00:00`).toLocaleDateString('en-US', {
@@ -585,7 +584,7 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
       </div>
       <ul
         aria-label="This week"
-        className="relative mt-2 grid grid-cols-7 short-screen:mt-1.5"
+        className="relative mt-1.5 grid grid-cols-7"
       >
         {first >= 0 && (
           <motion.span
@@ -593,10 +592,10 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
             initial={reduceMotion ? false : { scaleX: 0 }}
             animate={play ? { scaleX: 1 } : {}}
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
-            className="absolute inset-y-0 origin-left rounded-full bg-white/35"
+            className="absolute inset-y-0 origin-left rounded-full bg-amber-100 dark:bg-amber-400/15"
             style={{
-              left: `calc(${(first / 7) * 100}% + 2px)`,
-              width: `calc(${((last - first + 1) / 7) * 100}% - 4px)`,
+              left: `calc(${(first / 7) * 100}% + 1px)`,
+              width: `calc(${((last - first + 1) / 7) * 100}% - 2px)`,
             }}
           />
         )}
@@ -629,26 +628,28 @@ function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
             >
               <motion.span
                 aria-hidden
-                initial={reduceMotion ? false : { scale: landsLast ? 0 : 0.7, opacity: 0 }}
+                initial={reduceMotion ? false : { scale: landsLast ? 0.4 : 0.8, opacity: 0 }}
                 animate={play || !landsLast ? { scale: 1, opacity: 1 } : {}}
                 transition={{
                   type: 'spring',
                   stiffness: landsLast ? 520 : 420,
-                  damping: landsLast ? 14 : 24,
-                  delay: landsLast ? 0.55 : 0.04 * i,
+                  damping: landsLast ? 14 : 26,
+                  delay: landsLast ? 0.55 : 0.03 * i,
                 }}
                 className={cn(
                   'grid h-9 w-9 place-items-center rounded-full short-screen:h-8 short-screen:w-8',
                   frozen
-                    ? 'bg-white'
+                    ? 'bg-emerald-100 shadow-[0_2px_0_0_#6ee7b7] dark:bg-emerald-500/20 dark:shadow-[0_2px_0_0_rgba(16,185,129,0.45)]'
                     : lit
-                      ? 'bg-white text-amber-500 shadow-[0_2px_0_0_var(--streak-ink-shadow)]'
+                      ? 'bg-gradient-to-b from-amber-300 to-orange-400 text-white shadow-[0_2px_0_0_#c2410c]'
                       : pendingToday
-                        ? 'bg-white/20 text-white ring-2 ring-white/80'
+                        ? 'border-2 border-dashed border-orange-300 text-orange-400 dark:border-orange-400/60'
                         : future
-                          ? 'bg-white/15'
-                          : 'bg-[color:var(--streak-dim)] text-white/50',
-                  isToday && (lit || frozen) && 'ring-[3px] ring-amber-200',
+                          ? 'bg-muted/70'
+                          : 'bg-muted text-muted-foreground/70',
+                  isToday &&
+                    (lit || frozen) &&
+                    'ring-2 ring-amber-300 ring-offset-2 ring-offset-card dark:ring-amber-400/70',
                 )}
               >
                 {frozen ? (
@@ -672,38 +673,64 @@ function PledgeProgress({
   rewards,
   rewardCatalog,
   isPremium,
+  play,
 }: {
   goal: NonNullable<LoginStreakView['goal']>;
   rewards?: LoginStreakReward[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  play: boolean;
 }) {
   const reduceMotion = useReducedMotion();
-  const left = Math.max(0, goal.days - goal.progress);
   const ratio = goal.stepCount > 0 ? goal.stepsFilled / goal.stepCount : 0;
   return (
-    <div className="mt-4 border-t border-white/20 pt-4 text-left short-screen:mt-3 short-screen:pt-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="flex items-center gap-1.5 text-[14px] font-black text-white">
-          <Trophy className="h-4 w-4" />
-          {goal.days}-day pledge
-        </span>
-        <span className="text-[13px] font-bold text-white/85">
-          {left === 0
-            ? 'Prize ready'
-            : `${left} ${left === 1 ? 'day' : 'days'} to go`}
-        </span>
+    <div className="mt-3.5 flex items-center gap-3 border-t border-border/60 pt-3.5 short-screen:mt-3 short-screen:pt-3">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 shadow-[0_2px_0_0_#fcd34d] dark:bg-amber-400/15 dark:shadow-[0_2px_0_0_rgba(251,191,36,0.35)]">
+        <Trophy aria-hidden className="h-5 w-5 text-amber-500" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-black leading-tight text-foreground">
+          {pledgeName(goal.days)} pledge
+        </p>
+        <div
+          role="progressbar"
+          aria-label={`${goal.days}-day pledge`}
+          aria-valuemin={0}
+          aria-valuemax={goal.days}
+          aria-valuenow={goal.progress}
+          aria-valuetext={`${goal.progress} of ${goal.days} days`}
+          className="relative mt-1.5 h-5 overflow-hidden rounded-full bg-muted"
+        >
+          <motion.div
+            initial={reduceMotion ? false : { scaleX: 0 }}
+            animate={{ scaleX: play ? ratio : 0 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.7 }}
+            className="absolute inset-0 origin-left rounded-full bg-gradient-to-r from-amber-300 to-orange-400"
+          />
+          <span className="relative grid h-full place-items-center text-[11px] font-black tabular-nums text-foreground/80">
+            {goal.progress} / {goal.days}
+          </span>
+        </div>
       </div>
-      <div className="mt-2 h-3 overflow-hidden rounded-full bg-[color:var(--streak-dim)]">
-        <motion.div
-          initial={reduceMotion ? false : { scaleX: 0 }}
-          animate={{ scaleX: ratio }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.9 }}
-          className="h-full origin-left rounded-full bg-gradient-to-r from-amber-200 to-white"
+      {rewards && rewards.length > 0 && (
+        <PledgeRewardTiles
+          rewards={rewards}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          hydrateDelayMs={900}
+          flatLimit={2}
+          still
         />
-      </div>
+      )}
     </div>
   );
+}
+
+function sunNumeralSize(count: number, short: boolean, roomy: boolean) {
+  const digits = String(Math.max(0, count)).length;
+  const base = digits <= 1 ? 232 : digits === 2 ? 206 : 148;
+  const scale = short ? 0.76 : roomy ? 1.06 : 1;
+  return Math.round(base * scale);
 }
 
 function RevealStep({
@@ -728,9 +755,21 @@ function RevealStep({
   const [landed, setLanded] = useState(false);
   const [minDelayDone, setMinDelayDone] = useState(false);
   const [capDone, setCapDone] = useState(false);
-  const shortScreen = useMediaQuery('(max-height: 800px)');
-  const frogHeight = shortScreen ? 234 : 300;
+  const shortScreen = useMediaQuery('(max-height: 760px)');
+  const roomy = useMediaQuery('(min-width: 768px)');
+
+  const frogHeight = shortScreen ? 216 : roomy ? 292 : 264;
   const frogWidth = Math.round((frogHeight * 128) / 144);
+  const frogSeat = 1 + Math.round(frogHeight * 0.045);
+  const numeralSize = sunNumeralSize(
+    Math.max(view.count, celebration.previousCount),
+    shortScreen,
+    roomy,
+  );
+  const digitBottom = Math.round(frogHeight * 0.32);
+  const stageHeight = digitBottom + Math.round(numeralSize * 0.78) + 8;
+  const bubbleY = Math.round(frogHeight * 0.11);
+
   const revealMessage = streakRevealMessage({
     count: view.count,
     longestStreak: view.longestStreak,
@@ -740,9 +779,10 @@ function RevealStep({
   });
   const activeGoal =
     view.goal && view.goal.progress < view.goal.days ? view.goal : null;
+  const newBest = view.count > 1 && view.count >= view.longestStreak;
 
   useEffect(() => {
-    const minTimer = window.setTimeout(() => setMinDelayDone(true), 1000);
+    const minTimer = window.setTimeout(() => setMinDelayDone(true), 900);
     const capTimer = window.setTimeout(() => setCapDone(true), 2600);
     return () => {
       window.clearTimeout(minTimer);
@@ -754,20 +794,18 @@ function RevealStep({
   useEffect(() => {
     if (!readyToPop || popped) return;
     setPopped(true);
-    frogRef.current?.fireEmote(
-      view.count > 1 && view.count >= view.longestStreak ? 'tada' : 'celebrate',
-    );
+    frogRef.current?.fireEmote(newBest ? 'tada' : 'celebrate');
     confetti({
       particleCount: 110,
       spread: 90,
       startVelocity: 40,
-      origin: { y: 0.3 },
+      origin: { y: 0.28 },
       zIndex: 99999,
       colors: ['#fbbf24', '#fde68a', '#93df6e', '#4f9a45', '#ffffff'],
       disableForReducedMotion: true,
     });
     hapticCelebrate();
-  }, [readyToPop, popped]);
+  }, [readyToPop, popped, newBest]);
 
   useEffect(() => {
     if (popped) setCount(view.count);
@@ -780,152 +818,218 @@ function RevealStep({
         className="pointer-events-none absolute inset-0"
         style={{ background: 'var(--streak-overlay)' }}
       />
-      <div className="pointer-events-none absolute inset-0 opacity-[var(--streak-ray-opacity)]">
-        <RotatingRays
-          colorClass="text-[color:var(--streak-ray)]"
-          masked={false}
-          size="118vmax"
-        />
-      </div>
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: 'var(--streak-glow)' }}
-      />
 
-      <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2.25rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-10">
-        <div className="m-auto flex w-full max-w-sm shrink-0 flex-col items-center md:max-w-md">
-          <div className="flex items-center gap-1 short-screen:gap-0.5">
-            <div className="-mt-5 short-screen:-mt-3">
-            <motion.div
-              initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
-              animate={
-                popped
-                  ? { scale: [1, 1.3, 1], rotate: [0, -8, 6, 0], opacity: 1 }
-                  : { scale: 1, opacity: 1 }
-              }
-              transition={
-                popped
-                  ? { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
-                  : { type: 'spring', stiffness: 300, damping: 18, delay: 0.2 }
-              }
-              className="relative grid place-items-center"
+      <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+1.5rem)] short-screen:pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-10 md:pt-8">
+        <div className="mx-auto mt-auto flex w-full max-w-sm shrink-0 flex-col items-center md:max-w-md">
+          <p className="sr-only" aria-live="polite">
+            {view.count} day streak
+          </p>
+
+          <div
+            aria-hidden
+            className="relative w-full"
+            style={{ height: stageHeight }}
+          >
+            <div
+              className="pointer-events-none absolute left-1/2 -translate-x-1/2 translate-y-1/2"
+              style={{
+                bottom: digitBottom + Math.round(numeralSize * 0.36),
+                width: numeralSize * 2.6,
+                height: numeralSize * 2.6,
+              }}
             >
+              <div
+                className={cn(
+                  'absolute inset-0 transition-[opacity,transform] duration-[900ms] ease-[cubic-bezier(0.23,1,0.32,1)]',
+                  popped ? 'scale-100 opacity-100' : 'scale-75 opacity-40',
+                )}
+                style={{ background: 'var(--streak-sun)' }}
+              />
+              <div
+                className={cn(
+                  'absolute inset-0 transition-opacity duration-700',
+                  popped ? 'opacity-[var(--streak-sun-ray-opacity)]' : 'opacity-0',
+                )}
+                style={{
+                  maskImage:
+                    'radial-gradient(circle at center, black 18%, transparent 62%)',
+                  WebkitMaskImage:
+                    'radial-gradient(circle at center, black 18%, transparent 62%)',
+                }}
+              >
+                <RotatingRays
+                  colorClass="text-[color:var(--streak-sun-ray)]"
+                  masked={false}
+                  size="100%"
+                />
+              </div>
               {popped && !reduceMotion && (
-                <>
+                <div className="absolute inset-0 grid place-items-center">
                   <motion.span
-                    aria-hidden
-                    initial={{ opacity: 0.7, scale: 0.6 }}
-                    animate={{ opacity: 0, scale: 2.4 }}
-                    transition={{ duration: 0.7, ease: 'easeOut' }}
-                    className="absolute h-16 w-16 rounded-full bg-yellow-100"
+                    initial={{ opacity: 0.8, scale: 0.4 }}
+                    animate={{ opacity: 0, scale: 1.6 }}
+                    transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
+                    className="col-start-1 row-start-1 rounded-full bg-amber-50/80"
+                    style={{ width: numeralSize, height: numeralSize }}
                   />
                   {SPARKS.map((spark, i) => (
                     <motion.span
                       key={i}
-                      aria-hidden
-                      initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+                      initial={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 0.6 }}
                       animate={{
-                        x: spark.x,
-                        y: spark.y,
+                        x: spark.x * (numeralSize / 188),
+                        y: spark.y * (numeralSize / 188),
                         opacity: 0,
-                        rotate: 90,
+                        rotate: 120,
+                        scale: 1,
                       }}
-                      transition={{ duration: 0.65, ease: [0.2, 0.8, 0.3, 1] }}
-                      className="absolute rounded-[2px] bg-amber-200"
+                      transition={{ duration: 0.75, ease: [0.2, 0.8, 0.3, 1] }}
+                      className="col-start-1 row-start-1 rounded-[3px] bg-amber-200"
                       style={{ width: spark.size, height: spark.size }}
                     />
                   ))}
-                </>
+                </div>
               )}
-              <Flame
+            </div>
+
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.92 }}
+              animate={
+                popped && !reduceMotion
+                  ? { opacity: 1, y: 0, scale: [1, 1.08, 1] }
+                  : { opacity: 1, y: 0, scale: 1 }
+              }
+              transition={
+                popped
+                  ? { duration: 0.55, ease: [0.23, 1, 0.32, 1] }
+                  : { type: 'spring', duration: 0.6, bounce: 0.2, delay: 0.1 }
+              }
+              className="absolute inset-x-0 flex justify-center"
+              style={{
+                bottom: digitBottom - Math.round(numeralSize * 0.06),
+                fontSize: numeralSize,
+              }}
+            >
+              <TickerNumber
+                value={count}
                 className={cn(
-                  'relative h-[84px] w-[84px] transition-[color,fill] duration-500 short-screen:h-16 short-screen:w-16',
+                  'font-display leading-[0.78] tracking-[0.01em] transition-[color,filter] duration-500',
                   popped
-                    ? 'fill-amber-300 text-amber-100 drop-shadow-[0_0_18px_rgba(255,200,80,0.85)]'
-                    : 'fill-white/25 text-white/50',
+                    ? 'text-[color:var(--streak-numeral)] [filter:drop-shadow(0_6px_0_var(--streak-ink-shadow))_drop-shadow(0_0_28px_var(--streak-numeral-glow))]'
+                    : 'text-white/60 [filter:drop-shadow(0_6px_0_var(--streak-ink-shadow))]',
                 )}
               />
             </motion.div>
+          </div>
+
+          <div className="relative w-full">
+            {popped && landed && (
+              <div
+                className="pointer-events-none absolute z-0"
+                style={{
+                  left: `calc(50% - ${Math.round(frogWidth * 0.06)}px)`,
+                  bottom: `calc(100% + ${bubbleY}px)`,
+                }}
+              >
+                <FrogSpeechBubble
+                  rate={0}
+                  done={0}
+                  total={0}
+                  side
+                  fixedMessage={revealMessage}
+                  className="!left-0 !top-0 [--bubble-max:min(calc(100vw-13rem),15rem)] md:[--bubble-max:15rem]"
+                />
+              </div>
+            )}
+
+            <div
+              aria-hidden
+              className="pointer-events-none absolute z-20"
+              style={{
+                width: frogWidth,
+                height: frogHeight,
+                bottom: `calc(100% - ${frogSeat}px)`,
+                left: `calc(50% - ${Math.round(frogWidth * 0.86)}px)`,
+              }}
+            >
+              <Frog
+                ref={frogRef}
+                width={frogWidth}
+                height={frogHeight}
+                indices={indices}
+                emote="love"
+                arrive="drop"
+                onArrived={() => setLanded(true)}
+              />
             </div>
 
-            <TickerNumber
-              value={count}
-              className="font-display text-[112px] leading-[0.95] tracking-wide text-white [filter:drop-shadow(0_5px_0_var(--streak-ink-shadow))] short-screen:text-[84px]"
-            />
+            <div
+              className={cn(
+                ONBOARDING_DOCK_SURFACE_CLASS,
+                'relative z-10 w-full rounded-[24px] px-4 pb-4 pt-3.5 short-screen:px-3.5 short-screen:pb-3 short-screen:pt-3',
+              )}
+            >
+              <div className="mb-2.5 flex items-center justify-between gap-3 short-screen:mb-2">
+                <span className="flex items-center gap-1.5 text-[15px] font-black text-foreground">
+                  <Flame
+                    aria-hidden
+                    className={cn(
+                      'h-[18px] w-[18px] transition-[color,fill] duration-500',
+                      popped
+                        ? 'fill-amber-400 text-orange-500'
+                        : 'fill-transparent text-muted-foreground',
+                    )}
+                  />
+                  Day streak
+                </span>
+                {newBest ? (
+                  <motion.span
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+                    animate={popped ? { opacity: 1, scale: 1 } : {}}
+                    transition={{ delay: 0.8, type: 'spring', duration: 0.4, bounce: 0.3 }}
+                    className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-black text-amber-700 dark:bg-amber-400/15 dark:text-amber-300"
+                  >
+                    New best!
+                  </motion.span>
+                ) : view.longestStreak > 1 ? (
+                  <span className="text-[12px] font-bold tabular-nums text-muted-foreground">
+                    Best {view.longestStreak}
+                  </span>
+                ) : null}
+              </div>
+              <StreakChain view={view} play={popped} />
+              {activeGoal && (
+                <PledgeProgress
+                  goal={activeGoal}
+                  rewards={
+                    view.goalTiers.find((tier) => tier.days === activeGoal.days)
+                      ?.rewards
+                  }
+                  rewardCatalog={rewardCatalog}
+                  isPremium={isPremium}
+                  play={popped}
+                />
+              )}
+            </div>
           </div>
-
-          <p className="-mt-1 font-display text-[26px] leading-none tracking-wide text-white [filter:drop-shadow(0_2px_0_var(--streak-ink-shadow))] short-screen:text-[22px]">
-            day streak
-          </p>
-
-          <div
-            className="pointer-events-none relative z-20"
-            style={{
-              width: frogWidth,
-              height: frogHeight,
-              marginTop: -(Math.round(frogHeight * 0.68) - 102),
-              marginBottom: shortScreen ? -27 : -11,
-            }}
-          >
-            <Frog
-              ref={frogRef}
-              width={frogWidth}
-              height={frogHeight}
-              indices={indices}
-              emote="love"
-              arrive="drop"
-              onArrived={() => setLanded(true)}
-            />
-            {popped && landed && (
-              <FrogSpeechBubble
-                rate={0}
-                done={0}
-                total={0}
-                fixedMessage={revealMessage}
-                className={shortScreen ? '!top-[142px]' : '!top-[188px]'}
-              />
-            )}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={popped ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 24 }}
-            className="relative z-10 w-full rounded-[24px] bg-[color:var(--streak-glass)] p-4 ring-1 ring-inset ring-white/30 backdrop-blur-md short-screen:mt-4 short-screen:p-3"
-          >
-            <StreakChain view={view} play={popped} />
-            {activeGoal && (
-              <PledgeProgress
-                goal={activeGoal}
-                rewards={
-                  view.goalTiers.find((tier) => tier.days === activeGoal.days)
-                    ?.rewards
-                }
-                rewardCatalog={rewardCatalog}
-                isPremium={isPremium}
-              />
-            )}
-          </motion.div>
         </div>
       </div>
 
-      <div className="relative shrink-0 px-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] short-screen:pt-3 md:px-8 md:pb-7">
-        <div className="relative mx-auto w-full max-w-[320px]">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={popped ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.6 }}
-            className="relative z-10 w-full"
+      <div className="relative shrink-0 px-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] short-screen:pt-3 md:px-10 md:pb-7">
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={popped ? { opacity: 1, y: 0 } : {}}
+          transition={{ delay: 0.6, duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+          className="mx-auto w-full max-w-sm md:max-w-md"
+        >
+          <button
+            type="button"
+            onClick={onContinue}
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-white text-[17px] font-black tracking-tight text-[#447d3f] shadow-[0_5px_0_0_#2c511a,0_12px_24px_-8px_rgba(10,40,16,0.55)] ring-1 ring-[#2c511a]/15 transition-[transform,box-shadow] hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2c511a] active:translate-y-1 active:shadow-[0_1px_0_0_#2c511a] short-screen:h-[52px]"
           >
-            <button
-              type="button"
-              onClick={onContinue}
-              className="w-full rounded-2xl bg-white py-4 text-[17px] font-black tracking-tight text-[#447d3f] shadow-[0_5px_0_0_#2c511a,0_12px_24px_-8px_rgba(10,40,16,0.55)] ring-1 ring-[#2c511a]/15 transition-[transform,box-shadow] hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#447d3f] active:translate-y-1 active:shadow-none short-screen:py-3.5"
-            >
-              Continue
-            </button>
-          </motion.div>
-        </div>
+            Continue
+          </button>
+        </motion.div>
       </div>
     </div>
   );
@@ -939,12 +1043,16 @@ const PLEDGE_NAMES: Record<number, string> = {
 };
 
 const PLEDGE_COLORS = {
-  '--pl-bg': '#0e8a7e',
+  '--pl-bg': '#0a6f66',
   '--pl-on-bg': '#ffffff',
-  '--pl-on-bg-muted': 'rgba(255,255,255,0.78)',
-  '--pl-cta': '#f05a33',
-  '--pl-cta-ink': '#ffffff',
-  '--pl-cta-edge': '#b23d1c',
+  '--pl-on-bg-muted': 'rgba(255,255,255,0.88)',
+  '--pl-cta': '#ffc531',
+  '--pl-cta-ink': '#3b2800',
+  '--pl-cta-edge': '#c98b00',
+  '--pl-pick': '#0a6f66',
+  '--pl-pick-ink': '#ffffff',
+  '--pl-pick-edge': '#064a44',
+  '--pl-pick-soft': '#e9f6f4',
 } as React.CSSProperties;
 
 export function pledgeName(days: number) {
@@ -1073,7 +1181,6 @@ function CommitStep({
 }) {
   const reduceMotion = useReducedMotion();
   const [busyDays, setBusyDays] = useState<number | null>(null);
-  const settled = useSettled();
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
   const lowestTierDays = view?.goalTiers?.length
     ? Math.min(...view.goalTiers.map((tier) => tier.days))
@@ -1116,6 +1223,10 @@ function CommitStep({
     )
       ? lowestTierDays
       : null;
+  const recommendedDays = steppingUpTo ?? bestStartDays ?? lowestTierDays;
+  if (selectedDays === null && recommendedDays !== null) {
+    setSelectedDays(recommendedDays);
+  }
 
   const pickGoal = async (days: number) => {
     if (busyDays !== null) return;
@@ -1148,17 +1259,6 @@ function CommitStep({
       setBusyDays(null);
     }
   };
-
-  const rows = selectedTier
-    ? pledgePrizeRows(selectedTier.rewards, rewardCatalog, isPremium, false)
-    : [];
-  const widestPrizeRows = wide
-    ? Math.max(
-        ...view.goalTiers.map(
-          (tier) => pledgePrizeRows(tier.rewards, rewardCatalog, isPremium, true).length,
-        ),
-      )
-    : 0;
 
   const frog = (
     <Frog
@@ -1196,7 +1296,7 @@ function CommitStep({
   );
 
   const tierPanel = (
-    <div className="relative z-10 w-full rounded-[24px] bg-white px-3 pb-3.5 pt-5 shadow-[0_5px_0_0_rgba(0,0,0,0.16)] dark:bg-[hsl(var(--card-raised))] short-screen:pb-3">
+    <div className="relative z-10 w-full rounded-[26px] bg-white p-2 shadow-[0_5px_0_0_rgba(0,0,0,0.16)] dark:bg-[hsl(var(--card-raised))]">
       <fieldset
         className="w-full"
         aria-labelledby="streak-goal-heading"
@@ -1204,147 +1304,108 @@ function CommitStep({
         disabled={busyDays !== null}
       >
         <legend className="sr-only">Pledge length</legend>
-        <div className="grid grid-cols-4 gap-2">
-          {view.goalTiers.map((tier) => {
+        <div className="flex flex-col gap-1">
+          {view.goalTiers.map((tier, index) => {
             const selected = selectedDays === tier.days;
+            const badge =
+              tier.days === steppingUpTo
+                ? 'Next up'
+                : tier.days === bestStartDays
+                  ? 'Best start'
+                  : null;
             return (
-              <label key={tier.days} className="relative block cursor-pointer">
+              <label
+                key={tier.days}
+                className={cn(
+                  'relative flex cursor-pointer items-center gap-3 rounded-[20px] border-2 py-2 pl-2 pr-2.5 transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.985] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:disabled]:cursor-wait short-screen:py-1.5',
+                  selected
+                    ? 'border-[color:var(--pl-pick)] bg-[color:var(--pl-pick-soft)] dark:border-teal-400/70 dark:bg-teal-400/10'
+                    : 'border-transparent hover:bg-[#f5f7fb] dark:hover:bg-white/[0.04]',
+                )}
+              >
                 <input
                   type="radio"
                   name="streak-goal"
                   value={tier.days}
                   checked={selected}
                   onChange={() => choose(tier.days)}
-                  className="peer sr-only"
+                  className="sr-only"
                 />
-                {(tier.days === steppingUpTo || tier.days === bestStartDays) && (
-                  <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950 shadow-sm">
-                    {tier.days === steppingUpTo ? 'Next up' : 'Best start'}
+                {badge && (
+                  <span className="absolute left-[36px] top-0 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950 shadow-[0_1px_0_0_#b45309] short-screen:left-[34px]">
+                    {badge}
                   </span>
                 )}
                 <span
+                  aria-hidden
                   className={cn(
-                    'flex h-[80px] flex-col items-center justify-center rounded-2xl border-2 short-screen:h-[72px] transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
+                    'flex h-[52px] w-[52px] shrink-0 flex-col items-center justify-center rounded-2xl transition-[background-color,color,box-shadow] duration-150 short-screen:h-12 short-screen:w-12',
                     selected
-                      ? 'border-[color:var(--pl-cta)] bg-[color:var(--pl-cta)] text-[color:var(--pl-cta-ink)] shadow-[0_4px_0_0_var(--pl-cta-edge)]'
-                      : 'border-[#e3e8f0] bg-[#f5f7fb] text-foreground shadow-[0_3px_0_0_#e3e8f0] hover:bg-[#eef2f8] dark:border-white/10 dark:bg-white/[0.06] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.3)] dark:hover:bg-white/10',
+                      ? 'bg-[color:var(--pl-pick)] text-[color:var(--pl-pick-ink)] shadow-[0_3px_0_0_var(--pl-pick-edge)]'
+                      : 'bg-[#f1f4f9] text-foreground shadow-[0_3px_0_0_#e1e6ef] dark:bg-white/[0.07] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.35)]',
                   )}
                 >
-                  <span className="font-display text-[28px] leading-none tracking-wide short-screen:text-[26px]">
+                  <span className="font-display text-[24px] leading-none tracking-wide">
                     {tier.days}
                   </span>
                   <span
                     className={cn(
-                      'mt-1.5 text-[11px] font-black leading-none',
-                      selected ? 'text-[color:var(--pl-cta-ink)] opacity-80' : 'text-muted-foreground',
+                      'mt-0.5 text-[9.5px] font-black leading-none',
+                      selected ? 'opacity-85' : 'text-muted-foreground',
                     )}
                   >
-                    {tier.payoutPercent < 100
-                      ? `days · ${tier.payoutPercent}%`
-                      : 'days'}
+                    days
                   </span>
                 </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[15px] font-black leading-tight text-foreground">
+                      {pledgeName(tier.days)}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'mt-1 block truncate text-[12px] font-bold leading-tight',
+                      selected
+                        ? 'text-[color:var(--pl-pick)] dark:text-teal-300'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {selected
+                      ? `Ends ${formatPledgeEnd(tier.days)}`
+                      : tier.payoutPercent < 100
+                        ? `Flies pay ${tier.payoutPercent}%`
+                        : `${tier.days} days in a row`}
+                  </span>
+                </span>
+                <PledgeRewardTiles
+                  rewards={tier.rewards}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={isPremium}
+                  hydrateDelayMs={300 + index * 110}
+                  paused={!selected}
+                  still={!selected}
+                  flatLimit={3}
+                />
               </label>
             );
           })}
         </div>
       </fieldset>
+      {selectedTier && (
+        <p
+          aria-live="polite"
+          className="px-3 pb-1.5 pt-2.5 text-center text-[12.5px] font-semibold leading-snug text-muted-foreground short-screen:pt-2"
+        >
+          <span className="font-black text-foreground">
+            {pledgeName(selectedTier.days)} prize:
+          </span>{' '}
+          {pledgePrizeSummary(selectedTier.rewards, rewardCatalog, isPremium)}
+          {selectedTier.payoutPercent < 100 &&
+            `. Kept before, so flies pay ${selectedTier.payoutPercent}%`}
+        </p>
+      )}
     </div>
-  );
-
-  const prizes = (
-    <section className="mt-5 w-full short-screen:mt-4" aria-live="polite">
-      <div className="mb-2 flex h-6 items-center justify-between gap-2 px-1.5">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-black text-[color:var(--pl-on-bg)]">
-          <PrizeMedal className="h-[18px] w-[18px]" />
-          {selectedDays !== null ? `${pledgeName(selectedDays)} prize` : 'Prizes'}
-        </h3>
-        {selectedDays !== null && (
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11.5px] font-bold text-[color:var(--pl-on-bg)]">
-            Ends {formatPledgeEnd(selectedDays)}
-          </span>
-        )}
-      </div>
-      <div
-        className={cn(
-          'rounded-[24px] bg-white px-3.5 py-1.5 shadow-[0_5px_0_0_rgba(0,0,0,0.16)] dark:bg-[hsl(var(--card-raised))]',
-          wide && 'flex flex-col justify-center',
-        )}
-        style={wide ? { minHeight: Math.ceil(widestPrizeRows / 2) * 80 + 14 } : undefined}
-      >
-        {selectedDays !== null ? (
-          <>
-            <ul
-            className={cn(
-              'relative',
-              wide
-                ? 'grid grid-cols-2 gap-x-3'
-                : 'flex flex-col divide-y divide-border/70',
-            )}
-          >
-              <AnimatePresence initial={false} mode="popLayout">
-                {settled
-                  ? rows.map((row) => (
-                      <motion.li
-                        key={row.key}
-                        layout={reduceMotion ? false : 'position'}
-                        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
-                        transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-                        className="flex items-center gap-3.5 py-3 short-screen:py-2.5"
-                      >
-                        <span className="grid h-[52px] w-[52px] shrink-0 place-items-center">
-                          {row.tile}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-[15px] font-black leading-tight text-foreground">
-                            {row.title}
-                          </span>
-                          {row.note && (
-                            <span className="mt-1 block text-[12.5px] font-semibold leading-snug text-muted-foreground">
-                              {row.note}
-                            </span>
-                          )}
-                        </span>
-                      </motion.li>
-                    ))
-                  : rows.map((row) => (
-                      <li key={row.key} className="h-[76px] short-screen:h-[72px]" aria-hidden />
-                    ))}
-              </AnimatePresence>
-            </ul>
-            {selectedTier && selectedTier.payoutPercent < 100 && (
-              <p className="mb-2 rounded-xl bg-muted px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
-                You&apos;ve kept this pledge before, so its flies pay{' '}
-                {selectedTier.payoutPercent}%. A longer one pays in full.
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="flex min-h-[148px] flex-col items-center justify-center gap-3 py-3 text-center short-screen:min-h-[140px]">
-            {topTier && (
-              <PledgeRewardTiles
-                rewards={topTier.rewards}
-                rewardCatalog={rewardCatalog}
-                isPremium={isPremium}
-                hydrateDelayMs={450}
-                paused
-                still
-              />
-            )}
-            <span>
-              <span className="block text-[15px] font-black leading-tight text-foreground">
-                Longer pledges win bigger prizes
-              </span>
-              <span className="mt-1 block text-[12.5px] font-semibold text-muted-foreground">
-                Pick a length to see yours
-              </span>
-            </span>
-          </div>
-        )}
-      </div>
-    </section>
   );
 
   const actions = (
@@ -1367,7 +1428,7 @@ function CommitStep({
         aria-live="polite"
         className="flex h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[color:var(--pl-cta)] px-4 text-base font-black text-[color:var(--pl-cta-ink)] shadow-[0_5px_0_0_var(--pl-cta-edge)] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-white/20 disabled:text-[color:var(--pl-on-bg-muted)] disabled:shadow-none disabled:hover:brightness-100"
       >
-        {selectedDays !== null && <SolidFlame className="h-[22px] w-[22px] -translate-y-px" />}
+        {selectedDays !== null && <SolidFlame className="h-[22px] w-[22px] -translate-y-px text-[#ea580c]" />}
         {busyDays !== null
           ? 'Starting…'
           : selectedDays !== null
@@ -1420,7 +1481,6 @@ function CommitStep({
           <div className="m-auto flex w-full flex-col items-center">
             {heading}
             <div className="mt-6 w-full short-screen:mt-4">{tierPanel}</div>
-            {prizes}
             <div className="mt-5 w-full short-screen:mt-4">{actions}</div>
           </div>
         </div>
@@ -1434,8 +1494,8 @@ function CommitStep({
         className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ contain: 'paint' }}
       >
-        <div className="min-h-full px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
-          <div className="mx-auto flex w-full max-w-sm flex-col items-center">
+        <div className="flex min-h-full flex-col px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
+          <div className="mx-auto my-auto flex w-full max-w-sm flex-col items-center">
             {heading}
 
             <div className="relative mt-[80px] w-full short-screen:mt-[74px]">
@@ -1463,8 +1523,6 @@ function CommitStep({
 
               {tierPanel}
             </div>
-
-            {prizes}
           </div>
         </div>
       </div>

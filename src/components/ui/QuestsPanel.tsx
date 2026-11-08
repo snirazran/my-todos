@@ -1511,21 +1511,16 @@ function QuestSeasonEventOverlay({
               type="button"
               onClick={onUpgrade}
               aria-label={`Unlock the season Plus reward track. ${waitingPlusTiers > 0 ? `Plus rewards at ${waitingPlusTiers} reached tiers are ready to claim after upgrading.` : 'Get an extra reward at every tier.'}`}
-              style={{ ['--plus-button-base' as string]: '#b7791f' }}
-              className="plus-upgrade-button pointer-events-auto relative h-12 min-w-0 shrink-0 touch-manipulation rounded-[14px] bg-[#f7bf33] pl-[3.4rem] pr-4 text-left text-[#3d2905] hover:brightness-105 focus-visible:outline-none"
+              className="plus-upgrade-button plus-club pointer-events-auto relative h-12 min-w-0 shrink-0 touch-manipulation rounded-[16px] pl-[3.4rem] pr-4 text-left focus-visible:outline-none"
             >
-              <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[14px]">
-                <span className="absolute inset-x-3 top-[3px] h-[5px] rounded-full bg-white/45" />
-                <span className="absolute inset-y-0 left-0 w-1/2 -skew-x-12 bg-white/30 animate-[bar-shine-idle_3.2s_ease-in-out_infinite] motion-reduce:hidden" />
-              </span>
               <Icon
                 name="frogPlus"
-                className="plus-cta-frog pointer-events-none absolute -left-1 -top-5 h-14 w-14 drop-shadow-[0_3px_0_rgba(120,80,10,0.35)]"
+                className="plus-cta-frog pointer-events-none absolute -left-1 -top-5 h-14 w-14 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
               />
-              <span className="relative block text-[15px] font-black leading-tight">
+              <span className="relative block text-[15px] font-black leading-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">
                 Unlock Plus
               </span>
-              <span className="relative mt-0.5 block truncate text-[11px] font-bold leading-tight text-[#6b4a12]">
+              <span className="plus-club-sub relative mt-0.5 block truncate text-[11px] font-bold leading-tight">
                 {waitingPlusTiers > 0
                   ? `${waitingPlusTiers} ${waitingPlusTiers === 1 ? 'tier' : 'tiers'} ready to claim`
                   : 'Extra reward every tier'}
@@ -2154,19 +2149,14 @@ function LockedPlusPreview({
             type="button"
             onClick={onUpgrade}
             aria-label={`Unlock Plus. ${ctaLine}.`}
-            style={{ ['--plus-button-base' as string]: '#b7791f' }}
-            className="plus-upgrade-button relative mt-7 flex h-14 w-full touch-manipulation flex-col items-center justify-center rounded-[14px] bg-[#f7bf33] text-[#3d2905] hover:brightness-105 focus-visible:outline-none"
+            className="plus-upgrade-button plus-club relative mt-7 flex h-14 w-full touch-manipulation flex-col items-center justify-center rounded-[16px] focus-visible:outline-none"
           >
-            <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[14px]">
-              <span className="absolute inset-x-4 top-[3px] h-[5px] rounded-full bg-white/45" />
-              <span className="absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-white/30 animate-[bar-shine-idle_3.2s_ease-in-out_infinite] motion-reduce:hidden" />
-            </span>
             <Icon
               name="frogPlus"
-              className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(120,80,10,0.35)]"
+              className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
             />
-            <span className="relative text-[16px] font-black leading-tight">Unlock Plus</span>
-            <span className="relative mt-0.5 text-[11.5px] font-bold leading-tight text-[#6b4a12]">
+            <span className="relative text-[16px] font-black leading-tight [text-shadow:0_2px_0_rgba(35,13,82,0.5)]">Unlock Plus</span>
+            <span className="plus-club-sub relative mt-0.5 text-[11.5px] font-bold leading-tight">
               {ctaLine}
             </span>
           </button>
