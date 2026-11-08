@@ -3819,7 +3819,10 @@ body.dragging {
 
 .shop-surface {
   --shop-top: #5e4537;
-  --shop-body: hsl(var(--background));
+  --shop-body: #fbf6ef;
+  --shop-heading: #3b2a20;
+  --shop-sub: #8d7262;
+  --shop-floor-shadow: rgba(74, 46, 28, 0.16);
   --shop-wood: #e8c99c;
   --shop-wood-edge: #cfa673;
   --shop-wood-shine: rgba(255, 255, 255, 0.35);
@@ -3830,7 +3833,7 @@ body.dragging {
   --shop-wainscot: rgba(0, 0, 0, 0.12);
   --shop-prop: rgba(255, 255, 255, 0.09);
   --shop-prop-line: rgba(0, 0, 0, 0.16);
-  --shop-cubby: #f5f2ee;
+  --shop-cubby: #ffffff;
   --shop-shelf: #e6ded4;
   --shop-shelf-edge: #c9bcab;
   --shop-cubby-epic: #f3effc;
@@ -3844,7 +3847,10 @@ body.dragging {
 
 .dark .shop-surface {
   --shop-top: #2a1e18;
-  --shop-body: hsl(var(--background));
+  --shop-body: #1d1612;
+  --shop-heading: #f3e6da;
+  --shop-sub: #b39a89;
+  --shop-floor-shadow: rgba(0, 0, 0, 0.45);
   --shop-wood: #7d5d42;
   --shop-wood-edge: #5c4230;
   --shop-wood-shine: rgba(255, 255, 255, 0.12);
@@ -3855,7 +3861,7 @@ body.dragging {
   --shop-wainscot: rgba(0, 0, 0, 0.22);
   --shop-prop: rgba(255, 255, 255, 0.06);
   --shop-prop-line: rgba(0, 0, 0, 0.3);
-  --shop-cubby: rgba(255, 255, 255, 0.055);
+  --shop-cubby: rgba(255, 236, 220, 0.06);
   --shop-shelf: #3a2e27;
   --shop-shelf-edge: #1e1612;
   --shop-awning-a: #6f6152;

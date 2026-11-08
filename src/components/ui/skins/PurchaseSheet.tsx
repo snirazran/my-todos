@@ -238,6 +238,7 @@ export function PurchaseSheet({
               className={cn(
                 'relative flex min-h-0 flex-col overflow-hidden rounded-[28px] sm:shadow-[0_3px_0_0_rgba(0,0,0,0.18),0_24px_56px_-18px_rgba(0,0,0,0.45)]',
                 CARD_SURFACE,
+                '!bg-[color:var(--shop-body)]',
               )}
             >
               <div
@@ -315,7 +316,7 @@ export function PurchaseSheet({
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.28, delay: 0.05 }}
-                    className="text-balance text-[22px] font-black leading-tight tracking-tight text-foreground"
+                    className="text-balance text-[22px] font-black leading-tight tracking-tight text-[color:var(--shop-heading)]"
                   >
                     {target.name}
                   </motion.h2>

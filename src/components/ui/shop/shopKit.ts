@@ -1,9 +1,9 @@
 import type { Rarity } from '@/lib/skins/catalog';
 
 export const SHOP_CUBBY: Record<Rarity, string> = {
-  common: 'bg-[color:var(--shop-cubby)]',
-  uncommon: 'bg-[color:var(--shop-cubby)]',
-  rare: 'bg-[color:var(--shop-cubby)]',
+  common: 'bg-[color:var(--shop-cubby)] ring-1 ring-inset ring-[color:var(--shop-tag-edge)]',
+  uncommon: 'bg-[color:var(--shop-cubby)] ring-1 ring-inset ring-[color:var(--shop-tag-edge)]',
+  rare: 'bg-[color:var(--shop-cubby)] ring-1 ring-inset ring-[color:var(--shop-tag-edge)]',
   epic: 'bg-[color:var(--shop-cubby-epic)]',
   legendary: 'closet-foil closet-foil-gold bg-[color:var(--shop-cubby-legendary)]',
 };

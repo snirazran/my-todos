@@ -334,11 +334,11 @@ function SectionHeader({
   return (
     <div className="mb-4 flex items-center gap-3 md:mb-5">
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[20px] font-black leading-tight tracking-[-0.01em] text-foreground md:text-[24px]">
+        <span className="block truncate text-[20px] font-black leading-tight tracking-[-0.01em] text-[color:var(--shop-heading)] md:text-[24px]">
           {title}
         </span>
         {sub ? (
-          <span className="mt-0.5 block text-[13px] font-bold tabular-nums text-muted-foreground md:text-[14px]">
+          <span className="mt-0.5 block text-[13px] font-bold tabular-nums text-[color:var(--shop-sub)] md:text-[14px]">
             {sub}
           </span>
         ) : null}
@@ -676,6 +676,7 @@ export function ShopWindow({
 
         <div className="relative z-10 flex-1 bg-[color:var(--shop-body)] px-4 pb-10 pt-6 md:flex-none md:bg-transparent md:px-6 md:pb-16 md:pt-10">
           <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 bg-[color:var(--shop-body)] md:block" />
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[color:var(--shop-floor-shadow)] to-transparent md:left-1/2 md:right-auto md:w-screen md:-translate-x-1/2" />
           {!isGuest && shopGift?.available && (
             <div className="mb-6">
               <ShopGiftTile gift={shopGift} onClaim={onClaimGift} />
