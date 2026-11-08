@@ -1,5 +1,4 @@
 import {
-  isTradeOnlyRarity,
   rarityRank,
   type ItemDef,
   type Rarity,
@@ -149,7 +148,7 @@ export function computeDealPrice(priceFlies: number, discount: number): number {
 export function isShopBuyable(item: ItemDef, now: Date = new Date()): boolean {
   return (
     item.slot !== 'container' &&
-    !isTradeOnlyRarity(item.rarity) &&
+    item.rarity !== 'legendary' &&
     (item.priceFlies ?? 0) > 0 &&
     isAvailableAt(item, now)
   );
@@ -158,7 +157,7 @@ export function isShopBuyable(item: ItemDef, now: Date = new Date()): boolean {
 export function isLegendaryOffer(item: ItemDef, now: Date = new Date()): boolean {
   return (
     item.slot !== 'container' &&
-    isTradeOnlyRarity(item.rarity) &&
+    item.rarity === 'legendary' &&
     (item.priceFlies ?? 0) > 0 &&
     isAvailableAt(item, now)
   );

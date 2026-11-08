@@ -64,6 +64,11 @@ export async function loadShieldConfig(): Promise<ShieldConfigView> {
       SHIELD_DEFAULTS.twoPackPriceFlies,
       1,
     ),
+    rescuePriceFlies: num(
+      doc?.rescuePriceFlies,
+      SHIELD_DEFAULTS.rescuePriceFlies,
+      1,
+    ),
     capFree: Math.min(CAP_MAX, num(doc?.capFree, SHIELD_DEFAULTS.capFree, CAP_MIN)),
     capPlus: Math.min(CAP_MAX, num(doc?.capPlus, SHIELD_DEFAULTS.capPlus, CAP_MIN)),
     plusMonthlyGrant: num(

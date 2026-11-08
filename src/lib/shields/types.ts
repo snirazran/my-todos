@@ -30,6 +30,7 @@ export type ShieldConfigView = {
   isActive: boolean;
   priceFlies: number;
   twoPackPriceFlies: number;
+  rescuePriceFlies: number;
   capFree: number;
   capPlus: number;
   plusMonthlyGrant: number;

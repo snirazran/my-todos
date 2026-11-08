@@ -95,13 +95,13 @@ export function streakRevealMessage(context: StreakRevealContext): string {
 }
 
 const PLEDGE_LINES: Record<number, string> = {
-  7: 'Seven days.\nPerfect warm-up!',
-  14: 'Two weeks!\nBold. I like it.',
-  30: 'A whole month?\nI’m getting emotional.',
-  50: 'Fifty days?!\nThat’s a legend move.',
+  7: 'One week, side by side.\nI’ll be right here.',
+  14: 'Two weeks together?\nI believe in you.',
+  30: 'A whole month with you?\nMy heart’s doing hops.',
+  50: 'Fifty days, you and me.\nI’m proud of you already.',
 };
 
 export function pledgeFrogLine(days: number | null): string {
-  if (days === null) return 'Make it official?\nPick how long we go.';
-  return PLEDGE_LINES[days] ?? `${days} days together?\nI’m so in.`;
+  if (days === null) return 'Want to make a promise?\nI’ll keep you company.';
+  return PLEDGE_LINES[days] ?? `${days} days together?\nI’ve got your back.`;
 }

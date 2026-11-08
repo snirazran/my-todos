@@ -37,6 +37,7 @@ import { announcePledgeMade } from '@/lib/widget/prompt';
 import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
+import { PrizeMedal, SolidFlame } from './StreakIcons';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { pledgeFrogLine, streakRevealMessage } from '@/lib/streak/revealMessage';
 import { PondBackdrop } from '@/components/ui/PondBackdrop';
@@ -244,17 +245,19 @@ function useWarmSkinRolls(
  * get purpose-built tiles, but they join the same fan rather than sitting off
  * to the side. The rarity promise rides beside the stack, never over the art.
  */
-function PledgeRewardTiles({
+export function PledgeRewardTiles({
   rewards,
   rewardCatalog,
   isPremium,
   hydrateDelayMs = 0,
   paused = false,
   still = false,
+  flatLimit,
 }: {
   rewards: LoginStreakReward[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  flatLimit?: number;
   /** Staggered so four tiers' worth of artwork never parses in one frame. */
   hydrateDelayMs?: number;
   /** Only the selected tier animates; the rest hold a still frame. */
@@ -289,6 +292,7 @@ function PledgeRewardTiles({
           paused={paused}
           still={still}
           giftAnimation={index === 0 ? 'box_shake' : undefined}
+          flyOversample={flatLimit ? 2 : undefined}
         />
       ),
     }));
@@ -306,6 +310,26 @@ function PledgeRewardTiles({
         />
       ),
     });
+  }
+
+  if (flatLimit) {
+    const ordered = skinFloor ? [tiles[tiles.length - 1], ...tiles.slice(0, -1)] : tiles;
+    const overflow = ordered.length > flatLimit;
+    const shown = ordered.slice(0, overflow ? flatLimit - 1 : flatLimit);
+    return (
+      <span className="flex shrink-0 items-center gap-1.5">
+        {shown.map((tile) => (
+          <span key={tile.key} className="relative">
+            {tile.node}
+          </span>
+        ))}
+        {overflow && (
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-[13px] font-black tabular-nums text-muted-foreground">
+            +{ordered.length - shown.length}
+          </span>
+        )}
+      </span>
+    );
   }
 
   return (
@@ -914,7 +938,16 @@ const PLEDGE_NAMES: Record<number, string> = {
   50: 'Legend',
 };
 
-function pledgeName(days: number) {
+const PLEDGE_COLORS = {
+  '--pl-bg': '#0e8a7e',
+  '--pl-on-bg': '#ffffff',
+  '--pl-on-bg-muted': 'rgba(255,255,255,0.78)',
+  '--pl-cta': '#f05a33',
+  '--pl-cta-ink': '#ffffff',
+  '--pl-cta-edge': '#b23d1c',
+} as React.CSSProperties;
+
+export function pledgeName(days: number) {
   return PLEDGE_NAMES[days] ?? `${days} days`;
 }
 
@@ -1144,7 +1177,7 @@ function CommitStep({
         <h2
           id="streak-goal-heading"
           className={cn(
-          'text-center font-black tracking-tight text-foreground',
+          'text-center font-black tracking-tight text-[color:var(--pl-on-bg)]',
           wide ? 'text-[32px]' : 'text-[clamp(1.5rem,7vw,1.75rem)]',
         )}
         >
@@ -1153,7 +1186,7 @@ function CommitStep({
         <p
           id="streak-goal-hint"
           className={cn(
-          'mt-1 text-pretty text-center text-sm font-semibold leading-snug text-muted-foreground',
+          'mt-1 text-pretty text-center text-sm font-semibold leading-snug text-[color:var(--pl-on-bg-muted)]',
           !wide && 'max-w-[30ch]',
         )}
         >
@@ -1163,7 +1196,7 @@ function CommitStep({
   );
 
   const tierPanel = (
-    <div className="pond-panel relative z-10 w-full rounded-[24px] border border-[color:var(--pond-line)] bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] px-3 pb-3.5 pt-5 shadow-[0_3px_0_0_var(--pond-line)] short-screen:pb-3">
+    <div className="relative z-10 w-full rounded-[24px] bg-white px-3 pb-3.5 pt-5 shadow-[0_5px_0_0_rgba(0,0,0,0.16)] dark:bg-[hsl(var(--card-raised))] short-screen:pb-3">
       <fieldset
         className="w-full"
         aria-labelledby="streak-goal-heading"
@@ -1193,8 +1226,8 @@ function CommitStep({
                   className={cn(
                     'flex h-[80px] flex-col items-center justify-center rounded-2xl border-2 short-screen:h-[72px] transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
                     selected
-                      ? 'border-[#447d3f] bg-[#447d3f] text-white shadow-[0_4px_0_0_#2c511a]'
-                      : 'border-[color:var(--pond-chip-line)] bg-[color:var(--pond-chip)] text-[color:var(--pond-ink)] shadow-[0_3px_0_0_var(--pond-chip-line)] hover:bg-[color:var(--pond-chip-hover)]',
+                      ? 'border-[color:var(--pl-cta)] bg-[color:var(--pl-cta)] text-[color:var(--pl-cta-ink)] shadow-[0_4px_0_0_var(--pl-cta-edge)]'
+                      : 'border-[#e3e8f0] bg-[#f5f7fb] text-foreground shadow-[0_3px_0_0_#e3e8f0] hover:bg-[#eef2f8] dark:border-white/10 dark:bg-white/[0.06] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.3)] dark:hover:bg-white/10',
                   )}
                 >
                   <span className="font-display text-[28px] leading-none tracking-wide short-screen:text-[26px]">
@@ -1203,7 +1236,7 @@ function CommitStep({
                   <span
                     className={cn(
                       'mt-1.5 text-[11px] font-black leading-none',
-                      selected ? 'text-white/90' : 'text-[color:var(--pond-ink-muted)]',
+                      selected ? 'text-[color:var(--pl-cta-ink)] opacity-80' : 'text-muted-foreground',
                     )}
                   >
                     {tier.payoutPercent < 100
@@ -1222,19 +1255,19 @@ function CommitStep({
   const prizes = (
     <section className="mt-5 w-full short-screen:mt-4" aria-live="polite">
       <div className="mb-2 flex h-6 items-center justify-between gap-2 px-1.5">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-black text-amber-800 dark:text-amber-300">
-          <Trophy aria-hidden className="h-4 w-4 text-amber-500" />
+        <h3 className="flex items-center gap-1.5 text-[13px] font-black text-[color:var(--pl-on-bg)]">
+          <PrizeMedal className="h-[18px] w-[18px]" />
           {selectedDays !== null ? `${pledgeName(selectedDays)} prize` : 'Prizes'}
         </h3>
         {selectedDays !== null && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-bold text-amber-800 dark:bg-amber-400/15 dark:text-amber-300">
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11.5px] font-bold text-[color:var(--pl-on-bg)]">
             Ends {formatPledgeEnd(selectedDays)}
           </span>
         )}
       </div>
       <div
         className={cn(
-          'rounded-[24px] border border-amber-200 bg-[linear-gradient(to_bottom,#fffbeb,#ffffff)] px-3.5 py-1.5 shadow-[0_3px_0_0_rgba(217,119,6,0.14)] dark:border-amber-400/25 dark:bg-[linear-gradient(to_bottom,rgba(251,191,36,0.11),rgba(251,191,36,0.03))] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.3)]',
+          'rounded-[24px] bg-white px-3.5 py-1.5 shadow-[0_5px_0_0_rgba(0,0,0,0.16)] dark:bg-[hsl(var(--card-raised))]',
           wide && 'flex flex-col justify-center',
         )}
         style={wide ? { minHeight: Math.ceil(widestPrizeRows / 2) * 80 + 14 } : undefined}
@@ -1246,7 +1279,7 @@ function CommitStep({
               'relative',
               wide
                 ? 'grid grid-cols-2 gap-x-3'
-                : 'flex flex-col divide-y divide-amber-200/70 dark:divide-amber-400/15',
+                : 'flex flex-col divide-y divide-border/70',
             )}
           >
               <AnimatePresence initial={false} mode="popLayout">
@@ -1332,9 +1365,9 @@ function CommitStep({
           if (selectedDays !== null) void pickGoal(selectedDays);
         }}
         aria-live="polite"
-        className="flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#447d3f] px-4 text-base font-black text-white shadow-[0_4px_0_0_#2c511a] ring-1 ring-[#2c511a]/40 transition-[transform,box-shadow,filter] hover:brightness-110 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-[0_4px_0_0_rgba(0,0,0,0.08)] disabled:ring-0 disabled:hover:brightness-100"
+        className="flex h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[color:var(--pl-cta)] px-4 text-base font-black text-[color:var(--pl-cta-ink)] shadow-[0_5px_0_0_var(--pl-cta-edge)] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-white/20 disabled:text-[color:var(--pl-on-bg-muted)] disabled:shadow-none disabled:hover:brightness-100"
       >
-        {selectedDays !== null && <Flame className="h-5 w-5 fill-amber-300 text-amber-200" />}
+        {selectedDays !== null && <SolidFlame className="h-[22px] w-[22px] -translate-y-px" />}
         {busyDays !== null
           ? 'Starting…'
           : selectedDays !== null
@@ -1345,16 +1378,16 @@ function CommitStep({
         type="button"
         onClick={onSkip}
         disabled={busyDays !== null}
-        className="mt-1 min-h-11 px-4 text-sm font-bold text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+        className="mt-1 min-h-11 px-4 text-sm font-bold text-[color:var(--pl-on-bg-muted)] hover:text-[color:var(--pl-on-bg)] focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
       >
-        Not now
+        Skip the prize
       </button>
     </div>
   );
 
   if (wide) {
     return (
-      <div className="flex min-h-0 flex-1 bg-background">
+      <div className="flex min-h-0 flex-1 bg-[color:var(--pl-bg)] dark:[background-image:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3))]">
         <div className="relative flex w-[42%] shrink-0 items-center justify-center overflow-hidden px-7">
           <PondBackdrop className="absolute inset-0 h-full w-full" />
           <div className="pointer-events-none relative flex w-full -translate-y-8 flex-col items-center">
@@ -1396,12 +1429,12 @@ function CommitStep({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background">
+    <div className="flex min-h-0 flex-1 flex-col bg-[color:var(--pl-bg)] dark:[background-image:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3))]">
       <div
         className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ contain: 'paint' }}
       >
-        <div className="min-h-full bg-[radial-gradient(140%_42%_at_50%_0%,hsl(var(--primary)/0.13),transparent_72%)] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
+        <div className="min-h-full px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
           <div className="mx-auto flex w-full max-w-sm flex-col items-center">
             {heading}
 
@@ -1436,7 +1469,7 @@ function CommitStep({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
+      <div className="shrink-0 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
         {actions}
       </div>
     </div>
@@ -1758,7 +1791,7 @@ export function StreakSheet({
   };
 
   const finishCommit = () => {
-    if (celebration) close();
+    if (celebration || commitIntent) close();
     else setStep('home');
   };
 
@@ -1815,6 +1848,7 @@ export function StreakSheet({
                   }
                 }}
                 onClick={(event) => event.stopPropagation()}
+                style={PLEDGE_COLORS}
                 className={cn(
                   'relative mx-auto flex h-full w-full transform-gpu flex-col overflow-hidden will-change-transform [backface-visibility:hidden] md:h-auto md:max-h-[min(40rem,calc(100dvh-3rem))] md:rounded-[32px] md:shadow-2xl',
                   wideCommit ? 'md:w-[min(100%,60rem)]' : 'md:w-[min(100%,40rem)]',
@@ -1828,7 +1862,12 @@ export function StreakSheet({
                     onClick={() =>
                       step === 'commit' ? finishCommit() : onOpenChange(false)
                     }
-                    className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 grid h-11 w-11 place-items-center rounded-full bg-muted/70 text-muted-foreground backdrop-blur transition-colors hover:bg-muted active:scale-95 md:top-4"
+                    className={cn(
+                      'absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 grid h-11 w-11 place-items-center rounded-full backdrop-blur transition-colors active:scale-95 md:top-4',
+                      step === 'commit'
+                        ? 'bg-white/20 text-[color:var(--pl-on-bg)] ring-1 ring-white/30'
+                        : 'bg-muted/70 text-muted-foreground hover:bg-muted',
+                    )}
                   >
                     <X className="w-5 h-5" />
                   </button>

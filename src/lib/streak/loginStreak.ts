@@ -29,6 +29,8 @@ import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
 import { findTaskStreaksAtRisk } from './taskStreaks';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { streakFlyBase } from '@/lib/flyValue';
 import { getRewardPool } from '@/lib/skins/gifts';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import type {
@@ -98,6 +100,9 @@ function readRescue(raw: any): StreakRescue | null {
             taskId: t.taskId,
             text: typeof t.text === 'string' ? t.text : '',
             count: Math.max(0, Math.floor(t.count)),
+            ...(typeof t.fliesPerTask === 'number'
+              ? { fliesPerTask: Math.max(0, Math.floor(t.fliesPerTask)) }
+              : {}),
           }))
       : [],
     missedDayKey:
@@ -108,6 +113,7 @@ function readRescue(raw: any): StreakRescue | null {
     adsRequired: Math.max(0, Math.floor(raw.adsRequired ?? 0)),
     adsWatched: Math.max(0, Math.floor(raw.adsWatched ?? 0)),
     adEligible: raw.adEligible !== false,
+    priceFlies: Math.max(0, Math.floor(raw.priceFlies ?? 0)),
     dismissed: raw.dismissed === true,
     goal: readGoal(raw.goal),
   };
@@ -639,6 +645,7 @@ function buildRescueOffer(args: {
   loginCountAtRisk: number;
   taskStreaks: TaskStreakAtRisk[];
   goal: LoginStreakGoal | null;
+  priceFlies: number;
 }): StreakRescue | null {
   const {
     user,
@@ -672,6 +679,7 @@ function buildRescueOffer(args: {
     adsRequired: isPremiumUser(user.toObject()) ? 0 : rescueAdsRequired(largest),
     adsWatched: 0,
     adEligible,
+    priceFlies: args.priceFlies,
     goal,
   };
 }
@@ -776,13 +784,21 @@ async function evaluateStreakDay(
     freshState.lastDayKey < yesterdayKey &&
     freshState.goal.startDayKey <= yesterdayKey;
 
-  const taskStreaksAtRisk = await findTaskStreaksAtRisk({
+  const foundTaskStreaks = await findTaskStreaksAtRisk({
     userId,
     missedDayKey: yesterdayKey,
     timezone,
     protectedDays: new Set(freshState.protectedDayKeys),
     minStreak: RESCUE_MIN_TASK_STREAK,
   });
+  const streakTiers =
+    foundTaskStreaks.length > 0
+      ? (await loadFlyEconomyConfig().catch(() => null))?.taskStreak.tiers
+      : undefined;
+  const taskStreaksAtRisk = foundTaskStreaks.map((t) => ({
+    ...t,
+    fliesPerTask: streakFlyBase(t.count + 1, streakTiers),
+  }));
 
   // Saver mute accounting. The counter tracks warnings that DIDN'T work: a day
   // where nothing broke forgives the counter (and un-mutes a returning user).
@@ -810,6 +826,7 @@ async function evaluateStreakDay(
         loginCountAtRisk: loginBroke ? freshState.count : 0,
         taskStreaks: taskStreaksAtRisk,
         goal: loginBroke && goalBroke ? freshState.goal : null,
+        priceFlies: shieldConfig.rescuePriceFlies,
       }) ?? activeRescueForDay(freshState.rescue, todayKey),
   };
 
@@ -1046,7 +1063,7 @@ export async function performRescue(args: {
   rescueId: string;
   method: RescueMethod;
 }): Promise<RescueResult> {
-  const { userId, timezone, rescueId } = args;
+  const { userId, timezone, rescueId, method } = args;
   await connectMongo();
 
   const [user, config, shieldConfig] = await Promise.all([
@@ -1087,8 +1104,25 @@ export async function performRescue(args: {
   }
 
   const adsRequired = isPremium ? 0 : rescue.adsRequired;
+  const payWithFlies = method === 'flies' && adsRequired > 0;
+  const price = payWithFlies
+    ? rescue.priceFlies || shieldConfig.rescuePriceFlies
+    : 0;
+  const wardrobe = (user as any).wardrobe;
+  const flyBalance = Math.max(0, Number(wardrobe?.flies ?? 0));
+  const notEnoughFlies = (): RescueResult => ({
+    granted: false,
+    completed: false,
+    rescue,
+    view: buildLoginStreakView(state, config, todayKey, shieldSnapshot()),
+    goalEvent: null,
+    flyBalance,
+    error: 'not_enough_flies',
+  });
+  if (payWithFlies && (!wardrobe || flyBalance < price)) return notEnoughFlies();
+
   const adsWatched = rescue.adsWatched + 1;
-  if (adsWatched < adsRequired) {
+  if (!payWithFlies && adsWatched < adsRequired) {
     const updated: StreakRescue = { ...rescue, adsWatched };
     await UserModel.updateOne(
       { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },
@@ -1145,26 +1179,67 @@ export async function performRescue(args: {
     newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
-  const granted = await applyStreakRewardGrants({
-    user,
-    next,
-    config,
-    shieldConfig,
-    shieldState,
-    todayKey,
-    goalCompleted,
-  });
-  const goalEvent = granted.event;
-  shieldState = granted.shieldState;
+  if (payWithFlies) {
+    const paid = await UserModel.updateOne(
+      {
+        _id: userId,
+        'quests.loginStreak.rescue.id': rescue.id,
+        'wardrobe.flies': { $gte: price },
+      },
+      {
+        $inc: { 'wardrobe.flies': -price },
+        $set: { 'quests.loginStreak.rescue.id': `${rescue.id}:paid` },
+      },
+    );
+    if (paid.modifiedCount === 0) return notEnoughFlies();
+    wardrobe.flies = flyBalance - price;
+  }
 
-  const currentQuests =
-    typeof (user as any).quests === 'object' && (user as any).quests
-      ? (user as any).quests
-      : {};
-  (user as any).quests = { ...currentQuests, loginStreak: next };
-  setShieldStateOn(user, shieldState);
-  user.markModified('wardrobe');
-  await user.save();
+  const refund = async () => {
+    if (!payWithFlies) return;
+    await UserModel.updateOne(
+      { _id: userId, 'quests.loginStreak.rescue.id': `${rescue.id}:paid` },
+      {
+        $inc: { 'wardrobe.flies': price },
+        $set: { 'quests.loginStreak.rescue.id': rescue.id },
+      },
+    );
+  };
+
+  let goalEvent: LoginStreakRewardEvent | null;
+  try {
+    const granted = await applyStreakRewardGrants({
+      user,
+      next,
+      config,
+      shieldConfig,
+      shieldState,
+      todayKey,
+      goalCompleted,
+    });
+    goalEvent = granted.event;
+    shieldState = granted.shieldState;
+
+    const currentQuests =
+      typeof (user as any).quests === 'object' && (user as any).quests
+        ? (user as any).quests
+        : {};
+    (user as any).quests = { ...currentQuests, loginStreak: next };
+    setShieldStateOn(user, shieldState);
+    user.markModified('wardrobe');
+    await user.save();
+  } catch (error) {
+    await refund();
+    throw error;
+  }
+
+  if (payWithFlies) {
+    await recordAnalyticsEvent({
+      userId,
+      name: 'fly_spent',
+      properties: { source: 'streak_rescue', fly_amount: price, is_premium: isPremium },
+    });
+  }
 
   return {
     granted: true,
@@ -1172,5 +1247,6 @@ export async function performRescue(args: {
     rescue: null,
     view: buildLoginStreakView(next, config, todayKey, shieldSnapshot()),
     goalEvent,
+    flyBalance: Math.max(0, Number((user as any).wardrobe?.flies ?? 0)),
   };
 }

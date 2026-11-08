@@ -65,6 +65,12 @@ export async function PUT(req: NextRequest) {
             1,
             200_000,
           ),
+          rescuePriceFlies: clamp(
+            body?.rescuePriceFlies,
+            SHIELD_DEFAULTS.rescuePriceFlies,
+            1,
+            100_000,
+          ),
           capFree: clamp(
             body?.capFree,
             SHIELD_DEFAULTS.capFree,

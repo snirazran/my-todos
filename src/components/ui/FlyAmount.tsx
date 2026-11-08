@@ -50,11 +50,13 @@ export function FlyAmount({
   size = 14,
   alwaysPlay,
   className,
+  iconClassName,
 }: {
   amount: number | React.ReactNode;
   size?: number;
   alwaysPlay?: boolean;
   className?: string;
+  iconClassName?: string;
 }) {
   return (
     <span
@@ -64,7 +66,7 @@ export function FlyAmount({
       )}
       style={{ fontSize: size }}
     >
-      <FlyIcon textPx={size} alwaysPlay={alwaysPlay} />
+      <FlyIcon textPx={size} alwaysPlay={alwaysPlay} className={iconClassName} />
       {typeof amount === 'number' ? amount.toLocaleString() : amount}
     </span>
   );
@@ -74,10 +76,12 @@ export function FlyPriceChip({
   amount,
   size = 15,
   className,
+  iconClassName,
 }: {
   amount: number | React.ReactNode;
   size?: number;
   className?: string;
+  iconClassName?: string;
 }) {
   return (
     <span
@@ -86,7 +90,7 @@ export function FlyPriceChip({
         className,
       )}
     >
-      <FlyAmount amount={amount} size={size} />
+      <FlyAmount amount={amount} size={size} iconClassName={iconClassName} />
     </span>
   );
 }

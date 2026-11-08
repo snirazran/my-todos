@@ -21,8 +21,10 @@ export async function POST(req: NextRequest) {
     if (body.action === 'dismiss') {
       return NextResponse.json(await dismissRescue({ userId, rescueId }));
     }
+    const method = body.method === 'flies' ? 'flies' : 'ad';
     const user = await UserModel.findById(userId).select('premiumUntil').lean();
     if (
+      method === 'ad' &&
       !isPremiumActive(user?.premiumUntil) &&
       !(await consumeAdVerification(userId, 'streak_rescue'))
     ) {
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
       userId,
       timezone,
       rescueId,
-      method: 'ad',
+      method,
     });
 
     return NextResponse.json(result);

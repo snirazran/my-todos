@@ -284,7 +284,7 @@ export function ShopWindow({
   onGetFlies,
 }: {
   loading: boolean;
-  balance: number;
+  balance: number | undefined;
   catalog: ItemDef[];
   backgrounds: BackgroundItem[];
   inventory: Record<string, number>;
@@ -487,7 +487,13 @@ export function ShopWindow({
     >
       <div className="pond-panel sticky top-0 z-30 flex shrink-0 items-center gap-2 bg-[color:var(--pond-surface-top)] px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:hidden">
         {!isGuest && (
-          <FlyCounter balance={balance} variant="mobile" onClick={onGetFlies} flyTarget />
+          <FlyCounter
+            key={balance === undefined ? 'pending' : 'ready'}
+            balance={balance ?? 0}
+            variant="mobile"
+            onClick={onGetFlies}
+            flyTarget
+          />
         )}
         {catalogButton('ml-auto')}
       </div>

@@ -277,6 +277,7 @@ function WardrobeManagerContent({
 }) {
   const { user } = useAuth();
   const { data, mutate, markItemSeen, markAllSeen } = useInventory(open);
+  const { data: summaryData } = useInventory(open && !!user, true);
 
   const tradeReadiness = useTradeReadiness(!!user);
   const readyTrades = tradeReadiness.trades;
@@ -975,7 +976,8 @@ function WardrobeManagerContent({
     [data?.catalog, data?.wardrobe?.inventory],
   );
 
-  const balance = data?.wardrobe?.flies ?? 0;
+  const knownBalance = data?.wardrobe?.flies ?? summaryData?.wardrobe?.flies;
+  const balance = knownBalance ?? 0;
   const isGuest = !user;
 
   const outfits = useOutfitSaver({
@@ -1256,7 +1258,7 @@ function WardrobeManagerContent({
       {isShop && embedded ? (
         <ShopWindow
           loading={!canRenderItems || !data || bg.isLoading}
-          balance={balance}
+          balance={knownBalance}
           catalog={data?.catalog ?? []}
           backgrounds={bg.catalog}
           inventory={data?.wardrobe?.inventory ?? {}}

@@ -80,15 +80,7 @@ export function TaskMeta({
     items.push({
       key: `tag-${tag.id}`,
       node: (
-        <span className="inline-flex min-w-0 items-center gap-1">
-          <span
-            aria-hidden="true"
-            className={cn(
-              'flex-shrink-0 rounded-full',
-              compact ? 'h-1.5 w-1.5' : 'h-2 w-2',
-            )}
-            style={{ backgroundColor: tag.color || '#6366f1' }}
-          />
+        <span className="inline-flex min-w-0 items-center">
           <span className="truncate">{tag.name}</span>
         </span>
       ),
@@ -201,14 +193,6 @@ export function TaskMetaLine({
       fill: true,
       node: (
         <span className="flex min-w-0 items-center font-medium text-muted-foreground/80">
-          <span
-            aria-hidden
-            className={cn(
-              'mr-1.5 h-2 w-2 shrink-0 rounded-full transition-opacity',
-              isDone && 'opacity-50',
-            )}
-            style={{ backgroundColor: tag.color || '#6366f1' }}
-          />
           <span className="truncate">{tag.name}</span>
           {more > 0 && <span className="ml-1 shrink-0 tabular-nums">+{more}</span>}
         </span>

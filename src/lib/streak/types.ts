@@ -53,6 +53,7 @@ export type TaskStreakAtRisk = {
   taskId: string;
   text: string;
   count: number;
+  fliesPerTask?: number;
 };
 
 /**
@@ -73,11 +74,12 @@ export type StreakRescue = {
   adsRequired: number;
   adsWatched: number;
   adEligible: boolean;
+  priceFlies: number;
   dismissed?: boolean;
   goal?: LoginStreakGoal | null;
 };
 
-export type RescueMethod = 'ad';
+export type RescueMethod = 'ad' | 'flies';
 
 export type LoginStreakRescue = StreakRescue;
 
@@ -172,5 +174,6 @@ export type RescueResult = {
   rescue: StreakRescue | null;
   view: LoginStreakView | null;
   goalEvent: LoginStreakRewardEvent | null;
-  error?: 'expired';
+  flyBalance?: number;
+  error?: 'expired' | 'not_enough_flies';
 };

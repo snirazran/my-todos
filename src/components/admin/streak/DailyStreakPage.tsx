@@ -34,6 +34,7 @@ type ShieldConfig = {
   isActive: boolean;
   priceFlies: number;
   twoPackPriceFlies: number;
+  rescuePriceFlies: number;
   capFree: number;
   capPlus: number;
   plusMonthlyGrant: number;
@@ -283,6 +284,20 @@ export function DailyStreakPage() {
                 checked={pads.isActive}
                 onChange={(isActive) => shields.patch({ isActive })}
               />
+              <div className="space-y-2">
+                <SectionLabel>Save a broken streak</SectionLabel>
+                <FieldGrid cols={3}>
+                  <Field label="Save with flies" hint="The day after a miss. Keep it above one Lily Pad.">
+                    <NumberInput
+                      value={pads.rescuePriceFlies}
+                      min={1}
+                      max={100000}
+                      suffix="flies"
+                      onChange={(rescuePriceFlies) => shields.patch({ rescuePriceFlies })}
+                    />
+                  </Field>
+                </FieldGrid>
+              </div>
               <div className={cn('space-y-5 transition', !pads.isActive && 'pointer-events-none opacity-40')}>
                 <div className="space-y-2">
                   <SectionLabel>Price in the offer</SectionLabel>

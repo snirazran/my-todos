@@ -6,6 +6,7 @@ export interface ShieldConfigDoc {
   isActive: boolean;
   priceFlies: number;
   twoPackPriceFlies: number;
+  rescuePriceFlies: number;
   capFree: number;
   capPlus: number;
   plusMonthlyGrant: number;
@@ -36,6 +37,7 @@ export const SHIELD_DEFAULTS = {
   isActive: true,
   priceFlies: 350,
   twoPackPriceFlies: 600,
+  rescuePriceFlies: 500,
   capFree: 2,
   capPlus: 3,
   plusMonthlyGrant: 1,
@@ -53,6 +55,10 @@ const ShieldConfigSchema = new Schema<ShieldConfigDoc>(
     twoPackPriceFlies: {
       type: Number,
       default: SHIELD_DEFAULTS.twoPackPriceFlies,
+    },
+    rescuePriceFlies: {
+      type: Number,
+      default: SHIELD_DEFAULTS.rescuePriceFlies,
     },
     capFree: { type: Number, default: SHIELD_DEFAULTS.capFree },
     capPlus: { type: Number, default: SHIELD_DEFAULTS.capPlus },

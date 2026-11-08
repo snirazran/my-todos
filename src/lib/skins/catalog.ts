@@ -29,7 +29,7 @@ export const TRADE_MIN_ITEM_COUNT = 3;
  * trade-up value, wishlist maths) but no route to buy them — the trade-up is
  * the only way in.
  */
-export const TRADE_ONLY_RARITIES: readonly Rarity[] = ['legendary'];
+export const TRADE_ONLY_RARITIES: readonly Rarity[] = [];
 
 export function isTradeOnlyRarity(rarity: Rarity): boolean {
   return TRADE_ONLY_RARITIES.includes(rarity);

@@ -14,10 +14,12 @@ import {
   STREAK_EXTENDED_EVENT,
   subscribeStreakSheet,
   takePrewarmedCheckIn,
+  useLoginStreak,
   type StreakSheetRequest,
 } from '@/hooks/useLoginStreak';
 import { StreakSheet } from '@/components/ui/streak/StreakSheet';
-import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
+import { StreakRescueSheet, type RescueOutcome } from '@/components/ui/streak/StreakRescueSheet';
+import { useWidgetPinStore } from '@/lib/widget/pinStore';
 import { ShieldSheet } from '@/components/ui/streak/ShieldSheet';
 import {
   openShieldSheet,
@@ -33,7 +35,7 @@ import {
 } from '@/lib/popupGate';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { useUIStore } from '@/lib/uiStore';
-import type { CheckInResult, LoginStreakRescue } from '@/lib/streak/types';
+import type { CheckInResult, LoginStreakRescue, RescueResult } from '@/lib/streak/types';
 import type { ShieldOffer } from '@/lib/shields/types';
 
 // One auto-offer per app session, on top of the server's day-scale cooldown.
@@ -82,6 +84,25 @@ function queueShieldOffer(offer: ShieldOffer) {
   queueStreakSheet(() => openShieldSheet(offer), 8000, 900);
   return true;
 }
+
+const WIDGET_AFTER_RESCUE_MS = 450;
+
+const PREVIEW_RESCUE = process.env.NODE_ENV !== 'production';
+const PREVIEW_RESCUE_OFFER: LoginStreakRescue = {
+  id: 'preview-rescue',
+  previousCount: 12,
+  taskStreaks: [
+    { taskId: 'preview-1', text: 'Drink a glass of water', count: 9, fliesPerTask: 3 },
+    { taskId: 'preview-2', text: 'Read 5 pages', count: 4, fliesPerTask: 2 },
+  ],
+  goal: { days: 7, startCount: 8, startDayKey: '2026-11-03' },
+  missedDayKey: '2026-11-07',
+  offeredDayKey: '2026-11-08',
+  adsRequired: 1,
+  adsWatched: 0,
+  adEligible: true,
+  priceFlies: 500,
+};
 
 const AFTER_CATCH_DELAY_MS = 1400;
 const FIRST_RUN_CATCH_DELAY_MS = 2600;
@@ -230,6 +251,41 @@ function StreakSheetHost() {
   const [shieldOpen, setShieldOpen] = useState(false);
   const [shieldOffer, setShieldOffer] = useState<ShieldOffer | null>(null);
   const [shieldContext, setShieldContext] = useState<ShieldSheetContext>('streak');
+  const [widgetAfter, setWidgetAfter] = useState(false);
+  const widgetPinState = useWidgetPinStore((s) => s.pinState);
+  const requestWidgetPrompt = useWidgetPinStore((s) => s.requestPrompt);
+
+  useEffect(() => {
+    if (!PREVIEW_RESCUE) return;
+    setRescue(PREVIEW_RESCUE_OFFER);
+    setRescueOpen(true);
+  }, []);
+
+  const { view: streakView } = useLoginStreak(rescueOpen);
+
+  const onRescueDone = (outcome: RescueOutcome, result?: RescueResult) => {
+    const view = outcome === 'saved' ? result?.view ?? null : outcome === 'broke' ? streakView : null;
+    if (view) {
+      setCelebration({
+        active: true,
+        extended: true,
+        previousCount: Math.max(0, view.count - 1),
+        view,
+        shieldConsumedDays: [],
+        goalEvent: outcome === 'saved' ? result?.goalEvent ?? null : null,
+        rescue: null,
+        shieldOffer: null,
+        brokeFrom: outcome === 'broke' ? rescue?.previousCount ?? 0 : 0,
+      });
+      setCommitIntent(false);
+      setOpen(true);
+    } else if (outcome === 'broke') {
+      setCelebration(null);
+      setCommitIntent(true);
+      setOpen(true);
+    }
+    setWidgetAfter(true);
+  };
 
   useEffect(() => {
     return subscribeStreakSheet((req: StreakSheetRequest) => {
@@ -263,6 +319,15 @@ function StreakSheetHost() {
     }
   }, [streakVisible]);
 
+  useEffect(() => {
+    if (!widgetAfter || streakVisible) return;
+    const timer = window.setTimeout(() => {
+      setWidgetAfter(false);
+      if (widgetPinState !== 'pinned') requestWidgetPrompt();
+    }, WIDGET_AFTER_RESCUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [widgetAfter, streakVisible, widgetPinState, requestWidgetPrompt]);
+
   return (
     <>
       <StreakSheet
@@ -284,6 +349,7 @@ function StreakSheetHost() {
           if (!v) setRescue(null);
         }}
         offer={rescue}
+        onDone={onRescueDone}
       />
       <ShieldSheet
         open={shieldOpen}

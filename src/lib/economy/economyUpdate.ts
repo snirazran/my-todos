@@ -56,7 +56,7 @@ export const RECOMMENDED_ECONOMY_UPDATE: {
   dailySlotFlies: [10, 20, 30],
   cleanSweepFlies: 20,
   itemPrices: { common: 150, uncommon: 350, rare: 700, epic: 1600, legendary: 5000 },
-  backgroundPrices: {},
+  backgroundPrices: { legendary: 5000 },
 };
 
 const PITY_KEYS = ['softPityLuck', 'softPityBonusPoints', 'hardPityLuck', 'epicPityLuck'] as const;
