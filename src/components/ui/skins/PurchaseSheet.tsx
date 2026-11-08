@@ -507,8 +507,8 @@ export function PurchaseSheet({
                     Buy
                     <FlyPriceChip
                       amount={price}
-                      size={16}
-                      className="bg-white text-[#24451f] shadow-[inset_0_-2px_0_rgba(36,69,31,0.14),0_1px_0_rgba(0,0,0,0.16)] [text-shadow:none]"
+                      size={22}
+                      className="py-[3px] pl-2 bg-white text-[#24451f] shadow-[inset_0_-2px_0_rgba(36,69,31,0.14),0_1px_0_rgba(0,0,0,0.16)] [text-shadow:none]"
                     />
                   </PrimaryButton>
                   {wishlistButton('Save for later', 'On your wishlist')}
@@ -524,8 +524,8 @@ export function PurchaseSheet({
                   Sign in to buy
                   <FlyPriceChip
                     amount={price}
-                    size={15}
-                    className="bg-background text-muted-foreground shadow-none"
+                    size={20}
+                    className="py-[3px] pl-2 bg-background text-muted-foreground shadow-none"
                   />
                 </button>
               ) : (

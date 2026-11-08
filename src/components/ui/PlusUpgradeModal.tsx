@@ -648,13 +648,13 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                           <ChevronLeft className="h-5 w-5" aria-hidden /> Back
                         </button>
                       ) : (
-                        <span className="inline-flex items-center gap-2 text-base font-black tracking-tight [text-shadow:0_1px_8px_rgba(22,8,48,0.55)]">
+                        <span className="inline-flex items-center gap-2 text-base font-black tracking-tight">
                           <Icon name="frogPlus" className="h-10 w-10 drop-shadow-[0_2px_0_rgba(22,8,48,0.3)]" />
                           Frogress <span className="rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-[11px] tracking-wide text-[hsl(var(--primary-foreground))]">PLUS</span>
                         </span>
                       )}
                       <Dialog.Close asChild>
-                        <button type="button" disabled={purchasing} onClick={() => markClose('close_button')} aria-label="Close Plus" className="flex h-11 w-11 items-center justify-center rounded-full bg-[rgba(22,8,48,0.35)] text-white backdrop-blur-md transition-[background-color,transform] hover:bg-[rgba(22,8,48,0.5)] active:scale-90 disabled:opacity-50">
+                        <button type="button" disabled={purchasing} onClick={() => markClose('close_button')} aria-label="Close Plus" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.14)] transition-[background-color,transform] hover:bg-white/15 active:scale-90 disabled:opacity-50">
                           <X className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                         </button>
                       </Dialog.Close>
@@ -705,9 +705,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                             </motion.div>
                           )}
                         </div>
-                        <footer className={cn('relative shrink-0 bg-background px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 transition-shadow duration-200 md:px-7 md:pb-5', moreBelow ? 'shadow-[0_-1px_0_hsl(var(--border)),0_-10px_24px_-14px_rgba(15,23,42,0.35)]' : 'shadow-none')}>
-                          <span aria-hidden className={cn('pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent transition-opacity duration-200', moreBelow ? 'opacity-100' : 'opacity-0')} />
-                          {view === 'compare' ? (
+                        <footer data-more={moreBelow || undefined} className="plus-dock relative shrink-0 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 md:px-7 md:pb-5">                          {view === 'compare' ? (
                             <PrimaryButton onClick={() => { changeView('offer'); goStep('checkout'); }}>Continue</PrimaryButton>
                           ) : (
                             <>
@@ -799,10 +797,11 @@ function PlusCover({ className, imageClassName }: { className?: string; imageCla
 function CoverHero({ context }: { context: PaywallContext }) {
   return (
     <section className="flex flex-col items-center text-center">
-      <div className="relative -mx-5 self-stretch">
-        <PlusCover className="aspect-video [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_82%,transparent)] short:aspect-[2/1]" imageClassName="object-[50%_70%]" />
+      <div className="plus-stage-arc relative -mx-5 self-stretch">
+        <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[2px] bg-[#f5c84c]/60" />
+        <PlusCover className="plus-stage-cover aspect-video short:aspect-[2/1]" imageClassName="object-[50%_70%]" />
       </div>
-      <h2 className="relative -mt-2 text-balance text-[26px] font-black leading-[1.08] tracking-tight short:-mt-3 short:text-[22px]">
+      <h2 className="relative mt-4 text-balance text-[26px] font-black leading-[1.08] tracking-tight short:mt-3 short:text-[22px]">
         {context.headline}<br /><span className="text-primary">{context.accent}</span>
       </h2>
     </section>
@@ -811,14 +810,14 @@ function CoverHero({ context }: { context: PaywallContext }) {
 
 function DesktopHero({ context }: { context: PaywallContext }) {
   return (
-    <section className="relative isolate flex w-full flex-col overflow-hidden rounded-[28px] bg-[hsl(var(--plus-band))] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
-      <img aria-hidden src={COVER_SRC} alt="" width={1200} height={675} decoding="async" className="absolute inset-0 -z-20 h-full w-full scale-125 object-cover opacity-50 blur-2xl" />
-      <span aria-hidden className="absolute inset-0 -z-10 bg-[rgba(22,8,48,0.3)]" />
+    <section className="plus-hero-panel relative isolate flex w-full flex-col overflow-hidden rounded-[28px]">
       <h2 className="text-balance px-7 pt-7 text-[30px] font-black leading-[1.08] tracking-tight">
         {context.headline}<br /><span className="text-primary">{context.accent}</span>
       </h2>
-      <div className="flex flex-1 items-center">
-        <PlusCover className="aspect-[16/10] w-full [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_88%,transparent)]" imageClassName="object-[50%_70%]" />
+      <div className="flex flex-1 items-center px-4 pb-4">
+        <div className="plus-stage-arc w-full">
+          <PlusCover className="plus-stage-cover aspect-[16/10] w-full rounded-t-[20px]" imageClassName="object-[50%_70%]" />
+        </div>
       </div>
     </section>
   );
@@ -902,41 +901,21 @@ function MemberCard({ name, plan }: { name?: string; plan: PlanId }) {
         initial={reduceMotion ? false : { opacity: 0, y: 14, rotate: -2 }}
         animate={{ opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: 'spring', duration: 0.5, bounce: 0.25, delay: 0.05 }}
-        className="plus-club-card relative isolate h-[140px] w-[min(100%,316px)] overflow-hidden rounded-[24px] short:h-[120px]"
-      >
-        <span className="absolute -right-10 -top-16 -z-10 h-44 w-44 rounded-full bg-white/[0.07]" />
-        <span className="absolute -bottom-20 right-16 -z-10 h-36 w-36 rounded-full bg-white/[0.05]" />
-        <span className="absolute bottom-2.5 left-2.5 top-2.5 w-[104px] overflow-hidden rounded-[18px] bg-[repeating-conic-gradient(from_0deg_at_50%_62%,#ffe58f_0deg_12deg,#f8cf55_12deg_24deg)] shadow-[inset_0_-3px_0_rgba(150,90,0,0.22),0_3px_0_0_#3b1a86] short:w-[90px]">
-          <span className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-white/0" />
-          <span className="absolute bottom-[7px] left-1/2 h-3 w-[70px] -translate-x-1/2 rounded-[50%] bg-[rgba(120,70,0,0.28)] short:w-[60px]" />
-          <span className="absolute -bottom-[6px] left-1/2 h-[150px] w-[124px] -translate-x-1/2 short:h-[128px] short:w-[106px]">
-            <Frog ref={frog} width="100%" height="100%" indices={look} visualOffsetY={0} placeholder arrive="pop" arriveDelay={180} greet="loveShy" paused={!!reduceMotion} />
-          </span>
+        className="plus-club-card relative isolate h-[140px] w-[min(100%,316px)] overflow-hidden rounded-[24px] short:h-[120px]"      >
+        <span className="absolute -bottom-[58px] right-0 -z-10 h-[156px] w-[156px] rounded-full bg-white/[0.09] short:-bottom-[66px]" />
+        <span className="absolute -bottom-[8px] right-1 h-[176px] w-[148px] short:h-[156px] short:w-[132px]">
+          <Frog ref={frog} width="100%" height="100%" indices={look} visualOffsetY={0} placeholder arrive="pop" arriveDelay={180} greet="loveShy" paused={!!reduceMotion} />
         </span>
-        <motion.span
-          initial={reduceMotion ? false : { opacity: 0, scale: 1.6, rotate: -18 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-          transition={{ type: 'spring', duration: 0.45, bounce: 0.35, delay: 0.45 }}
-          className="absolute right-1.5 top-1.5"
-        >
+        <span className="absolute left-5 top-[16px] flex items-center gap-1.5 short:top-[12px]">
           <motion.span animate={seal} className="block">
-            <Icon name="frogPlus" className="h-[60px] w-[60px] short:h-[50px] short:w-[50px]" />
+            <Icon name="frogPlus" className="h-7 w-7" />
           </motion.span>
-        </motion.span>
-        <span className="absolute left-[128px] right-[60px] top-[22px] short:left-[112px] short:right-[52px] short:top-[16px]">
-          <span
-            className="-mx-[3px] -my-[3px] block truncate px-[3px] pb-[5px] pt-[3px] text-[24px] font-black leading-none tracking-[-0.01em] text-white short:text-[21px]"
-            style={{ textShadow: '0 1px 2px rgba(35,13,82,0.4)' }}
-          >
-            {member}
-          </span>
-          <span className="plus-club-chip mt-2 gap-1 rounded-full py-[4px] pl-1.5 pr-2 text-[11px] leading-none tracking-wide">
-            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor"><path d="M8 .8l2.1 4.5 4.9.6-3.6 3.4.9 4.9L8 11.8l-4.3 2.4.9-4.9L1 5.9l4.9-.6z" /></svg>
-            PLUS MEMBER
-          </span>
-          <span className="mt-2 block truncate text-[12px] font-black leading-none text-[#efe6ff]">Since {since}</span>
+          <span className="text-[11px] font-black uppercase leading-none tracking-[0.14em] text-[#d6c6ff]">Frogress Plus</span>
         </span>
-        <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 motion-safe:animate-[plus-card-sheen_1.1s_ease-out_0.6s_both]" />
+        <span className="absolute bottom-[18px] left-5 right-[150px] short:bottom-[14px] short:right-[134px]">
+          <span className="block truncate pb-[3px] text-[26px] font-black leading-none tracking-[-0.01em] text-white short:text-[22px]">{member}</span>
+          <span className="mt-1.5 block truncate text-[12px] font-bold leading-none text-[#d6c6ff]">Member since {since}</span>
+        </span>
       </motion.div>
     </div>
   );

@@ -93,7 +93,7 @@ function PriceTag({
         </>
       ) : (
         <>
-          <FlyAmount amount={price} size={14} />
+          <FlyAmount amount={price} size={19} />
           {plusPrice && <Icon name="frogPlus" className="-my-1 -mr-1 h-[18px] w-[18px] shrink-0" />}
         </>
       )}
@@ -705,22 +705,11 @@ export function ShopWindow({
               <div key={dealsKey}>
                 {freePicks.length > 0 && <Shelves cols={cols}>{freePicks.map(pickTile)}</Shelves>}
                 {plusPicks.length > 0 && (
-                  <>
-                    <div className={cn('mb-4 flex items-center', freePicks.length > 0 && 'mt-7 md:mt-9')}>
-                      <button
-                        type="button"
-                        disabled={isPremium}
-                        onClick={() => onPlus('shop_plus_slot')}
-                        className="plus-club plus-upgrade-button inline-flex h-9 items-center gap-1.5 rounded-full pl-1 pr-3.5 text-[14px] font-black disabled:cursor-default disabled:shadow-[0_4px_0_#3b1a86] md:h-10 md:text-[15px]"
-                      >
-                        <Icon name="frogPlus" className="h-7 w-7 shrink-0" />
-                        Plus picks
-                      </button>
-                    </div>
+                  <div className={cn(freePicks.length > 0 && 'mt-4 md:mt-6')}>
                     <Shelves cols={cols}>
                       {plusPicks.map((pick, i) => pickTile(pick, freePicks.length + i))}
                     </Shelves>
-                  </>
+                  </div>
                 )}
               </div>
             )}

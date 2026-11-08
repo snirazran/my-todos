@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-11-08T17:36:32.969Z",
+        "reason": "Claude: .plus-stage-cover/.plus-stage-arc deliberately draw a gold curved line by putting a border on an elliptical bottom radius; the curve is the intended design"
+      }
+    ]
+  }
+}
