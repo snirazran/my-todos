@@ -322,8 +322,10 @@ export function ShopWindow({
         .filter((row): row is { deal: DailyDeal; item: ItemDef } => !!row.item),
     [deals, byId],
   );
-  const freePicks = useMemo(() => special.filter(({ deal }) => !deal.plusOnly), [special]);
-  const plusPicks = useMemo(() => special.filter(({ deal }) => deal.plusOnly), [special]);
+  const todaysPicks = useMemo(
+    () => [...special.filter(({ deal }) => !deal.plusOnly), ...special.filter(({ deal }) => deal.plusOnly)],
+    [special],
+  );
   const endsAt = deals[0]?.endsAt;
   const countdown = useCountdown(endsAt);
   const sellerRef = useRef<FrogHandle>(null);
@@ -624,72 +626,34 @@ export function ShopWindow({
               </p>
             ) : (
               <div key={dealsKey} className={SHOP_GRID}>
-                {freePicks.map(({ deal, item }, index) => (
-                  <ShopTile
-                    key={item.id}
-                    index={index}
-                    entry={{
-                      kind: 'item',
-                      key: item.id,
-                      item,
-                      rarity: item.rarity,
-                      price: deal.onSale ? deal.dealPrice : deal.priceFlies,
-                    }}
-                    saleTag={deal.sale}
-                    owned={owns(item)}
-                    locked={false}
-                    wished={wishlistedIds.has(item.id) || deal.wishlistSlot}
-                    onTap={() => onOpenItem(item, deal.onSale ? deal.dealPrice : null)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {!loading && plusPicks.length > 0 && (
-            <section
-              aria-label="Members' shelf"
-              className="plus-club relative -mx-1.5 mt-7 overflow-hidden rounded-[28px] px-3 pb-2 pt-3 shadow-[0_5px_0_0_#3b1a86] md:px-4"
-            >
-              <SectionHeader
-                onDark
-                icon={<Icon name="frogPlus" className="h-11 w-11" />}
-                title="Members' shelf"
-                sub={isPremium ? 'Extra picks, just for Plus' : 'Six extra picks with Plus'}
-                action={
-                  isPremium ? undefined : (
-                    <button
-                      type="button"
-                      onClick={() => onPlus('shop_plus_slot')}
-                      className="plus-club-chip h-9 shrink-0 rounded-xl px-3 text-[13px] transition-transform duration-150 ease-out active:translate-y-0.5"
-                    >
-                      Unlock
-                    </button>
-                  )
-                }
-              />
-              <div key={dealsKey} className={SHOP_GRID}>
-                {plusPicks.map(({ deal, item }, index) => {
-                  const locked = !isPremium;
+                {todaysPicks.map(({ deal, item }, index) => {
+                  const locked = deal.plusOnly && !isPremium;
                   const owned = owns(item);
                   return (
                     <ShopTile
                       key={item.id}
-                      index={freePicks.length + index}
-                      entry={{ kind: 'item', key: item.id, item, rarity: item.rarity, price: deal.priceFlies }}
+                      index={index}
+                      entry={{
+                        kind: 'item',
+                        key: item.id,
+                        item,
+                        rarity: item.rarity,
+                        price: deal.onSale ? deal.dealPrice : deal.priceFlies,
+                      }}
+                      saleTag={deal.sale}
                       owned={owned}
                       locked={locked}
                       wished={wishlistedIds.has(item.id) || deal.wishlistSlot}
                       onTap={() => {
                         if (locked && !owned) onPlus('shop_plus_slot', item);
-                        else onOpenItem(item, null);
+                        else onOpenItem(item, deal.onSale ? deal.dealPrice : null);
                       }}
                     />
                   );
                 })}
               </div>
-            </section>
-          )}
+            )}
+          </section>
 
           <section aria-label="Everyday collection" className="mt-9">
             <SectionHeader
