@@ -54,7 +54,7 @@
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>Your data will be used to show you more relevant ads.</string>
+	<string>Lets us see which ad brought you to Frogress and show you more relevant ads.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

@@ -8,6 +8,7 @@ import type { OnboardingStepProps } from './steps/types';
 import AdoptFrogStep, { KEYBOARD_EASE } from './steps/AdoptFrogStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
+import TrackingStep from './steps/TrackingStep';
 import AboutIntroStep from './steps/AboutIntroStep';
 import TraitStep from './steps/TraitStep';
 import ProfileQuestionsStep, {
@@ -51,6 +52,7 @@ import { markFirstRunPending } from '@/hooks/useFirstRun';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { BARRIER_QUESTION_PREFIX } from '@/lib/quests/starterPlan';
 import { useAutoPopupHold } from '@/lib/popupGate';
+import { appTrackingStatus } from '@/lib/adpixels/appTracking';
 // Answers are drafted before sign-in, so they're persisted locally to survive the
 // email magic-link round trip (which reloads onto a fresh /onboarding). They are
 // dropped the moment the flow lands on an account that already finished onboarding.
@@ -68,6 +70,7 @@ const STEP_IDS = [
   'age',
   'notifications',
   'createAccount',
+  'tracking',
   'plan',
 ] as const;
 
@@ -81,6 +84,7 @@ const STEP_UNITS: Record<StepId, number> = {
   age: PROFILE_PROGRESS_UNITS,
   notifications: 1,
   createAccount: 1,
+  tracking: 1,
   plan: 1,
 };
 
@@ -92,6 +96,7 @@ const STEP_ANALYTICS_INDEX: Record<StepId, number> = {
   age: 3,
   notifications: 4,
   createAccount: 5,
+  tracking: 5.5,
   plan: 6,
 };
 
@@ -103,6 +108,7 @@ const STEP_ENTRY_EMOTES: Partial<Record<StepId, FrogEmote>> = {
   aboutIntro: 'hop',
   notifications: 'question',
   createAccount: 'loveHeartbeat',
+  tracking: 'question',
   plan: 'hop',
 };
 const STEP_ENTRY_DELAY_MS = 380;
@@ -140,6 +146,17 @@ export default function OnboardingPage() {
   const [arrivedWithAccount, setArrivedWithAccount] = useState(
     () => !!auth?.currentUser && !auth.currentUser.isAnonymous,
   );
+  const [askTracking, setAskTracking] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void appTrackingStatus().then((status) => {
+      if (!cancelled && status === 'notDetermined') setAskTracking(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
@@ -201,9 +218,10 @@ export default function OnboardingPage() {
         // account exists — e.g. a magic-link returnee. With no account yet
         // (deferred creation) or an anonymous one, keep offering it.
         if (id === 'createAccount' && arrivedWithAccount) return false;
+        if (id === 'tracking' && !askTracking) return false;
         return true;
       }),
-    [arrivedWithAccount],
+    [arrivedWithAccount, askTracking],
   );
 
   const currentId = stepIds[step] ?? stepIds[stepIds.length - 1];
@@ -233,7 +251,7 @@ export default function OnboardingPage() {
 
   const starterPlanKey = starterPlanUrl(selections);
   useEffect(() => {
-    if (currentId === 'notifications' || currentId === 'createAccount') {
+    if (currentId === 'notifications' || currentId === 'createAccount' || currentId === 'tracking') {
       preloadStarterPlan(starterPlanKey);
     }
   }, [currentId, starterPlanKey]);
@@ -595,6 +613,7 @@ export default function OnboardingPage() {
             {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}
             {currentId === 'plan' && <StarterPlanStep {...stepProps} />}
             {currentId === 'notifications' && <NotificationStep {...stepProps} />}
+            {currentId === 'tracking' && <TrackingStep {...stepProps} />}
             {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
             {currentId === 'age' && (
               <ProfileQuestionsStep

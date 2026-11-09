@@ -10,7 +10,10 @@ type FrogMetaPlugin = {
     params?: Record<string, string | number>;
   }): Promise<{ logged?: boolean }>;
   getAnonymousId(): Promise<{ id?: string }>;
+  fetchDeferredLink(): Promise<{ url?: string }>;
 };
+
+export type MetaDeferredLink = { supported: boolean; url?: string };
 
 const FrogMeta = registerPlugin<FrogMetaPlugin>('FrogMeta');
 
@@ -29,6 +32,16 @@ export function logMetaAppEvent(
 ) {
   if (!enabled()) return;
   FrogMeta.logEvent({ name, params }).catch(() => {});
+}
+
+export async function fetchMetaDeferredLink(): Promise<MetaDeferredLink> {
+  if (!enabled()) return { supported: false };
+  try {
+    const { url } = await FrogMeta.fetchDeferredLink();
+    return { supported: true, url: url || undefined };
+  } catch {
+    return { supported: false };
+  }
 }
 
 export async function metaAnonymousId(): Promise<string | undefined> {

@@ -11,6 +11,7 @@ public class FrogMetaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "activate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAnonymousId", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "fetchDeferredLink", returnType: CAPPluginReturnPromise),
     ]
 
     static var isConfigured: Bool {
@@ -68,5 +69,19 @@ public class FrogMetaPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         call.resolve(["id": AppEvents.shared.anonymousID])
+    }
+
+    @objc func fetchDeferredLink(_ call: CAPPluginCall) {
+        guard Self.isConfigured else {
+            call.resolve([:])
+            return
+        }
+        AppLinkUtility.fetchDeferredAppLink { url, _ in
+            if let url = url {
+                call.resolve(["url": url.absoluteString])
+            } else {
+                call.resolve([:])
+            }
+        }
     }
 }

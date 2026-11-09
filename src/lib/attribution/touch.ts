@@ -34,6 +34,29 @@ export function captureFirstTouch() {
   } catch {}
 }
 
+export function applyMetaLinkToFirstTouch(url: string): 'tagged' | 'untagged' | 'failed' {
+  if (typeof window === 'undefined') return 'failed';
+  const query = url.includes('?') ? url.slice(url.indexOf('?') + 1).split('#')[0] : '';
+  const params = new URLSearchParams(query);
+  const found: Partial<FirstTouch> = {};
+  for (const key of PARAMS) {
+    const value = params.get(key)?.trim();
+    if (value) found[key] = value.slice(0, 200);
+  }
+  try {
+    const touch: FirstTouch = {
+      ...(readFirstTouch() ?? { at: new Date().toISOString() }),
+      utm_source: 'meta',
+      utm_medium: 'paid_social',
+      ...found,
+    };
+    window.localStorage.setItem(TOUCH_KEY, JSON.stringify(touch));
+    return found.utm_campaign ? 'tagged' : 'untagged';
+  } catch {
+    return 'failed';
+  }
+}
+
 export function readFirstTouch(): FirstTouch | undefined {
   if (typeof window === 'undefined') return undefined;
   try {

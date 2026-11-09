@@ -91,7 +91,22 @@ const CLIENT_EVENTS = new Set([
   'ad_ready',
   'ad_consent_resolved',
   'ad_consent_failed',
+  'tracking_permission_result',
 ]);
+
+const SIGNED_OUT_EVENTS = new Set([
+  'app_opened',
+  'page_viewed',
+  'tracking_permission_result',
+  'starter_plan_shown',
+  'onboarding_step_viewed',
+  'referral_invite_opened',
+  'friend_link_opened',
+]);
+
+function allowedSignedOut(name: string) {
+  return SIGNED_OUT_EVENTS.has(name) || name.startsWith('try_') || name.startsWith('fly_game_');
+}
 
 function inferPlatform(req: NextRequest): AnalyticsPlatform {
   const requested = req.headers.get('x-frogress-platform');
@@ -131,17 +146,7 @@ export async function POST(req: NextRequest) {
   if (!CLIENT_EVENTS.has(name)) {
     return NextResponse.json({ error: 'Server analytics event required' }, { status: 400 });
   }
-  if (
-    !authenticated &&
-    name !== 'app_opened' &&
-    name !== 'page_viewed' &&
-    name !== 'starter_plan_shown' &&
-    name !== 'onboarding_step_viewed' &&
-    !name.startsWith('try_') &&
-    !name.startsWith('fly_game_') &&
-    name !== 'referral_invite_opened' &&
-    name !== 'friend_link_opened'
-  ) {
+  if (!authenticated && !allowedSignedOut(name)) {
     return new NextResponse(null, { status: 204 });
   }
 

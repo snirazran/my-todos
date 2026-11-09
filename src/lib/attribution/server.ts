@@ -69,14 +69,18 @@ export async function saveFirstTouch(userId: string, rawTouch: unknown, platform
   if (!touch) return;
   try {
     await connectMongo();
-    const user = await UserModel.findOne({ _id: userId, acquisition: { $exists: false } })
-      .select('createdAt')
-      .lean<{ createdAt?: Date } | null>();
+    const user = await UserModel.findById(userId)
+      .select('createdAt acquisition')
+      .lean<{ createdAt?: Date; acquisition?: UserAcquisition } | null>();
     if (!user?.createdAt) return;
     if (new Date(touch.at).getTime() > new Date(user.createdAt).getTime() + TOUCH_GRACE_MS) return;
+    const existing = user.acquisition;
+    if (existing && (existing.paid || existing.resolvedBy !== 'none' || !classifyTouch(touch, platform).paid)) return;
     const acquisition = await acquisitionFromTouch(userId, touch, platform);
     await UserModel.updateOne(
-      { _id: userId, acquisition: { $exists: false } },
+      existing
+        ? { _id: userId, 'acquisition.paid': false, 'acquisition.resolvedBy': 'none' }
+        : { _id: userId, acquisition: { $exists: false } },
       { $set: { acquisition: stripUndefined(acquisition) } },
     );
   } catch (error) {

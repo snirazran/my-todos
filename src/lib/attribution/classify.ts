@@ -169,7 +169,16 @@ export function classifyTouch(
   const paidMedium = PAID_MEDIUMS.has(medium) || medium.includes('paid');
   if (source && paidMedium) {
     const channel = networkChannel(source) ?? 'other_paid';
-    return { ...base, channel, paid: true, network: touch?.utm_source, resolvedBy: 'utm' };
+    const adSetLevels =
+      channel === 'meta_ads' || channel === 'tiktok_ads'
+        ? {
+            content: undefined,
+            keyword: undefined,
+            adGroup: cleanText(touch?.utm_content),
+            ad: cleanText(touch?.utm_term),
+          }
+        : {};
+    return { ...base, ...adSetLevels, channel, paid: true, network: touch?.utm_source, resolvedBy: 'utm' };
   }
   if (touch?.fbclid && paidMedium) {
     return { ...base, channel: 'meta_ads', paid: true, network: 'Meta', resolvedBy: 'click_id' };
