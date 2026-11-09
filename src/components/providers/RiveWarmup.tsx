@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import {
   FLY_RIVE_ASSET_URL,
+  MERCHANT_RIVE_ASSET_URL,
   preloadRiveAsset,
   warmRiveRuntime,
 } from '@/lib/riveLoader';
@@ -27,6 +28,7 @@ export function RiveWarmup() {
       id = idle(() => {
         preloadRiveAsset('/idle_gift.riv');
         preloadRiveAsset(FLY_RIVE_ASSET_URL);
+        preloadRiveAsset(MERCHANT_RIVE_ASSET_URL);
       });
     });
     return () => {

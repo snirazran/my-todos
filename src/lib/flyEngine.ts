@@ -119,7 +119,6 @@ function forEachMaster(fn: (master: Master) => void) {
 }
 
 let interactionPaused = false;
-let themeObserver: MutationObserver | null = null;
 
 // Marks every rasterized copy stale and advances the master once so a fresh
 // frame is pushed to each canvas, even while a sheet/idle pause is holding
@@ -148,19 +147,6 @@ function refreshAllFlies() {
   forEachMaster(invalidateMaster);
 }
 
-function syncFlyTheme(master: Master) {
-  if (!master.lightMode || typeof document === 'undefined') return;
-  // The fly asset intentionally maps light_mode=1 to its dark-theme artwork.
-  const value = document.documentElement.classList.contains('dark') ? 1 : 0;
-  master.lightMode.value = value;
-  master.canvas?.setAttribute('data-light-mode', String(value));
-  invalidateMaster(master);
-}
-
-function syncAllThemes() {
-  forEachMaster(syncFlyTheme);
-}
-
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) refreshAllFlies();
@@ -176,10 +162,11 @@ function bindFlyViewModel(master: Master) {
   if (!instance) return;
   rive.bindViewModelInstance(instance);
   master.lightMode = instance.number(FLY_LIGHT_MODE_PROPERTY);
+  if (master.lightMode) master.lightMode.value = 0;
   master.wings = instance.trigger(FLY_WINGS_TRIGGER);
   const premium = instance.boolean(FLY_PREMIUM_PROPERTY);
   if (premium) premium.value = master.variant === 'premium';
-  syncFlyTheme(master);
+  invalidateMaster(master);
   master.wings?.trigger();
 }
 
@@ -189,15 +176,6 @@ function bindFlyViewModel(master: Master) {
 function onStateChange(master: Master, event: { data?: unknown }) {
   if (!Array.isArray(event.data)) return;
   if (event.data.includes(FLY_WINGS_IDLE_STATE)) master.wings?.trigger();
-}
-
-function observeTheme() {
-  if (themeObserver || typeof document === 'undefined') return;
-  themeObserver = new MutationObserver(syncAllThemes);
-  themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class'],
-  });
 }
 
 useRiveInteractionPause.subscribe((state) => {
@@ -370,7 +348,6 @@ function ensureMaster(master: Master) {
       onLoad: () => {
         master.ready = true;
         bindFlyViewModel(master);
-        observeTheme();
         master.rive!.on(EventType.Advance, () => onAdvance(master));
         master.rive!.on(EventType.StateChange, (event) =>
           onStateChange(master, event),

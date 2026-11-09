@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, Heart, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
@@ -8,17 +8,27 @@ import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { rewardedAdsAvailable } from '@/lib/ads';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { EMOTE_MS, onFrogReact, pickEmote, type FrogEmote } from '@/lib/frogEmotes';
+import { useReducedMotion } from 'framer-motion';
+import MerchantFrog, {
+  merchantArtHeight,
+  type MerchantFrogHandle,
+} from '@/components/ui/shop/MerchantFrog';
+import { PURCHASE_CELEBRATION_EVENT } from '@/lib/purchaseCelebration';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { ShopGiftTile } from '@/components/ui/shop/ShopGiftPopup';
-import { BackgroundArt, ItemArt } from '@/components/ui/skins/DressingRoom';
+import {
+  BackgroundArt,
+  ItemArt,
+  ShelfHeader,
+  TileArt,
+  shelfActionClass,
+  useShelfGrid,
+} from '@/components/ui/skins/DressingRoom';
+import { ROUND_BUTTON } from '@/components/ui/skins/WardrobeMobileChrome';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
-  byId as staticById,
   isTradeOnlyRarity,
   type ItemDef,
   type Rarity,
@@ -30,31 +40,28 @@ import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import type { ShopGiftStatus } from '@/lib/economy/shopGift';
 import { warmFrogStamps, type FrogStampIndices } from '@/lib/frogStampEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
-import { SHOP_CHIP, SHOP_CUBBY, SHOP_PLANK } from '@/components/ui/shop/shopKit';
+import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 
 type ShopEntry =
   | { kind: 'item'; key: string; item: ItemDef; rarity: Rarity; price: number }
   | { kind: 'bg'; key: string; bg: BackgroundItem; rarity: Rarity; price: number };
 
-const SELLER_OUTFIT = { hat: '3002', body: '2002', hand_item: '4003' } as const;
 const SELLER_NAME = 'Sir Croaksalot';
-const SELLER_EMOTES: readonly FrogEmote[] = [
-  'hop',
-  'love',
-  'loveShy',
-  'hop',
-  'love',
-  'loveShy',
-  'celebrate',
-  'loveBurst',
-  'tada',
-  'loveHeartbeat',
-];
-const SELLER_HAPPY: ReadonlySet<FrogEmote> = new Set(SELLER_EMOTES);
-const SELLER_FIRST_EMOTE_MS = 4500;
-const SELLER_EMOTE_GAP_MS = 5000;
-const SELLER_EMOTE_JITTER_MS = 4000;
-const SELLER_FADE_MS = 200;
+const SELLER_GREET_MS = 450;
+const SELLER_FIRST_INTERACT_MS = 6000;
+const SELLER_INTERACT_GAP_MS = 7000;
+const SELLER_INTERACT_JITTER_MS = 6000;
+
+const PICK_GRID = 'grid grid-cols-3 gap-2 md:grid-cols-6 md:gap-2.5';
+
+const SCALLOP = 28;
+const AWNING_BAND = 32;
+const AWNING_HEIGHT = AWNING_BAND + SCALLOP / 2 + 2;
+
+const STALL = {
+  sm: { scallops: 6, merchant: 172, counter: 32, bury: 18, sink: 16, gap: 16 },
+  md: { scallops: 9, merchant: 236, counter: 38, bury: 20, sink: 20, gap: 18 },
+} as const;
 
 function stableRank(id: string, seed = 0) {
   let h = (2166136261 ^ seed) >>> 0;
@@ -65,63 +72,30 @@ function stableRank(id: string, seed = 0) {
   return h >>> 0;
 }
 
-const TAG_ROW = 'h-[36px]';
-
-function PriceTag({
-  owned,
-  price,
-  plusPrice,
-}: {
-  owned: boolean;
-  price: number;
-  plusPrice?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        'relative inline-flex h-[29px] max-w-full items-center gap-[5px] whitespace-nowrap rounded-[9px] px-2 text-[14px] font-black leading-none tabular-nums',
-        'shadow-[0_2px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)]',
-        owned
-          ? 'bg-[color:var(--pond-accent)] text-[color:var(--pond-accent-ink)]'
-          : 'bg-[color:var(--shop-tag)] text-[color:var(--shop-heading)]',
-      )}
-    >
-      {owned ? (
-        <>
-          <Check className="h-3.5 w-3.5" strokeWidth={4} />
-          Owned
-        </>
-      ) : (
-        <>
-          <FlyAmount amount={price} size={19} />
-          {plusPrice && <Icon name="frogPlus" className="-my-1 -mr-1 h-[18px] w-[18px] shrink-0" />}
-        </>
-      )}
-    </span>
-  );
-}
-
 function ShopTile({
   entry,
   owned,
   plus,
-  sale,
+  discount,
   plusPrice,
   wished,
+  affordable,
   index,
   onTap,
 }: {
   entry: ShopEntry;
   owned: boolean;
   plus?: boolean;
-  sale?: boolean;
+  discount?: number;
   plusPrice?: boolean;
   wished: boolean;
+  affordable: boolean;
   index?: number;
   onTap: () => void;
 }) {
   const name = entry.kind === 'item' ? entry.item.name : entry.bg.name;
   const rarity = RARITY_CONFIG[entry.rarity].label;
+  const onSale = !owned && !!discount;
   const status = owned
     ? 'owned'
     : plusPrice
@@ -136,134 +110,163 @@ function ShopTile({
       aria-label={`${name}, ${rarity}, ${status}`}
       style={index == null ? undefined : { animationDelay: `${Math.min(index, 11) * 35}ms` }}
       className={cn(
-        'shop-item group relative z-[1] flex w-full min-w-0 flex-col items-center outline-none [-webkit-tap-highlight-color:transparent]',
+        'group flex w-full min-w-0 flex-col items-stretch gap-1 text-left outline-none [-webkit-tap-highlight-color:transparent]',
         index != null && 'shop-tile-rise',
       )}
     >
-      <span
-        className={cn(
-          'shop-item-art relative block aspect-square w-full overflow-hidden rounded-b-[5px] rounded-t-[20px] md:rounded-t-[24px]',
-          'group-focus-visible:ring-2 group-focus-visible:ring-[color:var(--pond-accent)] group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background',
-          SHOP_CUBBY[entry.rarity],
-        )}
+      <TileArt
+        rarity={entry.rarity}
+        tone="closet"
+        className="transition-transform duration-150 group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
       >
-        <span className={cn('absolute inset-0', owned && 'opacity-50')}>
-          {entry.kind === 'item' ? (
-            <span className="absolute inset-x-0 bottom-0 top-[6%]">
-              <ItemArt item={entry.item} />
-            </span>
-          ) : (
-            <BackgroundArt bg={entry.bg} />
-          )}
+        <span className={cn('absolute inset-0', owned && 'opacity-45')}>
+          {entry.kind === 'item' ? <ItemArt item={entry.item} /> : <BackgroundArt bg={entry.bg} />}
         </span>
-        {wished && !owned && (
-          <span className="absolute left-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-white/95 text-rose-500 shadow-[0_1px_0_rgba(0,0,0,0.12)] md:left-2 md:top-2">
-            <Heart className="h-3.5 w-3.5" strokeWidth={3} fill="currentColor" />
+
+        {onSale ? (
+          <span className="absolute left-1 top-1 rounded-md bg-[#447d3f] px-1 text-[10px] font-black leading-[16px] text-white">
+            −{discount}%
           </span>
-        )}
-        {sale && !owned ? (
-          <Icon name="discount" className="absolute right-1 top-1 h-8 w-8 md:right-1.5 md:top-1.5 md:h-9 md:w-9" />
-        ) : plus && !owned ? (
-          <span className="absolute right-1 top-1 md:right-1.5 md:top-1.5">
-            <Icon name="frogPlus" className="h-8 w-8 md:h-9 md:w-9" />
+        ) : wished && plus && !owned ? (
+          <span className="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Heart className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
           </span>
         ) : null}
-      </span>
-      <span className={cn('flex w-full justify-center px-0.5 pt-[2px]', TAG_ROW)}>
-        <PriceTag owned={owned} price={entry.price} plusPrice={plusPrice} />
+
+        {plus && !owned ? (
+          <Icon name="frogPlus" className="absolute right-0.5 top-0.5 h-7 w-7" />
+        ) : wished && !owned ? (
+          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Heart className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
+          </span>
+        ) : null}
+      </TileArt>
+
+      <span className="flex h-6 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
+        {owned ? (
+          <span className="flex items-center gap-1 text-muted-foreground/70">
+            <Check className="h-3.5 w-3.5" strokeWidth={4} />
+            Owned
+          </span>
+        ) : (
+          <>
+            <FlyAmount
+              amount={entry.price}
+              size={15}
+              className={
+                !affordable
+                  ? 'text-muted-foreground'
+                  : onSale && !plusPrice
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : 'text-foreground'
+              }
+            />
+            {plusPrice && <Icon name="frogPlus" className="-my-1 h-[18px] w-[18px] shrink-0" />}
+          </>
+        )}
       </span>
     </button>
   );
 }
 
-function Shelves({
-  cols,
-  children,
-  className,
-}: {
-  cols: number;
-  children: React.ReactNode[];
-  className?: string;
-}) {
-  const rows: React.ReactNode[][] = [];
-  for (let i = 0; i < children.length; i += cols) rows.push(children.slice(i, i + cols));
+function GridSkeleton({ gridClass, count }: { gridClass: string; count: number }) {
   return (
-    <div className={cn('flex flex-col gap-4 md:gap-6', className)}>
-      {rows.map((row, r) => (
-        <div key={r} className="relative">
-          <span
-            aria-hidden
-            className={cn(SHOP_PLANK, '-inset-x-2 bottom-[26px] md:-inset-x-3')}
-          />
-          <div
-            className="grid gap-x-2.5 md:gap-x-4"
-            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-          >
-            {row}
-          </div>
-        </div>
+    <div className={gridClass}>
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className="flex flex-col gap-1">
+          <span className="skeleton block aspect-square w-full rounded-2xl" />
+          <span className="h-6" />
+        </span>
       ))}
     </div>
   );
 }
 
-function ShelfSkeleton({ cols, count }: { cols: number; count: number }) {
+function Awning({ scallops }: { scallops: number }) {
+  const id = useId();
+  const width = scallops * SCALLOP;
+  const r = SCALLOP / 2;
+  let d = `M0 ${AWNING_BAND} V9 Q0 0 9 0 H${width - 9} Q${width} 0 ${width} 9 V${AWNING_BAND}`;
+  for (let i = scallops - 1; i >= 0; i--) d += ` A${r} ${r} 0 0 1 ${i * SCALLOP} ${AWNING_BAND}`;
+  d += ' Z';
   return (
-    <Shelves cols={cols}>
-      {Array.from({ length: count }, (_, i) => (
-        <span key={i} className="flex flex-col">
-          <span className="aspect-square w-full animate-pulse rounded-b-[5px] rounded-t-[20px] bg-[color:var(--shop-cubby)] md:rounded-t-[24px]" />
-          <span className={TAG_ROW} />
-        </span>
-      ))}
-    </Shelves>
-  );
-}
-
-function ShopWall() {
-  return (
-    <svg aria-hidden className="absolute inset-x-0 bottom-0 h-[184px] w-full">
+    <svg
+      aria-hidden
+      width={width + 4}
+      height={AWNING_HEIGHT + 4}
+      viewBox={`-2 -2 ${width + 4} ${AWNING_HEIGHT + 4}`}
+      className="block overflow-visible drop-shadow-[0_4px_6px_rgba(0,0,0,0.18)]"
+    >
       <defs>
-        <linearGradient id="shop-wall-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--shop-wainscot)" stopOpacity="0" />
-          <stop offset="1" stopColor="var(--shop-wainscot)" />
+        <pattern id={`${id}-stripes`} width={SCALLOP * 2} height="8" patternUnits="userSpaceOnUse">
+          <rect width={SCALLOP} height="8" fill="var(--shop-awning-a)" />
+          <rect x={SCALLOP} width={SCALLOP} height="8" fill="var(--shop-awning-b)" />
+        </pattern>
+        <linearGradient id={`${id}-shade`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#000" stopOpacity="0.1" />
+          <stop offset="0.45" stopColor="#000" stopOpacity="0" />
+          <stop offset="0.7" stopColor="#000" stopOpacity="0" />
+          <stop offset="1" stopColor="#000" stopOpacity="0.08" />
         </linearGradient>
-        <pattern id="shop-wall-paper" width="28" height="184" patternUnits="userSpaceOnUse">
-          <rect x="0" y="0" width="12" height="184" fill="var(--shop-wall-stripe)" />
-        </pattern>
-        <pattern id="shop-wall-stock" width="312" height="184" patternUnits="userSpaceOnUse" x="-40">
-          <g fill="var(--shop-prop)" stroke="var(--shop-prop-line)" strokeWidth="2" strokeLinejoin="round">
-            <rect x="20" y="47" width="24" height="31" rx="7" />
-            <rect x="23" y="41" width="18" height="7" rx="2.5" />
-            <rect x="66" y="64" width="40" height="14" rx="4" />
-            <rect x="70" y="51" width="32" height="13" rx="4" />
-            <path d="M136 60h28l-4 18h-20z" />
-            <path d="M150 60c-2-10-10-16-18-15 1 9 8 15 18 15z" />
-            <path d="M150 60c2-12 9-19 18-19 0 10-8 18-18 19z" />
-            <path d="M194 78c0-14 9-24 21-24s21 10 21 24z" />
-            <rect x="188" y="74" width="54" height="5" rx="2.5" />
-            <rect x="262" y="56" width="30" height="22" rx="4" />
-            <path d="M277 56v22" fill="none" />
-          </g>
-          <rect x="0" y="78" width="312" height="8" fill="var(--shop-prop)" />
-          <rect x="0" y="86" width="312" height="3" fill="var(--shop-prop-line)" />
-          <path d="M52 89h12l-6 9z M248 89h12l-6 9z" fill="var(--shop-prop-line)" />
-        </pattern>
       </defs>
-      <rect x="0" y="0" width="100%" height="184" fill="url(#shop-wall-paper)" />
-      <rect x="0" y="0" width="100%" height="184" fill="url(#shop-wall-stock)" />
-      <rect x="0" y="104" width="100%" height="80" fill="url(#shop-wall-fade)" />
+      <path d={d} fill={`url(#${id}-stripes)`} />
+      <path d={d} fill={`url(#${id}-shade)`} />
+      <path
+        d={`M0 9 Q0 0 9 0 H${width - 9} Q${width} 0 ${width} 9`}
+        fill="none"
+        stroke="var(--shop-wood-shine)"
+        strokeWidth="3"
+        transform="translate(0 3)"
+      />
+      <path d={d} fill="none" stroke="var(--shop-ink)" strokeWidth="2.5" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function ShopCounter() {
+function MarketStall({
+  size,
+  merchant,
+  bubble,
+}: {
+  size: (typeof STALL)['sm' | 'md'];
+  merchant: React.ReactNode;
+  bubble: (pos: { left: number; top: number }) => React.ReactNode;
+}) {
+  const width = size.scallops * SCALLOP;
+  const artHeight = merchantArtHeight(size.merchant);
+  const artBottom = size.counter - size.bury;
+  const artTop = artBottom + artHeight;
+  const height = artTop + size.gap + AWNING_HEIGHT;
   return (
-    <div aria-hidden className="relative z-20 -mx-px h-[52px] md:h-[60px]">
-      <div className="absolute inset-y-0 left-0 right-0 md:left-1/2 md:right-auto md:w-screen md:-translate-x-1/2">
-        <div className="absolute inset-x-0 top-0 h-[17px] border-y-2 border-[color:var(--shop-ink)] bg-[color:var(--shop-wood)] shadow-[inset_0_3px_0_0_var(--shop-wood-shine)] md:h-[19px]" />
-        <div className="shop-counter-face absolute inset-x-0 bottom-0 top-[17px] border-b-2 border-[color:var(--shop-ink)] md:top-[19px]" />
+    <div className="shop-surface relative" style={{ width, height }}>
+      <span
+        aria-hidden
+        className="absolute left-[7px] w-[9px] rounded-[3px] border-2 border-[color:var(--shop-ink)] bg-[color:var(--shop-wood-edge)]"
+        style={{ top: AWNING_HEIGHT - 12, bottom: size.counter - 4 }}
+      />
+      <span
+        aria-hidden
+        className="absolute right-[7px] w-[9px] rounded-[3px] border-2 border-[color:var(--shop-ink)] bg-[color:var(--shop-wood-edge)]"
+        style={{ top: AWNING_HEIGHT - 12, bottom: size.counter - 4 }}
+      />
+      <div
+        className="pointer-events-none absolute"
+        style={{ bottom: artBottom, left: (width - size.merchant) / 2 }}
+      >
+        {merchant}
       </div>
+      <div className="absolute -left-0.5 top-0">
+        <Awning scallops={size.scallops} />
+      </div>
+      <div
+        aria-hidden
+        className="absolute inset-x-[3px]"
+        style={{ bottom: -size.sink, height: size.counter + size.sink }}
+      >
+        <div className="absolute inset-x-0 top-0 z-[1] h-[14px] rounded-t-[7px] border-2 border-[color:var(--shop-ink)] bg-[color:var(--shop-wood)] shadow-[inset_0_3px_0_0_var(--shop-wood-shine)]" />
+        <div className="absolute inset-x-[3px] bottom-0 top-[12px] border-x-2 border-[color:var(--shop-ink)] bg-[color:var(--shop-wood-face)] shadow-[inset_0_6px_6px_-4px_rgba(0,0,0,0.25)]" />
+      </div>
+      {bubble({ left: width + 6, top: height - artBottom - Math.round(artHeight * 0.52) })}
     </div>
   );
 }
@@ -293,54 +296,22 @@ function RefreshButton({
       onClick={onClick}
       disabled={busy || spent}
       aria-label={REFRESH_LABEL[state]}
-      className="group inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--shop-tag)] pl-1 pr-2.5 text-[13px] font-black text-foreground shadow-[0_3px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)] transition-[transform,box-shadow] duration-150 ease-out active:translate-y-0.5 active:shadow-[0_1px_0_0_var(--shop-tag-edge)] disabled:opacity-60 disabled:active:translate-y-0"
+      className={cn('group', shelfActionClass(spent ? 'quiet' : 'primary'), spent && 'opacity-60')}
     >
-      <span
+      <RefreshCw
         className={cn(
-          'grid h-8 w-8 place-items-center rounded-full',
-          spent ? 'bg-muted text-muted-foreground' : 'bg-[#5e4537] text-white shadow-[inset_0_-2px_0_rgba(0,0,0,0.25)]',
+          'h-3.5 w-3.5 transition-transform duration-300 ease-out group-active:rotate-90',
+          busy && 'animate-spin',
         )}
-      >
-        <RefreshCw
-          className={cn('h-4 w-4 transition-transform duration-300 ease-out group-active:rotate-90', busy && 'animate-spin')}
-          strokeWidth={3}
-        />
-      </span>
+        strokeWidth={3}
+      />
       {spent ? 'Refreshed' : 'Refresh'}
       {state === 'free' && (
-        <span className="rounded-md bg-[color:var(--shop-cubby)] px-1.5 py-[3px] text-[10px] uppercase leading-none tracking-[0.06em] text-[#5e4537] ring-1 ring-[color:var(--shop-tag-edge)] dark:text-[#e8cfbd]">
-          Free
-        </span>
+        <span className="text-[10px] uppercase tracking-[0.06em] opacity-70">Free</span>
       )}
-      {state === 'ad' && <AdPlayIcon className="h-4 w-4 text-muted-foreground" strokeWidth={2.75} />}
-      {state === 'plus' && <Icon name="frogPlus" className="-my-2 -mr-1 h-7 w-7" />}
+      {state === 'ad' && <AdPlayIcon className="h-3.5 w-3.5" strokeWidth={2.75} />}
+      {state === 'plus' && <Icon name="frogPlus" className="-my-1 -mr-1 h-5 w-5" />}
     </button>
-  );
-}
-
-function SectionHeader({
-  title,
-  sub,
-  action,
-}: {
-  title: string;
-  sub?: React.ReactNode;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex items-center gap-3 md:mb-5">
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[20px] font-black leading-tight tracking-[-0.01em] text-[color:var(--shop-heading)] md:text-[24px]">
-          {title}
-        </span>
-        {sub ? (
-          <span className="mt-0.5 block text-[13px] font-bold tabular-nums text-[color:var(--shop-sub)] md:text-[14px]">
-            {sub}
-          </span>
-        ) : null}
-      </span>
-      {action}
-    </div>
   );
 }
 
@@ -360,6 +331,7 @@ export function ShopWindow({
   rerolling,
   wishlistedIds,
   shopGift,
+  scene,
   onOpenItem,
   onOpenBackground,
   onReroll,
@@ -383,6 +355,7 @@ export function ShopWindow({
   rerolling: boolean;
   wishlistedIds: ReadonlySet<string>;
   shopGift?: ShopGiftStatus;
+  scene?: React.ReactNode;
   onOpenItem: (item: ItemDef, dealPrice: number | null) => void;
   onOpenBackground: (bg: BackgroundItem) => void;
   onReroll: () => void;
@@ -393,20 +366,9 @@ export function ShopWindow({
 }) {
   const byId = useMemo(() => new Map(catalog.map((item) => [item.id, item])), [catalog]);
   const isMd = useMediaQuery('(min-width: 768px)');
-  const isLg = useMediaQuery('(min-width: 1024px)');
-  const cols = isLg ? 6 : isMd ? 4 : 3;
-
-  const sellerIndices = useMemo<FrogStampIndices | null>(() => {
-    if (byId.size === 0) return null;
-    const index = (id: string) => (byId.get(id) ?? staticById[id])?.riveIndex ?? 0;
-    return {
-      skin: 0,
-      mood: 0,
-      hat: index(SELLER_OUTFIT.hat),
-      body: index(SELLER_OUTFIT.body),
-      hand_item: index(SELLER_OUTFIT.hand_item),
-    };
-  }, [byId]);
+  const { cols, gridClass } = useShelfGrid();
+  const pickCols = isMd ? 6 : 3;
+  const stall = isMd ? STALL.md : STALL.sm;
 
   const sale = deals.find((deal) => deal.sale);
   const saleItem = sale ? byId.get(sale.itemId) : undefined;
@@ -421,45 +383,40 @@ export function ShopWindow({
   const plusPicks = useMemo(() => special.filter(({ deal }) => deal.plusOnly), [special]);
   const endsAt = deals[0]?.endsAt;
   const countdown = useCountdown(endsAt);
-  const sellerRef = useRef<FrogHandle>(null);
-  const [sellerGreet] = useState(() => pickEmote('greet'));
+  const sellerRef = useRef<MerchantFrogHandle>(null);
   const [sellerLive, setSellerLive] = useState(false);
-  const sellerFadeTimer = useRef(0);
-  useEffect(() => () => window.clearTimeout(sellerFadeTimer.current), []);
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
     if (!sellerLive) return;
+    const greet = window.setTimeout(() => sellerRef.current?.interact(), SELLER_GREET_MS);
+    if (reduceMotion) return () => window.clearTimeout(greet);
     let timer = 0;
-    let last: FrogEmote | null = null;
     const schedule = (wait: number) => {
       timer = window.setTimeout(() => {
-        if (document.visibilityState !== 'visible' || useRiveIdlePause.getState().idle) {
-          schedule(SELLER_EMOTE_GAP_MS);
-          return;
+        if (document.visibilityState === 'visible' && !useRiveIdlePause.getState().idle) {
+          sellerRef.current?.interact({ soft: true });
         }
-        const options = SELLER_EMOTES.filter((name) => name !== last);
-        const name = options[Math.floor(Math.random() * options.length)];
-        last = name;
-        sellerRef.current?.fireEmote(name, { soft: true });
-        schedule(EMOTE_MS[name] + SELLER_EMOTE_GAP_MS + Math.random() * SELLER_EMOTE_JITTER_MS);
+        schedule(SELLER_INTERACT_GAP_MS + Math.random() * SELLER_INTERACT_JITTER_MS);
       }, wait);
     };
-    schedule(SELLER_FIRST_EMOTE_MS);
-    return () => window.clearTimeout(timer);
-  }, [sellerLive]);
-  useEffect(
-    () =>
-      onFrogReact((name) => {
-        if (SELLER_HAPPY.has(name)) sellerRef.current?.fireEmote(name);
-      }),
-    [],
-  );
+    schedule(SELLER_FIRST_INTERACT_MS);
+    return () => {
+      window.clearTimeout(greet);
+      window.clearTimeout(timer);
+    };
+  }, [sellerLive, reduceMotion]);
+  useEffect(() => {
+    const onPurchase = () => sellerRef.current?.purchase();
+    window.addEventListener(PURCHASE_CELEBRATION_EVENT, onPurchase);
+    return () => window.removeEventListener(PURCHASE_CELEBRATION_EVENT, onPurchase);
+  }, []);
   const dealsKey = deals.map((deal) => deal.itemId).join(',');
   const shownDealsRef = useRef<string | null>(null);
   useEffect(() => {
     if (loading || !dealsKey) return;
     const previous = shownDealsRef.current;
     shownDealsRef.current = dealsKey;
-    if (previous && previous !== dealsKey) sellerRef.current?.fireEmote('tada');
+    if (previous && previous !== dealsKey) sellerRef.current?.interact();
   }, [loading, dealsKey]);
   const refreshState: RefreshState | null =
     isGuest || special.length === 0
@@ -520,32 +477,36 @@ export function ShopWindow({
       .sort((a, b) => stableRank(a.key, shuffleSeed) - stableRank(b.key, shuffleSeed));
   }, [loading, everydayIds, catalog, backgrounds, inventory, bgInventory, shuffleSeed]);
 
-  const warmList = useMemo(() => {
-    const list: FrogStampIndices[] = sellerIndices ? [sellerIndices] : [];
-    for (const { item } of special) list.push({ [item.slot]: item.riveIndex });
+  const pickWarmList = useMemo<FrogStampIndices[]>(
+    () => special.map(({ item }) => ({ [item.slot]: item.riveIndex })),
+    [special],
+  );
+  const everydayWarmList = useMemo(() => {
+    const list: FrogStampIndices[] = [];
     for (const entry of everyday) {
       if (entry.kind === 'item') list.push({ [entry.item.slot]: entry.item.riveIndex });
     }
     return list;
-  }, [sellerIndices, special, everyday]);
+  }, [everyday]);
 
   useEffect(() => {
-    if (warmList.length <= 1) return;
-    let cancel: (() => void) | null = null;
+    if (pickWarmList.length === 0 && everydayWarmList.length === 0) return;
+    const cancels: (() => void)[] = [];
     const timer = window.setTimeout(() => {
-      const tile = Math.min(190, (Math.min(window.innerWidth, 1152) - 48) / cols);
-      cancel = warmFrogStamps(
-        warmList as Record<string, number>[],
-        Math.round(tile * 1.3 * riveDevicePixelRatio()),
-      );
+      const width = Math.min(window.innerWidth, 768) - 48;
+      const stampSize = (columns: number) =>
+        Math.round(Math.min(150, width / columns) * 1.24 * riveDevicePixelRatio());
+      cancels.push(warmFrogStamps(pickWarmList, stampSize(pickCols)));
+      cancels.push(warmFrogStamps(everydayWarmList, stampSize(cols)));
     }, 250);
     return () => {
       window.clearTimeout(timer);
-      cancel?.();
+      cancels.forEach((cancel) => cancel());
     };
-  }, [warmList, cols]);
+  }, [pickWarmList, everydayWarmList, pickCols, cols]);
 
   const owns = (item: ItemDef) => (inventory[item.id] ?? 0) > 0;
+  const canAfford = (price: number) => balance === undefined || balance >= price;
   const saleOwned = saleItem ? owns(saleItem) : false;
   const sellerLine =
     sale && saleItem && !saleOwned
@@ -562,180 +523,166 @@ export function ShopWindow({
     else onOpenItem(item, deal.onSale ? deal.dealPrice : null);
   };
 
-  const pickTile = ({ deal, item }: { deal: DailyDeal; item: ItemDef }, index: number) => (
-    <ShopTile
-      key={item.id}
-      index={index}
-      entry={{
-        kind: 'item',
-        key: item.id,
-        item,
-        rarity: item.rarity,
-        price: deal.sale ? deal.dealPrice : deal.priceFlies,
-      }}
-      owned={owns(item)}
-      plus={deal.plusOnly}
-      sale={deal.sale}
-      plusPrice={deal.sale && !isPremium}
-      wished={wishlistedIds.has(item.id) || deal.wishlistSlot}
-      onTap={() => tapPick(deal, item)}
-    />
-  );
-
-  const catalogButton = (className: string) => (
-    <button
-      type="button"
-      onClick={onOpenCatalog}
-      className={cn(
-        'flex h-10 shrink-0 items-center gap-1.5 pl-1 pr-3.5 text-[13px] font-black text-[color:var(--shop-heading)]',
-        SHOP_CHIP,
-        className,
-      )}
-    >
-      <Icon name="closetAlbum" className="h-7 w-7 shrink-0" />
-      Catalog
-    </button>
-  );
+  const pickTile = ({ deal, item }: { deal: DailyDeal; item: ItemDef }, index: number) => {
+    const price = deal.sale ? deal.dealPrice : deal.priceFlies;
+    return (
+      <ShopTile
+        key={item.id}
+        index={index}
+        entry={{ kind: 'item', key: item.id, item, rarity: item.rarity, price }}
+        owned={owns(item)}
+        plus={deal.plusOnly}
+        discount={deal.sale ? deal.discountPercent : undefined}
+        plusPrice={deal.sale && !isPremium}
+        wished={wishlistedIds.has(item.id) || deal.wishlistSlot}
+        affordable={canAfford(price)}
+        onTap={() => tapPick(deal, item)}
+      />
+    );
+  };
 
   return (
-    <div
-      role="region"
-      aria-label="Shop"
-      className="shop-surface relative -mx-4 flex min-h-[100dvh] flex-1 flex-col bg-[color:var(--shop-top)] md:mx-0 md:min-h-0 md:bg-transparent"
-    >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-[29] md:hidden">
-        <div className="shop-awning h-[calc(env(safe-area-inset-top)+56px)]" />
-        <div className="shop-awning-edge" />
+    <div role="region" aria-label="Shop" className="relative flex flex-1 flex-col">
+      <h1 className="sr-only">Shop</h1>
+      <div
+        aria-hidden
+        style={backgroundFadeMaskStyle}
+        className="pointer-events-none absolute left-[calc(50%-50vw)] top-0 z-0 h-[calc(372px+env(safe-area-inset-top))] w-screen overflow-hidden md:h-[540px]"
+      >
+        {scene}
       </div>
-      <div className="pond-panel relative z-30 flex shrink-0 items-center gap-2 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:hidden">
+
+      <div className="relative z-[1] h-[calc(312px+env(safe-area-inset-top))] shrink-0 md:h-[438px]">
         {!isGuest && (
-          <FlyCounter
-            key={balance === undefined ? 'pending' : 'ready'}
-            balance={balance ?? 0}
-            variant="shop"
-            onClick={onGetFlies}
-            flyTarget
-          />
+          <div className="absolute left-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-20 md:hidden">
+            <FlyCounter
+              key={balance === undefined ? 'pending' : 'ready'}
+              balance={balance ?? 0}
+              variant="mobile"
+              onClick={onGetFlies}
+              flyTarget
+            />
+          </div>
         )}
-        {catalogButton('ml-auto')}
-      </div>
-      <div className="relative flex flex-1 flex-col">
-        <div className="pond-panel relative md:pt-[100px]">
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 top-[-140px] overflow-hidden md:left-1/2 md:right-auto md:w-screen md:-translate-x-1/2">
-            <div className="absolute inset-0 hidden bg-[color:var(--shop-top)] md:block" />
-            <ShopWall />
-          </div>
-          <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 z-[1] hidden w-screen -translate-x-1/2 md:block">
-            <div className="shop-awning h-[96px]" />
-            <div className="shop-awning-edge" />
-          </div>
-          <h1 className="sr-only">Shop</h1>
-          <div className="relative h-[150px] md:h-[176px]">
-            {catalogButton('absolute right-6 top-4 hidden md:flex')}
-            <div className="pointer-events-none absolute bottom-[-24px] left-1 z-[25] h-[228px] w-[204px] md:bottom-[-30px] md:left-2 md:h-[284px] md:w-[254px]">
-              {sellerIndices && !sellerLive && (
-                <div className="absolute inset-0">
-                  <FrogSnapshot indices={sellerIndices} width={isMd ? 254 : 204} height={isMd ? 284 : 228} />
-                </div>
-              )}
-              {sellerIndices && (
-                <div className="absolute inset-0">
-                  <Frog
-                    ref={sellerRef}
-                    width={isMd ? 254 : 204}
-                    height={isMd ? 284 : 228}
-                    indices={sellerIndices}
-                    greet={sellerGreet}
-                    pokeable={false}
-                    onDressed={() => {
-                      sellerFadeTimer.current = window.setTimeout(
-                        () => setSellerLive(true),
-                        SELLER_FADE_MS,
-                      );
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <FrogSpeechBubble
-              rate={0}
-              done={0}
-              total={0}
-              side
-              name={SELLER_NAME}
-              fixedMessage={sellerLine}
-              className="!z-[26] !left-[176px] !top-[102px] md:!left-[236px] md:!top-[136px] [--bubble-max:min(calc(100vw-190px),15rem)]"
-            />
-          </div>
-          <ShopCounter />
-        </div>
+        <button
+          type="button"
+          onClick={onOpenCatalog}
+          className="group absolute right-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-20 flex flex-col items-center gap-0.5 focus-visible:outline-none md:top-[5.5rem]"
+        >
+          <span
+            className={cn(
+              'group-focus-visible:ring-2 group-focus-visible:ring-primary group-focus-visible:ring-offset-2',
+              ROUND_BUTTON,
+            )}
+          >
+            <Icon name="closetAlbum" className="h-7 w-7" />
+          </span>
+          <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
+            Catalog
+          </span>
+        </button>
 
-        <div className="relative z-10 flex-1 bg-[color:var(--shop-body)] px-4 pb-10 pt-6 md:flex-none md:bg-transparent md:px-6 md:pb-16 md:pt-10">
-          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 bg-[color:var(--shop-body)] md:block" />
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[color:var(--shop-floor-shadow)] to-transparent md:left-1/2 md:right-auto md:w-screen md:-translate-x-1/2" />
-          {!isGuest && shopGift?.available && (
-            <div className="mb-6">
-              <ShopGiftTile gift={shopGift} onClaim={onClaimGift} />
-            </div>
-          )}
-
-          <section aria-label="Today's picks" data-hint="shop-deals">
-            <SectionHeader
-              title="Today's picks"
-              sub={countdown ? <>New picks in {countdown}</> : 'New items every day'}
-              action={
-                refreshState ? (
-                  <RefreshButton
-                    state={refreshState}
-                    busy={rerolling}
-                    onClick={rerollsLeft > 0 ? onReroll : () => onPlus('shop_reroll')}
-                  />
-                ) : undefined
-              }
-            />
-            {loading ? (
-              <ShelfSkeleton cols={cols} count={cols === 4 ? 4 : 6} />
-            ) : special.length === 0 ? (
-              <p className="rounded-[22px] bg-[color:var(--shop-cubby)] px-4 py-6 text-center text-[14px] font-bold text-muted-foreground">
-                {isGuest
-                  ? 'Sign in to see today’s picks.'
-                  : 'You own everything that could show up here. Nice!'}
-              </p>
-            ) : (
-              <div key={dealsKey}>
-                {freePicks.length > 0 && <Shelves cols={cols}>{freePicks.map(pickTile)}</Shelves>}
-                {plusPicks.length > 0 && (
-                  <div className={cn(freePicks.length > 0 && 'mt-4 md:mt-6')}>
-                    <Shelves cols={cols}>
-                      {plusPicks.map((pick, i) => pickTile(pick, freePicks.length + i))}
-                    </Shelves>
-                  </div>
-                )}
+        <div className="absolute bottom-0 left-0 md:left-1/2 md:-translate-x-1/2">
+          <MarketStall
+            size={stall}
+            merchant={
+              <MerchantFrog
+                ref={sellerRef}
+                width={stall.merchant}
+                onReady={() => setSellerLive(true)}
+              />
+            }
+            bubble={({ left, top }) => (
+              <div className="absolute z-[26] h-0 w-0" style={{ left, top }}>
+                <FrogSpeechBubble
+                  rate={0}
+                  done={0}
+                  total={0}
+                  side
+                  name={SELLER_NAME}
+                  fixedMessage={sellerLine}
+                  className="!left-0 !top-0 [--bubble-max:min(calc(100vw-218px),15rem)]"
+                />
               </div>
             )}
-          </section>
-
-          <section aria-label="Everyday collection" className="mt-10 md:mt-14">
-            <SectionHeader title="Everyday collection" />
-            {loading ? (
-              <ShelfSkeleton cols={cols} count={cols * 2} />
-            ) : (
-              <Shelves cols={cols}>
-                {everyday.map((entry) => (
-                  <ShopTile
-                    key={entry.key}
-                    entry={entry}
-                    owned={entry.kind === 'item' ? owns(entry.item) : (bgInventory[entry.bg.id] ?? 0) > 0}
-                    wished={entry.kind === 'item' && wishlistedIds.has(entry.item.id)}
-                    onTap={() =>
-                      entry.kind === 'item' ? onOpenItem(entry.item, null) : onOpenBackground(entry.bg)
-                    }
-                  />
-                ))}
-              </Shelves>
-            )}
-          </section>
+          />
         </div>
+      </div>
+
+      <div className="relative z-10 -mx-4 flex-1 rounded-t-[24px] bg-background px-4 pb-10 pt-5 md:-mx-6 md:px-6 md:pb-16 md:pt-6">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-px left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block"
+        />
+        {!isGuest && shopGift?.available && (
+          <div className="mb-5">
+            <ShopGiftTile gift={shopGift} onClaim={onClaimGift} />
+          </div>
+        )}
+
+        <section aria-label="Today's picks" data-hint="shop-deals">
+          <ShelfHeader
+            label="Today's picks"
+            meta={countdown ? <>New in {countdown}</> : null}
+            action={
+              refreshState ? (
+                <RefreshButton
+                  state={refreshState}
+                  busy={rerolling}
+                  onClick={rerollsLeft > 0 ? onReroll : () => onPlus('shop_reroll')}
+                />
+              ) : undefined
+            }
+          />
+          {loading ? (
+            <GridSkeleton gridClass={PICK_GRID} count={pickCols} />
+          ) : special.length === 0 ? (
+            <p className="rounded-2xl bg-muted/50 px-4 py-6 text-center text-[14px] font-bold text-muted-foreground">
+              {isGuest
+                ? 'Sign in to see today’s picks.'
+                : 'You own everything that could show up here. Nice!'}
+            </p>
+          ) : (
+            <div key={dealsKey}>
+              {freePicks.length > 0 && <div className={PICK_GRID}>{freePicks.map(pickTile)}</div>}
+              {plusPicks.length > 0 && (
+                <>
+                  <ShelfHeader
+                    label="Plus picks"
+                    icon={<Icon name="frogPlus" className="-my-1 h-5 w-5" />}
+                    tone="text-[#5b34c2] dark:text-[#c9b6ff]"
+                    className={cn(freePicks.length > 0 && 'mt-4')}
+                  />
+                  <div className={PICK_GRID}>
+                    {plusPicks.map((pick, i) => pickTile(pick, freePicks.length + i))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section aria-label="Everyday collection" className="mt-6 md:mt-8">
+          <ShelfHeader label="Everyday" />
+          {loading ? (
+            <GridSkeleton gridClass={gridClass} count={cols * 2} />
+          ) : (
+            <div className={gridClass}>
+              {everyday.map((entry) => (
+                <ShopTile
+                  key={entry.key}
+                  entry={entry}
+                  owned={entry.kind === 'item' ? owns(entry.item) : (bgInventory[entry.bg.id] ?? 0) > 0}
+                  wished={entry.kind === 'item' && wishlistedIds.has(entry.item.id)}
+                  affordable={canAfford(entry.price)}
+                  onTap={() =>
+                    entry.kind === 'item' ? onOpenItem(entry.item, null) : onOpenBackground(entry.bg)
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

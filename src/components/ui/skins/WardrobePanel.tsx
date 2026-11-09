@@ -1272,6 +1272,7 @@ function WardrobeManagerContent({
           rerolling={rerolling}
           wishlistedIds={wishlistedItemIds}
           shopGift={data?.shopGift}
+          scene={stageBackground}
           onOpenItem={(item, dealPrice) => openItemPurchase(item, dealPrice)}
           onOpenBackground={openBgPurchase}
           onReroll={() => void rerollDeals()}

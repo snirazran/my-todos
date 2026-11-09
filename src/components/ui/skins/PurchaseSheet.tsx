@@ -13,7 +13,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { CloseButton } from '@/components/ui/CloseButton';
 import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
-import { SHOP_CUBBY, SHOP_GEM, SHOP_PLANK, SHOP_TAG } from '@/components/ui/shop/shopKit';
+import { BAR_TONE, CLOSET_TONE } from '@/components/ui/skins/DressingRoom';
 import { PurchaseBurst } from '@/components/ui/skins/PurchaseBurst';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
@@ -233,12 +233,11 @@ export function PurchaseSheet({
     >
       {({ entered, bindScroll, dragControls }) =>
         target ? (
-          <div className="shop-surface flex min-h-0 flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-1 sm:px-1.5 sm:pb-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-1 sm:px-1.5 sm:pb-3">
             <div
               className={cn(
                 'relative flex min-h-0 flex-col overflow-hidden rounded-[28px] sm:shadow-[0_3px_0_0_rgba(0,0,0,0.18),0_24px_56px_-18px_rgba(0,0,0,0.45)]',
                 CARD_SURFACE,
-                '!bg-[color:var(--shop-body)]',
               )}
             >
               <div
@@ -257,16 +256,15 @@ export function PurchaseSheet({
                 ref={bindScroll}
                 className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 pb-4 pt-px sm:pt-3"
               >
-                <div className="relative overflow-hidden px-1 pb-[15px]">
-                <span aria-hidden className={cn(SHOP_PLANK, 'inset-x-0 bottom-[4px]')} />
+                <div className="relative">
                 <div
                   ref={tileRef}
                   className={cn(
-                    'relative flex w-full shrink-0 items-center justify-center rounded-b-none rounded-t-[22px]',
-                    previewWide ? 'overflow-hidden' : '[clip-path:inset(0_0_-12px_0_round_22px_22px_0_0)]',
+                    'closet-tile relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-[22px]',
                     previewWide ? 'aspect-[16/10]' : 'h-[min(232px,27dvh)]',
-                    SHOP_CUBBY[target.rarity],
+                    CLOSET_TONE[target.rarity],
                     showFoil && phase === 'confirm' && 'closet-foil',
+                    target.rarity === 'legendary' && phase === 'confirm' && 'closet-foil-gold',
                   )}
                 >
                   {phase === 'success' && (
@@ -316,18 +314,18 @@ export function PurchaseSheet({
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.28, delay: 0.05 }}
-                    className="text-balance text-[22px] font-black leading-tight tracking-tight text-[color:var(--shop-heading)]"
+                    className="text-balance text-[22px] font-black leading-tight tracking-tight text-foreground"
                   >
                     {target.name}
                   </motion.h2>
 
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className={cn(SHOP_TAG, 'h-6 gap-1.5 pl-2 pr-2.5 text-[12.5px]')}>
-                      <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', SHOP_GEM[target.rarity])} />
+                    <span className={cn('inline-flex h-6 items-center gap-1.5 rounded-full pl-2 pr-2.5 text-[12.5px] font-black', rarity.chip)}>
+                      <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', BAR_TONE[target.rarity])} />
                       {rarity.label}
                     </span>
                     {target.slotLabel && (
-                      <span className={cn(SHOP_TAG, 'h-6 px-2.5 text-[12.5px] font-bold text-muted-foreground')}>
+                      <span className="inline-flex h-6 items-center rounded-full bg-muted px-2.5 text-[12.5px] font-bold text-muted-foreground">
                         {target.slotLabel}
                       </span>
                     )}
@@ -641,7 +639,7 @@ function SecondaryButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'relative flex h-12 w-full items-center justify-center gap-2 rounded-[20px] bg-[color:var(--shop-tag)] text-[15px] font-black text-[color:var(--shop-heading)] shadow-[0_3px_0_0_var(--shop-tag-edge)] ring-1 ring-[color:var(--shop-tag-edge)] transition-[transform,box-shadow] duration-150 ease-out active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-60 short:h-11 short:text-[14px]',
+        'relative flex h-12 w-full items-center justify-center gap-2 rounded-[20px] bg-card text-[15px] font-black text-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] ring-1 ring-border/70 transition-[transform,box-shadow] duration-150 ease-out active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-60 short:h-11 short:text-[14px]',
         className,
       )}
     >

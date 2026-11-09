@@ -471,43 +471,18 @@ function ShopPageSkeleton() {
       label="Loading shop"
       className="relative flex min-h-[100dvh] flex-col overflow-x-clip md:min-h-[calc(100vh-4rem)]"
     >
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col md:px-6">
-        <div className="pond-panel sticky top-0 z-30 flex shrink-0 items-center gap-2 bg-[color:var(--pond-surface-top)] px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:hidden">
-          <Skeleton className="h-10 w-24 rounded-full" />
-          <Skeleton className="ml-auto h-12 w-12 rounded-2xl" />
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 md:px-6">
+        <div className="relative h-[calc(312px+env(safe-area-inset-top))] shrink-0 md:h-[438px]">
+          <Skeleton className="absolute left-0 top-[calc(env(safe-area-inset-top)+0.5rem)] h-10 w-24 rounded-full md:hidden" />
+          <Skeleton className="absolute right-0 top-[calc(env(safe-area-inset-top)+0.5rem)] h-11 w-11 rounded-full md:top-[5.5rem]" />
         </div>
-        <div className="pond-panel relative bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] pb-10 pt-1 md:bg-none md:pt-[140px]">
-          <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 bg-[linear-gradient(to_bottom,var(--pond-surface-top),var(--pond-surface-bottom))] md:block" />
-          <div className="relative px-4 md:px-6">
-            <div className="mx-auto mt-3 h-[118px] w-full max-w-[340px] animate-pulse rounded-[26px] bg-[color:var(--pond-well)]" />
+        <div className="relative -mx-4 flex flex-1 flex-col rounded-t-[24px] bg-background px-4 pt-5 md:-mx-6 md:px-6 md:pt-6">
+          <div aria-hidden className="pointer-events-none absolute -bottom-px left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
+          <div className="mb-2 flex min-h-7 items-center gap-2 px-0.5">
+            <Skeleton className="h-3.5 w-28 rounded-full" />
+            <Skeleton className="ml-auto h-7 w-24 rounded-full" />
           </div>
-          <div className="h-[128px]" />
-        </div>
-        <div className="relative z-20 -mt-6 flex-1 rounded-t-[28px] bg-background px-4 pb-8 pt-6 md:flex-none md:rounded-none md:bg-transparent md:px-6 md:pb-12 md:pt-8">
-          <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block" />
-          <div className="-mx-1.5 rounded-[28px] bg-[#fff8e3] p-2.5 pb-3 ring-1 ring-[#f6e3ae] dark:bg-amber-400/[0.06] dark:ring-amber-300/15">
-            <div className="mb-2.5 flex items-center gap-2.5 px-1 pt-0.5">
-              <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <Skeleton className="h-4 w-36 rounded-full" />
-                <Skeleton className="h-3 w-24 rounded-full" />
-              </div>
-              <Skeleton className="h-10 w-24 shrink-0 rounded-full" />
-            </div>
-            <div className="grid grid-cols-3 gap-2.5 md:grid-cols-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="aspect-[4/5] animate-pulse rounded-[22px] bg-muted" />
-              ))}
-            </div>
-          </div>
-          <div className="mt-8">
-            <Skeleton className="mb-3 ml-1 h-5 w-40 rounded-full" />
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="aspect-[4/5] animate-pulse rounded-[22px] bg-muted" />
-              ))}
-            </div>
-          </div>
+          <WardrobeGridSkeleton />
         </div>
       </div>
     </SkeletonShell>

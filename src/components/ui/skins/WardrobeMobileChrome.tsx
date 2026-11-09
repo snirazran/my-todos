@@ -25,7 +25,7 @@ export function previousRoute() {
   return previousPath;
 }
 
-const ROUND_BUTTON =
+export const ROUND_BUTTON =
   'grid h-11 w-11 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur-md transition-[background-color,transform] hover:bg-background active:scale-95';
 
 export function WardrobeMobileChrome() {

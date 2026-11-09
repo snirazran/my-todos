@@ -43,6 +43,12 @@ PODS:
     - Alamofire (~> 5.10.2)
     - Capacitor
     - GoogleSignIn (~> 9.0.0)
+  - FBAEMKit (18.1.1):
+    - FBSDKCoreKit_Basics (= 18.1.1)
+  - FBSDKCoreKit (18.1.1):
+    - FBAEMKit (= 18.1.1)
+    - FBSDKCoreKit_Basics (= 18.1.1)
+  - FBSDKCoreKit_Basics (18.1.1)
   - FirebaseCore (12.7.0):
     - FirebaseCoreInternal (~> 12.7.0)
     - GoogleUtilities/Environment (~> 8.1)
@@ -158,6 +164,7 @@ DEPENDENCIES:
   - "CapacitorNativeSettings (from `../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings`)"
   - "CapacitorShare (from `../../node_modules/.pnpm/@capacitor+share@8.0.1_@capacitor+core@8.0.2/node_modules/@capacitor/share`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login`)"
+  - FBSDKCoreKit (~> 18.0)
   - LiveActivitiesKit (from `../../node_modules/capacitor-live-activities`)
   - "RevenuecatPurchasesCapacitor (from `../../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.2.1_@capacitor+core@8.0.2/node_modules/@revenuecat/purchases-capacitor`)"
 
@@ -166,6 +173,9 @@ SPEC REPOS:
     - Alamofire
     - AppAuth
     - AppCheckCore
+    - FBAEMKit
+    - FBSDKCoreKit
+    - FBSDKCoreKit_Basics
     - FirebaseCore
     - FirebaseCoreInternal
     - FirebaseInstallations
@@ -240,6 +250,9 @@ SPEC CHECKSUMS:
   CapacitorNativeSettings: d512b84fdcc04948c32f267621079a0d7c0d452f
   CapacitorShare: 0c58305114538568059bfc07111f22dcb9cb2a82
   CapgoCapacitorSocialLogin: 51a5840798c3df3b5c3e391d633cdab7fbde0431
+  FBAEMKit: fbb0a50e13109400d0615e7630a0db26ec6b8206
+  FBSDKCoreKit: 0063014b3b1f7e975e70b60232b0cf8003839746
+  FBSDKCoreKit_Basics: f4a1e0f38769eb71abaf6395b85e015318fcda49
   FirebaseCore: c7b57863ce0859281a66d16ca36d665c45d332b5
   FirebaseCoreInternal: 571a2dd8c975410966199623351db3a3265c874d
   FirebaseInstallations: 6d05424a046b68ca146b4de4376f05b4e9262fc3
@@ -264,6 +277,6 @@ SPEC CHECKSUMS:
   RevenueCat: f4427b8a1daa7a04a26cb20d60807aa818d9420b
   RevenuecatPurchasesCapacitor: c31daadc8c3b89ff31686b6ea07ff99bc21c96b7
 
-PODFILE CHECKSUM: 017e926af7dfd388d3ce656b772f8ea37ed533d5
+PODFILE CHECKSUM: 6f615f65317bf2319b1d14f4967c592a677a7fed
 
 COCOAPODS: 1.16.2

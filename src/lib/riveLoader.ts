@@ -137,6 +137,33 @@ export const preloadGiftFile = (): Promise<RiveFile | null> => {
 
 export const getGiftFile = () => giftFile;
 
+export const MERCHANT_RIVE_ASSET_URL = '/merchant_frog_idle.riv?v=61109001';
+
+let merchantFile: RiveFile | null = null;
+let merchantFileLoad: Promise<RiveFile | null> | null = null;
+
+export const preloadMerchantFile = (): Promise<RiveFile | null> => {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (merchantFile) return Promise.resolve(merchantFile);
+  merchantFileLoad ??= preloadRiveAsset(MERCHANT_RIVE_ASSET_URL)
+    .then((url) => {
+      const file = new RiveFile({ src: url });
+      return file.init().then(() => {
+        file.getInstance();
+        merchantFile = file;
+        return file;
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      merchantFileLoad = null;
+      return null;
+    });
+  return merchantFileLoad;
+};
+
+export const getMerchantFile = () => merchantFile;
+
 export const riveDevicePixelRatio = (cap = 2) => {
   if (typeof window === 'undefined') return 1;
   return Math.min(window.devicePixelRatio || 1, cap);

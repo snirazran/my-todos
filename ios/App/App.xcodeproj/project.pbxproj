@@ -47,8 +47,8 @@
 		FA0100033100AAAA00000003 /* FrogWidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0100013100AAAA00000001 /* FrogWidgetStore.swift */; };
 		FA0100053100AAAA00000005 /* FrogTasksWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0100043100AAAA00000004 /* FrogTasksWidget.swift */; };
 		FA0100073100AAAA00000007 /* FrogWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0100063100AAAA00000006 /* FrogWidgetPlugin.swift */; };
-		FA01000B3100AAAA0000000B /* FrogMetaPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */; };
 		FA0100093100AAAA00000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FA0100083100AAAA00000008 /* PrivacyInfo.xcprivacy */; };
+		FA01000B3100AAAA0000000B /* FrogMetaPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -119,8 +119,8 @@
 		FA0100013100AAAA00000001 /* FrogWidgetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogWidgetStore.swift; sourceTree = "<group>"; };
 		FA0100043100AAAA00000004 /* FrogTasksWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogTasksWidget.swift; sourceTree = "<group>"; };
 		FA0100063100AAAA00000006 /* FrogWidgetPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogWidgetPlugin.swift; path = App/FrogWidgetPlugin.swift; sourceTree = SOURCE_ROOT; };
-		FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogMetaPlugin.swift; path = App/FrogMetaPlugin.swift; sourceTree = SOURCE_ROOT; };
 		FA0100083100AAAA00000008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		FA01000A3100AAAA0000000A /* FrogMetaPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogMetaPlugin.swift; path = App/FrogMetaPlugin.swift; sourceTree = SOURCE_ROOT; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -607,13 +607,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = M7BKYJ6U55;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Frogress;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 1.1.2;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = io.frog.tasks;
 				PRODUCT_NAME = Frogress;
@@ -631,13 +631,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = M7BKYJ6U55;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Frogress;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 1.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = io.frog.tasks;
 				PRODUCT_NAME = Frogress;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
