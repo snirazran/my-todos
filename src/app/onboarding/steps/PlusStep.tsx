@@ -71,7 +71,7 @@ function pageLook(
   base: Partial<Record<WardrobeSlot, number>> | undefined,
 ) {
   const look: Partial<Record<WardrobeSlot, number>> = { ...base };
-  if (!catalog.length || !PAGE_LOOK[page].length) return look;
+  if (!catalog.length) return look;
   LOOK_SLOTS.forEach((slot) => {
     look[slot] = 0;
   });
@@ -599,11 +599,11 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
       );
     }
     if (page === 'discount') return <OfferTicket percent={save} />;
-    if (page === 'free') {
+    if (page === 'free' && !desktop) {
       return (
         <span
           aria-hidden
-          className="relative -top-[7px] block h-3.5 w-28 rounded-[50%] bg-zinc-900/[0.08] dark:bg-black/40 lg:-top-2 lg:h-4 lg:w-36"
+          className="relative -top-2 block h-4 w-[168px] rounded-[50%] bg-zinc-900/10 dark:bg-black/45 short:w-[136px]"
         />
       );
     }

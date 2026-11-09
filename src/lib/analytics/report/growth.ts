@@ -44,8 +44,16 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     .lean<CohortUser[]>();
   const cohortIds = cohortUsers.map((user) => String(user._id));
 
-  const [activeDayRows, milestoneRows, platformRows, pageRows, onboardingStepRows, firstRunRows, guestRows] =
-    await Promise.all([
+  const [
+    activeDayRows,
+    milestoneRows,
+    platformRows,
+    pageRows,
+    onboardingStepRows,
+    firstRunRows,
+    guestRows,
+    taskDayRows,
+  ] = await Promise.all([
       cohortIds.length
         ? AnalyticsEventModel.aggregate<{ _id: string; days: string[] }>([
             {
@@ -131,6 +139,27 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
         },
         { event: '$name', provider: 'provider' },
       ),
+      cohortIds.length
+        ? AnalyticsEventModel.aggregate<{ _id: { user: string; name: string }; days: string[] }>([
+            {
+              $match: {
+                userId: { $in: cohortIds },
+                name: { $in: ['task_created', 'task_completed'] },
+                occurredAt: { $gte: range.start },
+              },
+            },
+            {
+              $group: {
+                _id: { user: '$userId', name: '$name' },
+                days: {
+                  $addToSet: {
+                    $dateToString: { date: '$occurredAt', format: '%Y-%m-%d', timezone: 'UTC' },
+                  },
+                },
+              },
+            },
+          ])
+        : Promise.resolve([]),
     ]);
 
   const activeDays = new Map(activeDayRows.map((row) => [row._id, new Set(row.days)]));
@@ -220,7 +249,48 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
       of_signups: rate(step.users, cohortUsers.length),
       step_conversion: index === 0 ? 100 : rate(step.users, funnelSteps[index - 1].users),
     })),
-    note: 'Counts only accounts created inside the selected range, so it reads as a true cohort.',
+    note: 'Counts only accounts created inside the selected range, so it reads as a true cohort. "Created a task" means a task they added themselves; starter-plan tasks and the "Tap the fly" task do not count.',
+  };
+
+  const taskDays = new Map<string, Set<string>>();
+  for (const row of taskDayRows) {
+    taskDays.set(`${row._id.user}|${row._id.name}`, new Set(row.days));
+  }
+  const ownTaskGroups: { label: string; users: CohortUser[] }[] = [
+    { label: 'Added their own task on signup day', users: [] },
+    { label: 'Only finished starter tasks on signup day', users: [] },
+    { label: 'Finished no task on signup day', users: [] },
+  ];
+  for (const user of cohortUsers) {
+    const id = String(user._id);
+    const signupDay = ymd(startOfUtcDay(new Date(user.createdAt)));
+    if (taskDays.get(`${id}|task_created`)?.has(signupDay)) ownTaskGroups[0].users.push(user);
+    else if (taskDays.get(`${id}|task_completed`)?.has(signupDay)) ownTaskGroups[1].users.push(user);
+    else ownTaskGroups[2].users.push(user);
+  }
+  const ownTaskTable: StatTable = {
+    key: 'growth.own_task_return',
+    title: 'Own task on signup day vs coming back',
+    question: 'Do people who add a task of their own on day one come back more than people who only use the starter tasks?',
+    columns: [
+      { key: 'group', label: 'On signup day' },
+      { key: 'accounts', label: 'Accounts', format: 'integer' },
+      { key: 'of_signups', label: '% of signups', format: 'percent' },
+      { key: 'd1', label: 'Back D1', format: 'percent' },
+      { key: 'd7', label: 'Back D7', format: 'percent' },
+    ],
+    rows: ownTaskGroups.map(({ label, users }) => {
+      const d1 = retentionFor(users, 1);
+      const d7 = retentionFor(users, 7);
+      return {
+        group: label,
+        accounts: users.length,
+        of_signups: rate(users.length, cohortUsers.length),
+        d1: d1.eligible ? d1.rate : null,
+        d7: d7.eligible ? d7.rate : null,
+      };
+    }),
+    note: 'Signup day is the UTC calendar day of the account. Back D1/D7 only count accounts old enough to reach that day. A gap here shows the two groups differ, not that adding a task causes the return: motivated people tend to do both.',
   };
 
   const onboardingSteps = onboardingStepRows
@@ -347,6 +417,7 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     tables: [
       onboardingTable,
       activationTable,
+      ownTaskTable,
       firstRunTable,
       guestTable,
       retentionTable,

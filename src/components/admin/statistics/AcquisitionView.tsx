@@ -498,6 +498,7 @@ export function AcquisitionView({
                   <th className="px-3 py-2 font-semibold">Platform</th>
                   <th className="px-3 py-2 font-semibold">Source</th>
                   <th className="px-3 py-2 font-semibold">Onboarded</th>
+                  <th className="px-3 py-2 text-right font-semibold">Own tasks</th>
                   <th className="px-3 py-2 text-right font-semibold">Tasks wk1</th>
                   <th className="px-3 py-2 text-right font-semibold">Active days</th>
                   <th className="px-3 py-2 font-semibold">D1</th>
@@ -523,6 +524,7 @@ export function AcquisitionView({
                       <td className="px-3 py-2 text-muted-foreground">{row.platform}</td>
                       <td className="max-w-[280px] truncate px-3 py-2 font-semibold">{source || String(row.channel)}</td>
                       <td className="px-3 py-2"><YesNo value={String(row.onboarded)} /></td>
+                      <td className="px-3 py-2 text-right tabular-nums">{row.own_tasks ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{row.tasks_week1}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{row.active_days}</td>
                       <td className="px-3 py-2"><YesNo value={String(row.back_d1)} /></td>

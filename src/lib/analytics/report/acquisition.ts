@@ -83,6 +83,7 @@ type UserOutcome = {
   activated: boolean;
   activeDays: Set<string>;
   tasksFirstWeek: number;
+  ownTasks: number;
   trials: number;
   paid: number;
   revenue: number;
@@ -270,6 +271,7 @@ export async function buildAcquisition(
                   'app_opened',
                   'page_viewed',
                   'onboarding_completed',
+                  'task_created',
                   'task_completed',
                   'subscription_started',
                   'subscription_renewed',
@@ -373,6 +375,7 @@ export async function buildAcquisition(
         activated: false,
         activeDays: new Set<string>(),
         tasksFirstWeek: 0,
+        ownTasks: 0,
         trials: 0,
         paid: 0,
         revenue: 0,
@@ -383,6 +386,7 @@ export async function buildAcquisition(
       if (row.platform && row.platform !== 'unknown') outcome.platform = row.platform;
     }
     if (row._id.name === 'onboarding_completed') outcome.onboarded = true;
+    if (row._id.name === 'task_created') outcome.ownTasks += row.count;
     if (row._id.name === 'task_completed') {
       outcome.activated = true;
       if (signup && row._id.day < ymd(addUtcDays(signup, 7))) outcome.tasksFirstWeek += row.count;
@@ -503,6 +507,7 @@ export async function buildAcquisition(
         keyword: segments[3]?.label ?? '',
         guest: user.isGuest ? 'yes' : 'no',
         onboarded: outcome?.onboarded ? 'yes' : 'no',
+        own_tasks: outcome?.ownTasks ?? 0,
         tasks_week1: outcome?.tasksFirstWeek ?? 0,
         active_days: outcome?.activeDays.size ?? 0,
         back_d1: d1Eligible ? (d1Retained ? 'yes' : 'no') : 'too early',
@@ -764,6 +769,7 @@ export async function buildAcquisition(
           { key: 'keyword', label: 'Keyword / ad' },
           { key: 'guest', label: 'Guest' },
           { key: 'onboarded', label: 'Onboarded' },
+          { key: 'own_tasks', label: 'Own tasks', format: 'integer' },
           { key: 'tasks_week1', label: 'Tasks wk1', format: 'integer' },
           { key: 'active_days', label: 'Active days', format: 'integer' },
           { key: 'back_d1', label: 'Back D1' },
@@ -774,7 +780,7 @@ export async function buildAcquisition(
           { key: 'last_seen', label: 'Last seen' },
         ],
         rows: people,
-        note: 'User is the first 8 characters of the account id. Active days count days with an app open since the start of the range.',
+        note: 'User is the first 8 characters of the account id. Own tasks counts the times they added tasks themselves (starter-plan tasks and the "Tap the fly" task are not included; adding several at once counts once). Tasks wk1 counts tasks finished in the first 7 days. Active days count days with an app open since the start of the range.',
       },
     ],
   };
