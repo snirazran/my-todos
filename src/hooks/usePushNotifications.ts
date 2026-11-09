@@ -127,6 +127,7 @@ export function usePushNotifications(userId: string | null | undefined) {
               | undefined;
             trackAnalyticsEvent('notification_opened', {
               notification_type: typeof data?.type === 'string' ? data.type : 'unknown',
+              slot: typeof data?.slot === 'string' ? data.slot : undefined,
             });
             const path = data?.path;
             if (typeof path === 'string' && path) {

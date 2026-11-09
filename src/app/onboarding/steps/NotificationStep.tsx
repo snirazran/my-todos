@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
-import { enableWebPush } from '@/lib/webPush';
+import { enableWebPush, isWebPushSupported, webPushPermission } from '@/lib/webPush';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import {
@@ -15,15 +16,28 @@ import {
 } from './OnboardingFrogHeader';
 import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
-async function enableNotifications() {
+type PermissionStatus = 'granted' | 'denied' | 'dismissed' | 'unsupported' | 'later' | 'failed';
+type PermissionOutcome = 'prompted' | 'already_set' | 'skipped';
+type ReportPermission = (status: PermissionStatus, outcome: PermissionOutcome) => void;
+
+function reportPermission(status: PermissionStatus, outcome: PermissionOutcome) {
+  trackAnalyticsEvent('notification_permission_result', { status, outcome });
+}
+
+function permissionStatus(state: string): PermissionStatus {
+  if (state === 'granted' || state === 'denied' || state === 'unsupported') return state;
+  return 'dismissed';
+}
+
+async function enableNotifications(report: ReportPermission) {
   if (Capacitor.isNativePlatform()) {
     let status = await FirebaseMessaging.checkPermissions();
-    if (
-      status.receive === 'prompt' ||
-      status.receive === 'prompt-with-rationale'
-    ) {
+    const prompted =
+      status.receive === 'prompt' || status.receive === 'prompt-with-rationale';
+    if (prompted) {
       status = await FirebaseMessaging.requestPermissions();
     }
+    report(permissionStatus(status.receive), prompted ? 'prompted' : 'already_set');
     if (status.receive !== 'granted') return;
 
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -39,7 +53,16 @@ async function enableNotifications() {
     return;
   }
 
-  await enableWebPush();
+  if (!(await isWebPushSupported())) {
+    report('unsupported', 'already_set');
+    return;
+  }
+  const before = webPushPermission();
+  try {
+    await enableWebPush();
+  } finally {
+    report(permissionStatus(webPushPermission()), before === 'default' ? 'prompted' : 'already_set');
+  }
 }
 
 export default function NotificationStep({ selections, onNext, saving, direction }: OnboardingStepProps) {
@@ -48,14 +71,25 @@ export default function NotificationStep({ selections, onNext, saving, direction
 
   const handleEnable = async () => {
     setRequesting(true);
+    let reported = false;
+    const report: ReportPermission = (status, outcome) => {
+      reported = true;
+      reportPermission(status, outcome);
+    };
     try {
-      await enableNotifications();
+      await enableNotifications(report);
     } catch {
       // Permission setup is best-effort; onboarding should still continue.
+      if (!reported) reportPermission('failed', 'prompted');
     } finally {
       setRequesting(false);
       onNext();
     }
+  };
+
+  const handleLater = () => {
+    reportPermission('later', 'skipped');
+    onNext();
   };
 
   return (
@@ -92,7 +126,7 @@ export default function NotificationStep({ selections, onNext, saving, direction
         <OnboardingButton onClick={handleEnable} disabled={saving} loading={requesting}>
           Turn on reminders
         </OnboardingButton>
-        <OnboardingButton variant="ghost" onClick={onNext} disabled={saving || requesting}>
+        <OnboardingButton variant="ghost" onClick={handleLater} disabled={saving || requesting}>
           Maybe later
         </OnboardingButton>
       </OnboardingFooter>

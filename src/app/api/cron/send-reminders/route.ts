@@ -486,6 +486,8 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
+    const slot = isEvening ? 'evening' : 'morning';
+
     // Send to all registered tokens
     const invalidTokens: string[] = [];
 
@@ -497,7 +499,7 @@ export async function GET(req: NextRequest) {
             title: message.title,
             body: message.body,
           },
-          data: message.data,
+          data: { ...message.data, slot },
           // Android-specific config
           android: {
             priority: 'high' as const,
@@ -545,7 +547,7 @@ export async function GET(req: NextRequest) {
       name: 'notification_sent',
       properties: {
         notification_type: String(message.data.type ?? 'unknown'),
-        slot: isEvening ? 'evening' : 'morning',
+        slot,
       },
     });
 

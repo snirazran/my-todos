@@ -584,7 +584,7 @@ export const METRICS: MetricDefinition[] = [
     system: 'frog',
     unit: 'percent',
     format: 'percent',
-    definition: 'notification_opened divided by notification_sent.',
+    definition: 'notification_opened divided by notification_sent, leaving out scheduled_task_reminder (the reminders people set on their own tasks).',
     why: 'The only way to tell which of the priority-ladder messages is worth its slot.',
     direction: 'up',
     band: { min: 6 },

@@ -85,6 +85,8 @@ const EVENT_LABELS: Record<string, string> = {
   ad_requested: 'Asked for a rewarded ad',
   ad_completed: 'Watched a rewarded ad',
   notification_opened: 'Opened a notification',
+  notification_permission_result: 'Answered the reminder prompt',
+  tracking_permission_result: 'Answered the tracking prompt',
   referral_invite_shared: 'Shared an invite',
   referral_invite_opened: 'Opened an invite link',
   friend_link_opened: 'Opened a friend link',

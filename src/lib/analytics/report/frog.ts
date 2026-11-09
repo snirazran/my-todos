@@ -1,4 +1,4 @@
-import type { StatSection } from '@/lib/analytics/catalog';
+import type { StatRow, StatSection } from '@/lib/analytics/catalog';
 import { groupByProperties, kpi, rate, type ReportContext } from './context';
 import { mixTable, propertyMix } from './dimensions';
 
@@ -8,8 +8,70 @@ const REVIEW_OUTCOMES: Record<string, string> = {
   app_review_suppressed: 'Paused after a bad moment',
 };
 
+const SELF_SET_REMINDER = 'scheduled_task_reminder';
+
+const PERMISSION_STATUS: Record<string, string> = {
+  granted: 'Allowed',
+  denied: "Don't Allow",
+  dismissed: 'Closed without answering',
+  later: 'Maybe later',
+  unsupported: 'Not supported',
+  failed: 'Failed',
+};
+
+const PERMISSION_OUTCOME: Record<string, string> = {
+  prompted: 'Saw the system prompt',
+  already_set: 'Answered before',
+  skipped: 'No prompt',
+};
+
+type CountRow = { _id: Record<string, unknown>; count: number; users: number };
+
+function notificationTable(sendRows: CountRow[], openRows: CountRow[]) {
+  const key = (type: unknown, slot: unknown) => `${String(type)}|${String(slot)}`;
+  const opens = new Map(openRows.map((row) => [key(row._id.type, row._id.slot), row.count]));
+  const slotsByType = new Map<string, number>();
+  for (const row of sendRows) {
+    const type = String(row._id.type);
+    slotsByType.set(type, (slotsByType.get(type) ?? 0) + 1);
+  }
+  const used = new Set<string>();
+  const take = (k: string) => {
+    used.add(k);
+    return opens.get(k) ?? 0;
+  };
+  const rows: StatRow[] = sendRows.map((row) => {
+    const type = String(row._id.type);
+    const slot = String(row._id.slot);
+    const unslotted =
+      slot !== 'unknown' && slotsByType.get(type) === 1 ? take(key(type, 'unknown')) : 0;
+    const opened = take(key(type, slot)) + unslotted;
+    return {
+      type,
+      slot,
+      sent: row.count,
+      recipients: row.users,
+      opened,
+      open_rate: rate(opened, row.count),
+    };
+  });
+  for (const row of openRows) {
+    const k = key(row._id.type, row._id.slot);
+    if (used.has(k)) continue;
+    rows.push({
+      type: String(row._id.type),
+      slot: String(row._id.slot) === 'unknown' ? 'not recorded' : String(row._id.slot),
+      sent: null,
+      recipients: null,
+      opened: row.count,
+      open_rate: null,
+    });
+  }
+  return rows;
+}
+
 export async function buildFrog(context: ReportContext): Promise<StatSection> {
-  const [streakMix, notificationRows, openRows, hungerRows, reviewRows, goalRows] = await Promise.all([
+  const [streakMix, notificationRows, openRows, hungerRows, reviewRows, goalRows, permissionRows] = await Promise.all([
     propertyMix({ occurredAt: context.window, name: 'streak_checked_in' }, [
       'streak_tier',
       'is_premium',
@@ -21,7 +83,7 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
     ),
     groupByProperties(
       { occurredAt: context.window, name: 'notification_opened' },
-      { type: 'notification_type' },
+      { type: 'notification_type', slot: 'slot' },
     ),
     groupByProperties(
       { occurredAt: context.window, name: 'hunger_resolved' },
@@ -38,6 +100,10 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
       { occurredAt: context.window, name: { $in: ['streak_goal_set', 'streak_goal_reached'] } },
       { event: '$name', days: 'days' },
     ),
+    groupByProperties(
+      { occurredAt: context.window, name: 'notification_permission_result' },
+      { status: 'status', outcome: 'outcome' },
+    ),
   ]);
 
   const checkIns = context.metric('streak_checked_in');
@@ -47,13 +113,15 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
   const hungerStarted = context.metric('hunger_started');
   const hungerResolved = context.metric('hunger_resolved');
   const sent = context.metric('notification_sent');
-  const opened = context.metric('notification_opened');
 
   const extended = streakMix
     .filter((row) => row._id.key === 'streak_tier' && row._id.value !== 'none')
     .reduce((sum, row) => sum + row.count, 0);
 
-  const openByType = new Map(openRows.map((row) => [String(row._id.type), row]));
+  const notSelfSet = (row: CountRow) => String(row._id.type) !== SELF_SET_REMINDER;
+  const nudgesSent = notificationRows.filter(notSelfSet).reduce((sum, row) => sum + row.count, 0);
+  const nudgesOpened = openRows.filter(notSelfSet).reduce((sum, row) => sum + row.count, 0);
+  const permissionTotal = permissionRows.reduce((sum, row) => sum + row.count, 0);
 
   return {
     id: 'frog',
@@ -77,9 +145,9 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
         sample: hungerStarted.events,
       }),
       kpi('notifications_sent', sent.events, { sparkline: context.seriesFor('notification_sent') }),
-      kpi('notification_open_rate', rate(opened.events, sent.events), {
-        detail: `${opened.events} opens from ${sent.events} sends`,
-        sample: sent.events,
+      kpi('notification_open_rate', rate(nudgesOpened, nudgesSent), {
+        detail: `${nudgesOpened} opens from ${nudgesSent} sends, not counting reminders people set on their own tasks`,
+        sample: nudgesSent,
       }),
     ],
     series: [
@@ -113,18 +181,28 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
           { key: 'opened', label: 'Opened', format: 'integer' },
           { key: 'open_rate', label: 'Open rate', format: 'percent' },
         ],
-        rows: notificationRows.map((row) => {
-          const open = openByType.get(String(row._id.type));
-          return {
-            type: String(row._id.type),
-            slot: String(row._id.slot),
-            sent: row.count,
-            recipients: row.users,
-            opened: open?.count ?? 0,
-            open_rate: rate(open?.count ?? 0, row.count),
-          };
-        }),
-        note: 'Only two notifications a day get through the cap, so a low open rate here is a slot being wasted.',
+        rows: notificationTable(notificationRows, openRows),
+        note: 'Only two notifications a day get through the cap, so a low open rate here is a slot being wasted. Opens before Nov 9, 2026 did not record the slot, so a message sent both morning and evening shows those opens on a separate "not recorded" row.',
+      },
+      {
+        key: 'frog.notification_permission',
+        title: 'Reminder permission at onboarding',
+        question: 'How many new users let the frog send reminders?',
+        columns: [
+          { key: 'status', label: 'Answer' },
+          { key: 'outcome', label: 'Prompt' },
+          { key: 'people', label: 'People', format: 'integer' },
+          { key: 'share', label: 'Share of answers', format: 'percent' },
+        ],
+        rows: permissionRows
+          .map((row) => ({
+            status: PERMISSION_STATUS[String(row._id.status)] ?? String(row._id.status),
+            outcome: PERMISSION_OUTCOME[String(row._id.outcome)] ?? String(row._id.outcome),
+            people: row.users,
+            share: rate(row.count, permissionTotal),
+          }))
+          .sort((a, b) => b.people - a.people),
+        note: 'One row per answer on the "Get reminders" onboarding step. Tracked from Nov 9, 2026.',
       },
       mixTable({
         key: 'frog.streak_mix',

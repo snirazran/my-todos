@@ -92,12 +92,14 @@ const CLIENT_EVENTS = new Set([
   'ad_consent_resolved',
   'ad_consent_failed',
   'tracking_permission_result',
+  'notification_permission_result',
 ]);
 
 const SIGNED_OUT_EVENTS = new Set([
   'app_opened',
   'page_viewed',
   'tracking_permission_result',
+  'notification_permission_result',
   'starter_plan_shown',
   'onboarding_step_viewed',
   'referral_invite_opened',
