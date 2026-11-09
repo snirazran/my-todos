@@ -34,7 +34,6 @@ import {
   whenScreenIsFree,
 } from '@/lib/popupGate';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
-import { useUIStore } from '@/lib/uiStore';
 import type { CheckInResult, LoginStreakRescue, RescueResult } from '@/lib/streak/types';
 import type { ShieldOffer } from '@/lib/shields/types';
 
@@ -88,7 +87,6 @@ function queueShieldOffer(offer: ShieldOffer) {
 const WIDGET_AFTER_RESCUE_MS = 450;
 
 const AFTER_CATCH_DELAY_MS = 1400;
-const FIRST_RUN_CATCH_DELAY_MS = 2600;
 
 function revealStreakDay(result: CheckInResult, initialDelayMs = 0) {
   queueStreakSheet(
@@ -192,12 +190,7 @@ export function StreakCheckInProvider() {
           lastChecked = { dayKey: localDayKey(), userId, doneToday: true };
         }
         if (result?.active && result.extended) {
-          queued = revealStreakDay(
-            result,
-            useUIStore.getState().isFirstRunGuided
-              ? FIRST_RUN_CATCH_DELAY_MS
-              : AFTER_CATCH_DELAY_MS,
-          );
+          queued = revealStreakDay(result, AFTER_CATCH_DELAY_MS);
         }
       } finally {
         revealing = false;

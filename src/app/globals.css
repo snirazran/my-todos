@@ -1946,6 +1946,43 @@ body.dragging {
   }
 }
 
+@keyframes offer-heartbeat {
+  0%, 46%, 100% { transform: scale(1); }
+  10% { transform: scale(1.16); }
+  20% { transform: scale(0.97); }
+  31% { transform: scale(1.09); }
+}
+
+@keyframes offer-bell-ring {
+  0%, 52%, 100% { transform: rotate(0deg); }
+  57% { transform: rotate(18deg); }
+  63% { transform: rotate(-16deg); }
+  69% { transform: rotate(12deg); }
+  75% { transform: rotate(-8deg); }
+  81% { transform: rotate(4deg); }
+  87% { transform: rotate(-1.5deg); }
+  92% { transform: rotate(0deg); }
+}
+
+@keyframes offer-ring-wave {
+  0%, 52% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1); }
+  84%, 100% { opacity: 0; transform: scale(1.25); }
+}
+
+@keyframes offer-popper {
+  0%, 60%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  66% { transform: translateY(2px) rotate(8deg) scale(0.94); }
+  74% { transform: translateY(-6px) rotate(-12deg) scale(1.1); }
+  84% { transform: translateY(0) rotate(3deg) scale(1); }
+  92% { transform: rotate(-1deg); }
+}
+
+@keyframes offer-float {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-7px) rotate(6deg); }
+}
+
 @keyframes plus-benefit-rise {
   from {
     opacity: 0;

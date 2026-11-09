@@ -102,7 +102,6 @@ function PlusEndingTriggers() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const fromPush = searchParams.get('plus') === 'ending';
-  const firstRunGuided = useUIStore((state) => state.isFirstRunGuided);
   const { data } = useSWR<{ plusTrialEndsAt?: string | null }>(
     user ? '/api/user' : null,
     bootstrapFetcher,
@@ -123,10 +122,10 @@ function PlusEndingTriggers() {
   }, [fromPush, user]);
 
   useEffect(() => {
-    if (!endsAt || pathname !== '/' || firstRunGuided) return;
+    if (!endsAt || pathname !== '/') return;
     if (readSeen() === endsAt) return;
     showPlusEnding('in_app');
-  }, [endsAt, pathname, firstRunGuided]);
+  }, [endsAt, pathname]);
 
   return null;
 }

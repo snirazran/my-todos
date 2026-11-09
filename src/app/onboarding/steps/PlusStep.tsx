@@ -15,10 +15,8 @@ import {
   ONBOARDING_PLUS_OFFERING,
   TRIAL_REMINDER_LEAD_MS,
   trialEndsAt,
-  trialReminderPush,
   type TrialPeriod,
 } from '@/lib/plusPaywall';
-import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
 import { cn } from '@/lib/utils';
 import type { WardrobeSlot } from '@/components/ui/frog';
 import { ONBOARDING_SPLIT_BAR_CLASS, ONBOARDING_SPLIT_STEP_CLASS } from './OnboardingFrogHeader';
@@ -30,7 +28,7 @@ type Page = 'free' | 'reminder' | 'discount' | 'checkout';
 const EASE = [0.22, 1, 0.36, 1] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LEAD_DAYS = Math.round(TRIAL_REMINDER_LEAD_MS / DAY_MS);
-const SEAT_LIFT = 72;
+const SEAT_DROP = 24;
 const SWAP_OUT_MS = 150;
 const SWAP_SETTLE_MS = 50;
 
@@ -43,9 +41,46 @@ const PAGE_EMOTE: Record<Page, FrogEmote> = {
 
 const PAGE_LOOK: Record<Page, string[]> = {
   free: [],
-  reminder: ['3025', '2016', '4004'],
-  discount: ['1022', '3026'],
-  checkout: ['1005', '3024', '4005'],
+  reminder: ['4019'],
+  discount: ['3023', '2014', '4001'],
+  checkout: ['3026'],
+};
+
+type OfferProp = { emoji: string; place: string; size: string; loop: string; waves?: boolean };
+
+const PAGE_PROPS: Record<Page, OfferProp[]> = {
+  free: [
+    {
+      emoji: '💚',
+      place: 'bottom-[calc(100%+14px)] left-[calc(50%-124px)] short:left-[calc(50%-108px)] lg:bottom-[calc(100%+40px)] lg:left-[calc(50%-184px)]',
+      size: 'text-[46px] short:text-[38px] lg:text-[62px]',
+      loop: 'motion-safe:animate-[offer-heartbeat_1.9s_ease-in-out_infinite]',
+    },
+  ],
+  reminder: [
+    {
+      emoji: '🔔',
+      place: 'bottom-[calc(100%+14px)] left-[calc(50%-134px)] short:left-[calc(50%-114px)] lg:bottom-[calc(100%+52px)] lg:left-[calc(50%-196px)]',
+      size: 'text-[54px] short:text-[44px] lg:text-[70px]',
+      loop: 'origin-[50%_8%] motion-safe:animate-[offer-bell-ring_2.8s_ease-in-out_infinite]',
+      waves: true,
+    },
+  ],
+  discount: [
+    {
+      emoji: '🎉',
+      place: 'bottom-[calc(100%+40px)] left-[calc(50%-136px)] short:left-[calc(50%-116px)] lg:bottom-[calc(100%+64px)] lg:left-[calc(50%-198px)]',
+      size: 'text-[50px] short:text-[42px] lg:text-[66px]',
+      loop: 'origin-[30%_80%] motion-safe:animate-[offer-popper_3.2s_ease-in-out_infinite]',
+    },
+    {
+      emoji: '🎁',
+      place: 'bottom-[calc(100%+6px)] right-[calc(50%-128px)] short:right-[calc(50%-110px)] lg:bottom-[calc(100%+30px)] lg:right-[calc(50%-188px)]',
+      size: 'text-[40px] short:text-[34px] lg:text-[54px]',
+      loop: 'motion-safe:animate-[offer-float_3.4s_ease-in-out_infinite]',
+    },
+  ],
+  checkout: [],
 };
 
 type CatalogItem = { id: string | number; slot: string; riveIndex: number };
@@ -93,7 +128,6 @@ const SPARKLES = [
 const UNIT = { D: 'day', W: 'week', M: 'month', Y: 'year' } as const;
 
 const shortDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-const longDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 
 function trialDates(trial: TrialPeriod, start: Date) {
   const end = trialEndsAt(trial, start);
@@ -162,47 +196,36 @@ function PlusBar() {
   );
 }
 
-function ReminderPhone({ date, renewDate, action }: { date: Date; renewDate: Date; action: ReactNode }) {
-  const push = trialReminderPush(`in ${LEAD_DAYS} days`, longDate(renewDate));
+function OfferProps({ page, still }: { page: Page; still: boolean }) {
   return (
-    <div className="flex w-full flex-col items-center">
-      <div className="w-full max-w-[318px] [-webkit-mask-image:linear-gradient(to_bottom,#000_80%,transparent)] [mask-image:linear-gradient(to_bottom,#000_80%,transparent)] lg:max-w-[340px]">
-        <div className="rounded-t-[46px] bg-zinc-900 p-[7px] pb-0 shadow-[0_18px_40px_-20px_rgba(15,23,42,0.6)] ring-1 ring-black/10 dark:bg-zinc-800">
-          <div className="relative h-[244px] overflow-hidden rounded-t-[39px] font-[-apple-system,BlinkMacSystemFont,'SF_Pro_Text',system-ui,sans-serif] short:h-[214px] lg:h-[258px]">
-            <img
-              src={DEFAULT_BACKGROUND_IMAGES.mobile}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover object-[50%_30%]"
-            />
-            <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/5 to-black/20" />
-            <div className="relative flex flex-col items-center px-2.5 pt-7 text-white short:pt-5">
-              <span className="text-[14px] font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
-                {date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-              </span>
-              <span className="text-[62px] font-bold leading-[1.05] tracking-[-0.01em] drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)] short:text-[52px]">
-                9:41
-              </span>
-              <motion.div
-                initial={{ opacity: 0, y: 14, scale: 0.94 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ delay: 0.45, type: 'spring', stiffness: 380, damping: 26 }}
-                className="mt-3 flex w-full items-start gap-2.5 rounded-[20px] bg-white/80 p-2.5 text-left shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] backdrop-blur-md short:mt-2"
-              >
-                <img src="/frogress-icon.png" alt="" className="h-[38px] w-[38px] shrink-0 rounded-[9px]" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[13.5px] font-semibold leading-tight text-zinc-900">{push.title}</span>
-                    <span className="shrink-0 text-[11.5px] font-medium text-zinc-500">now</span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-3 text-[13px] leading-[1.28] text-zinc-800">{push.body}</p>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {action}
-    </div>
+    <>
+      {PAGE_PROPS[page].map((prop, i) => (
+        <motion.span
+          key={prop.emoji}
+          aria-hidden
+          initial={still ? false : { opacity: 0, scale: 0.3, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ delay: 0.22 + i * 0.12, type: 'spring', stiffness: 440, damping: 16 }}
+          className={cn('pointer-events-none absolute select-none leading-none', prop.place, prop.size)}
+        >
+          {prop.waves ? (
+            <svg
+              viewBox="0 0 100 100"
+              className="absolute -inset-[35%] overflow-visible text-amber-400 opacity-0 motion-safe:animate-[offer-ring-wave_2.8s_ease-out_infinite]"
+            >
+              <path
+                d="M17 36 Q9 50 17 64 M83 36 Q91 50 83 64"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={5}
+                strokeLinecap="round"
+              />
+            </svg>
+          ) : null}
+          <span className={cn('relative block', prop.loop)}>{prop.emoji}</span>
+        </motion.span>
+      ))}
+    </>
   );
 }
 
@@ -235,7 +258,7 @@ function LockOpenSolid() {
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      className="h-4 w-4"
+      className="h-3.5 w-3.5"
       fill="none"
       stroke="currentColor"
       strokeWidth={2.5}
@@ -251,18 +274,17 @@ function LockOpenSolid() {
 function OfferTimeline({
   trial,
   start,
-  price,
   remindersOn,
   action,
 }: {
   trial: TrialPeriod;
   start: Date;
-  price: string | null;
   remindersOn: boolean;
   action: ReactNode;
 }) {
   const { end, reminder, hasReminder, label } = trialDates(trial, start);
-  const rows: Array<{ key: string; icon: ReactNode; title: string; date?: string; body: string; action?: ReactNode }> = [
+  const endTitle = label(end);
+  const rows: Array<{ key: string; icon: ReactNode; title: string; body: string; action?: ReactNode }> = [
     {
       key: 'today',
       icon: <LockOpenSolid />,
@@ -273,54 +295,50 @@ function OfferTimeline({
   if (hasReminder) {
     rows.push({
       key: 'reminder',
-      icon: <Bell className="h-4 w-4" fill="currentColor" strokeWidth={2.5} />,
+      icon: <Bell className="h-3.5 w-3.5" fill="currentColor" strokeWidth={2.5} />,
       title: label(reminder),
-      date: shortDate(reminder),
       body: remindersOn
         ? 'We’ll remind you with a notification that your trial is ending.'
-        : 'Get a heads-up before it ends.',
+        : 'Get a heads-up before your trial ends.',
       action,
     });
   }
   rows.push({
     key: 'end',
-    icon: <Crown className="h-4 w-4" fill="currentColor" strokeWidth={2.5} />,
-    title: label(end),
-    date: shortDate(end),
-    body: price ? `You’ll be charged ${price}. Cancel anytime before.` : 'Plus starts. Cancel anytime before.',
+    icon: <Crown className="h-3.5 w-3.5" fill="currentColor" strokeWidth={2.5} />,
+    title: endTitle,
+    body:
+      endTitle === shortDate(end)
+        ? 'You’ll be charged, cancel anytime before.'
+        : `You’ll be charged on ${shortDate(end)}, cancel anytime before.`,
   });
   return (
-    <ol className="relative pb-14">
+    <ol className="relative pb-12 short:pb-8">
       {rows.map((row, index) => {
         const last = index === rows.length - 1;
         return (
-          <li key={row.key} className="relative flex gap-4 pb-7 last:pb-0 short:pb-4 lg:short-screen:pb-4">
+          <li key={row.key} className="relative flex gap-3.5 pb-5 last:pb-0 short:pb-3 lg:short-screen:pb-3">
             {last ? (
               <span
                 aria-hidden
-                className="absolute left-0 top-[18px] h-[96px] w-7 bg-gradient-to-b from-amber-300 via-amber-200/60 to-transparent dark:from-amber-400/70 dark:via-amber-400/25"
+                className="absolute left-0 top-[16px] h-[84px] w-6 bg-gradient-to-b from-amber-300 via-amber-200/60 to-transparent dark:from-amber-400/70 dark:via-amber-400/25"
               />
             ) : null}
             <span
               aria-hidden
               className={cn(
-                'absolute left-0 top-0 w-7 bg-[#447d3f]',
+                'absolute left-0 top-0 w-6 bg-[#447d3f]',
                 index === 0 && 'rounded-t-full',
-                last ? 'h-[36px] rounded-b-full' : '-bottom-px',
+                last ? 'h-[32px] rounded-b-full' : '-bottom-px',
               )}
             />
-            <span className="relative grid h-[34px] w-7 shrink-0 place-items-center text-white">{row.icon}</span>
-            <div className="min-w-0 flex-1 pt-1.5 text-left">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[17px] font-extrabold leading-[22px] text-foreground short:text-[16px]">
-                  {row.title}
-                  {row.date && row.date !== row.title ? (
-                    <span className="font-semibold text-muted-foreground"> · {row.date}</span>
-                  ) : null}
-                </p>
+            <span className="relative grid h-[30px] w-6 shrink-0 place-items-center text-white">{row.icon}</span>
+            <div className="min-w-0 flex-1 pt-1 text-left">
+              <div className="flex min-h-[22px] items-center justify-between gap-2">
+                <p className="text-[16px] font-extrabold leading-[22px] text-foreground">{row.title}</p>
                 {row.action}
               </div>
-              <p className="mt-1 text-pretty text-[14.5px] font-medium leading-[1.42] text-foreground/65 short:text-[13.5px]">
+              <p className="mt-0.5 text-pretty text-[14px] font-medium leading-[1.4] text-muted-foreground short:text-[13px]">
                 {row.body}
               </p>
             </div>
@@ -527,7 +545,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
       eyebrowClass: save ? 'font-black text-primary' : undefined,
       title: trial ? (
         <>
-          Start your <span className="whitespace-nowrap">{`${trial.count}-${UNIT[trial.unit]}`}</span> {accent('free')} trial
+          Start your <span className="whitespace-nowrap">{`${trial.count}-${UNIT[trial.unit]}`}</span> {accent('FREE')} trial
         </>
       ) : (
         'Get Frogress Plus'
@@ -564,7 +582,6 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
         <OfferTimeline
           trial={trial}
           start={start}
-          price={selected.hasIntroPrice ? null : selected.priceString}
           remindersOn={notifications.isEnabled}
           action={remindersAction}
         />
@@ -589,26 +606,28 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
   );
 
   const object = (() => {
-    if (page === 'reminder' && dates) {
-      return (
-        <ReminderPhone
-          date={dates.reminder}
-          renewDate={dates.end}
-          action={remindersAction ? <div className="relative -mt-5 rounded-xl bg-card shadow-[0_6px_16px_-8px_rgba(15,23,42,0.35)]">{remindersAction}</div> : null}
-        />
-      );
-    }
-    if (page === 'discount') return <OfferTicket percent={save} />;
-    if (page === 'free' && !desktop) {
-      return (
-        <span
-          aria-hidden
-          className="relative -top-2 block h-4 w-[168px] rounded-[50%] bg-zinc-900/10 dark:bg-black/45 short:w-[136px]"
-        />
-      );
-    }
-    if (checkout && !desktop) return null;
-    return <PlusBar />;
+    if (checkout) return desktop ? <PlusBar /> : null;
+    const floor = !desktop ? (
+      <span
+        aria-hidden
+        className="relative -top-2 block h-4 w-[168px] rounded-[50%] bg-zinc-900/10 dark:bg-black/45 short:w-[136px]"
+      />
+    ) : page === 'discount' ? (
+      <OfferTicket percent={save} />
+    ) : (
+      <PlusBar />
+    );
+    return (
+      <div className="relative flex w-full flex-col items-center">
+        <OfferProps page={page} still={!!reduceMotion} />
+        {floor}
+        {page === 'reminder' && remindersAction ? (
+          <div className="mt-4 rounded-xl bg-card shadow-[0_6px_16px_-8px_rgba(15,23,42,0.35)] lg:mt-8">
+            {remindersAction}
+          </div>
+        ) : null}
+      </div>
+    );
   })();
 
   return (
@@ -643,7 +662,12 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
               >
                 {heading.eyebrow}
               </p>
-              <h1 className="mx-auto mt-1 max-w-[21rem] text-balance text-[27px] font-black leading-[1.16] tracking-tight text-foreground short:text-[24px] lg:mt-2 lg:max-w-[27rem] lg:text-[36px] lg:leading-[1.12] lg:short-screen:max-w-[30rem] lg:short-screen:text-[30px]">
+              <h1
+                className={cn(
+                  'mx-auto mt-1 max-w-[21rem] text-balance text-[27px] font-black leading-[1.16] tracking-tight text-foreground short:text-[24px] lg:mt-2 lg:max-w-[27rem] lg:text-[36px] lg:leading-[1.12] lg:short-screen:max-w-[30rem] lg:short-screen:text-[30px]',
+                  checkout && 'max-w-none text-[25px] short:text-[23px] lg:max-w-[30rem] lg:text-[32px]',
+                )}
+              >
                 {heading.title}
               </h1>
             </motion.div>
@@ -652,7 +676,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
       </div>
 
       {checkout && pricesReady ? (
-        <div className={cn('mx-auto mt-7 w-full max-w-md short:mt-5 lg:mt-9 lg:short-screen:mt-5', swapFade)}>
+        <div className={cn('mx-auto mt-5 w-full max-w-md short:mt-4 lg:mt-8 lg:short-screen:mt-4', swapFade)}>
           {checkoutDetails}
         </div>
       ) : null}
@@ -673,8 +697,8 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
                 ? Math.round(viewportHeight / 2) + 31
                 : 'calc(50vh + 31px)'
               : bodyHeight
-                ? Math.max(Math.round(frogHeight * 0.45), Math.round(bodyHeight / 2 - SEAT_LIFT))
-                : `calc(50% - ${SEAT_LIFT}px)`,
+                ? Math.max(Math.round(frogHeight * 0.45), Math.round(bodyHeight / 2 + SEAT_DROP))
+                : `calc(50% + ${SEAT_DROP}px)`,
           }}
         >
           <div className="relative flex w-full justify-center lg:mx-auto lg:max-w-[26rem]">
@@ -743,7 +767,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
           </p>
         ) : null}
         {checkout ? (
-          <p aria-live="polite" className="mb-2.5 max-w-[22rem] text-center text-[14px] font-semibold leading-snug text-muted-foreground short:mb-1 lg:mb-1.5 lg:short-screen:mb-0.5">
+          <p aria-live="polite" className="mb-2.5 max-w-[22rem] text-center text-[13px] font-semibold leading-[1.45] text-muted-foreground short:mb-1 lg:mb-1.5 lg:text-[14px] lg:short-screen:mb-0.5">
             {!selected ? (
               pricingFailed ? 'Store prices are unavailable right now.' : 'Checking your store’s prices…'
             ) : selected.hasIntroPrice ? (
@@ -802,9 +826,6 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
                 Offer expires when you leave this screen
               </p>
             ) : null}
-            <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground short:mt-0.5 lg:mt-1.5 lg:short-screen:mt-0">
-              Renews automatically. Cancel anytime.
-            </p>
           </>
         ) : null}
       </OnboardingFooter>

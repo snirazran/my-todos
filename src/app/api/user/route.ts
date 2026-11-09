@@ -9,11 +9,9 @@ import ReferralModel from '@/lib/models/Referral';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
 import { MAX_HUNGER_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
-import { getZonedToday } from '@/lib/utils';
 import { normalizeWeekStart } from '@/lib/weekStart';
 import { trialEndingAt } from '@/lib/plus/trialEnding';
 import type { PlusSubscriptionSnapshot } from '@/lib/revenuecat';
-import { v4 as uuid } from 'uuid';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
 import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/statsExclusion';
@@ -103,8 +101,6 @@ export async function POST(req: NextRequest) {
   try {
     const { uid, email, name, phone_number: phoneNumber, firebase } = decoded as any;
     const isAnonymous = firebase?.sign_in_provider === 'anonymous';
-    const body = await req.json().catch(() => ({}) as Record<string, unknown>);
-    const tz = typeof body?.timezone === 'string' ? body.timezone : 'UTC';
     await connectMongo();
 
     const existingUser = await UserModel.findById(uid).lean();
@@ -156,23 +152,6 @@ export async function POST(req: NextRequest) {
         categoryTagMap: [],
       },
     });
-
-    try {
-      await TaskModel.create({
-        userId: uid,
-        type: 'regular',
-        id: uuid(),
-        text: 'Tap the fly to finish this task',
-        order: 0,
-        date: getZonedToday(tz),
-        completed: false,
-        isStarter: true,
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch (seedError) {
-      console.error('Error seeding starter task:', seedError);
-    }
 
     await recordAnalyticsEvent({
       userId: uid,

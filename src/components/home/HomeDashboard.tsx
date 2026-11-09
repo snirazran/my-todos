@@ -24,7 +24,7 @@ import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { SavedTaskIntroSheet } from '@/components/ui/FirstTimeIntros';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { motion, useAnimation } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '@/lib/uiStore';
 import { useSheetStore } from '@/lib/sheetStore';
@@ -34,7 +34,6 @@ import {
   type FrogHandle,
 } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import { TapFinger } from '@/components/ui/TapFinger';
 import TaskList from '@/components/ui/TaskList';
 import { GuestAccountBanner } from '@/components/ui/GuestAccountBanner';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
@@ -83,11 +82,6 @@ import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
-import {
-  clearFirstRunPending,
-  readFirstRunPending,
-  useFirstRun,
-} from '@/hooks/useFirstRun';
 import { useFlyOfferHeight } from '@/components/ui/questRewardReveal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { leapViewKey } from '@/lib/leap/viewKey';
@@ -562,7 +556,6 @@ export default function HomeDashboard() {
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
   const {
     data: questsData,
-    error: questsError,
     mutate: mutateQuests,
   } = useSWR<{
     isPremium?: boolean;
@@ -588,29 +581,6 @@ export default function HomeDashboard() {
     { revalidateOnFocus: false },
   );
   const questOnboarding = questsData?.onboarding;
-
-  const starterTask = user ? tasks.find((t) => t.isStarter) : undefined;
-  const [firstRunFlagged] = useState(readFirstRunPending);
-  useEffect(() => {
-    if (seenIntros && seenIntros.firstRun !== false) clearFirstRunPending();
-  }, [seenIntros]);
-  const firstRun = useFirstRun({
-    pending:
-      !!user && (seenIntros ? seenIntros.firstRun === false : firstRunFlagged),
-    ready: !!user && !isLoading && (questsData !== undefined || !!questsError),
-    starterDone: !starterTask || !!starterTask.completed,
-    onFinish: () => {
-      clearFirstRunPending();
-      markIntroSeen('firstRun');
-    },
-  });
-  const guided = firstRun.guided;
-  const taskListHidden =
-    guided && firstRun.phase !== 'hungry' && firstRun.phase !== 'off';
-  const listTasks = useMemo(
-    () => (guided ? data.filter((t) => t.isStarter) : data),
-    [data, guided],
-  );
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -755,7 +725,7 @@ export default function HomeDashboard() {
     ) : null;
 
   const showListHeader =
-    !guided && !((dayCleared || data.length === 0) && !filtersActive);
+    !((dayCleared || data.length === 0) && !filtersActive);
 
   const renderListHeader = (inList: boolean) => (
     <>
@@ -838,7 +808,7 @@ export default function HomeDashboard() {
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(440px+env(safe-area-inset-top))] -z-10 bg-[hsl(var(--board-list))] dark:hidden md:top-[640px]"
       />
-      {!guided && <MobileMenuCluster position="absolute" />}
+      <MobileMenuCluster position="absolute" />
       {user && <FlyGainPopup />}
       <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-40">
         <Header router={router} />
@@ -866,7 +836,6 @@ export default function HomeDashboard() {
                     visuallyDone={visuallyDone}
                     sheetOpen={showTimer}
                     hidden={
-                      guided ||
                       ((cinematic || !!grab) && !focusGrabActive) ||
                       (isAnyPanelOpen && !showTimer)
                     }
@@ -895,7 +864,6 @@ export default function HomeDashboard() {
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
               paused={isAnyPanelOpen}
-              fixedSpeech={firstRun.speech}
               hideDeck
             />
             </div>
@@ -910,7 +878,7 @@ export default function HomeDashboard() {
               animateHunger={!!user}
               className="rounded-[19px] md:h-auto md:w-full md:shrink-0 md:self-stretch group-has-[[data-dock-row]]/dock:rounded-b-none"
             />
-            {user && !guided && !cinematic && !taskCinematic && <TryOnPill />}
+            {user && !cinematic && !taskCinematic && <TryOnPill />}
           </StatusDock>
 
           <div
@@ -923,9 +891,9 @@ export default function HomeDashboard() {
               className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 bg-[hsl(var(--board-list))] dark:bg-background md:block"
             />
             <div className="flex w-full flex-col gap-2 md:gap-5">
-              {!firstRun.active && <GuestAccountBanner />}
+              <GuestAccountBanner />
               <div
-                className={taskListHidden ? 'pb-16 md:pb-4' : 'min-h-[360px] pb-16 md:pb-4'}
+                className="min-h-[360px] pb-16 md:pb-4"
                 ref={taskListRef}
               >
                 {renderGuestPrompt()}
@@ -944,29 +912,18 @@ export default function HomeDashboard() {
                   onClearAll={clearLensFilters}
                 />
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
-                <AnimatePresence initial={false}>
-                {!taskListHidden && (
-                <motion.div
-                  key="home-task-list"
-                  initial={{ opacity: 0, y: 18 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                >
                 <TaskList
-                  tasks={listTasks}
+                  tasks={data}
                   header={
                     <div className="hidden md:block">
                       {renderListHeader(true)}
                     </div>
                   }
-                  hideAddControls={guided}
                   toggle={handleToggle}
                   showConfetti={rate === 100}
                   visuallyCompleted={visuallyDone}
                   renderBullet={(task, isVisuallyDone, isPaused) => {
                     if (task.completed || isVisuallyDone) return null;
-                    const showFlyCoach = !!task.isStarter && doneCount === 0;
                     return (
                       <div
                         ref={(el) => {
@@ -978,19 +935,6 @@ export default function HomeDashboard() {
                         data-tag-ids={task.tags?.join(',') || undefined}
                         data-habit={task.type === 'weekly' ? 'true' : undefined}
                       >
-                        {showFlyCoach && (
-                          <>
-                            <span
-                              aria-hidden
-                              className="pointer-events-none absolute -inset-0.5 rounded-full ring-[2.5px] ring-primary/70"
-                            />
-                            <span
-                              aria-hidden
-                              className="pointer-events-none absolute -inset-0.5 rounded-full bg-primary/15 ring-[2.5px] ring-primary/60 animate-[demo-sonar_1.6s_cubic-bezier(0,0,0.2,1)_0.8s_infinite_both] motion-reduce:hidden"
-                            />
-                            <TapFinger className="left-[24px] top-[31px] z-20 h-[21px] w-[18px] md:left-[27px] md:top-[34px]" />
-                          </>
-                        )}
                         <Fly
                           onClick={() => null}
                           size={40}
@@ -1137,10 +1081,7 @@ export default function HomeDashboard() {
                   quickAddOpen={showQuickAdd}
                   paused={isAnyPanelOpen}
                 />
-                </motion.div>
-                )}
-                </AnimatePresence>
-                {!firstRun.active && <BuddyNudgeCard />}
+                <BuddyNudgeCard />
               </div>
             </div>
           </div>
@@ -1409,7 +1350,6 @@ export default function HomeDashboard() {
         show={
           !!user &&
           !!questOnboarding &&
-          !firstRun.active &&
           (isQuestOnboardingOpen ||
             (!questOnboarding.complete && !dismissQuestOnboarding))
         }
@@ -1431,9 +1371,9 @@ export default function HomeDashboard() {
       />
 
       <div
-        aria-hidden={fabsConcealed || guided || undefined}
+        aria-hidden={fabsConcealed || undefined}
         className={`fixed right-4 z-[40] flex items-center gap-1 md:hidden rounded-full bg-card/95 p-1 shadow-[0_4px_14px_-6px_rgba(15,23,42,0.3),0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-border/60 backdrop-blur-xl bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
-          fabsConcealed || guided ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
+          fabsConcealed ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
         }`}
         style={
           {
@@ -1445,11 +1385,11 @@ export default function HomeDashboard() {
           } as React.CSSProperties
         }
       >
-        <FocusFabSatellite hidden={webLayout} concealed={fabsConcealed || guided} />
+        <FocusFabSatellite hidden={webLayout} concealed={fabsConcealed} />
         <button
           type="button"
           aria-label="Add task"
-          tabIndex={fabsConcealed || guided ? -1 : undefined}
+          tabIndex={fabsConcealed ? -1 : undefined}
           data-hint="add-task"
           onClick={() => {
             if (!user) {

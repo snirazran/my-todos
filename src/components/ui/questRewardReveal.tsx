@@ -33,7 +33,6 @@ import {
 } from '@/lib/ads';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { X } from 'lucide-react';
-import { useUIStore } from '@/lib/uiStore';
 import { hapticCelebrate, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { maybeRequestAppRating, type RatingMoment } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
@@ -209,8 +208,6 @@ function launchRect(source?: Element | DOMRect | null): DOMRect {
 
 let flyOfferCounter = 0;
 
-const COUNTER_WAIT_MS = 900;
-
 function landFlies(
   amount: number,
   balanceAfter: number | undefined,
@@ -263,26 +260,7 @@ function landFlies(
     window.setTimeout(done, 3200);
   };
 
-  const counter = flyCounterState();
-  if (counter === 'shown') {
-    start(true);
-    return;
-  }
-  if (counter === 'faded' || !useUIStore.getState().isFirstRunGuided) {
-    start(false);
-    return;
-  }
-  const waitStarted = Date.now();
-  const poll = () => {
-    if (flyCounterState() === 'shown') {
-      window.setTimeout(() => start(true), 120);
-    } else if (Date.now() - waitStarted > COUNTER_WAIT_MS) {
-      start(false);
-    } else {
-      window.setTimeout(poll, 60);
-    }
-  };
-  poll();
+  start(flyCounterState() === 'shown');
 }
 
 /**

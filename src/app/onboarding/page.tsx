@@ -48,7 +48,6 @@ import { findStarterSkin } from '@/lib/skins/starterSkins';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
 import { todayTasksKey } from '@/hooks/useTaskData';
 import { preloadBackgrounds } from '@/hooks/useBackgrounds';
-import { markFirstRunPending } from '@/hooks/useFirstRun';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { BARRIER_QUESTION_PREFIX } from '@/lib/quests/starterPlan';
 import { useAutoPopupHold } from '@/lib/popupGate';
@@ -471,14 +470,6 @@ export default function OnboardingPage() {
     await mutate(
       (key) => typeof key === 'string' && key.startsWith('/api/quests'),
       undefined,
-      { revalidate: false },
-    );
-    markFirstRunPending();
-    await mutate(
-      '/api/user/intros',
-      (cur: { seenIntros?: Record<string, boolean> } | undefined) => ({
-        seenIntros: { ...(cur?.seenIntros ?? {}), firstRun: false },
-      }),
       { revalidate: false },
     );
     router.push('/');
