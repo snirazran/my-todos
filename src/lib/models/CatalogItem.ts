@@ -12,6 +12,8 @@ export type CatalogItemDoc = {
   availableFrom?: Date | null;
   availableUntil?: Date | null;
   hidden: boolean;
+  variantGroup?: string | null;
+  color?: string | null;
 };
 
 const CatalogItemSchema = new Schema<CatalogItemDoc>(
@@ -26,6 +28,8 @@ const CatalogItemSchema = new Schema<CatalogItemDoc>(
     availableFrom: { type: Date, default: null },
     availableUntil: { type: Date, default: null },
     hidden: { type: Boolean, default: false },
+    variantGroup: { type: String, default: null },
+    color: { type: String, default: null },
   },
   { collection: 'catalogItems' },
 );

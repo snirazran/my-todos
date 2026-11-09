@@ -10,7 +10,17 @@ const iso = (value: Date | string | null | undefined): string | null => {
 
 function toItemDef(doc: Pick<
   CatalogItemDoc,
-  'id' | 'name' | 'slot' | 'rarity' | 'riveIndex' | 'icon' | 'priceFlies' | 'availableFrom' | 'availableUntil'
+  | 'id'
+  | 'name'
+  | 'slot'
+  | 'rarity'
+  | 'riveIndex'
+  | 'icon'
+  | 'priceFlies'
+  | 'availableFrom'
+  | 'availableUntil'
+  | 'variantGroup'
+  | 'color'
 >): ItemDef {
   return {
     id: doc.id,
@@ -22,6 +32,8 @@ function toItemDef(doc: Pick<
     priceFlies: doc.priceFlies ?? 0,
     availableFrom: iso(doc.availableFrom),
     availableUntil: iso(doc.availableUntil),
+    ...(doc.variantGroup ? { variantGroup: doc.variantGroup } : {}),
+    ...(doc.color ? { color: doc.color } : {}),
   };
 }
 

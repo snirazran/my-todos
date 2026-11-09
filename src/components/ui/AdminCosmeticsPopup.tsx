@@ -519,7 +519,7 @@ function CsvImport({ onImported }: { onImported: () => void }) {
         type: 'success',
         text: `Imported ${data.imported ?? 0}, removed ${data.removed ?? 0}${data.scheduled ? `, ${data.scheduled} scheduled` : ''}${
           data.expired ? `, ${data.expired} already ended` : ''
-        }.`,
+        }${data.colorGroups ? `, ${data.colorGroups} color groups` : ''}.`,
       });
       setFile(null);
       onImported();
@@ -536,7 +536,8 @@ function CsvImport({ onImported }: { onImported: () => void }) {
         <p className="text-[14px] font-black">Replace the catalog from a CSV</p>
         <p className="text-[12px] font-medium text-muted-foreground">
           Columns: id, name, rarity, price, skin, body, hat, handItem, and optional startDate / endDate (YYYY-MM-DD). Use -1 in unused
-          columns. This replaces every cosmetic.
+          columns. Optional duplicate: rows with the same number are colors of one item. Optional color: a swatch hex like #4f8bff.
+          This replaces every cosmetic.
         </p>
       </div>
       {result ? <Notice type={result.type}>{result.text}</Notice> : null}

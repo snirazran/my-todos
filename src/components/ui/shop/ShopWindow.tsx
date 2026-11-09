@@ -26,6 +26,7 @@ import {
   useShelfGrid,
 } from '@/components/ui/skins/DressingRoom';
 import { ROUND_BUTTON } from '@/components/ui/skins/WardrobeMobileChrome';
+import { VariantDots } from '@/components/ui/skins/VariantSwatch';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
@@ -59,9 +60,32 @@ const AWNING_BAND = 32;
 const AWNING_HEIGHT = AWNING_BAND + SCALLOP / 2 + 2;
 
 const STALL = {
-  sm: { scallops: 6, merchant: 172, counter: 32, bury: 18, sink: 16, gap: 16 },
+  sm: { scallops: 7, merchant: 200, counter: 34, bury: 18, sink: 16, gap: 14 },
   md: { scallops: 9, merchant: 236, counter: 38, bury: 20, sink: 20, gap: 18 },
 } as const;
+
+type PickRow = { deal: DailyDeal; item: ItemDef };
+
+function itemTileKey(item: ItemDef) {
+  return item.variantGroup
+    ? `family:${item.slot}|${item.variantGroup}|${item.rarity}`
+    : `item:${item.id}`;
+}
+
+function entryTileKey(entry: ShopEntry) {
+  return entry.kind === 'item' ? itemTileKey(entry.item) : entry.key;
+}
+
+function groupRows<T>(rows: T[], keyOf: (row: T) => string): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return Array.from(groups.values());
+}
 
 function stableRank(id: string, seed = 0) {
   let h = (2166136261 ^ seed) >>> 0;
@@ -80,6 +104,7 @@ function ShopTile({
   plusPrice,
   wished,
   affordable,
+  variants,
   index,
   onTap,
 }: {
@@ -90,12 +115,14 @@ function ShopTile({
   plusPrice?: boolean;
   wished: boolean;
   affordable: boolean;
+  variants?: ItemDef[];
   index?: number;
   onTap: () => void;
 }) {
   const name = entry.kind === 'item' ? entry.item.name : entry.bg.name;
   const rarity = RARITY_CONFIG[entry.rarity].label;
   const onSale = !owned && !!discount;
+  const colors = variants && variants.length > 1 ? `, ${variants.length} colors` : '';
   const status = owned
     ? 'owned'
     : plusPrice
@@ -107,7 +134,7 @@ function ShopTile({
     <button
       type="button"
       onClick={onTap}
-      aria-label={`${name}, ${rarity}, ${status}`}
+      aria-label={`${name}, ${rarity}${colors}, ${status}`}
       style={index == null ? undefined : { animationDelay: `${Math.min(index, 11) * 35}ms` }}
       className={cn(
         'group flex w-full min-w-0 flex-col items-stretch gap-1 text-left outline-none [-webkit-tap-highlight-color:transparent]',
@@ -140,6 +167,8 @@ function ShopTile({
             <Heart className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
           </span>
         ) : null}
+
+        {variants && variants.length > 1 && <VariantDots items={variants} />}
       </TileArt>
 
       <span className="flex h-6 items-center justify-center gap-1 text-[12.5px] font-black tabular-nums leading-none">
@@ -356,7 +385,11 @@ export function ShopWindow({
   wishlistedIds: ReadonlySet<string>;
   shopGift?: ShopGiftStatus;
   scene?: React.ReactNode;
-  onOpenItem: (item: ItemDef, dealPrice: number | null) => void;
+  onOpenItem: (
+    item: ItemDef,
+    dealPrice: number | null,
+    variants?: { item: ItemDef; dealPrice: number | null }[],
+  ) => void;
   onOpenBackground: (bg: BackgroundItem) => void;
   onReroll: () => void;
   onPlus: (placement: string, item?: ItemDef) => void;
@@ -379,8 +412,14 @@ export function ShopWindow({
         .filter((row): row is { deal: DailyDeal; item: ItemDef } => !!row.item),
     [deals, byId],
   );
-  const freePicks = useMemo(() => special.filter(({ deal }) => !deal.plusOnly), [special]);
-  const plusPicks = useMemo(() => special.filter(({ deal }) => deal.plusOnly), [special]);
+  const freePicks = useMemo(
+    () => groupRows(special.filter(({ deal }) => !deal.plusOnly), ({ item }) => itemTileKey(item)),
+    [special],
+  );
+  const plusPicks = useMemo(
+    () => groupRows(special.filter(({ deal }) => deal.plusOnly), ({ item }) => itemTileKey(item)),
+    [special],
+  );
   const endsAt = deals[0]?.endsAt;
   const countdown = useCountdown(endsAt);
   const sellerRef = useRef<MerchantFrogHandle>(null);
@@ -435,7 +474,7 @@ export function ShopWindow({
 
   const frozenEveryday = useRef<Set<string> | null>(null);
   const [shuffleSeed] = useState(() => Math.floor(Math.random() * 0x7fffffff));
-  const everyday = useMemo<ShopEntry[]>(() => {
+  const everyday = useMemo<ShopEntry[][]>(() => {
     if (loading) return [];
     const ids = everydayIds
       ? new Set(everydayIds)
@@ -460,21 +499,23 @@ export function ShopWindow({
       if (rarity === 'legendary' || isTradeOnlyRarity(rarity) || !((bg.priceFlies ?? 0) > 0)) continue;
       entries.push({ kind: 'bg', key: `bg:${bg.id}`, bg, rarity, price: bg.priceFlies ?? 0 });
     }
+    const tiles = groupRows(entries, entryTileKey);
+    const unowned = (entry: ShopEntry) =>
+      entry.kind === 'item'
+        ? (inventory[entry.item.id] ?? 0) <= 0
+        : (bgInventory[entry.bg.id] ?? 0) <= 0;
     if (!frozenEveryday.current) {
       frozenEveryday.current = new Set(
-        entries
-          .filter((entry) =>
-            entry.kind === 'item'
-              ? (inventory[entry.item.id] ?? 0) <= 0
-              : (bgInventory[entry.bg.id] ?? 0) <= 0,
-          )
-          .map((entry) => entry.key),
+        tiles.filter((tile) => tile.some(unowned)).map((tile) => entryTileKey(tile[0])),
       );
     }
     const keep = frozenEveryday.current;
-    return entries
-      .filter((entry) => keep.has(entry.key))
-      .sort((a, b) => stableRank(a.key, shuffleSeed) - stableRank(b.key, shuffleSeed));
+    return tiles
+      .filter((tile) => keep.has(entryTileKey(tile[0])))
+      .sort(
+        (a, b) =>
+          stableRank(entryTileKey(a[0]), shuffleSeed) - stableRank(entryTileKey(b[0]), shuffleSeed),
+      );
   }, [loading, everydayIds, catalog, backgrounds, inventory, bgInventory, shuffleSeed]);
 
   const pickWarmList = useMemo<FrogStampIndices[]>(
@@ -483,7 +524,7 @@ export function ShopWindow({
   );
   const everydayWarmList = useMemo(() => {
     const list: FrogStampIndices[] = [];
-    for (const entry of everyday) {
+    for (const entry of everyday.flat()) {
       if (entry.kind === 'item') list.push({ [entry.item.slot]: entry.item.riveIndex });
     }
     return list;
@@ -523,20 +564,66 @@ export function ShopWindow({
     else onOpenItem(item, deal.onSale ? deal.dealPrice : null);
   };
 
-  const pickTile = ({ deal, item }: { deal: DailyDeal; item: ItemDef }, index: number) => {
+  const gated = (deal: DailyDeal) => !isPremium && (deal.plusOnly || deal.sale);
+  const pickDealPrice = (deal: DailyDeal) => (deal.onSale ? deal.dealPrice : null);
+
+  const pickTile = (group: PickRow[], index: number) => {
+    const rep = group.find(({ item }) => !owns(item)) ?? group[0];
+    const { deal, item } = rep;
     const price = deal.sale ? deal.dealPrice : deal.priceFlies;
+    const multi = group.length > 1;
+    const tapFamily = () => {
+      const options = group.filter((row) => owns(row.item) || !gated(row.deal));
+      if (options.length > 1 && (owns(item) || !gated(deal))) {
+        onOpenItem(
+          item,
+          pickDealPrice(deal),
+          options.map((row) => ({ item: row.item, dealPrice: pickDealPrice(row.deal) })),
+        );
+      } else {
+        tapPick(deal, item);
+      }
+    };
     return (
       <ShopTile
-        key={item.id}
+        key={itemTileKey(group[0].item)}
         index={index}
         entry={{ kind: 'item', key: item.id, item, rarity: item.rarity, price }}
-        owned={owns(item)}
+        owned={group.every((row) => owns(row.item))}
         plus={deal.plusOnly}
         discount={deal.sale ? deal.discountPercent : undefined}
         plusPrice={deal.sale && !isPremium}
-        wished={wishlistedIds.has(item.id) || deal.wishlistSlot}
+        wished={group.some((row) => wishlistedIds.has(row.item.id) || row.deal.wishlistSlot)}
         affordable={canAfford(price)}
-        onTap={() => tapPick(deal, item)}
+        variants={multi ? group.map((row) => row.item) : undefined}
+        onTap={multi ? tapFamily : () => tapPick(deal, item)}
+      />
+    );
+  };
+
+  const everydayTile = (group: ShopEntry[]) => {
+    const isOwned = (entry: ShopEntry) =>
+      entry.kind === 'item' ? owns(entry.item) : (bgInventory[entry.bg.id] ?? 0) > 0;
+    const entry = group.find((member) => !isOwned(member)) ?? group[0];
+    const items = group.flatMap((member) => (member.kind === 'item' ? [member.item] : []));
+    const multi = items.length > 1;
+    return (
+      <ShopTile
+        key={entryTileKey(group[0])}
+        entry={entry}
+        owned={group.every(isOwned)}
+        wished={items.some((item) => wishlistedIds.has(item.id))}
+        affordable={canAfford(entry.price)}
+        variants={multi ? items : undefined}
+        onTap={() =>
+          entry.kind === 'item'
+            ? onOpenItem(
+                entry.item,
+                null,
+                multi ? items.map((item) => ({ item, dealPrice: null })) : undefined,
+              )
+            : onOpenBackground(entry.bg)
+        }
       />
     );
   };
@@ -601,7 +688,7 @@ export function ShopWindow({
                   side
                   name={SELLER_NAME}
                   fixedMessage={sellerLine}
-                  className="!left-0 !top-0 [--bubble-max:min(calc(100vw-218px),15rem)]"
+                  className="!left-0 !top-0 [--bubble-max:min(calc(100vw-246px),15rem)]"
                 />
               </div>
             )}
@@ -667,20 +754,7 @@ export function ShopWindow({
           {loading ? (
             <GridSkeleton gridClass={gridClass} count={cols * 2} />
           ) : (
-            <div className={gridClass}>
-              {everyday.map((entry) => (
-                <ShopTile
-                  key={entry.key}
-                  entry={entry}
-                  owned={entry.kind === 'item' ? owns(entry.item) : (bgInventory[entry.bg.id] ?? 0) > 0}
-                  wished={entry.kind === 'item' && wishlistedIds.has(entry.item.id)}
-                  affordable={canAfford(entry.price)}
-                  onTap={() =>
-                    entry.kind === 'item' ? onOpenItem(entry.item, null) : onOpenBackground(entry.bg)
-                  }
-                />
-              ))}
-            </div>
+            <div className={gridClass}>{everyday.map(everydayTile)}</div>
           )}
         </section>
       </div>

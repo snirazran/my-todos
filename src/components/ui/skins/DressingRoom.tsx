@@ -17,8 +17,10 @@ import {
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { hapticTick } from '@/lib/haptics';
+import { hapticSelect, hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { BaseSheet } from '@/components/ui/BaseSheet';
+import { VariantDots, VariantSwatchButton } from '@/components/ui/skins/VariantSwatch';
 
 export type ClosetSlot =
   | 'all'
@@ -236,6 +238,36 @@ export function entryId(entry: ClosetEntry) {
 
 export function entryRarity(entry: ClosetEntry): Rarity {
   return entry.kind === 'item' ? entry.item.rarity : (entry.bg.rarity as Rarity);
+}
+
+export function variantKey(entry: ClosetEntry) {
+  if (entry.kind !== 'item' || !entry.item.variantGroup) return null;
+  return `${entry.item.slot}|${entry.item.variantGroup}|${entry.item.rarity}`;
+}
+
+export function groupVariants(entries: ClosetEntry[]): ClosetEntry[][] {
+  const groups: ClosetEntry[][] = [];
+  const byKey = new Map<string, ClosetEntry[]>();
+  for (const entry of entries) {
+    const key = variantKey(entry);
+    if (!key) {
+      groups.push([entry]);
+      continue;
+    }
+    const group = byKey.get(key);
+    if (group) {
+      group.push(entry);
+    } else {
+      const next = [entry];
+      byKey.set(key, next);
+      groups.push(next);
+    }
+  }
+  return groups;
+}
+
+export function variantItems(group: ClosetEntry[]): ItemDef[] {
+  return group.flatMap((entry) => (entry.kind === 'item' ? [entry.item] : []));
 }
 
 export function isEntryEquipped(
@@ -869,19 +901,22 @@ function ClosetOwnedTile({
   entry,
   equipped,
   isNew,
+  variants,
   onTap,
 }: {
   entry: ClosetEntry;
   equipped: boolean;
   isNew: boolean;
+  variants?: ItemDef[];
   onTap: () => void;
 }) {
   const rarity = entryRarity(entry);
+  const colors = variants && variants.length > 1 ? `, ${variants.length} colors` : '';
   return (
     <button
       type="button"
       onClick={onTap}
-      aria-label={`${entryName(entry)}, ${RARITY_CONFIG[rarity].label}${equipped ? ', wearing' : ''}`}
+      aria-label={`${entryName(entry)}, ${RARITY_CONFIG[rarity].label}${colors}${equipped ? ', wearing' : ''}`}
       aria-pressed={equipped}
       className="group block w-full"
     >
@@ -904,8 +939,102 @@ function ClosetOwnedTile({
           </span>
         )}
         {equipped ? <WornCheck /> : isNew ? <NewDot /> : null}
+        {variants && variants.length > 1 && <VariantDots items={variants} />}
       </TileArt>
     </button>
+  );
+}
+
+export function VariantPickerSheet({
+  entries,
+  equipped,
+  onClose,
+  onWear,
+}: {
+  entries: ClosetEntry[] | null;
+  equipped: Partial<Record<WardrobeSlot, string | null>>;
+  onClose: () => void;
+  onWear: (item: ItemDef) => void;
+}) {
+  const open = !!entries;
+  const lastItems = useRef<ItemDef[]>([]);
+  const items = useMemo(() => (entries ? variantItems(entries) : null), [entries]);
+  if (items?.length) lastItems.current = items;
+  const list = items ?? lastItems.current;
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const equippedRef = useRef(equipped);
+  equippedRef.current = equipped;
+
+  useEffect(() => {
+    if (!items?.length) return;
+    const worn = items.find((item) => equippedRef.current[item.slot] === item.id);
+    setPickedId((worn ?? items[0]).id);
+  }, [items]);
+
+  const picked = list.find((item) => item.id === pickedId) ?? list[0];
+  const wearing = !!picked && equipped[picked.slot] === picked.id;
+
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) onClose();
+      }}
+      className="select-none sm:max-w-[420px]"
+      zIndex={1150}
+      closeAriaLabel="Close colors"
+    >
+      {() =>
+        picked ? (
+          <div className="flex flex-col gap-4 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 sm:px-6 sm:pb-6 sm:pt-6">
+            <TileArt
+              rarity={picked.rarity}
+              tone="closet"
+              className="mx-auto w-[min(200px,26dvh)] rounded-[22px]"
+            >
+              <ItemArt item={picked} />
+            </TileArt>
+            <div className="flex flex-col items-center gap-1.5 text-center">
+              <h2 className="text-balance text-[20px] font-black leading-tight tracking-tight text-foreground">
+                {picked.name}
+              </h2>
+              <span
+                className={cn(
+                  'inline-flex h-6 items-center rounded-full px-2.5 text-[12px] font-black',
+                  RARITY_CONFIG[picked.rarity].bg,
+                  RARITY_CONFIG[picked.rarity].text,
+                )}
+              >
+                {RARITY_CONFIG[picked.rarity].label}
+              </span>
+            </div>
+            <div role="group" aria-label="Colors" className="flex flex-wrap justify-center gap-2.5">
+              {list.map((item) => (
+                <VariantSwatchButton
+                  key={item.id}
+                  item={item}
+                  selected={item.id === picked.id}
+                  marked={equipped[item.slot] === item.id}
+                  onSelect={() => {
+                    if (item.id !== picked.id) hapticSelect();
+                    setPickedId(item.id);
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={wearing}
+              onClick={() => onWear(picked)}
+              className="flex h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-[#447d3f] text-[15px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none disabled:bg-primary/10 disabled:text-primary disabled:shadow-none"
+            >
+              {wearing && <Check className="h-4 w-4" strokeWidth={3.5} />}
+              {wearing ? 'Wearing' : 'Wear'}
+            </button>
+          </div>
+        ) : null
+      }
+    </BaseSheet>
   );
 }
 
@@ -980,6 +1109,7 @@ export function ClosetGrid({
   onOpenAlbum: (slot: ClosetSlot) => void;
 }) {
   const { gridClass, cols } = useShelfGrid();
+  const [picking, setPicking] = useState<ClosetEntry[] | null>(null);
   const freezeKey = `${slot}|${catalog.length > 0}|${backgrounds.length > 0}`;
   const frozen = useRef<{ key: string; worn: Set<string>; fresh: Set<string> } | null>(null);
   if (!frozen.current || frozen.current.key !== freezeKey) {
@@ -1027,14 +1157,16 @@ export function ClosetGrid({
   const lead = leading ?? [];
   if (!sorted.length && !lead.length) return <>{empty}</>;
 
+  const tiles = slot === 'all' ? groupVariants(sorted) : sorted.map((entry) => [entry]);
   const bareNoun = BARE_SLOT_NOUN[slot];
   const bareSlot = bareNoun ? (slot as WardrobeSlot) : null;
   const bare = bareSlot ? !equipped[bareSlot] : false;
-  const filled = (bareSlot ? 1 : 0) + lead.length + sorted.length + (missing > 0 ? 1 : 0);
+  const filled = (bareSlot ? 1 : 0) + lead.length + tiles.length + (missing > 0 ? 1 : 0);
   const rows = Math.max(3, Math.ceil(filled / cols));
   const spare = rows * cols - filled;
 
   return (
+    <>
     <div className={cn(gridClass, 'pb-4')}>
       {bareSlot && (
         <button
@@ -1058,17 +1190,28 @@ export function ClosetGrid({
         </button>
       )}
       {lead}
-      {sorted.map((entry) => {
+      {tiles.map((group) => {
+        const worn = group.find((entry) => isEntryEquipped(entry, equipped, equippedBgId));
+        const entry = worn ?? group[0];
         const id = entryId(entry);
+        const multi = group.length > 1;
         return (
           <ClosetOwnedTile
-            key={`${entry.kind}-${id}`}
+            key={multi ? `variant-${variantKey(entry)}` : `${entry.kind}-${id}`}
             entry={entry}
-            equipped={isEntryEquipped(entry, equipped, equippedBgId)}
-            isNew={unseen.has(id)}
-            onTap={() =>
-              entry.kind === 'item' ? onTapItem(entry.item) : onTapBackground(entry.bg)
-            }
+            equipped={!!worn}
+            isNew={group.some((member) => unseen.has(entryId(member)))}
+            variants={multi ? variantItems(group) : undefined}
+            onTap={() => {
+              if (multi) {
+                hapticTick();
+                setPicking(group);
+              } else if (entry.kind === 'item') {
+                onTapItem(entry.item);
+              } else {
+                onTapBackground(entry.bg);
+              }
+            }}
           />
         );
       })}
@@ -1095,6 +1238,16 @@ export function ClosetGrid({
         </button>
       )}
     </div>
+    <VariantPickerSheet
+      entries={picking}
+      equipped={equipped}
+      onClose={() => setPicking(null)}
+      onWear={(item) => {
+        setPicking(null);
+        onTapItem(item);
+      }}
+    />
+    </>
   );
 }
 

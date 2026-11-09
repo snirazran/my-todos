@@ -14,6 +14,8 @@ import { CloseButton } from '@/components/ui/CloseButton';
 import { FlyAmount, FlyPriceChip } from '@/components/ui/FlyAmount';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { BAR_TONE, CLOSET_TONE } from '@/components/ui/skins/DressingRoom';
+import { VariantSwatchButton } from '@/components/ui/skins/VariantSwatch';
+import { hapticSelect } from '@/lib/haptics';
 import { PurchaseBurst } from '@/components/ui/skins/PurchaseBurst';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
@@ -23,7 +25,7 @@ import { useWishlist } from '@/hooks/useWishlist';
 import { useTradeConfig } from '@/hooks/useTradeConfig';
 import { Icon } from '@/components/ui/Icon';
 import type { WishlistKind } from '@/lib/skins/wishlist';
-import { isTradeOnlyRarity, type Rarity } from '@/lib/skins/catalog';
+import { isTradeOnlyRarity, type ItemDef, type Rarity } from '@/lib/skins/catalog';
 
 const RARITY: Record<Rarity, { label: string; chip: string }> = {
   common: { label: 'Common', chip: 'bg-muted text-muted-foreground' },
@@ -71,6 +73,8 @@ export function PurchaseSheet({
   onUpgrade,
   equipLabel = 'Equip now',
   previewWide = false,
+  variants,
+  onPickVariant,
 }: {
   open: boolean;
   onClose: () => void;
@@ -86,6 +90,8 @@ export function PurchaseSheet({
   onUpgrade?: () => void;
   equipLabel?: string;
   previewWide?: boolean;
+  variants?: { item: ItemDef; owned: boolean }[];
+  onPickVariant?: (id: string) => void;
 }) {
   const [phase, setPhase] = useState<'confirm' | 'success'>('confirm');
   const [busy, setBusy] = useState(false);
@@ -350,6 +356,24 @@ export function PurchaseSheet({
                       </span>
                     )}
                   </div>
+
+                  {variants && variants.length > 1 && (
+                    <div role="group" aria-label="Colors" className="mt-3 flex flex-wrap gap-2.5">
+                      {variants.map((variant) => (
+                        <VariantSwatchButton
+                          key={variant.item.id}
+                          item={variant.item}
+                          selected={variant.item.id === target.id}
+                          marked={variant.owned}
+                          onSelect={() => {
+                            if (busy || variant.item.id === target.id) return;
+                            hapticSelect();
+                            onPickVariant?.(variant.item.id);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   {phase === 'confirm' && !owned && tradeOnly && (
                     <div className="mt-2.5">

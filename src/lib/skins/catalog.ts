@@ -11,6 +11,8 @@ export type ItemDef = {
   priceFlies?: number;
   availableFrom?: string | null;
   availableUntil?: string | null;
+  variantGroup?: string | null;
+  color?: string | null;
 };
 
 export const RARITY_ORDER = [

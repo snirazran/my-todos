@@ -29,11 +29,15 @@ import {
   entryName,
   entryRarity,
   entrySlotRank,
+  groupVariants,
   isEntryEquipped,
   useShelfGrid,
+  variantItems,
+  variantKey,
   type ClosetEntry,
   type ClosetSlot,
 } from './DressingRoom';
+import { VariantDots, VariantSwatchButton } from './VariantSwatch';
 
 const ALBUM_FILTERS: { id: ClosetSlot; label: string; icon: ReactNode }[] = [
   { id: 'all', label: 'All', icon: <Icon name="closetAll" /> },
@@ -50,6 +54,10 @@ const ALBUM_FILTERS: { id: ClosetSlot; label: string; icon: ReactNode }[] = [
 
 function entryKey(entry: ClosetEntry) {
   return `${entry.kind}:${entryId(entry)}`;
+}
+
+function tileKey(group: ClosetEntry[]) {
+  return group.length > 1 ? `variant:${variantKey(group[0])}` : entryKey(group[0]);
 }
 
 const ALBUM_ORDER = ALBUM_FILTERS.map((filter) => filter.id);
@@ -83,11 +91,13 @@ function AlbumTile({
   entry,
   equipped,
   selected,
+  variants,
   onTap,
 }: {
   entry: ClosetEntry;
   equipped: boolean;
   selected: boolean;
+  variants?: ItemDef[];
   onTap: () => void;
 }) {
   const rarity = entryRarity(entry);
@@ -116,7 +126,7 @@ function AlbumTile({
     <button
       type="button"
       onClick={onTap}
-      aria-label={`${name}, ${RARITY_CONFIG[rarity].label}, ${owned ? 'collected' : 'not collected yet'}`}
+      aria-label={`${name}, ${RARITY_CONFIG[rarity].label}${variants && variants.length > 1 ? `, ${variants.length} colors` : ''}, ${owned ? 'collected' : 'not collected yet'}`}
       aria-pressed={selected}
       className="block w-full group"
     >
@@ -136,6 +146,7 @@ function AlbumTile({
             <Check className="w-3 h-3" strokeWidth={4} />
           </span>
         )}
+        {variants && variants.length > 1 && <VariantDots items={variants} />}
       </TileArt>
     </button>
   );
@@ -181,6 +192,7 @@ export function ClosetAlbum({
     entry.kind !== 'item' || !buyableIds || buyableIds.has(entry.item.id);
   const [slot, setSlot] = useState<ClosetSlot>(initialSlot);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [pickedKey, setPickedKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -228,6 +240,7 @@ export function ClosetAlbum({
           return {
             rarity,
             list,
+            tiles: groupVariants(list),
             owned: list.filter((entry) => entry.owned > 0).length,
           };
         })
@@ -237,9 +250,28 @@ export function ClosetAlbum({
         ),
     [entries],
   );
-  const selected = selectedKey
-    ? (entries.find((entry) => entryKey(entry) === selectedKey) ?? null)
+  const tileGroups = useMemo(
+    () =>
+      new Map(
+        sections.flatMap((section) =>
+          section.tiles.map((group) => [tileKey(group), group] as const),
+        ),
+      ),
+    [sections],
+  );
+  const selectedGroup = selectedKey ? (tileGroups.get(selectedKey) ?? null) : null;
+  const selected = selectedGroup
+    ? (selectedGroup.find((entry) => entryKey(entry) === pickedKey) ?? selectedGroup[0])
     : null;
+  const shownEntry = (group: ClosetEntry[]) => {
+    if (group.length === 1) return group[0];
+    if (selected && selectedKey === tileKey(group)) return selected;
+    return (
+      group.find((entry) => isEntryEquipped(entry, equipped, equippedBgId)) ??
+      group.find((entry) => entry.owned > 0) ??
+      group[0]
+    );
+  };
   const selectedRarity = selected ? entryRarity(selected) : null;
   const selectedWorn = selected
     ? isEntryEquipped(selected, equipped, equippedBgId)
@@ -342,8 +374,9 @@ export function ClosetAlbum({
                           </p>
                         </>
                       )}
-                      {section.list.map((entry) => {
-                        const key = entryKey(entry);
+                      {section.tiles.map((group) => {
+                        const key = tileKey(group);
+                        const entry = shownEntry(group);
                         return (
                           <AlbumTile
                             key={key}
@@ -354,8 +387,10 @@ export function ClosetAlbum({
                               equippedBgId,
                             )}
                             selected={selectedKey === key}
+                            variants={group.length > 1 ? variantItems(group) : undefined}
                             onTap={() => {
                               hapticTick();
+                              setPickedKey(entryKey(entry));
                               setSelectedKey((prev) =>
                                 prev === key ? null : key,
                               );
@@ -372,6 +407,28 @@ export function ClosetAlbum({
 
           {selected && selectedRarity && (
             <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:px-6 sm:pb-5">
+              {selectedGroup && selectedGroup.length > 1 && (
+                <div
+                  role="group"
+                  aria-label="Colors"
+                  className="-mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {selectedGroup.map((entry) =>
+                    entry.kind === 'item' ? (
+                      <VariantSwatchButton
+                        key={entry.item.id}
+                        item={entry.item}
+                        selected={entryKey(entry) === entryKey(selected)}
+                        marked={entry.owned > 0}
+                        onSelect={() => {
+                          if (entryKey(entry) !== entryKey(selected)) hapticSelect();
+                          setPickedKey(entryKey(entry));
+                        }}
+                      />
+                    ) : null,
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center gap-2">

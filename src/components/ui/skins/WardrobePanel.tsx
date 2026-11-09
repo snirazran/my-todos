@@ -301,6 +301,9 @@ function WardrobeManagerContent({
   const [purchaseDealPrice, setPurchaseDealPrice] = useState<number | null>(
     null,
   );
+  const [purchaseVariants, setPurchaseVariants] = useState<
+    { item: ItemDef; dealPrice: number | null }[] | null
+  >(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('premium_daily_deal');
   const [plusPreview, setPlusPreview] = useState<ItemDef | null>(null);
@@ -1090,7 +1093,11 @@ function WardrobeManagerContent({
       ? (bg.inventory[purchaseBg.id] ?? 0)
       : 0;
 
-  const openItemPurchase = (item: ItemDef, dealPrice: number | null = null) => {
+  const openItemPurchase = (
+    item: ItemDef,
+    dealPrice: number | null = null,
+    variants?: { item: ItemDef; dealPrice: number | null }[],
+  ) => {
     const ownedNow = (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0;
     if (
       !isGuest &&
@@ -1113,6 +1120,11 @@ function WardrobeManagerContent({
       return;
     }
     hapticSelect();
+    setPurchaseVariants(variants && variants.length > 1 ? variants : null);
+    showItemCard(item, dealPrice);
+  };
+
+  const showItemCard = (item: ItemDef, dealPrice: number | null) => {
     // Sale prices apply everywhere, not just on the shelf — resolve today's
     // price here so a card opened from the main grid quotes what the server
     // will actually charge. A slot sitting at its standing price is not a deal,
@@ -1129,8 +1141,14 @@ function WardrobeManagerContent({
     });
   };
 
+  const pickPurchaseVariant = (id: string) => {
+    const variant = purchaseVariants?.find((entry) => entry.item.id === id);
+    if (variant) showItemCard(variant.item, variant.dealPrice);
+  };
+
   const openBgPurchase = (bgItem: BackgroundItem) => {
     hapticSelect();
+    setPurchaseVariants(null);
     setPurchaseDealPrice(null);
     setPurchaseCard({
       kind: 'bg',
@@ -1273,7 +1291,7 @@ function WardrobeManagerContent({
           wishlistedIds={wishlistedItemIds}
           shopGift={data?.shopGift}
           scene={stageBackground}
-          onOpenItem={(item, dealPrice) => openItemPurchase(item, dealPrice)}
+          onOpenItem={(item, dealPrice, variants) => openItemPurchase(item, dealPrice, variants)}
           onOpenBackground={openBgPurchase}
           onReroll={() => void rerollDeals()}
           onPlus={openPlus}
@@ -1701,8 +1719,14 @@ function WardrobeManagerContent({
           if (boughtTried) clearTryOn();
           setPurchaseCard(null);
           setPurchaseDealPrice(null);
+          setPurchaseVariants(null);
         }}
         target={purchaseTarget}
+        variants={purchaseVariants?.map(({ item }) => ({
+          item,
+          owned: (data?.wardrobe?.inventory?.[item.id] ?? 0) > 0,
+        }))}
+        onPickVariant={pickPurchaseVariant}
         preview={purchasePreview}
         previewWide={!!purchaseBg}
         balance={balance}
