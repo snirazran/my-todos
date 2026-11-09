@@ -39,7 +39,11 @@ export function FrogSpeechBubble({
   messageClassName = '',
   side = false,
   name,
-}: FrogSpeechBubbleProps & { isCatching?: boolean }) {
+  cue = null,
+}: FrogSpeechBubbleProps & {
+  isCatching?: boolean;
+  cue?: { text: string; at: number } | null;
+}) {
   const reduceMotion = useReducedMotion();
   const [message, setMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
@@ -64,6 +68,13 @@ export function FrogSpeechBubble({
 
   const speakRef = useRef(speak);
   speakRef.current = speak;
+  const cueAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!cue || cue.at === cueAtRef.current) return;
+    cueAtRef.current = cue.at;
+    speakRef.current(cue.text, 8000);
+  }, [cue]);
 
   useEffect(() => {
     if (fixedMessage !== undefined) return;
@@ -79,7 +90,7 @@ export function FrogSpeechBubble({
         return;
       }
       const slot = consumeWelcomeSlot();
-      if (!slot.show) return;
+      if (!slot.show || cueAtRef.current) return;
       const current = factsRef.current;
       speakRef.current(
         pickFrogLine('welcome', {

@@ -11,6 +11,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import type { PlusPriceInfo } from '@/lib/purchases';
 import {
+  formatTrialPeriod,
   ONBOARDING_PLUS_OFFERING,
   TRIAL_REMINDER_LEAD_MS,
   trialEndsAt,
@@ -105,6 +106,10 @@ function trialDates(trial: TrialPeriod, start: Date) {
     hasReminder: reminder.getTime() - start.getTime() >= 12 * 60 * 60 * 1000,
     label,
   };
+}
+
+function inDays(trial: TrialPeriod | null): TrialPeriod | null {
+  return trial?.unit === 'W' ? { unit: 'D', count: trial.count * 7 } : trial;
 }
 
 function savePercent(price: PlusPriceInfo | undefined) {
@@ -404,7 +409,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
     return () => observer.disconnect();
   }, [mounted]);
 
-  const trial = selected?.trialPeriod ?? null;
+  const trial = inDays(selected?.trialPeriod ?? null);
   const dates = trial ? trialDates(trial, start) : null;
   const canRemind = notifications.isEnabled || notifications.canEnable;
   const save = savePercent(selected);
@@ -417,7 +422,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
   const index = Math.max(0, pages.indexOf(page));
   const checkout = page === 'checkout';
   const period = plan === 'yearly' ? 'year' : 'month';
-  const trialDuration = selected?.trialDuration ?? null;
+  const trialDuration = formatTrialPeriod(trial);
   const pricesReady = !pricesPending;
   const frogHidden = checkout && !desktop;
   const lookPage = frogHidden ? pages[Math.max(0, index - 1)] : page;
@@ -486,7 +491,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
       ),
     },
     reminder: {
-      eyebrow: 'No surprise charges',
+      eyebrow: 'Free to cancel anytime',
       title: notifications.isEnabled ? (
         <>
           We’ll remind you {accent(dates ? `on ${shortDate(dates.reminder)}` : `${LEAD_DAYS} days before`)}
@@ -535,12 +540,14 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
     ? !selected
       ? 'Try again'
       : trialDuration
-        ? 'Start my free trial'
+        ? 'Start my free trial now'
         : 'Get Plus'
     : page === 'discount'
-      ? 'See offer details'
+      ? trialDuration
+        ? 'See FREE offer details'
+        : 'See offer details'
       : trialDuration
-        ? 'See my free offer'
+        ? 'See my FREE offer'
         : 'See my offer';
 
   const slide = reduceMotion
@@ -592,6 +599,14 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
       );
     }
     if (page === 'discount') return <OfferTicket percent={save} />;
+    if (page === 'free') {
+      return (
+        <span
+          aria-hidden
+          className="relative -top-[7px] block h-3.5 w-28 rounded-[50%] bg-zinc-900/[0.08] dark:bg-black/40 lg:-top-2 lg:h-4 lg:w-36"
+        />
+      );
+    }
     if (checkout && !desktop) return null;
     return <PlusBar />;
   })();
@@ -762,6 +777,16 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
           />
           {ctaLabel}
         </OnboardingButton>
+        {!checkout ? (
+          <OnboardingButton
+            variant="ghost"
+            onClick={skip}
+            disabled={page !== 'free'}
+            className={cn('mt-1.5 h-10 short:mt-0.5 short:h-8', page !== 'free' && 'invisible')}
+          >
+            Continue for free
+          </OnboardingButton>
+        ) : null}
         {checkout ? (
           <>
             <OnboardingButton

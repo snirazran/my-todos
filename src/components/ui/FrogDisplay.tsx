@@ -12,6 +12,10 @@ import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import type { FrogSpeechContext } from '@/lib/frogSpeech';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import {
+  takePushGreeting,
+  usePushGreeting,
+} from '@/lib/notifications/pushGreeting';
 import { cn } from '@/lib/utils';
 import { prefetchQuests } from './QuestsPanel';
 import { useLeapView } from '@/components/leap/useLeapView';
@@ -167,6 +171,19 @@ export function FrogDisplay({
     };
   }, [profile, streakView, hunger, maxHunger, leapView]);
 
+  const pendingGreeting = usePushGreeting((s) => s.greeting);
+  const [cue, setCue] = React.useState<{ text: string; at: number } | null>(
+    null,
+  );
+
+  React.useEffect(() => {
+    if (!pendingGreeting || !speechEnabled || fixedSpeech) return;
+    const greeting = takePushGreeting();
+    if (!greeting) return;
+    setCue({ text: greeting.text, at: greeting.at });
+    frogRef.current?.fireEmote(greeting.emote);
+  }, [pendingGreeting, speechEnabled, fixedSpeech, frogRef]);
+
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
   return (
@@ -239,6 +256,7 @@ export function FrogDisplay({
               isCatching={isCatching}
               clickedAt={clickedAt}
               facts={speechFacts}
+              cue={cue}
               className="!top-[150px]"
             />
           )

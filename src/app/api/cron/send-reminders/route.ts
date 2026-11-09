@@ -23,16 +23,21 @@ import type {
 import {
   eveningMessage,
   farewellMessage,
+  firstName,
   friendFliesMessage,
   hungerMessage,
   leapHoldMessage,
   leapPromotionMessage,
-  morningMessage,
+  leapResultMessage,
+  PUSH_VOICE_VARIANT,
   type CopyCursors,
+  type Speaker,
 } from '@/lib/notifications/frogVoice';
 import { runWishlistDealAlerts } from '@/lib/skins/wishlistAlerts';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { lineGoal } from '@/lib/leap/targets';
+import { runLoginStreakSweep } from '@/lib/streak/sweep';
+import { previousDayKey } from '@/lib/quests/streak';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -52,6 +57,7 @@ type PushMessage = {
   data: Record<string, string>;
   bucket?: string;
   cursor?: number;
+  mood?: string;
 };
 
 /**
@@ -228,7 +234,7 @@ async function leapMessage(
   userId: string,
   tz: string,
   slot: 'morning' | 'evening',
-  cursors?: CopyCursors,
+  speaker: Speaker,
 ): Promise<PushMessage | null> {
   try {
     const { getLeapView } = await import('@/lib/leap/view');
@@ -239,21 +245,12 @@ async function leapMessage(
     if (slot === 'morning') {
       const result = view.weekResult;
       if (!result) return null;
-      const message: PushMessage | null =
-        result.outcome === 'up'
-          ? {
-              title: `You advanced to the ${league(result.leagueAfter)} League!`,
-              body: 'Your habits did that. Every habit now pays more flies. Fancy.',
-              data: { type: 'leap_day', path: '/quests#leap' },
-            }
-          : result.outcome === 'covered'
-            ? {
-                title: 'A Lily Pad saved you',
-                body: `You stay in the ${league(result.leagueAfter)} League. Fresh week, clean slate.`,
-                data: { type: 'leap_day', path: '/quests#leap' },
-              }
-            : null;
-      if (!message) return null;
+      if (result.outcome !== 'up' && result.outcome !== 'covered') return null;
+      const line = leapResultMessage(speaker, result.outcome, league(result.leagueAfter));
+      const message: PushMessage = {
+        ...line,
+        data: { type: 'leap_day', path: '/quests#leap' },
+      };
       const claimed = await UserModel.updateOne(
         { _id: userId, 'quests.leap.resultPushed': { $ne: result.weekKey } },
         { $set: { 'quests.leap.resultPushed': result.weekKey } },
@@ -273,7 +270,7 @@ async function leapMessage(
       holdLeft <= week.openToday
     ) {
       return {
-        ...leapHoldMessage(league(view.league), holdLeft, cursors),
+        ...leapHoldMessage(speaker, league(view.league), holdLeft),
         data: { type: 'leap_reminder', path: '/' },
       };
     }
@@ -281,7 +278,7 @@ async function leapMessage(
     const next = view.leagues[view.league + 1]?.label;
     if (next && left <= Math.min(2, week.openToday)) {
       return {
-        ...leapPromotionMessage(next, left, cursors),
+        ...leapPromotionMessage(speaker, next, left),
         data: { type: 'leap_reminder', path: '/' },
       };
     }
@@ -295,15 +292,18 @@ async function leapMessage(
  * GET /api/cron/send-reminders
  *
  * Called by an external cron service every 30 minutes.
- * For each user with notifications enabled, checks if the current hour
- * matches their morning or evening slot and sends at most one push.
+ * The login-streak sweep runs first, so a streak that ends at midnight always
+ * gets the evening slot. Then, for each user with notifications enabled whose
+ * morning or evening slot is now, sends at most one push from the frog.
  *
- * Morning slot: plan-your-day nudge (only if open tasks exist).
+ * Morning slot: news only (Leap result). The sweep sends "a Lily Pad saved
+ * your streak" in the same slot.
  * Evening slot: highest-value message wins —
- *   1. unclaimed friend flies expiring at midnight (loss)
+ *   1. a streak ends at midnight (sent by the sweep above)
  *   2. Leap league rescue or promotion within reach
- *   3. frog's belly is empty (nudge — hunger never costs flies)
- *   4. open tasks remaining (nudge)
+ *   3. unclaimed friend flies expiring at midnight
+ *   4. frog's belly is empty (nudge — hunger never costs flies)
+ *   5. open tasks remaining, at most every other day
  */
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent unauthorized calls
@@ -313,6 +313,11 @@ export async function GET(req: NextRequest) {
   }
 
   await connectMongo();
+
+  const streakSweep = await runLoginStreakSweep().catch((err) => {
+    console.error('Login streak sweep failed:', err);
+    return null;
+  });
 
   // Wishlist deal alerts ride this cron rather than owning one. They have
   // their own per-day dedupe and local-hour window, so the only coupling
@@ -329,7 +334,7 @@ export async function GET(req: NextRequest) {
     'notificationPrefs.fcmTokens': { $exists: true, $ne: [] },
   })
     .select(
-      '_id notificationPrefs frogName wardrobe.flies wardrobe.hunger wardrobe.lastHungerUpdate wardrobe.friendFlyDaily',
+      '_id name notificationPrefs frogName wardrobe.flies wardrobe.hunger wardrobe.lastHungerUpdate wardrobe.friendFlyDaily',
     )
     .lean()
     .exec();
@@ -381,97 +386,91 @@ export async function GET(req: NextRequest) {
     }
 
     const todayYMD = getTodayInTz(tz);
-    const {
-      count: uncompletedCount,
-      done: doneCount,
-      exampleText,
-    } = await getUncompletedTasks(
-      userId,
-      todayYMD,
-      getCurrentMinutesInTz(tz),
-      tz,
-    );
     const ignoredCount = prefs.reminderIgnoredCount ?? 0;
-
-    const cursors = prefs.copyCursor as CopyCursors | undefined;
+    const speaker: Speaker = {
+      frog,
+      name: firstName((user as any).name),
+      cursors: prefs.copyCursor as CopyCursors | undefined,
+    };
     const withData = (
-      line: { title: string; body: string; bucket: string; cursor: number },
+      line: { title: string; body: string; bucket: string; cursor: number; mood?: string },
       data: Record<string, string>,
     ): PushMessage => ({
       title: line.title,
       body: line.body,
       bucket: line.bucket,
       cursor: line.cursor,
+      mood: line.mood,
       data,
     });
 
-    const routineNudge = (slot: 'morning' | 'evening'): PushMessage | null => {
-      if (uncompletedCount === 0) return null;
-      if (ignoredCount < REMINDER_MUTE_THRESHOLD) {
-        const ctx = {
-          count: uncompletedCount,
-          done: doneCount,
-          frog,
-          exampleTask: exampleText,
-          ignoredStreak: ignoredCount,
-          cursors,
-        };
-        const copy =
-          slot === 'morning' ? morningMessage(ctx) : eveningMessage(ctx);
-        return withData(copy, {
-          type: 'task_reminder',
-          uncompletedCount: String(uncompletedCount),
-        });
-      }
-      if (ignoredCount === REMINDER_MUTE_THRESHOLD) {
-        return withData(farewellMessage(frog, cursors), {
-          type: 'task_reminder_muted',
-          path: '/',
-        });
-      }
-      return null;
-    };
-
     let message: PushMessage | null = null;
     let isRoutine = false;
+    let uncompletedCount = 0;
+    let skipReason: string | null = null;
 
     if (isEvening) {
-      const owedFlies = await countUnclaimedFriendFlies(
+      const tasksToday = await getUncompletedTasks(
         userId,
-        wardrobe?.friendFlyDaily,
         todayYMD,
+        getCurrentMinutesInTz(tz),
+        tz,
       );
-      if (owedFlies > 0) {
-        message = withData(friendFliesMessage(owedFlies, cursors), {
+      uncompletedCount = tasksToday.count;
+      const taskNudgedYesterday =
+        prefs.lastTaskNudgeDay === previousDayKey(todayYMD);
+
+      const leapNudge = await leapMessage(userId, tz, 'evening', speaker);
+      const owedFlies = leapNudge
+        ? 0
+        : await countUnclaimedFriendFlies(
+            userId,
+            wardrobe?.friendFlyDaily,
+            todayYMD,
+          );
+      if (leapNudge) {
+        message = leapNudge;
+      } else if (owedFlies > 0) {
+        message = withData(friendFliesMessage(speaker, owedFlies), {
           type: 'friend_flies',
           path: '/friends',
         });
-      } else {
-        const leapNudge = await leapMessage(userId, tz, 'evening', cursors);
-        if (leapNudge) {
-          message = leapNudge;
-        } else if (
-          isFrogStarving(wardrobe) &&
-          ignoredCount < REMINDER_MUTE_THRESHOLD
-        ) {
-          message = withData(hungerMessage(frog, cursors, exampleText), {
-            type: 'frog_hunger',
-            path: '/',
-          });
-          isRoutine = true;
+      } else if (
+        isFrogStarving(wardrobe) &&
+        ignoredCount < REMINDER_MUTE_THRESHOLD
+      ) {
+        message = withData(hungerMessage(speaker, tasksToday.exampleText), {
+          type: 'frog_hunger',
+          path: '/',
+        });
+        isRoutine = true;
+      } else if (uncompletedCount > 0 && ignoredCount < REMINDER_MUTE_THRESHOLD) {
+        if (taskNudgedYesterday) {
+          skipReason = 'every_other_day';
         } else {
-          message = routineNudge('evening');
-          isRoutine = message !== null;
+          message = withData(
+            eveningMessage(speaker, {
+              count: uncompletedCount,
+              done: tasksToday.done,
+              exampleTask: tasksToday.exampleText,
+              ignoredStreak: ignoredCount,
+            }),
+            {
+              type: 'task_reminder',
+              uncompletedCount: String(uncompletedCount),
+            },
+          );
+          isRoutine = true;
         }
+      } else if (uncompletedCount > 0 && ignoredCount === REMINDER_MUTE_THRESHOLD) {
+        message = withData(farewellMessage(speaker), {
+          type: 'task_reminder_muted',
+          path: '/',
+        });
+        isRoutine = true;
       }
     } else {
-      const leapNudge = await leapMessage(userId, tz, 'morning');
-      if (leapNudge) {
-        message = leapNudge;
-      } else {
-        message = routineNudge('morning');
-        isRoutine = message !== null;
-      }
+      message = await leapMessage(userId, tz, 'morning', speaker);
     }
 
     if (!message) {
@@ -479,9 +478,10 @@ export async function GET(req: NextRequest) {
         userId,
         sent: false,
         reason:
-          ignoredCount > REMINDER_MUTE_THRESHOLD && uncompletedCount > 0
+          skipReason ??
+          (ignoredCount > REMINDER_MUTE_THRESHOLD && uncompletedCount > 0
             ? 'reminders_muted'
-            : 'nothing_to_say',
+            : 'nothing_to_say'),
       });
       continue;
     }
@@ -499,7 +499,12 @@ export async function GET(req: NextRequest) {
             title: message.title,
             body: message.body,
           },
-          data: { ...message.data, slot },
+          data: {
+            ...message.data,
+            slot,
+            variant: PUSH_VOICE_VARIANT,
+            ...(message.mood ? { mood: message.mood } : {}),
+          },
           // Android-specific config
           android: {
             priority: 'high' as const,
@@ -548,6 +553,8 @@ export async function GET(req: NextRequest) {
       properties: {
         notification_type: String(message.data.type ?? 'unknown'),
         slot,
+        variant: PUSH_VOICE_VARIANT,
+        moment: message.mood,
       },
     });
 
@@ -558,6 +565,9 @@ export async function GET(req: NextRequest) {
       {
         $set: {
           'notificationPrefs.lastNotifiedAt': new Date(),
+          ...(message.data.type === 'task_reminder'
+            ? { 'notificationPrefs.lastTaskNudgeDay': todayYMD }
+            : {}),
           ...(message.bucket
             ? {
                 [`notificationPrefs.copyCursor.${message.bucket}`]:
@@ -579,6 +589,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     processed: results.length,
     sent: sentCount,
+    streakSweep,
     results,
   });
 }

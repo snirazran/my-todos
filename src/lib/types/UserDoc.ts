@@ -343,6 +343,7 @@ export type NotificationPrefs = {
   activityHours: number[]; // Rolling log of active hours (last 50)
   lastNotifiedAt?: Date; // Prevent duplicate sends
   reminderIgnoredCount?: number; // Consecutive routine reminders sent with no app activity; mutes nudges at threshold
+  lastTaskNudgeDay?: string;
   timezone: string; // User's IANA timezone
   morningSlot: number; // Best morning notification hour (0-23), default 9
   eveningSlot: number; // Best evening notification hour (0-23), default 21

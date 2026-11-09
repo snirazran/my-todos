@@ -27,6 +27,36 @@ const PERMISSION_OUTCOME: Record<string, string> = {
 
 type CountRow = { _id: Record<string, unknown>; count: number; users: number };
 
+const VOICE_VARIANT: Record<string, string> = {
+  unknown: 'Old style (hook in the title)',
+  frog_sender_v1: 'Frog talks (his name in the title)',
+};
+
+function voiceTable(sendRows: CountRow[], openRows: CountRow[]): StatRow[] {
+  const totals = new Map<string, { sent: number; opened: number }>();
+  const add = (rows: CountRow[], field: 'sent' | 'opened') => {
+    rows.forEach((row) => {
+      if (String(row._id.type) === SELF_SET_REMINDER) return;
+      const variant = String(row._id.variant);
+      const entry = totals.get(variant) ?? { sent: 0, opened: 0 };
+      entry[field] += row.count;
+      totals.set(variant, entry);
+    });
+  };
+  add(sendRows, 'sent');
+  add(openRows, 'opened');
+  const rows: StatRow[] = [];
+  totals.forEach((entry, variant) => {
+    rows.push({
+      variant: VOICE_VARIANT[variant] ?? variant,
+      sent: entry.sent,
+      opened: entry.opened,
+      open_rate: entry.sent > 0 ? rate(entry.opened, entry.sent) : null,
+    });
+  });
+  return rows;
+}
+
 function notificationTable(sendRows: CountRow[], openRows: CountRow[]) {
   const key = (type: unknown, slot: unknown) => `${String(type)}|${String(slot)}`;
   const opens = new Map(openRows.map((row) => [key(row._id.type, row._id.slot), row.count]));
@@ -71,7 +101,17 @@ function notificationTable(sendRows: CountRow[], openRows: CountRow[]) {
 }
 
 export async function buildFrog(context: ReportContext): Promise<StatSection> {
-  const [streakMix, notificationRows, openRows, hungerRows, reviewRows, goalRows, permissionRows] = await Promise.all([
+  const [
+    streakMix,
+    notificationRows,
+    openRows,
+    hungerRows,
+    reviewRows,
+    goalRows,
+    permissionRows,
+    voiceSendRows,
+    voiceOpenRows,
+  ] = await Promise.all([
     propertyMix({ occurredAt: context.window, name: 'streak_checked_in' }, [
       'streak_tier',
       'is_premium',
@@ -103,6 +143,14 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
     groupByProperties(
       { occurredAt: context.window, name: 'notification_permission_result' },
       { status: 'status', outcome: 'outcome' },
+    ),
+    groupByProperties(
+      { occurredAt: context.window, name: 'notification_sent' },
+      { type: 'notification_type', variant: 'variant' },
+    ),
+    groupByProperties(
+      { occurredAt: context.window, name: 'notification_opened' },
+      { type: 'notification_type', variant: 'variant' },
     ),
   ]);
 
@@ -183,6 +231,19 @@ export async function buildFrog(context: ReportContext): Promise<StatSection> {
         ],
         rows: notificationTable(notificationRows, openRows),
         note: 'Only two notifications a day get through the cap, so a low open rate here is a slot being wasted. Opens before Nov 9, 2026 did not record the slot, so a message sent both morning and evening shows those opens on a separate "not recorded" row.',
+      },
+      {
+        key: 'frog.notification_voice',
+        title: 'Old vs new frog voice',
+        question: 'Do pushes from the frog himself get opened more than the old style?',
+        columns: [
+          { key: 'variant', label: 'Style' },
+          { key: 'sent', label: 'Sent', format: 'integer' },
+          { key: 'opened', label: 'Opened', format: 'integer' },
+          { key: 'open_rate', label: 'Open rate', format: 'percent' },
+        ],
+        rows: voiceTable(voiceSendRows, voiceOpenRows),
+        note: 'Leaves out reminders people set on their own tasks. The new style started Nov 9, 2026, so pick a window that covers both sides of that date. Taps on an old-style push after the switch still count as old style.',
       },
       {
         key: 'frog.notification_permission',

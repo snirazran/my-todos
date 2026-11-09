@@ -20,9 +20,13 @@ import { sendStreakPush } from '@/lib/streak/push';
 import { recordShieldUsed, recordStreakBroken } from '@/lib/streak/analytics';
 import type { TaskStreakAtRisk } from '@/lib/streak/types';
 import {
+  addressed,
+  firstName,
+  frogTitle,
   rotateIndex,
   shortTaskText,
   type CopyCursors,
+  type Mood,
 } from '@/lib/notifications/frogVoice';
 
 const MIN_HOURS_BETWEEN_NOTIFICATIONS = 4;
@@ -84,31 +88,31 @@ function nextOption<T>(
 const SHIELD_NOTES_LEFT: ((n: number) => string)[] = [
   (n) =>
     n === 1
-      ? ' Otherwise your last Lily Pad covers the day.'
-      : ` Otherwise a Lily Pad covers the day. You have ${n}.`,
+      ? ' Otherwise your last Lily Pad covers it.'
+      : ` Otherwise a Lily Pad covers it. You have ${n}.`,
   (n) =>
     n === 1
       ? ' If not, your only Lily Pad steps in.'
       : ` If not, one of your ${n} Lily Pads steps in.`,
-  () => ' A Lily Pad would cover the day, but why spend one?',
+  () => ' A Lily Pad would cover it, but why spend one?',
   (n) =>
     n === 1
-      ? ' Skip tonight and your last Lily Pad gets used.'
-      : ` Skip tonight and a Lily Pad gets used. You have ${n}.`,
+      ? ' Skip it and your last Lily Pad gets used.'
+      : ` Skip it and a Lily Pad gets used. You have ${n}.`,
 ];
 
 const SHIELD_NOTES_NONE: string[] = [
-  ' No Lily Pads left to cover the day.',
+  ' No Lily Pads left to cover it.',
   ' There is no Lily Pad left to cover a miss.',
   ' No Lily Pads in reserve, so this one counts.',
   " You're out of Lily Pads, so tonight really counts.",
 ];
 
-const SAVER_MULTI_TITLES: ((n: number) => string)[] = [
-  (n) => `${n} streaks end at midnight`,
-  (n) => `${n} streaks need you tonight`,
-  (n) => `Midnight is coming for ${n} streaks`,
-  (n) => `${n} streaks, one evening to save them`,
+const SAVER_MULTI_OPENERS: ((n: number) => string)[] = [
+  (n) => `${n} of our streaks end at midnight.`,
+  (n) => `${n} of our streaks need you tonight.`,
+  (n) => `Midnight is coming for ${n} of our streaks.`,
+  (n) => `${n} streaks, one evening to save them.`,
 ];
 
 const SAVER_MULTI_BODIES: ((list: string, one: boolean) => string)[] = [
@@ -118,39 +122,63 @@ const SAVER_MULTI_BODIES: ((list: string, one: boolean) => string)[] = [
   (list, one) => `${list} ${one ? 'is' : 'are'} one tick from safe.`,
 ];
 
-const SAVER_HABIT_TITLES: ((text: string, count: number) => string)[] = [
-  (text, count) => `Your ${count}-day "${text}" streak ends tonight`,
-  (text, count) => `${count} days of "${text}" end at midnight`,
-  (text, count) => `Midnight ends ${count} days of "${text}"`,
-  (text, count) => `Save ${count} days of "${text}" tonight`,
+const SAVER_HABIT_OPENERS: ((text: string, count: number) => string)[] = [
+  (text, count) => `Your ${count}-day "${text}" streak ends at midnight.`,
+  (text, count) => `Midnight is coming for ${count} days of "${text}".`,
+  (text, count) => `${count} days of "${text}" are riding on tonight.`,
+  (text, count) => `"${text}" is on ${count} days and still unticked today.`,
+  (text, count) => `Your "${text}" streak is ${count} days old. Tonight decides day ${count + 1}.`,
+  (text, count) => `${count} days of "${text}", and the clock is ticking.`,
 ];
 
 const SAVER_HABIT_CLOSERS: string[] = [
-  'One tick saves it.',
-  'Tick it off and it survives the night.',
-  "It only needs one tick. I'd hate to see it go.",
-  'Tick it off and it lives to see tomorrow.',
+  'One tick keeps it alive.',
+  'Tick it and it survives the night.',
+  "I'd hate to see it go. One tick saves it.",
+  "Tick it and I'll do my victory wiggle.",
+  'One tick and it lives to see tomorrow.',
+  'One tick and I can stop watching the clock.',
 ];
 
-const SAVER_LOGIN_TITLES: ((n: number) => string)[] = [
-  (n) => `Your ${n}-day streak ends at midnight`,
-  (n) => `Midnight is coming for ${n} days`,
-  (n) => `${n} days on the line tonight`,
-  (n) => `Save your ${n}-day streak tonight`,
+const SAVER_LOGIN_OPENERS: ((n: number) => string)[] = [
+  (n) => `Our ${n}-day streak ends at midnight.`,
+  (n) => `Midnight is coming for our ${n}-day streak.`,
+  (n) => `${n} days in a row, and tonight decides day ${n + 1}.`,
+  (n) => `Our streak is ${n} days old, and nothing's ticked yet today.`,
+  (n) => `The clock is eyeing our ${n}-day streak.`,
+  (n) => `${n} days strong. I'd love to see ${n + 1}.`,
 ];
 
 const SAVER_LOGIN_CLOSERS: string[] = [
+  'Finish anything on your list and it carries on.',
   'One finished task saves it. Any task.',
-  'Finish anything today and it carries on.',
-  "One small task keeps it alive. I'd pick the smallest.",
+  "Any finished task keeps it going. I'm not picky.",
+  'One tick and I can stop staring at the clock.',
   'Tick off one thing and it survives. Even a tiny thing.',
+  'Finish one task and we keep going.',
 ];
 
-const FREEZE_TITLES: ((n: number) => string)[] = [
-  (n) => `A Lily Pad saved your ${n}-day streak`,
-  (n) => `Your ${n}-day streak survived the night`,
-  (n) => `${n} days, saved by a Lily Pad`,
-  (n) => `Close call: your ${n}-day streak is safe`,
+const FIRST_STREAK_OPENERS: string[] = [
+  'Yesterday was day 1 of our streak. One task today makes it 2.',
+  'Day 1 is done. Day 2 just needs one finished task.',
+  'You started a streak yesterday. One task today keeps it going.',
+  'One task today and our streak hits 2 days.',
+  "Day 2 is right here. Finish one task and we're on 2 days.",
+  'Yesterday you got us to day 1. Today could be day 2.',
+];
+
+const FIRST_STREAK_CLOSERS: string[] = [
+  "I'm keeping count.",
+  "No pressure. I'm just very excited.",
+  'I have a good feeling about this.',
+  "I'll be counting.",
+];
+
+const FREEZE_OPENERS: ((n: number) => string)[] = [
+  (n) => `A Lily Pad saved our ${n}-day streak last night.`,
+  (n) => `Our ${n}-day streak survived the night, thanks to a Lily Pad.`,
+  (n) => `${n} days, saved by a Lily Pad.`,
+  (n) => `Close call. A Lily Pad kept our ${n}-day streak going.`,
 ];
 
 const FREEZE_BODIES_LEFT: ((n: number, plural: string) => string)[] = [
@@ -176,6 +204,8 @@ function listOf(items: string[], rest: number): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+type StreakPushCopy = { title: string; body: string; mood: Mood };
+
 /**
  * One evening message for everything expiring tonight. Names what is actually
  * at stake rather than saying "your streak" — specific, countable copy is what
@@ -183,13 +213,27 @@ function listOf(items: string[], rest: number): string {
  */
 function buildSaverMessage(args: {
   loginCount: number;
+  firstStreak: boolean;
   habits: TaskStreakAtRisk[];
   shields: number;
+  frog: string;
+  name: string | null;
   cursors: CopyCursors;
   writes: Record<string, number>;
-}): { title: string; body: string } {
-  const { loginCount, habits, shields, cursors, writes } = args;
+}): StreakPushCopy {
+  const { loginCount, firstStreak, habits, shields, frog, name, cursors, writes } = args;
   const total = habits.length + (loginCount > 0 ? 1 : 0);
+
+  if (total === 0 && firstStreak) {
+    const opener = nextOption('first_streak_open', FIRST_STREAK_OPENERS, cursors, writes);
+    const closer = nextOption('first_streak_close', FIRST_STREAK_CLOSERS, cursors, writes);
+    return {
+      title: frogTitle(frog, 'happy'),
+      body: `${addressed(name, opener)} ${closer}`,
+      mood: 'happy',
+    };
+  }
+
   const named = habits
     .slice(0, SAVER_NAMED_HABITS)
     .map((h) => `"${shortTaskText(h.text, 20) ?? h.text}" (${h.count} days)`);
@@ -200,11 +244,12 @@ function buildSaverMessage(args: {
           shields,
         )
       : nextOption('shield_note_none', SHIELD_NOTES_NONE, cursors, writes);
+  const title = frogTitle(frog, 'nervous');
 
   if (total > 1) {
-    const title = nextOption(
-      'saver_multi_title',
-      SAVER_MULTI_TITLES,
+    const opener = nextOption(
+      'f_saver_multi_open',
+      SAVER_MULTI_OPENERS,
       cursors,
       writes,
     )(total);
@@ -215,39 +260,63 @@ function buildSaverMessage(args: {
             habits.length === 1,
           )
         : 'Finish a task to keep them all.';
-    return { title, body: `${body}${shieldNote}` };
+    return { title, body: `${addressed(name, opener)} ${body}${shieldNote}`, mood: 'nervous' };
   }
 
   if (habits.length === 1) {
     const h = habits[0];
-    const title = nextOption(
-      'saver_habit_title',
-      SAVER_HABIT_TITLES,
+    const opener = nextOption(
+      'f_saver_habit_open',
+      SAVER_HABIT_OPENERS,
       cursors,
       writes,
     )(shortTaskText(h.text, 20) ?? h.text, h.count);
     const closer = nextOption(
-      'saver_habit_close',
+      'f_saver_habit_close',
       SAVER_HABIT_CLOSERS,
       cursors,
       writes,
     );
-    return { title, body: `${closer}${shieldNote}` };
+    return { title, body: `${addressed(name, opener)} ${closer}${shieldNote}`, mood: 'nervous' };
   }
 
-  const title = nextOption(
-    'saver_login_title',
-    SAVER_LOGIN_TITLES,
+  const opener = nextOption(
+    'f_saver_login_open',
+    SAVER_LOGIN_OPENERS,
     cursors,
     writes,
   )(loginCount);
   const closer = nextOption(
-    'saver_login_close',
+    'f_saver_login_close',
     SAVER_LOGIN_CLOSERS,
     cursors,
     writes,
   );
-  return { title, body: `${closer}${shieldNote}` };
+  return { title, body: `${addressed(name, opener)} ${closer}${shieldNote}`, mood: 'nervous' };
+}
+
+function buildFreezeMessage(args: {
+  count: number;
+  shields: number;
+  frog: string;
+  name: string | null;
+  cursors: CopyCursors;
+  writes: Record<string, number>;
+}): StreakPushCopy {
+  const { count, shields, frog, name, cursors, writes } = args;
+  const opener = nextOption('f_freeze_open', FREEZE_OPENERS, cursors, writes)(count);
+  const body =
+    shields > 0
+      ? nextOption('freeze_body_left', FREEZE_BODIES_LEFT, cursors, writes)(
+          shields,
+          shields === 1 ? '' : 's',
+        )
+      : nextOption('freeze_body_none', FREEZE_BODIES_NONE, cursors, writes);
+  return {
+    title: frogTitle(frog, 'relief'),
+    body: `${addressed(name, opener)} ${body}`,
+    mood: 'relief',
+  };
 }
 
 export async function runLoginStreakSweep() {
@@ -260,7 +329,7 @@ export async function runLoginStreakSweep() {
   const users = await UserModel.find({
     'quests.loginStreak.lastDayKey': { $exists: true, $ne: '' },
   })
-    .select('_id quests notificationPrefs')
+    .select('_id name frogName quests notificationPrefs')
     .lean()
     .exec();
 
@@ -327,6 +396,8 @@ export async function runLoginStreakSweep() {
 
     const morningSlot = prefs?.morningSlot ?? 9;
     const eveningSlot = prefs?.eveningSlot ?? 21;
+    const frog = ((user as any).frogName as string | undefined) ?? '';
+    const name = firstName((user as any).name);
 
     const lastFrozen =
       state.shieldedDayKeys[state.shieldedDayKeys.length - 1];
@@ -339,19 +410,14 @@ export async function runLoginStreakSweep() {
     ) {
       const cursors: CopyCursors = { ...(prefs?.copyCursor ?? {}) };
       const writes: Record<string, number> = {};
-      const title = nextOption(
-        'freeze_title',
-        FREEZE_TITLES,
+      const message = buildFreezeMessage({
+        count: state.count,
+        shields: shieldState.count,
+        frog,
+        name,
         cursors,
         writes,
-      )(state.count);
-      const body =
-        shieldState.count > 0
-          ? nextOption('freeze_body_left', FREEZE_BODIES_LEFT, cursors, writes)(
-              shieldState.count,
-              shieldState.count === 1 ? '' : 's',
-            )
-          : nextOption('freeze_body_none', FREEZE_BODIES_NONE, cursors, writes);
+      });
 
       const claim = await UserModel.updateOne(
         {
@@ -370,9 +436,9 @@ export async function runLoginStreakSweep() {
       );
       if (claim.modifiedCount === 1) {
         await sendStreakPush(userId, {
-          title,
-          body,
+          ...message,
           type: 'streak_freeze_used',
+          slot: 'morning',
         });
         results.freezePush += 1;
         continue;
@@ -399,13 +465,19 @@ export async function runLoginStreakSweep() {
         minStreak: RESCUE_MIN_TASK_STREAK,
       });
 
-      if (loginAtRisk > 0 || habitsAtRisk.length > 0) {
+      const firstStreak =
+        state.count === 1 && state.lastDayKey === yesterdayKey;
+
+      if (loginAtRisk > 0 || habitsAtRisk.length > 0 || firstStreak) {
         const cursors: CopyCursors = { ...(prefs?.copyCursor ?? {}) };
         const writes: Record<string, number> = {};
         const message = buildSaverMessage({
           loginCount: loginAtRisk,
+          firstStreak,
           habits: habitsAtRisk,
           shields: shieldState.count,
+          frog,
+          name,
           cursors,
           writes,
         });
@@ -426,6 +498,7 @@ export async function runLoginStreakSweep() {
           await sendStreakPush(userId, {
             ...message,
             type: 'streak_saver',
+            slot: 'evening',
           });
           results.saverPush += 1;
         }

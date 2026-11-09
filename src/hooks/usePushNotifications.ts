@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { setLiveActivityControlToken, setTimerControlConfig } from '@/lib/liveTimer';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { setPushGreeting } from '@/lib/notifications/pushGreeting';
 import {
   notifyTaskSync,
   type TaskSyncDetail,
@@ -128,8 +129,13 @@ export function usePushNotifications(userId: string | null | undefined) {
             trackAnalyticsEvent('notification_opened', {
               notification_type: typeof data?.type === 'string' ? data.type : 'unknown',
               slot: typeof data?.slot === 'string' ? data.slot : undefined,
+              variant: typeof data?.variant === 'string' ? data.variant : undefined,
+              moment: typeof data?.mood === 'string' ? data.mood : undefined,
             });
             const path = data?.path;
+            if (typeof path !== 'string' || path === '/') {
+              setPushGreeting(event.notification.body, data?.mood);
+            }
             if (typeof path === 'string' && path) {
               router.push(path);
             }

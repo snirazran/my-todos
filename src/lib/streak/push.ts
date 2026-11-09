@@ -1,6 +1,7 @@
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import UserModel from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { PUSH_VOICE_VARIANT, type Mood } from '@/lib/notifications/frogVoice';
 
 function isInvalidTokenError(err: unknown) {
   const code = (err as { code?: string } | null)?.code;
@@ -16,6 +17,8 @@ export async function sendStreakPush(
     title: string;
     body: string;
     type: 'streak_saver' | 'streak_freeze_used';
+    slot: 'morning' | 'evening';
+    mood: Mood;
   },
 ) {
   try {
@@ -34,7 +37,13 @@ export async function sendStreakPush(
           await messaging.send({
             token,
             notification: { title: opts.title, body: opts.body },
-            data: { type: opts.type, path: '/' },
+            data: {
+              type: opts.type,
+              path: '/',
+              slot: opts.slot,
+              variant: PUSH_VOICE_VARIANT,
+              mood: opts.mood,
+            },
             android: {
               priority: 'high' as const,
               notification: {
@@ -69,7 +78,12 @@ export async function sendStreakPush(
       await recordAnalyticsEvent({
         userId,
         name: 'notification_sent',
-        properties: { notification_type: opts.type },
+        properties: {
+          notification_type: opts.type,
+          slot: opts.slot,
+          variant: PUSH_VOICE_VARIANT,
+          moment: opts.mood,
+        },
       });
     }
   } catch (err) {
