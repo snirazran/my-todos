@@ -29,6 +29,7 @@ const CLIENT_EVENTS = new Set([
   'xplat_gift_shown',
   'xplat_gift_claimed',
   'guest_account_linked',
+  'guest_save_prompt',
   'calendar_connect_viewed',
   'paywall_viewed',
   'paywall_prices_failed',

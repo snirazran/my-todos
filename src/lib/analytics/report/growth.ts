@@ -135,9 +135,10 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
           $or: [
             { name: 'account_created', 'properties.method': 'guest' },
             { name: 'guest_account_linked' },
+            { name: 'guest_save_prompt', 'properties.action': { $in: ['shown', 'linked'] } },
           ],
         },
-        { event: '$name', provider: 'provider' },
+        { event: '$name', provider: 'provider', source: 'source', action: 'action' },
       ),
       cohortIds.length
         ? AnalyticsEventModel.aggregate<{ _id: { user: string; name: string }; days: string[] }>([
@@ -337,6 +338,15 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
   const guestsCreated = guestRows.find((row) => row._id.event === 'account_created')?.users ?? 0;
   const linkRows = guestRows.filter((row) => row._id.event === 'guest_account_linked');
   const linkedTotal = linkRows.reduce((sum, row) => sum + row.users, 0);
+  const sheetUsers = (action: string, source?: string) =>
+    guestRows
+      .filter(
+        (row) =>
+          row._id.event === 'guest_save_prompt' &&
+          row._id.action === action &&
+          (!source || row._id.source === source),
+      )
+      .reduce((sum, row) => sum + row.users, 0);
   const guestTable: StatTable = {
     key: 'growth.guest_accounts',
     title: 'Guest accounts saved',
@@ -356,8 +366,11 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
           users: row.users,
           of_guests: rate(row.users, guestsCreated),
         })),
+      { row: 'Opened the save sheet from the home card', users: sheetUsers('shown', 'banner'), of_guests: rate(sheetUsers('shown', 'banner'), guestsCreated) },
+      { row: 'Save sheet opened on its own', users: sheetUsers('shown', 'auto'), of_guests: rate(sheetUsers('shown', 'auto'), guestsCreated) },
+      { row: 'Saved from the save sheet', users: sheetUsers('linked'), of_guests: rate(sheetUsers('linked'), guestsCreated) },
     ],
-    note: 'Saves inside the range can come from guests created before it, so the share can run above what a strict cohort would show. Counting started October 2026.',
+    note: 'Saves inside the range can come from guests created before it, so the share can run above what a strict cohort would show. Counting started October 2026. The save sheet rows started November 10, 2026; it opens on its own only on Closet, Shop, Quests and Friends, for guests who joined on an earlier day and at least 8 hours ago.',
   };
 
   const activationRate = rate(reached('task_completed'), cohortUsers.length);

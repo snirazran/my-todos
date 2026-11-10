@@ -43,6 +43,13 @@ const NUDGES = {
     blocking: true,
     flatCooldown: true,
   },
+  guest_save: {
+    maxImpressions: 3,
+    cooldownHours: 48,
+    suppressAfterDismissals: 3,
+    minVisits: 1,
+    blocking: true,
+  },
 } satisfies Record<string, NudgeConfig>;
 
 export type NudgeKey = keyof typeof NUDGES;

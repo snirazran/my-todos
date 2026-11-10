@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CloudUpload, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { openGuestSave, useGuestSaved } from '@/components/ui/GuestSaveSheet';
 
 const SNOOZE_KEY = 'guestBannerSnoozedAt';
 const SNOOZE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -71,10 +71,10 @@ export function GuestBackupCard({
 }
 
 export function GuestAccountBanner() {
-  const router = useRouter();
   const { user, loading } = useAuth();
+  const saved = useGuestSaved();
   const [snoozed, setSnoozed] = useState(true);
-  const show = !loading && !!user?.isAnonymous && !snoozed;
+  const show = !loading && !!user?.isAnonymous && !saved && !snoozed;
   const { indices } = useWardrobeIndices(show);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export function GuestAccountBanner() {
         >
           <GuestBackupCard
             indices={indices}
-            onSave={() => router.push('/login?upgrade=1')}
+            onSave={() => openGuestSave('banner')}
             onDismiss={dismiss}
           />
         </motion.div>

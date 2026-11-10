@@ -38,17 +38,12 @@ import {
 } from '@/lib/plusPaywall';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { showPlusWelcome } from '@/components/ui/PlusWelcome';
-import { establishSessionCookie } from '@/lib/authCookie';
 import {
-  GoogleAccountExistsError,
-  getGoogleAuthErrorMessage,
-  signInWithGoogle,
-} from '@/lib/googleAuth';
-import {
-  AppleAccountExistsError,
-  getAppleAuthErrorMessage,
-  signInWithApple,
-} from '@/lib/appleAuth';
+  GUEST_UPGRADE_PATH,
+  guestLinkErrorMessage,
+  isExistingAccountError,
+  linkGuestAccountWith,
+} from '@/lib/guestLink';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
 import { HOME_CARD_SURFACE } from '@/components/ui/taskSurfaces';
@@ -316,34 +311,16 @@ export function usePlusPaywall({
     setLinking(provider);
     setLinkError(null);
     try {
-      if (provider === 'google') {
-        await signInWithGoogle({ linkTo: current });
-      } else {
-        await signInWithApple({ linkTo: current });
-      }
-      const user = auth?.currentUser;
-      if (!user) throw new Error('Authentication did not complete');
-      await user.getIdToken(true);
-      await establishSessionCookie(user);
-      await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      });
+      await linkGuestAccountWith(provider);
       trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'linked', provider });
       setNeedsAccount(false);
       void mutate(() => true);
       // Linking can change offer eligibility. Refresh before the user confirms.
       setPricingAttempt((attempt) => attempt + 1);
     } catch (err) {
-      if (
-        err instanceof GoogleAccountExistsError ||
-        err instanceof AppleAccountExistsError
-      ) {
+      if (isExistingAccountError(err)) {
         trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'existing_account', provider });
-        window.location.assign('/login?upgrade=1');
+        window.location.assign(GUEST_UPGRADE_PATH);
         return;
       }
       trackAnalyticsEvent('paywall_account_result', {
@@ -352,11 +329,7 @@ export function usePlusPaywall({
         provider,
         error_code: purchaseErrorCode(err),
       });
-      setLinkError(
-        provider === 'google'
-          ? getGoogleAuthErrorMessage(err)
-          : getAppleAuthErrorMessage(err),
-      );
+      setLinkError(guestLinkErrorMessage(provider, err));
     } finally {
       setLinking(null);
     }
@@ -449,7 +422,7 @@ export function usePlusPaywall({
 
   const continueWithEmail = () => {
     trackAnalyticsEvent('paywall_account_result', { ...paywallProps(), status: 'email' });
-    window.location.assign('/login?upgrade=1');
+    window.location.assign(GUEST_UPGRADE_PATH);
   };
 
   const selected = pricing?.[plan];
