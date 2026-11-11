@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR, { mutate as revalidateAll } from 'swr';
-import { Check, ChevronDown, Loader2, Play } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Loader2, Play } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
@@ -231,10 +231,10 @@ export function CurrencyShop() {
 function PlusFliesCard() {
   const openPremium = useUIStore((s) => s.setPremiumModalOpen);
   return (
-    <button type="button" onClick={() => openPremium(true, 'fly_shop_free_flies')} className="plus-upgrade-button plus-club group mb-1 mt-4 flex min-h-16 w-full items-center gap-3 rounded-[20px] py-3 pl-3 pr-3 text-left">
+    <button type="button" onClick={() => openPremium(true, 'fly_shop_free_flies')} className="plus-upgrade-button plus-club group mb-1 mt-4 flex min-h-[60px] w-full items-center gap-2.5 rounded-[18px] py-2 pl-2 pr-3 text-left">
       <Icon name="frogPlus" className="-my-2 h-14 w-14 shrink-0" />
-      <span className="min-w-0 flex-1"><span className="block text-sm font-black [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">Make each quest more rewarding</span><span className="plus-club-sub mt-0.5 block text-xs font-bold">Earn 2× flies from daily quests with Plus.</span></span>
-      <span className="plus-club-chip shrink-0 rounded-xl px-3 py-2 text-xs">Try Plus</span>
+      <span className="min-w-0 flex-1"><span className="block text-[15px] font-black leading-tight">Double every quest reward</span><span className="plus-club-sub mt-0.5 block text-xs font-bold">2× flies with Frogress Plus</span></span>
+      <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
     </button>
   );
 }

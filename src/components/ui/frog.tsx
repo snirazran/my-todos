@@ -134,6 +134,7 @@ const MOUTH_OPEN_MS = 230;
 const MOUTH_HOLD_END_MS = 1200;
 const MOUTH_CLIP_MS = 1470;
 const MOUTH_SYNC_MAX_DT_MS = 50;
+const MOUTH_FRAME_MS = 16;
 const MOUTH_PENDING_MAX_MS = 100;
 const MOUTH_OPEN_STATE = 'open_mouth';
 const MOUTH_CLOSED_STATE = 'close_mouth';
@@ -498,58 +499,75 @@ const Frog = memo(
     /* ---- mouth trigger: open on grab, explicit close when it ends ---- */
     const wasMouthOpenRef = useRef(false);
     const mouthClipRef = useRef({
-      startedAt: -Infinity,
-      skipped: 0,
+      active: false,
+      ran: 0,
+      skipFrame: false,
       syncedAt: 0,
       pendingSince: 0,
     });
     const stateChangeRef = useRef<(event: { data?: unknown }) => void>(() => {});
 
-    const markMouthStates = React.useCallback((states: unknown) => {
-      if (!Array.isArray(states)) return;
-      const clip = mouthClipRef.current;
-      if (states.indexOf(MOUTH_OPEN_STATE) >= 0) {
-        clip.startedAt = performance.now();
-        clip.skipped = 0;
-        clip.pendingSince = 0;
-      } else if (states.indexOf(MOUTH_CLOSED_STATE) >= 0 && !clip.pendingSince) {
-        clip.startedAt = -Infinity;
-      }
-    }, []);
+    const markMouthStates = React.useCallback(
+      (states: unknown, manual: boolean) => {
+        if (!Array.isArray(states)) return;
+        const clip = mouthClipRef.current;
+        if (states.indexOf(MOUTH_OPEN_STATE) >= 0) {
+          clip.active = true;
+          clip.ran = 0;
+          clip.skipFrame = !manual;
+          clip.pendingSince = 0;
+        } else if (states.indexOf(MOUTH_CLOSED_STATE) >= 0) {
+          clip.active = false;
+        }
+      },
+      [],
+    );
 
     useEffect(() => {
       if (!rive) return;
       const onMouthState = (event: { data?: unknown }) =>
-        markMouthStates(event.data);
+        markMouthStates(event.data, false);
+      const onAdvance = (event: { data?: unknown }) => {
+        const clip = mouthClipRef.current;
+        if (!clip.active) return;
+        if (clip.skipFrame) {
+          clip.skipFrame = false;
+          return;
+        }
+        if (typeof event.data === 'number') clip.ran += event.data * 1000;
+      };
       rive.on(EventType.StateChange, onMouthState);
-      return () => rive.off(EventType.StateChange, onMouthState);
+      rive.on(EventType.Advance, onAdvance);
+      return () => {
+        rive.off(EventType.StateChange, onMouthState);
+        rive.off(EventType.Advance, onAdvance);
+      };
     }, [rive, markMouthStates]);
 
     const mouthClipAt = React.useCallback((now: number) => {
       const clip = mouthClipRef.current;
       if (clip.pendingSince) {
         if (now - clip.pendingSince < MOUTH_PENDING_MAX_MS) return -1;
-        clip.startedAt = clip.pendingSince;
-        clip.skipped = 0;
         clip.pendingSince = 0;
       }
-      return now - clip.startedAt + clip.skipped;
+      return clip.active ? clip.ran : Infinity;
     }, []);
 
     const skipMouthClip = React.useCallback(
       (ms: number) => {
-        if (ms <= 0 || !rive?.isPlaying) return;
+        if (ms < 0 || !rive?.isPlaying) return;
         const machine = (
           rive as unknown as { animator?: { stateMachines?: MouthMachine[] } }
         ).animator?.stateMachines?.[0];
         if (!machine?.advanceAndApply) return;
         try {
+          const clip = mouthClipRef.current;
           machine.advanceAndApply(ms / 1000);
-          mouthClipRef.current.skipped += ms;
+          if (clip.active) clip.ran += ms;
           const changed = machine.statesChanged;
           if (changed && changed.length) {
             stateChangeRef.current({ data: changed });
-            markMouthStates(changed);
+            markMouthStates(changed, true);
           }
         } catch {
           // ignore
@@ -567,6 +585,7 @@ const Frog = memo(
       triggerOpenMouth();
       triggerOpenMouthSnake();
       mouthTrigger?.fire();
+      skipMouthClip(0);
     }, [
       mouthClipAt,
       mouthTrigger,
@@ -579,7 +598,8 @@ const Frog = memo(
       (to: number, ms: number) => {
         const clip = mouthClipRef.current;
         const now = performance.now();
-        const dt = Math.min(MOUTH_SYNC_MAX_DT_MS, now - clip.syncedAt);
+        const gap = now - clip.syncedAt;
+        const dt = gap > MOUTH_SYNC_MAX_DT_MS ? MOUTH_FRAME_MS : gap;
         clip.syncedAt = now;
         const at = mouthClipAt(now);
         if (at < 0 || at >= to) return;

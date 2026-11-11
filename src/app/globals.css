@@ -2108,21 +2108,23 @@ body.dragging {
   .plus-upgrade-button { transition: none; }
 }
 
-.plus-club,
-.plus-club-card {
-  --plus-button-base: #3b1a86;
-  background-color: #6a3bd6;
-  background-image: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.34) 0 1.5px,
-    rgba(255, 255, 255, 0.08) 1.5px 50%,
-    transparent 50%
-  );
+.plus-club {
+  --plus-button-base: #c9971f;
+  background-color: #6336d0;
+  background-image: linear-gradient(180deg, #7647e4 0%, #5529ba 100%);
   color: #fff;
 }
 
-.plus-club-card {
-  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0 1.5px, transparent 1.5px);
+.plus-club.plus-upgrade-button:not(:disabled) {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000), 0 4px 0 var(--plus-button-base),
+    inset 0 1.5px 0 rgba(245, 200, 76, 0.9);
+}
+
+.plus-club.plus-upgrade-button:not(:disabled):active {
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000), 0 1px 0 var(--plus-button-base),
+    inset 0 1.5px 0 rgba(245, 200, 76, 0.9);
 }
 
 .plus-club:focus-visible,
@@ -2131,16 +2133,12 @@ body.dragging {
   outline-offset: 3px;
 }
 
-.plus-club-card {
-  box-shadow: 0 5px 0 0 #3b1a86, inset 0 1px 0 rgba(255, 255, 255, 0.28);
-}
-
 .plus-club:hover:not(:disabled) {
-  background-color: #7244e0;
+  background-image: linear-gradient(180deg, #8153ec 0%, #5c2fc4 100%);
 }
 
 .plus-club-sub {
-  color: #ece4ff;
+  color: #e6dcff;
 }
 
 .plus-club-chip {
@@ -2149,13 +2147,12 @@ body.dragging {
   background-color: #f5c84c;
   color: #3a2700;
   font-weight: 900;
-  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 0 50%, transparent 50%);
   box-shadow: 0 2px 0 #b98a17, inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
-.dark .plus-club,
-.dark .plus-club-card {
-  background-color: #5a30c0;
+.dark .plus-club {
+  --plus-button-base: #a87a0e;
+  background-image: linear-gradient(180deg, #6a3dd6 0%, #4a22a6 100%);
 }
 
 .plus-club-soft {
@@ -3954,10 +3951,3 @@ body.dragging {
   --shop-awning-a: #f6e9d6;
   --shop-awning-b: #d9958b;
 }
-
-
-.plus-try-a { --plus-button-base: #36167a; background-color: #6a3bd6; background-image: linear-gradient(180deg, #7d4dea 0%, #5a2dc4 100%); color: #fff; box-shadow: 0 4px 0 #36167a, inset 0 1.5px 0 rgba(255,255,255,0.32) !important; }
-.plus-try-b { --plus-button-base: #c9971f; background-color: #5f31cb; background-image: linear-gradient(180deg, #7446e2 0%, #5327b8 100%); color: #fff; box-shadow: 0 4px 0 #c9971f, inset 0 1.5px 0 rgba(245,200,76,0.9) !important; }
-.plus-try-c { --plus-button-base: #cdb8f8; background-color: #f3ecff; background-image: none; color: #3b1a86; box-shadow: 0 4px 0 #cdb8f8, inset 0 0 0 2px #dfd0fc !important; }
-.plus-try-c .plus-club-sub { color: #6a4fb0; }
-.plus-try-chip { display: inline-flex; align-items: center; background-color: #f5c84c; color: #3a2700; font-weight: 900; box-shadow: 0 3px 0 #a87a0e, inset 0 1.5px 0 rgba(255,255,255,0.5); }

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PlusPreviewIntro } from '@/components/ui/PlusPreview';
 import { PlusMembershipSheet } from '@/components/ui/PlusMembershipSheet';
@@ -78,48 +79,21 @@ export default function PlusPreview() {
       <button id="dev-open-active" onClick={() => openMembership('active')}>Membership: member</button>
       <button id="dev-open-preview" onClick={() => openMembership('preview')}>Membership: preview</button>
       <button id="dev-open-welcome" onClick={() => setWelcome(mockStatus('trial'))}>Welcome</button>
-      <div id="dev-variants" className="flex w-full max-w-sm flex-col gap-5 rounded-3xl bg-white p-4">
-        {(['a', 'b', 'c'] as const).map((v) => (
-          <div key={v} className="flex flex-col gap-4">
-            <span className="text-xs font-bold text-slate-500">{v.toUpperCase()}</span>
-            <button type="button" className={`plus-upgrade-button plus-try-${v} group relative isolate flex w-full items-center gap-3 rounded-[20px] py-3 pl-2.5 pr-3 text-left`}>
-              <span className="-my-3 shrink-0"><Icon name="frogPlus" className="h-[58px] w-[58px]" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[16px] font-black leading-tight tracking-tight">Frogress Plus</span>
-                <span className="plus-club-sub mt-1 block text-[12.5px] font-bold leading-snug">2× rewards and every Special item</span>
-              </span>
-              <span aria-hidden className="plus-try-chip shrink-0 rounded-xl px-3 py-2 text-[13px]">Try Plus</span>
-            </button>
-            <button type="button" className={`plus-upgrade-button plus-try-${v} relative flex h-12 items-center self-start rounded-[16px] pl-[3.4rem] pr-5 text-left`}>
-              <Icon name="frogPlus" className="pointer-events-none absolute -left-1 -top-5 h-14 w-14" />
-              <span>
-                <span className="block text-[15px] font-black leading-tight">Unlock Plus</span>
-                <span className="plus-club-sub mt-0.5 block text-[11px] font-bold leading-tight">Extra reward every tier</span>
-              </span>
-            </button>
-          </div>
-        ))}
-      </div>
       <div id="dev-buttons" className="flex w-full max-w-sm flex-col gap-5 pt-6">
         <button
           type="button"
-          className="plus-upgrade-button plus-club group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-[20px] py-3 pl-2.5 pr-3 text-left"
+          className="plus-upgrade-button plus-club group relative isolate flex min-h-[60px] w-full items-center gap-2.5 rounded-[18px] py-2 pl-2 pr-3 text-left"
         >
           <span className="-my-3 shrink-0">
             <Icon name="frogPlus" className="h-[58px] w-[58px]" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-1.5 text-[16px] font-black leading-tight tracking-tight">
-              Frogress
-              <span className="plus-club-chip rounded-full px-1.5 py-[2px] text-[10px] tracking-wide">PLUS</span>
-            </span>
-            <span className="plus-club-sub mt-1 block text-[12.5px] font-bold leading-snug">
-              <span className="plus-club-accent">2×</span> rewards and every Special item
+            <span className="block text-[16px] font-black leading-tight tracking-tight">Try Frogress Plus</span>
+            <span className="plus-club-sub mt-0.5 block text-[12.5px] font-bold leading-snug">
+              <span className="text-[#f5c84c]">2×</span> rewards, every Special item
             </span>
           </span>
-          <span aria-hidden className="plus-club-chip shrink-0 rounded-xl px-3 py-2 text-[13px]">
-            Try Plus
-          </span>
+          <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
         </button>
         <LeapPlusButton title="Unlock Plus" subtitle="Extra reward every tier" onClick={() => {}} />
         <button

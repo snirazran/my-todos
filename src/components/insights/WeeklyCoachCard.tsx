@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Sparkles, Target } from 'lucide-react';
+import { ChevronRight, Loader2, Sparkles, Target } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
@@ -205,21 +205,19 @@ function LockedPreview({
         onClick={onUpgrade}
         aria-label="Unlock Frogress Plus"
         className={cn(
-          'plus-upgrade-button plus-club group relative isolate mx-auto mt-5 flex w-full max-w-md items-center gap-2 rounded-[20px] py-3 pl-2 pr-3 text-left',
+          'plus-upgrade-button plus-club group relative isolate mx-auto mt-5 flex min-h-[60px] w-full max-w-md items-center gap-2 rounded-[18px] py-2 pl-2 pr-3 text-left',
         )}
       >
         <Icon name="frogPlus" className="-my-4 h-[72px] w-[72px] shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-black tracking-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
+          <span className="block text-[15px] font-black leading-tight tracking-tight">
             Unlock your weekly read
           </span>
           <span className="plus-club-sub block text-[11px] font-bold">
             A new one every week, from your own numbers
           </span>
         </span>
-        <span className="plus-club-chip shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] leading-none">
-          Try Plus
-        </span>
+        <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
       </button>
     </div>
   );

@@ -131,13 +131,13 @@ function WelcomeContent({
   );
   const trial = useMemo(() => trialInfo(status), [status]);
   useAutoPopupHold('plus-welcome', true);
-  const frogName = me?.frogName?.trim() || 'Your frog';
+  const frogName = me?.frogName?.trim() || '';
   const inShop = pathname === '/shop';
   const unlocked = [
     '2× flies from every quest and habit',
     '2 prizes in every gift',
     `${SHOP_ITEMS} Special items in today’s shop`,
-    `A golden fly for ${frogName}`,
+    frogName ? `A golden fly for ${frogName}` : 'A golden fly companion',
   ];
 
   useEffect(() => {
@@ -174,7 +174,7 @@ function WelcomeContent({
             id="plus-welcome-title"
             className="text-balance text-[27px] font-black leading-[1.08] tracking-tight short:text-[24px]"
           >
-            {frogName} is in the club!
+            {frogName ? `${frogName} is in the club!` : 'You’re in the club!'}
           </h2>
           <p className="mx-auto mt-2.5 max-w-[19rem] text-pretty text-[14.5px] font-semibold leading-snug text-muted-foreground">
             {trial

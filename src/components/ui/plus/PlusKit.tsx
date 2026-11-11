@@ -212,7 +212,7 @@ export function PlusStage({
           )}
         />
       </div>
-      <div className="relative -mb-0.5" style={{ width, height }}>
+      <div className="relative" style={{ width, height, marginBottom: -(1 + Math.round(height * 0.045)) }}>
         {entered ? (
           <Frog
             width={width}

@@ -1581,23 +1581,20 @@ function MainView({
           type="button"
           onClick={onOpenPlus}
           aria-label="Unlock Frogress Plus"
-          className="plus-upgrade-button plus-club group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-[20px] py-3 pl-2.5 pr-3 text-left focus-visible:outline-none"
+          className="plus-upgrade-button plus-club group relative isolate flex min-h-[60px] w-full items-center gap-2.5 rounded-[18px] py-2 pl-2 pr-3 text-left focus-visible:outline-none"
         >
           <span className="-my-3 shrink-0 transition-transform duration-200 ease-out group-hover:-rotate-6 group-hover:scale-105">
             <Icon name="frogPlus" className="h-[58px] w-[58px]" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-1.5 text-[16px] font-black leading-tight tracking-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
-              Frogress
-              <span className="plus-club-chip rounded-full px-1.5 py-[2px] text-[10px] tracking-wide [text-shadow:none]">PLUS</span>
+            <span className="block text-[16px] font-black leading-tight tracking-tight">
+              Try Frogress Plus
             </span>
-            <span className="plus-club-sub mt-1 block text-[12.5px] font-bold leading-snug">
-              <span className="text-[#f5c84c]">2×</span> rewards and every Special item
+            <span className="plus-club-sub mt-0.5 block text-[12.5px] font-bold leading-snug">
+              <span className="text-[#f5c84c]">2×</span> rewards, every Special item
             </span>
           </span>
-          <span aria-hidden className="plus-club-chip shrink-0 rounded-xl px-3 py-2 text-[13px] transition-transform duration-150 ease-out group-active:translate-y-0.5 narrow:hidden">
-            Try Plus
-          </span>
+          <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
         </button>
       )}
 

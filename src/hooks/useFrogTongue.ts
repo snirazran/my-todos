@@ -48,8 +48,9 @@ const COMBO_MAX = 7;
 const QUEUE_SPEED = 1.45;
 const FLINCH_AT = 0.4;
 const BULGE_TAIL_MS = 70;
-const MOUTH_OPEN_LEAD_MS = 40;
-const MOUTH_CLOSE_LEAD_MS = 70;
+const MOUTH_OPEN_LEAD_MS = 50;
+const MIN_LAUNCH_LEAD_MS = 70;
+const MOUTH_CLOSE_LEAD_MS = 30;
 const BITS_COLORS = ['#fb7185', '#86efac', '#fde68a', '#7dd3fc'];
 const GOLDEN_CHANCE = 0.05;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -623,6 +624,7 @@ export function useFrogTongue({
 
     let raf = 0;
     let frame = 0;
+    let startAt = grab.startAt;
     timeOffsetRef.current = 0;
     lastTickRef.current = 0;
 
@@ -636,7 +638,8 @@ export function useFrogTongue({
       lastTickRef.current = realNow;
       const now = realNow + timeOffsetRef.current;
 
-      const tRaw = (now - grab.startAt) / grab.duration;
+      if (frame === 1) startAt = Math.max(startAt, now + MIN_LAUNCH_LEAD_MS);
+      const tRaw = (now - startAt) / grab.duration;
       const t = Math.max(0, Math.min(1, tRaw));
 
       const run = runRef.current!;
