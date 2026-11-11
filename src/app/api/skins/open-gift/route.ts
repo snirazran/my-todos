@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
@@ -163,17 +162,6 @@ export async function POST(req: NextRequest) {
       inc['plusEarned.rareItems'] = 1;
     }
 
-    let doubleClaimId: string | undefined;
-    if (!premium) {
-      doubleClaimId = randomUUID();
-      set['giftDoubleClaim'] = {
-        id: doubleClaimId,
-        giftBoxId,
-        doubled: false,
-        createdAt: new Date(),
-      };
-    }
-
     await UserModel.updateOne({ _id: user._id }, { $inc: inc, $set: set });
 
     // A slot held by something they now own is a slot they can't use.
@@ -193,7 +181,6 @@ export async function POST(req: NextRequest) {
       prizeMeta: revealMeta(roll, revealed[0].owned),
       bonusPrize: bonus?.roll.prize ?? null,
       bonusPrizeMeta: bonus ? revealMeta(bonus.roll, bonus.owned) : null,
-      doubleClaimId,
     });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

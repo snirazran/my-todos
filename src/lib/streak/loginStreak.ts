@@ -25,7 +25,6 @@ import type { ShieldConfigView, ShieldOffer, ShieldState } from '@/lib/shields/t
 import { previousDayKey } from '@/lib/quests/streak';
 import { isPremiumUser } from '@/lib/quests/engine';
 import { plusFlyBonus, recordPlusEarned } from '@/lib/plus/earned';
-import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
 import { findTaskStreaksAtRisk } from './taskStreaks';
@@ -592,8 +591,6 @@ async function applyStreakRewardGrants(args: {
     ? grantShields(args.shieldState, shieldConfig, isPremium, payableShields)
     : args.shieldState;
 
-  // Plus took its double above; a free player takes the same one from an ad.
-  recordDoubleableClaim(user, summary);
   await recordPlusEarned(user._id, {
     flies: plusFlyBonus(summary.fliesGranted, multiplier),
   });

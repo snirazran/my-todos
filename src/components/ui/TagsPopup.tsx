@@ -271,7 +271,7 @@ function FocusTagLimitDialog({
                 className="-my-8 -ml-1 h-[72px] w-[72px]"
               />
               <span className="text-sm font-black [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
-                Connect more with
+                More tags with
               </span>
               <span className="plus-club-chip rounded-lg px-2.5 py-1.5 text-[13px] leading-none">
                 Plus

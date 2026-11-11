@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { create } from 'zustand';
-import { mutate } from 'swr';
+import useSWR, { mutate } from 'swr';
 import confetti from 'canvas-confetti';
-import { Bell, Check, Sparkle } from 'lucide-react';
-import Frog from '@/components/ui/frog';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
-import { Icon } from '@/components/ui/Icon';
+import { Bell, Check } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { PlusGoldButton, PlusStage } from '@/components/ui/plus/PlusKit';
+import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { hapticCelebrate } from '@/lib/haptics';
-import { BENEFITS } from '@/lib/plusBenefits';
 import { useAutoPopupHold, whenScreenIsFree } from '@/lib/popupGate';
 import {
   PLUS_STATUS_KEY,
@@ -22,10 +23,11 @@ import {
   prefetchPlusStatus,
   type PlusStatus,
 } from '@/lib/plusStatus';
-import { cn } from '@/lib/utils';
+import { DEFAULT_SHOP_SALES } from '@/lib/skins/shopSales';
 
 const DAY_MS = 86_400_000;
 const REMINDER_LEAD_DAYS = 2;
+const SHOP_ITEMS = DEFAULT_SHOP_SALES.freeSlots + DEFAULT_SHOP_SALES.plusSlots;
 
 const usePlusWelcomeStore = create<{
   open: boolean;
@@ -71,6 +73,7 @@ function trialInfo(status: PlusStatus | null | undefined) {
     days: Math.max(1, Math.round((end - start) / DAY_MS)),
     endsOn: formatPlusDate(sub.expiresAt),
     remindOn: formatPlusDate(new Date(end - REMINDER_LEAD_DAYS * DAY_MS).toISOString()),
+    canRemind: end - Date.now() > REMINDER_LEAD_DAYS * DAY_MS,
   };
 }
 
@@ -90,7 +93,7 @@ export function PlusWelcomeCelebration({
       zIndex={10010}
       hideHandle
       showClose={false}
-      className="border-0 sm:max-w-[400px]"
+      className="plus-paywall border-0 bg-background text-foreground sm:max-w-[420px]"
     >
       {({ entered, bindScroll }) => (
         <WelcomeContent
@@ -116,10 +119,26 @@ function WelcomeContent({
   onDone: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user } = useAuth();
   const { indices } = useWardrobeIndices(true);
+  const notifications = useNotificationStatus();
+  const { data: me } = useSWR<{ frogName?: string | null }>(
+    user ? '/api/user' : null,
+    bootstrapFetcher,
+    { revalidateOnFocus: false },
+  );
   const trial = useMemo(() => trialInfo(status), [status]);
-  const [landed, setLanded] = useState(false);
   useAutoPopupHold('plus-welcome', true);
+  const frogName = me?.frogName?.trim() || 'Your frog';
+  const inShop = pathname === '/shop';
+  const unlocked = [
+    '2× flies from every quest and habit',
+    '2 prizes in every gift',
+    `${SHOP_ITEMS} Special items in today’s shop`,
+    `A golden fly for ${frogName}`,
+  ];
 
   useEffect(() => {
     if (!entered) return;
@@ -131,156 +150,87 @@ function WelcomeContent({
       startVelocity: 38,
       origin: { y: 0.3 },
       zIndex: 10020,
-      colors: ['#fbbf24', '#fde68a', '#4ade80', '#ffffff'],
+      colors: ['#f5c84c', '#fde68a', '#a78bfa', '#ffffff'],
       disableForReducedMotion: true,
     });
   }, [entered, reduceMotion]);
 
+  const finish = (action: 'shop' | 'done' | 'later') => {
+    trackAnalyticsEvent('plus_welcome_step', { action, status: trial ? 'trial' : 'paid' });
+    onDone();
+    if (action === 'shop') router.push('/shop');
+  };
+
   return (
-    <div className="flex max-h-[92dvh] flex-col sm:max-h-[calc(100dvh-3rem)]">
+    <div className="flex max-h-[94dvh] flex-col sm:max-h-[calc(100dvh-3rem)]">
       <div
         ref={bindScroll}
         className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
       >
-        <div className="relative z-10 flex h-[196px] shrink-0 items-end justify-center short-screen:h-[164px]">
-          <div aria-hidden className="absolute inset-0 overflow-hidden">
-            <span className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_0%,#2f7d50_0%,#1d5a3f_45%,#123a2a_100%)]" />
-            <span className="absolute left-1/2 top-[62%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 opacity-50 [mask-image:radial-gradient(circle,black_20%,transparent_62%)]">
-              <span className="block h-full w-full will-change-transform motion-safe:animate-[spin_24s_linear_infinite] [background:repeating-conic-gradient(from_0deg,rgba(251,191,36,0.22)_0deg_8deg,transparent_8deg_24deg)]" />
-            </span>
-            <motion.span
-              className="absolute bottom-0 left-1/2 h-56 w-56 rounded-full bg-[radial-gradient(closest-side,rgba(251,191,36,0.45),transparent)]"
-              style={{ x: '-50%', y: '33%' }}
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={entered ? { opacity: 1, scale: 1 } : undefined}
-              transition={{ type: 'spring', stiffness: 140, damping: 16 }}
-            />
-          </div>
-          <div className="relative -mb-0.5" style={{ width: 170, height: 180 }}>
-            {entered && (
-              <Frog
-                width={170}
-                height={180}
-                indices={indices}
-                greet="tada"
-                arrive="hop"
-                onArrived={() => setLanded(true)}
-              />
-            )}
-            {landed && <PremiumFrogAura show compact alwaysPlay />}
-          </div>
-        </div>
+        <PlusStage look={indices} greet="tada" />
 
-        <div className="relative px-6 pb-4 pt-4 text-center">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-amber-600 dark:text-amber-400">
-            Frogress Plus
-          </p>
+        <div className="px-5 pb-4 pt-6 text-center short:pt-5">
           <h2
             id="plus-welcome-title"
-            className="mt-1 text-[30px] font-black leading-none tracking-tight short-screen:text-[26px]"
+            className="text-balance text-[27px] font-black leading-[1.08] tracking-tight short:text-[24px]"
           >
-            You’re in!
+            {frogName} is in the club!
           </h2>
-          <p className="mx-auto mt-2 max-w-[18rem] text-[14px] font-semibold leading-snug text-muted-foreground">
+          <p className="mx-auto mt-2.5 max-w-[19rem] text-pretty text-[14.5px] font-semibold leading-snug text-muted-foreground">
             {trial
-              ? `Your ${trial.days}-day free trial is on. Everything in Plus is yours, free until ${trial.endsOn}.`
-              : 'Every perk is unlocked. Thanks for backing Frogress.'}
+              ? `Your ${trial.days}-day free trial is on. Nothing is charged before ${trial.endsOn}.`
+              : 'Every perk is unlocked. Thank you for backing Frogress.'}
           </p>
-          {trial && (
-            <ol className="mt-4 grid grid-cols-3 gap-2 text-left">
-              {[
-                {
-                  icon: <Sparkle className="h-3.5 w-3.5" fill="currentColor" />,
-                  when: 'Today',
-                  what: 'All unlocked',
-                  done: true,
-                },
-                {
-                  icon: <Bell className="h-3.5 w-3.5" strokeWidth={2.75} />,
-                  when: trial.remindOn,
-                  what: 'We remind you',
-                  done: false,
-                },
-                {
-                  icon: <Icon name="frogPlus" className="h-4 w-4" />,
-                  when: trial.endsOn,
-                  what: 'Plan starts',
-                  done: false,
-                },
-              ].map((step) => (
-                <li
-                  key={step.what}
-                  className={cn(
-                    'rounded-2xl px-2.5 py-2 ring-1 ring-inset',
-                    step.done
-                      ? 'bg-emerald-500/10 ring-emerald-500/25'
-                      : 'bg-muted/50 ring-border/60',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex h-6 w-6 items-center justify-center rounded-full',
-                      step.done
-                        ? 'bg-emerald-700 text-white'
-                        : 'bg-card text-amber-600 ring-1 ring-border dark:text-amber-400',
-                    )}
-                  >
-                    {step.done ? <Check className="h-3.5 w-3.5" strokeWidth={3.5} /> : step.icon}
-                  </span>
-                  <span className="mt-1.5 block truncate text-[12px] font-black leading-tight">
-                    {step.when}
-                  </span>
-                  <span className="block truncate text-[11px] font-semibold text-muted-foreground">
-                    {step.what}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          <ul className="mt-4 space-y-2 text-left">
-            {BENEFITS.map((benefit, i) => (
-              <motion.li
-                key={benefit.title}
-                className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/30 px-3 py-2.5"
-                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-                animate={entered ? { opacity: 1, y: 0 } : undefined}
-                transition={{ type: 'spring', stiffness: 320, damping: 26, delay: 0.1 + i * 0.1 }}
+          {trial?.canRemind ? (
+            notifications.isEnabled ? (
+              <p className="mt-2.5 inline-flex items-center gap-1.5 text-[13.5px] font-black text-primary">
+                <Bell className="h-4 w-4" strokeWidth={2.75} aria-hidden />
+                We’ll remind you on {trial.remindOn}
+              </p>
+            ) : notifications.canEnable ? (
+              <button
+                type="button"
+                onClick={() => void notifications.enableOrConfigure()}
+                className="mt-2.5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/10 px-3.5 text-[13.5px] font-black text-primary transition-[background-color,transform] hover:bg-white/15 active:scale-95"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/15">
-                  <Icon name={benefit.icon} className="h-6 w-6" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-black leading-tight">
-                    {benefit.title}
-                  </span>
-                  <span className="block text-[11.5px] font-semibold leading-snug text-muted-foreground">
-                    {benefit.body}
-                  </span>
-                </span>
+                <Bell className="h-4 w-4" strokeWidth={2.75} aria-hidden />
+                Remind me before the trial ends
+              </button>
+            ) : null
+          ) : null}
+
+          <ul className="mt-4 divide-y divide-white/10 rounded-[22px] bg-card px-4 text-left shadow-[0_4px_0_0_rgba(26,8,56,0.35)]">
+            {unlocked.map((line, i) => (
+              <li key={line} className="flex items-center gap-3 py-[11px] short:py-[9px]">
                 <motion.span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--plus-cta)] text-[var(--plus-cta-ink)]"
                   initial={reduceMotion ? false : { scale: 0 }}
                   animate={entered ? { scale: 1 } : undefined}
-                  transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.35 + i * 0.12 }}
+                  transition={{ type: 'spring', stiffness: 520, damping: 16, delay: 0.5 + i * 0.16 }}
                 >
-                  <Check className="h-3 w-3" strokeWidth={4} />
+                  <Check className="h-3.5 w-3.5" strokeWidth={3.5} aria-hidden />
                 </motion.span>
-              </motion.li>
+                <span className="min-w-0 text-[14.5px] font-bold leading-tight">{line}</span>
+              </li>
             ))}
           </ul>
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border/50 bg-card px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:pb-5">
-        <button
-          type="button"
-          onClick={onDone}
-          className="flex h-14 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#fcd34d_0%,#f59e0b_100%)] text-[17px] font-black tracking-tight text-[#3b2708] shadow-[0_4px_0_0_#b45309] ring-1 ring-inset ring-amber-100/60 transition-all active:translate-y-1 active:shadow-none [@media(hover:hover)]:hover:brightness-105"
-        >
-          Let’s hop in
-        </button>
-        <p className="mt-2 text-center text-[11.5px] font-semibold text-muted-foreground">
+      <div className="plus-dock shrink-0 px-5 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3.5">
+        <PlusGoldButton onClick={() => finish(inShop ? 'done' : 'shop')}>
+          {inShop ? 'Let’s go' : 'See today’s Plus shop'}
+        </PlusGoldButton>
+        {inShop ? null : (
+          <button
+            type="button"
+            onClick={() => finish('later')}
+            className="mt-1.5 min-h-10 w-full rounded-xl text-[13.5px] font-black text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+          >
+            Later
+          </button>
+        )}
+        <p className="mt-1 text-center text-[11.5px] font-semibold text-muted-foreground">
           Manage or cancel anytime in Settings → Frogress Plus.
         </p>
       </div>

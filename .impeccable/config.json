@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-11-08T17:36:32.969Z",
         "reason": "Claude: .plus-stage-cover/.plus-stage-arc deliberately draw a gold curved line by putting a border on an elliptical bottom radius; the curve is the intended design"
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "src/components/ui/skins/TradePanel.tsx"
+        ],
+        "createdAt": "2026-11-11T17:18:25.369Z",
+        "reason": "agent triage: line 97 is the epic tier in a per-rarity tint map (slate/emerald/sky/violet/amber); violet is the app's existing rarity color, not a decorative palette choice, and predates this session"
       }
     ]
   }

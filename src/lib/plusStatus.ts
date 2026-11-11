@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { Capacitor } from '@capacitor/core';
+import type { PlusPreviewState } from '@/lib/plus/preview';
 
 export type PlusStore = 'app_store' | 'play_store' | 'web' | 'unknown';
 
@@ -21,6 +22,7 @@ export type PlusStatus = {
     productId: string | null;
   } | null;
   earned?: { flies: number; rareItems: number };
+  preview?: PlusPreviewState;
 };
 
 export type PlusPhase =
@@ -30,6 +32,7 @@ export type PlusPhase =
   | 'cancelled'
   | 'billing_issue'
   | 'gift'
+  | 'preview'
   | 'inactive';
 
 export const PLUS_STATUS_KEY = '/api/plus/status';
@@ -56,7 +59,9 @@ export function prefetchPlusStatus() {
 export function plusPhase(status: PlusStatus | undefined): PlusPhase {
   if (!status?.isPremium) return 'inactive';
   const sub = status.subscription;
-  if (status.source === 'gift' || !sub) return 'gift';
+  if (status.source === 'gift' || !sub) {
+    return status.preview?.phase === 'active' ? 'preview' : 'gift';
+  }
   if (sub.billingIssue) return 'billing_issue';
   if (sub.periodType === 'trial') return sub.willRenew ? 'trial' : 'trial_cancelled';
   return sub.willRenew ? 'active' : 'cancelled';
@@ -69,7 +74,7 @@ export function daysUntil(iso: string | null | undefined) {
 
 export function formatPlusDate(iso: string | null | undefined, withYear = false) {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     ...(withYear ? { year: 'numeric' } : {}),

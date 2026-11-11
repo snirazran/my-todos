@@ -15,7 +15,6 @@ import QuestStreakConfigModel, {
   type SweepRollEntry,
 } from '@/lib/models/QuestStreakConfig';
 import { getZonedToday } from '@/lib/utils';
-import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { applyBonusRewards } from '@/lib/leap/rewards';
 import type { BonusReward } from '@/lib/leap/types';
 import {
@@ -422,8 +421,6 @@ export async function claimSweepRoll(args: {
       table: config.standardRoll,
     },
   };
-  recordDoubleableClaim(user, summary);
-
   const currentQuests =
     typeof (user as any).quests === 'object' && (user as any).quests
       ? (user as any).quests

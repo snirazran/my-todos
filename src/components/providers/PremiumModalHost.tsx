@@ -4,6 +4,7 @@ import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PlusWelcomeHost } from '@/components/ui/PlusWelcome';
 import { PlusEndingHost } from '@/components/ui/PlusEndingSheet';
 import { GuestSaveHost } from '@/components/ui/GuestSaveSheet';
+import { PlusPreviewHost } from '@/components/ui/PlusPreview';
 import { useUIStore } from '@/lib/uiStore';
 
 /**
@@ -28,6 +29,7 @@ export function PremiumModalHost() {
       />
       <PlusWelcomeHost />
       <PlusEndingHost />
+      <PlusPreviewHost />
       <GuestSaveHost />
     </>
   );

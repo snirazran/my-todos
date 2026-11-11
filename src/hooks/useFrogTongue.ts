@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FrogHandle } from '@/components/ui/frog';
+import { FROG_ARTBOARD, type FrogHandle } from '@/components/ui/frog';
 import {
   hapticCelebrate,
   hapticImpact,
@@ -18,7 +18,9 @@ import {
 } from '@/lib/catchSounds';
 import {
   TONGUE_EDGE,
+  TONGUE_EDGE_WIDTH,
   TONGUE_GLOSS,
+  TONGUE_ROOT_SHADE,
   TONGUE_WIDTH,
   aimControl,
   bowSideFor,
@@ -34,11 +36,11 @@ import {
 
 export const TONGUE_MS = 1111;
 export const OFFSET_MS = 120;
-const CHAIN_OFFSET_MS = 50;
+const CHAIN_OFFSET_MS = 70;
 const PRE_LINGER_MS = 70;
 const FOLLOW_OFFSET_MS = 70;
 const FOLLOW_EXTEND_STRETCH = 1.5;
-const ORIGIN_Y_ADJ = -3;
+const ORIGIN_Y_ADJ = -2;
 export const TONGUE_STROKE = TONGUE_WIDTH;
 const COMBO_WINDOW_MS = 8000;
 const COMBO_SPEED = [1, 0.92, 0.86, 0.8];
@@ -46,10 +48,19 @@ const COMBO_MAX = 7;
 const QUEUE_SPEED = 1.45;
 const FLINCH_AT = 0.4;
 const BULGE_TAIL_MS = 70;
-const MOUTH_CLOSE_LEAD_MS = 130;
+const MOUTH_OPEN_LEAD_MS = 40;
+const MOUTH_CLOSE_LEAD_MS = 70;
 const BITS_COLORS = ['#fb7185', '#86efac', '#fde68a', '#7dd3fc'];
 const GOLDEN_CHANCE = 0.05;
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const ROOT_SHADE_UNITS = 6.8;
+const ROOT_SHADE_STOPS: [number, number][] = [
+  [0, 1],
+  [0.35, 1],
+  [0.7, 0.5],
+  [1, 0],
+];
+let rootShadeSeq = 0;
 
 const FOLLOW_EASE = (t: number) =>
   0.5 * extendEase(t) + 0.5 * t * t * (3 - 2 * t);
@@ -146,7 +157,6 @@ export function useFrogTongue({
     hidImpact: boolean;
     thwipDone: boolean;
     slurpDone: boolean;
-    mouthClosed: boolean;
     flinched: boolean;
     raf: number;
   } | null>(null);
@@ -355,7 +365,7 @@ export function useFrogTongue({
       : follow
         ? FOLLOW_OFFSET_MS
         : OFFSET_MS;
-    if (chained) frogRef.current?.openMouth?.();
+    frogRef.current?.openMouth?.();
     const startAt = performance.now() + offset;
 
     flyEl.style.visibility = 'visible';
@@ -475,7 +485,6 @@ export function useFrogTongue({
       hidImpact: false,
       thwipDone: false,
       slurpDone: false,
-      mouthClosed: false,
       flinched: false,
       raf: 0,
     };
@@ -483,11 +492,13 @@ export function useFrogTongue({
     const pathNode = tonguePathEl.current;
     const world = worldGroupEl.current;
     let glossNode: SVGPathElement | null = null;
+    let rootGrad: SVGRadialGradientElement | null = null;
+    let rootNode: SVGPathElement | null = null;
 
     if (pathNode) {
       pathNode.style.fill = pathNode.getAttribute('stroke') || '#f43f5e';
       pathNode.style.stroke = TONGUE_EDGE;
-      pathNode.style.strokeWidth = '1';
+      pathNode.style.strokeWidth = `${TONGUE_EDGE_WIDTH}`;
       pathNode.style.strokeLinejoin = 'round';
       pathNode.style.strokeDasharray = 'none';
       pathNode.setAttribute('d', '');
@@ -499,6 +510,34 @@ export function useFrogTongue({
       glossNode.setAttribute('stroke-linecap', 'round');
       glossNode.setAttribute('stroke-linejoin', 'round');
       pathNode.parentNode?.insertBefore(glossNode, pathNode.nextSibling);
+
+      const frogBox = frogRef.current?.getBoxRect();
+      const frogScale =
+        frogBox && frogBox.width > 0 && frogBox.height > 0
+          ? Math.min(
+              frogBox.width / FROG_ARTBOARD.width,
+              frogBox.height / FROG_ARTBOARD.height,
+            )
+          : 1.9;
+      const rootId = `tongue-root-shade-${++rootShadeSeq}`;
+      rootGrad = document.createElementNS(SVG_NS, 'radialGradient');
+      rootGrad.setAttribute('id', rootId);
+      rootGrad.setAttribute('gradientUnits', 'userSpaceOnUse');
+      rootGrad.setAttribute('r', `${ROOT_SHADE_UNITS * frogScale}`);
+      for (const [offset, opacity] of ROOT_SHADE_STOPS) {
+        const stop = document.createElementNS(SVG_NS, 'stop');
+        stop.setAttribute('offset', `${offset}`);
+        stop.setAttribute('stop-color', TONGUE_ROOT_SHADE);
+        stop.setAttribute('stop-opacity', `${opacity}`);
+        rootGrad.appendChild(stop);
+      }
+      rootNode = document.createElementNS(SVG_NS, 'path');
+      rootNode.setAttribute('fill', `url(#${rootId})`);
+      rootNode.setAttribute('stroke', `url(#${rootId})`);
+      rootNode.setAttribute('stroke-width', `${TONGUE_EDGE_WIDTH + 0.5}`);
+      rootNode.setAttribute('stroke-linejoin', 'round');
+      glossNode.parentNode?.insertBefore(rootGrad, glossNode.nextSibling);
+      rootGrad.parentNode?.insertBefore(rootNode, rootGrad.nextSibling);
     }
 
     const pulseFrog = (
@@ -681,13 +720,15 @@ export function useFrogTongue({
           )
         : 0;
 
-      if (
-        !run.mouthClosed &&
-        retractU > 0 &&
-        (1 - retractU) * retractMs <= MOUTH_CLOSE_LEAD_MS
-      ) {
-        run.mouthClosed = true;
-        frogRef.current?.closeMouth?.();
+      if (tRaw < 0) {
+        frogRef.current?.openMouthIn?.(
+          (-tRaw * grab.duration) / speedRef.current - MOUTH_OPEN_LEAD_MS,
+        );
+      } else {
+        frogRef.current?.closeMouthIn?.(
+          ((1 - Math.min(1, tRaw)) * grab.duration) / speedRef.current -
+            MOUTH_CLOSE_LEAD_MS,
+        );
       }
 
       /* ---------------------------------------------------------------
@@ -731,6 +772,11 @@ export function useFrogTongue({
       });
 
       if (pathNode) pathNode.setAttribute('d', shape.body);
+      if (rootGrad && rootNode) {
+        rootGrad.setAttribute('cx', `${p0Doc.x - (world ? 0 : offX)}`);
+        rootGrad.setAttribute('cy', `${p0Doc.y - (world ? 0 : offY)}`);
+        rootNode.setAttribute('d', shape.body);
+      }
       if (glossNode) {
         glossNode.setAttribute('d', shape.gloss);
         glossNode.setAttribute('stroke-width', `${shape.glossWidth}`);
@@ -845,6 +891,7 @@ export function useFrogTongue({
           pathNode.style.visibility = 'hidden';
         }
         glossNode?.setAttribute('d', '');
+        rootNode?.setAttribute('d', '');
 
         if (!grab.silent) {
           frogRef.current?.fireEmote(catchEmote(grab.combo, grab.golden));
@@ -921,6 +968,8 @@ export function useFrogTongue({
         pathNode.style.visibility = 'hidden';
       }
       glossNode?.remove();
+      rootNode?.remove();
+      rootGrad?.remove();
       if (fxGroupEl.current) {
         fxGroupEl.current.replaceChildren();
       }

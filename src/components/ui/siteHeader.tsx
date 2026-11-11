@@ -351,6 +351,8 @@ import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { CommunityPanel } from '@/components/ui/CommunityModal';
 import { ProfilePanel } from '@/components/ui/ProfileModal';
 import { PlusMembershipSheet } from '@/components/ui/PlusMembershipSheet';
+import { usePlusPreview } from '@/hooks/usePlusPreview';
+import { previewDaysLeft } from '@/lib/plus/preview';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useWidgetPinStore } from '@/lib/widget/pinStore';
 import { GiftBadge } from '@/components/ui/GiftBadge';
@@ -1484,6 +1486,9 @@ function MainView({
   flashSoon: (label: string) => void;
 }) {
   const [plusInfoOpen, setPlusInfoOpen] = useState(false);
+  const plusPreview = usePlusPreview();
+  const previewLeft =
+    plusPreview?.phase === 'active' ? previewDaysLeft(plusPreview.endsAt) : null;
   const [confirmGuestSignOut, setConfirmGuestSignOut] = useState(false);
   const { connections } = useCalendarConnections();
   const { aiConnections } = useAiConnections();
@@ -1587,7 +1592,7 @@ function MainView({
               <span className="plus-club-chip rounded-full px-1.5 py-[2px] text-[10px] tracking-wide [text-shadow:none]">PLUS</span>
             </span>
             <span className="plus-club-sub mt-1 block text-[12.5px] font-bold leading-snug">
-              New outfits <span className="text-[#f5c84c]">2×</span> faster, every Special item
+              <span className="text-[#f5c84c]">2×</span> rewards and every Special item
             </span>
           </span>
           <span aria-hidden className="plus-club-chip shrink-0 rounded-xl px-3 py-2 text-[13px] transition-transform duration-150 ease-out group-active:translate-y-0.5 narrow:hidden">
@@ -1646,7 +1651,15 @@ function MainView({
               </RowIcon>
             }
             label="Frogress Plus"
-            trailing={<MenuValue>Active</MenuValue>}
+            trailing={
+              <MenuValue>
+                {previewLeft === null
+                  ? 'Active'
+                  : previewLeft <= 1
+                    ? 'Preview · last day'
+                    : `Preview · ${previewLeft} days left`}
+              </MenuValue>
+            }
             onClick={() => setPlusInfoOpen(true)}
           />
         </MenuSection>

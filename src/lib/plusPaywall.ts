@@ -1,14 +1,16 @@
 import type { IconName } from '@/components/ui/Icon';
-import { SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
-import { PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
+import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
+import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { DEFAULT_SHOP_SALES } from '@/lib/skins/shopSales';
 
 export type PlusBenefit = { icon: IconName; title: string; body: string };
+export type PlusPerk = { label: string; free: string; plus: string };
 export type PaywallContext = {
   headline: string;
   accent: string;
   sub: string;
   benefits: PlusBenefit[];
+  perks: PlusPerk[];
 };
 
 export const TRIAL_REMINDER_LEAD_MS = 48 * 60 * 60 * 1000;
@@ -35,143 +37,161 @@ const COACH: PlusBenefit = {
   title: 'Know what keeps you going',
   body: 'A weekly coach read, with one thing to try.',
 };
-const DOUBLE: PlusBenefit = {
-  icon: 'x2',
-  title: 'New outfits 2× faster',
-  body: 'Double flies and two prizes in every gift.',
-};
 const SUPPORT: PlusBenefit = {
   icon: 'community',
   title: 'Support a small indie team',
   body: 'Help us keep making Frogress better.',
 };
-const SHOP: PlusBenefit = {
-  icon: 'wardrobe',
-  title: `Shop all ${DEFAULT_SHOP_SALES.freeSlots + DEFAULT_SHOP_SALES.plusSlots} Special items`,
-  body: `Plus a new ${DEFAULT_SHOP_SALES.saleDiscountPercent}% off pick every day.`,
-};
-const REWARDS: PlusBenefit = {
-  icon: 'x2',
-  title: '2× flies from daily quests',
-  body: 'Get to your next look sooner.',
-};
-const GIFTS: PlusBenefit = {
-  icon: 'store',
-  title: '2 prizes in every gift',
-  body: 'A bonus surprise every time you open one.',
-};
-const STREAK: PlusBenefit = {
-  icon: 'lilyPad',
-  title: 'A free Lily Pad every month',
-  body: 'Miss a day, keep your progress.',
-};
+
+const SHOP_TOTAL = DEFAULT_SHOP_SALES.freeSlots + DEFAULT_SHOP_SALES.plusSlots;
+export const INCLUDED = 'Included';
+export const NOT_INCLUDED = '—';
+
+export const PLUS_PERKS = {
+  flies: { label: 'Quest and habit flies', free: '1×', plus: '2×' },
+  gifts: { label: 'Prizes in every gift', free: '1', plus: '2' },
+  special: {
+    label: 'Special items a day',
+    free: String(DEFAULT_SHOP_SALES.freeSlots),
+    plus: String(SHOP_TOTAL),
+  },
+  sale: {
+    label: `Daily ${DEFAULT_SHOP_SALES.saleDiscountPercent}% off pick`,
+    free: NOT_INCLUDED,
+    plus: INCLUDED,
+  },
+  season: { label: 'Season Plus rewards', free: NOT_INCLUDED, plus: INCLUDED },
+  lilyPad: { label: 'Free Lily Pads a month', free: NOT_INCLUDED, plus: '1' },
+  league: { label: 'Prizes per new league', free: '1', plus: '2' },
+  coach: { label: 'Weekly coach read', free: NOT_INCLUDED, plus: INCLUDED },
+  looks: {
+    label: 'Saved looks',
+    free: String(SAVED_LOOKS_FREE),
+    plus: String(SAVED_LOOKS_PLUS),
+  },
+  wishlist: { label: 'Wishlist slots', free: '4', plus: '10' },
+  tags: {
+    label: 'Tags for your tasks',
+    free: String(FREE_TAG_LIMIT),
+    plus: String(PREMIUM_TAG_LIMIT),
+  },
+  tradeReroll: { label: 'Trade rerolls', free: 'Ad', plus: 'Free' },
+  shopRefresh: {
+    label: 'Shop refreshes a day',
+    free: `${DEFAULT_SHOP_SALES.adRerolls} ad`,
+    plus: String(DEFAULT_SHOP_SALES.plusRefreshes),
+  },
+} satisfies Record<string, PlusPerk>;
+
+type PerkId = keyof typeof PLUS_PERKS;
+const CORE: PerkId[] = ['flies', 'gifts', 'special', 'season'];
+
+function perksLed(...lead: PerkId[]): PlusPerk[] {
+  const ids = [...lead, ...CORE.filter((id) => lead.indexOf(id) < 0)].slice(0, 4);
+  return ids.map((id) => PLUS_PERKS[id]);
+}
 
 export function getPlusContext(placement: string, frogName?: string): PaywallContext {
   const base = placement.replace(/^(skip_ads|after_ad)_/, '');
   if (base !== placement) return getPlusContext(base, frogName);
   const name = frogName?.trim() || 'your frog';
   const context: PaywallContext = {
-    headline: `Dress ${name} up`,
-    accent: 'twice as fast.',
-    sub: `Double rewards, every Special item and a weekly coach for ${name}.`,
-    benefits: [DOUBLE, SHOP, COACH],
+    headline: 'Join the Plus club.',
+    accent: 'Twice the rewards.',
+    sub: `Double rewards, every Special item and the Plus season track for ${name}.`,
+    benefits: [],
+    perks: perksLed(),
   };
   if (placement === 'onboarding') return {
     ...context,
     benefits: [COACH, { icon: 'x2', title: 'Double prizes', body: 'For every quest, habit and gift.' }, SUPPORT],
+  };
+  if (placement === 'plus_preview_ended') return {
+    ...context,
+    headline: 'Your 3 days are up.',
+    accent: `Keep Plus for ${name}?`,
+    sub: 'Your Plus preview ended. Nothing was charged.',
+  };
+  if (placement.startsWith('plus_preview')) return {
+    ...context,
+    headline: 'Enjoying Plus?',
+    accent: 'Keep it after your preview.',
+    sub: 'Your preview ends by itself. Join to keep every perk.',
+  };
+  if (placement === 'plus_trial_ended') return {
+    ...context,
+    headline: 'Miss your perks?',
+    accent: 'Pick Plus back up.',
   };
   if (placement === 'first_gift') return {
     ...context,
     headline: 'Loved that gift?',
     accent: 'Get two prizes every time.',
     sub: 'Two prizes in every gift, double flies and every Special item.',
-    benefits: [GIFTS, REWARDS, SHOP],
+    perks: perksLed('gifts'),
   };
   if (placement === 'wardrobe_looks') return {
     ...context,
     headline: 'A look for every mood.',
     accent: 'Keep your favorites.',
     sub: 'More room for the outfits you’ve made your own.',
-    benefits: [{ icon: 'saved', title: `Save up to ${SAVED_LOOKS_PLUS} favorite looks`, body: 'Switch outfits with a tap.' }, REWARDS, GIFTS],
-  };
-  if (placement === 'gift_double') return {
-    ...context,
-    headline: 'A little more surprise.',
-    accent: 'In every gift.',
-    sub: 'Open a second prize from this gift—and every gift after it.',
-    benefits: [GIFTS, REWARDS, STREAK],
+    perks: perksLed('looks', 'special'),
   };
   if (placement === 'season_plus_track') return {
     ...context,
     headline: 'Same progress.',
     accent: 'More to collect.',
     sub: 'Add the Plus reward track to your season. Every tier you reach has more to discover.',
-    benefits: [
-      { icon: 'quests', title: 'The Plus reward track', body: 'Claim it at every tier you’ve already reached.' },
-      REWARDS,
-      GIFTS,
-    ],
+    perks: perksLed('season'),
   };
   if (placement === 'leap_leagues') return {
     ...context,
     headline: 'Same habits.',
     accent: 'Bigger league prizes.',
-    sub: 'Turn every habit into more outfits, faster.',
-    benefits: [
-      { icon: 'leap', title: 'Bonus prizes in every league', body: 'Extra gifts on unlock and every week.' },
-      { icon: 'x2', title: '2× flies from every habit', body: 'Every repeating task pays double.' },
-      STREAK,
-    ],
+    sub: 'Extra prizes at every league and double flies from every habit.',
+    perks: perksLed('league', 'flies', 'lilyPad'),
   };
-  if (placement === 'streak_rescue') return {
+  if (placement === 'streak_rescue' || placement === 'shield_offer') return {
     ...context,
     headline: 'Life happens.',
     accent: 'Your streak can stay.',
-    sub: 'Rescue your streak today, with a little backup for next month.',
-    benefits: [STREAK, REWARDS, GIFTS],
+    sub: 'A free Lily Pad every month covers a day off.',
+    perks: perksLed('lilyPad'),
   };
   if (placement === 'trade_reroll' || placement === 'shop_reroll') return {
     ...context,
     headline: 'Not quite your style?',
     accent: 'Try something new.',
-    sub: placement === 'trade_reroll' ? 'Another chance to find a trade reward you love.' : 'Refresh today’s deals and find your next look.',
-    benefits: [{ icon: 'shuffle', title: placement === 'trade_reroll' ? 'Free trade rerolls' : `${DEFAULT_SHOP_SALES.plusRefreshes} free refreshes a day`, body: placement === 'trade_reroll' ? 'Not feeling the prize? Try another.' : 'Fresh deals, no ad break.' }, REWARDS, GIFTS],
+    sub: placement === 'trade_reroll' ? 'Another chance to find a trade reward you love.' : 'Refresh today’s picks and find your next look.',
+    perks: placement === 'trade_reroll' ? perksLed('tradeReroll') : perksLed('shopRefresh', 'special', 'sale'),
   };
-  if (placement === 'shop_plus_slot' || placement === 'shop_plus_sale') {
-    const { freeSlots, plusSlots, saleDiscountPercent } = DEFAULT_SHOP_SALES;
-    const total = freeSlots + plusSlots;
-    return {
-      ...context,
-      headline: placement === 'shop_plus_sale' ? `${saleDiscountPercent}% off, every day.` : 'Love that look?',
-      accent: placement === 'shop_plus_sale' ? 'Only with Plus.' : 'Unlock every Special slot.',
-      sub: `All ${total} Special items and a daily sale for ${name}.`,
-      benefits: [
-        { icon: 'wardrobe', title: `All ${total} Special items`, body: `Not just the first ${freeSlots}.` },
-        { icon: 'discount', title: `A ${saleDiscountPercent}% off sale every day`, body: 'A new pick every morning.' },
-        DOUBLE,
-      ],
-    };
-  }
+  if (placement === 'shop_plus_slot' || placement === 'shop_plus_sale') return {
+    ...context,
+    headline: placement === 'shop_plus_sale' ? `${DEFAULT_SHOP_SALES.saleDiscountPercent}% off, every day.` : 'Love that look?',
+    accent: placement === 'shop_plus_sale' ? 'Only with Plus.' : 'Unlock every Special slot.',
+    sub: `All ${SHOP_TOTAL} Special items and a daily sale for ${name}.`,
+    perks: placement === 'shop_plus_sale' ? perksLed('sale', 'special') : perksLed('special', 'sale'),
+  };
   if (placement.includes('tag_limit')) return {
     ...context,
     headline: 'Room for all your plans.',
-    accent: 'And all your interests.',
+    accent: `Up to ${PREMIUM_TAG_LIMIT} tags.`,
     sub: 'Keep your tasks organized as your routine grows.',
-    benefits: [{ icon: 'planner', title: `Up to ${PREMIUM_TAG_LIMIT} tags`, body: 'A place for every project and interest.' }, REWARDS, STREAK],
+    perks: perksLed('tags', 'flies', 'gifts', 'coach'),
   };
   if (placement.includes('wishlist')) return {
     ...context,
     headline: 'So many looks to love.',
     accent: 'Make room for more.',
     sub: 'Keep your next outfit goals close as you get things done.',
-    benefits: [{ icon: 'wardrobe', title: '10 wishlist slots', body: 'Room for every piece you’re chasing.' }, REWARDS, GIFTS],
+    perks: perksLed('wishlist', 'special'),
   };
-  if (placement === 'fly_shop_free_flies' || placement === 'premium_daily_deal' || placement.endsWith('_double')) return {
+  if (placement === 'insights_weekly') return {
     ...context,
-    headline: 'Double every reward.',
-    accent: 'Instantly, every time.',
-    sub: 'Plus doubles your quest rewards and gifts for you.',
-    benefits: [DOUBLE, SHOP, COACH],
+    headline: 'Know what keeps you going.',
+    accent: 'A coach read every week.',
+    sub: 'One clear read of your week, with one thing to try.',
+    perks: perksLed('coach'),
   };
   return context;
 }
@@ -191,6 +211,13 @@ export function formatTrialPeriod(trial: TrialPeriod | null): string | null {
   if (!trial) return null;
   const unit = { D: 'day', W: 'week', M: 'month', Y: 'year' }[trial.unit];
   return `${trial.count} ${unit}${trial.count === 1 ? '' : 's'}`;
+}
+
+export function trialDays(trial: TrialPeriod | null | undefined): number | null {
+  if (!trial) return null;
+  if (trial.unit === 'D') return trial.count;
+  if (trial.unit === 'W') return trial.count * 7;
+  return null;
 }
 
 export function trialEndsAt(trial: TrialPeriod, from: Date): Date {

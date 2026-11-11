@@ -49,8 +49,6 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
-import { afterAdPlacement } from '@/lib/plusPaywall';
-import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
 import { ShopGiftPopup } from '@/components/ui/shop/ShopGiftPopup';
 import { WishlistButton } from './WishlistButton';
 import { WishlistSheet } from './WishlistSheet';
@@ -80,7 +78,6 @@ import {
   rewardedAdsAvailable,
   rewardedAdFailureMessage,
   showRewardedAd,
-  takePlusOfferAfterAd,
 } from '@/lib/ads';
 import {
   ClosetEmptyPrompt,
@@ -507,7 +504,6 @@ function WardrobeManagerContent({
         { revalidate: false },
       );
       mutateInventoryCaches();
-      if (viaAd && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('shop_reroll'));
     } catch {
       if (viaAd) creditRewardedAd('shop_reroll');
       setNotif({ msg: 'Could not reroll deals.', type: 'error' });

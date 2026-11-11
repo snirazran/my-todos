@@ -130,9 +130,19 @@ const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
 const HUNGRY_MOOD_INDEX = 1;
 const MOUTH_HUNGRY_Y_ADJ = 3;
-const MOUTH_REOPEN_GUARD_MS = 400;
+const MOUTH_OPEN_MS = 230;
+const MOUTH_HOLD_END_MS = 1200;
+const MOUTH_CLIP_MS = 1470;
+const MOUTH_SYNC_MAX_DT_MS = 50;
+const MOUTH_PENDING_MAX_MS = 100;
+const MOUTH_OPEN_STATE = 'open_mouth';
+const MOUTH_CLOSED_STATE = 'close_mouth';
 const HIT_TEST_TOLERANCE_PX = 10;
 const HIT_TEST_MIN_ALPHA = 8;
+export const FROG_ARTBOARD = {
+  width: ARTBOARD_WIDTH,
+  height: ARTBOARD_HEIGHT,
+} as const;
 export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_TABLET = { x: -19, y: 18 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_SPLIT = { x: -20, y: 13 } as const;
@@ -162,8 +172,14 @@ export interface FrogHandle {
   fireEmote: (emote: FrogEmote, options?: { soft?: boolean }) => boolean;
   poke: () => void;
   openMouth?: () => void;
-  closeMouth?: () => void;
+  openMouthIn?: (ms: number) => void;
+  closeMouthIn?: (ms: number) => void;
 }
+
+type MouthMachine = {
+  advanceAndApply?: (seconds: number) => void;
+  statesChanged?: string[];
+};
 
 interface FrogProps {
   className?: string;
@@ -481,27 +497,122 @@ const Frog = memo(
 
     /* ---- mouth trigger: open on grab, explicit close when it ends ---- */
     const wasMouthOpenRef = useRef(false);
-    const mouthOpenedAtRef = useRef(-Infinity);
+    const mouthClipRef = useRef({
+      startedAt: -Infinity,
+      skipped: 0,
+      syncedAt: 0,
+      pendingSince: 0,
+    });
+    const stateChangeRef = useRef<(event: { data?: unknown }) => void>(() => {});
+
+    const markMouthStates = React.useCallback((states: unknown) => {
+      if (!Array.isArray(states)) return;
+      const clip = mouthClipRef.current;
+      if (states.indexOf(MOUTH_OPEN_STATE) >= 0) {
+        clip.startedAt = performance.now();
+        clip.skipped = 0;
+        clip.pendingSince = 0;
+      } else if (states.indexOf(MOUTH_CLOSED_STATE) >= 0 && !clip.pendingSince) {
+        clip.startedAt = -Infinity;
+      }
+    }, []);
+
+    useEffect(() => {
+      if (!rive) return;
+      const onMouthState = (event: { data?: unknown }) =>
+        markMouthStates(event.data);
+      rive.on(EventType.StateChange, onMouthState);
+      return () => rive.off(EventType.StateChange, onMouthState);
+    }, [rive, markMouthStates]);
+
+    const mouthClipAt = React.useCallback((now: number) => {
+      const clip = mouthClipRef.current;
+      if (clip.pendingSince) {
+        if (now - clip.pendingSince < MOUTH_PENDING_MAX_MS) return -1;
+        clip.startedAt = clip.pendingSince;
+        clip.skipped = 0;
+        clip.pendingSince = 0;
+      }
+      return now - clip.startedAt + clip.skipped;
+    }, []);
+
+    const skipMouthClip = React.useCallback(
+      (ms: number) => {
+        if (ms <= 0 || !rive?.isPlaying) return;
+        const machine = (
+          rive as unknown as { animator?: { stateMachines?: MouthMachine[] } }
+        ).animator?.stateMachines?.[0];
+        if (!machine?.advanceAndApply) return;
+        try {
+          machine.advanceAndApply(ms / 1000);
+          mouthClipRef.current.skipped += ms;
+          const changed = machine.statesChanged;
+          if (changed && changed.length) {
+            stateChangeRef.current({ data: changed });
+            markMouthStates(changed);
+          }
+        } catch {
+          // ignore
+        }
+      },
+      [rive, markMouthStates],
+    );
+
+    const fireOpenMouth = React.useCallback(() => {
+      const now = performance.now();
+      const at = mouthClipAt(now);
+      if (at < MOUTH_HOLD_END_MS) return;
+      if (at < MOUTH_CLIP_MS) skipMouthClip(MOUTH_CLIP_MS - at);
+      mouthClipRef.current.pendingSince = now;
+      triggerOpenMouth();
+      triggerOpenMouthSnake();
+      mouthTrigger?.fire();
+    }, [
+      mouthClipAt,
+      mouthTrigger,
+      skipMouthClip,
+      triggerOpenMouth,
+      triggerOpenMouthSnake,
+    ]);
+
+    const paceMouthClip = React.useCallback(
+      (to: number, ms: number) => {
+        const clip = mouthClipRef.current;
+        const now = performance.now();
+        const dt = Math.min(MOUTH_SYNC_MAX_DT_MS, now - clip.syncedAt);
+        clip.syncedAt = now;
+        const at = mouthClipAt(now);
+        if (at < 0 || at >= to) return;
+        const surplus = to - at - Math.max(0, ms);
+        if (surplus <= 0) return;
+        skipMouthClip(ms <= dt ? surplus : (surplus * dt) / ms);
+      },
+      [mouthClipAt, skipMouthClip],
+    );
+
+    const openMouthIn = React.useCallback(
+      (ms: number) => paceMouthClip(MOUTH_OPEN_MS, ms),
+      [paceMouthClip],
+    );
+
+    const closeMouthIn = React.useCallback(
+      (ms: number) => {
+        const at = mouthClipAt(performance.now());
+        if (at >= 0 && at < MOUTH_OPEN_MS) skipMouthClip(MOUTH_OPEN_MS - at);
+        paceMouthClip(MOUTH_HOLD_END_MS, ms);
+      },
+      [mouthClipAt, paceMouthClip, skipMouthClip],
+    );
+
     useEffect(() => {
       if (mouthOpen) {
         wasMouthOpenRef.current = true;
-        if (performance.now() - mouthOpenedAtRef.current < MOUTH_REOPEN_GUARD_MS) {
-          return;
-        }
-        triggerOpenMouth();
-        triggerOpenMouthSnake();
-        mouthTrigger?.fire();
+        fireOpenMouth();
       } else if (wasMouthOpenRef.current) {
         wasMouthOpenRef.current = false;
         triggerCloseMouth();
       }
-    }, [
-      mouthOpen,
-      mouthTrigger,
-      triggerOpenMouth,
-      triggerOpenMouthSnake,
-      triggerCloseMouth,
-    ]);
+    }, [mouthOpen, fireOpenMouth, triggerCloseMouth]);
 
     const moodIndexRef = useRef(0);
 
@@ -707,6 +818,7 @@ const Frog = memo(
           QUEUED_EMOTE_GAP_MS,
         );
       };
+      stateChangeRef.current = onStateChange;
       rive.on(EventType.StateChange, onStateChange);
       return () => rive.off(EventType.StateChange, onStateChange);
     }, [rive]);
@@ -946,16 +1058,10 @@ const Frog = memo(
       },
       openMouth() {
         wasMouthOpenRef.current = true;
-        mouthOpenedAtRef.current = performance.now();
-        triggerOpenMouth();
-        triggerOpenMouthSnake();
-        mouthTrigger?.fire();
+        fireOpenMouth();
       },
-      closeMouth() {
-        if (!wasMouthOpenRef.current) return;
-        wasMouthOpenRef.current = false;
-        triggerCloseMouth();
-      },
+      openMouthIn,
+      closeMouthIn,
     }));
 
     const arrivedRef = useRef(false);

@@ -7,6 +7,11 @@ import { sendPlusPush } from '@/lib/plus/push';
 import { TRIAL_ENDING_LEAD_MS, trialEndingAt } from '@/lib/plus/trialEnding';
 import { readPlusEarned } from '@/lib/plus/earned';
 import { TRIAL_REMINDER_LEAD_MS, trialReminderPush } from '@/lib/plusPaywall';
+import {
+  PLUS_PREVIEW_ENDING_LEAD_MS,
+  plusPreviewState,
+  previewEndPush,
+} from '@/lib/plus/preview';
 
 const QUIET_START_HOUR = 21;
 const QUIET_END_HOUR = 9;
@@ -170,6 +175,50 @@ export async function runPlusTrialEndingReminders() {
     await UserModel.updateOne(
       { _id: user._id },
       { $set: { 'plusSubscription.trialEndingFor': endsAt } },
+    );
+    sent += 1;
+  }
+  return { scanned: candidates.length, sent };
+}
+
+type PreviewCandidate = {
+  _id: string;
+  plusPreview?: unknown;
+  plusSubscription?: unknown;
+  notificationPrefs?: { timezone?: string };
+};
+
+export async function runPlusPreviewEndingReminders() {
+  const now = Date.now();
+  const candidates = await UserModel.find({
+    'plusPreview.endsAt': {
+      $gt: new Date(now),
+      $lte: new Date(now + PLUS_PREVIEW_ENDING_LEAD_MS),
+    },
+    'plusPreview.endingPushAt': null,
+  })
+    .select('_id plusPreview plusSubscription notificationPrefs.timezone')
+    .lean<PreviewCandidate[]>();
+
+  let sent = 0;
+  for (const user of candidates) {
+    const state = plusPreviewState(user, now);
+    if (state.phase !== 'active' || !state.endsAt) continue;
+    const tz = user.notificationPrefs?.timezone || 'UTC';
+    const hour = hourIn(tz);
+    if (hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR) continue;
+    const when =
+      dayKeyIn(new Date(state.endsAt), tz) === dayKeyIn(new Date(now), tz)
+        ? 'today'
+        : 'tomorrow';
+    await sendPlusPush(user._id, {
+      type: 'plus_preview_ending',
+      path: '/?plus=preview',
+      ...previewEndPush(when),
+    });
+    await UserModel.updateOne(
+      { _id: user._id },
+      { $set: { 'plusPreview.endingPushAt': new Date(now) } },
     );
     sent += 1;
   }

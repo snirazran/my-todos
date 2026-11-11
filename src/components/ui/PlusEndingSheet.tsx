@@ -7,12 +7,11 @@ import useSWR, { mutate } from 'swr';
 import { create } from 'zustand';
 import { useAuth } from '@/components/auth/AuthContext';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { FlyAmount } from '@/components/ui/FlyAmount';
-import { Icon } from '@/components/ui/Icon';
 import { PlusSheetHero } from '@/components/ui/PlusMembershipSheet';
+import { PerkLedger, PlusEarnedStrip, PlusGoldButton } from '@/components/ui/plus/PlusKit';
+import { getPlusContext } from '@/lib/plusPaywall';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import { BENEFITS } from '@/lib/plusBenefits';
 import { whenScreenIsFree } from '@/lib/popupGate';
 import {
   PLUS_STATUS_KEY,
@@ -24,11 +23,11 @@ import {
   type PlusStatus,
 } from '@/lib/plusStatus';
 import { useUIStore } from '@/lib/uiStore';
-import { cn } from '@/lib/utils';
 
 type Via = 'push' | 'in_app';
 
 const SEEN_KEY = 'frogress_plus_ending_seen';
+const SWITCHING_OFF = getPlusContext('plus_ending').perks;
 const DAY_MS = 86_400_000;
 
 const usePlusEndingStore = create<{
@@ -184,91 +183,44 @@ function PlusEndingSheet({
       zIndex={1360}
       hideHandle
       showClose={false}
-      className="border-0 sm:max-w-[400px]"
+      className="plus-paywall border-0 bg-background text-foreground sm:max-w-[420px]"
     >
-      {({ entered, bindScroll }) => (
+      {({ bindScroll }) => (
         <div className="flex max-h-[92dvh] flex-col sm:max-h-[calc(100dvh-3rem)]">
-          <PlusSheetHero
-            headline={endsAt ? `Plus ends ${endsWhen(endsAt)}` : 'Plus is ending'}
-            pill={{ label: `Trial ends ${formatPlusDate(endsAt)}`, tone: 'amber' }}
-            onClose={onClose}
-            entered={entered}
-          />
           <div
             ref={bindScroll}
-            className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4"
+            className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
           >
-            {(earnedFlies > 0 || earnedRare > 0) && (
-              <section className="mb-4">
-                <h3 className="px-1 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
-                  Plus got you
-                </h3>
-                <div
-                  className={cn(
-                    'mt-2 grid gap-2',
-                    earnedFlies > 0 && earnedRare > 0 ? 'grid-cols-2' : 'grid-cols-1',
-                  )}
-                >
-                  {earnedFlies > 0 && (
-                    <div className="rounded-2xl border border-border/50 bg-card px-3 py-3">
-                      <FlyAmount amount={earnedFlies} size={20} className="font-black" />
-                      <span className="mt-1 block text-[12px] font-semibold text-muted-foreground">
-                        extra flies
-                      </span>
-                    </div>
-                  )}
-                  {earnedRare > 0 && (
-                    <div className="rounded-2xl border border-border/50 bg-card px-3 py-3">
-                      <span className="flex items-center gap-1.5 text-[20px] font-black tabular-nums leading-none">
-                        <Icon name="wardrobe" className="h-6 w-6" />
-                        {earnedRare}
-                      </span>
-                      <span className="mt-1 block text-[12px] font-semibold text-muted-foreground">
-                        rare+ {earnedRare === 1 ? 'outfit' : 'outfits'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
-            <h3 className="px-1 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
-              Switching off
-            </h3>
-            <ul className="mt-2 space-y-2">
-              {BENEFITS.map((benefit) => (
-                <li
-                  key={benefit.title}
-                  className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card px-3 py-2.5"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/15">
-                    <Icon name={benefit.icon} className="h-7 w-7" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[13.5px] font-black leading-tight">
-                      {benefit.title}
-                    </span>
-                    <span className="block text-[12px] font-semibold leading-snug text-muted-foreground">
-                      {benefit.body}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <PlusSheetHero
+              headline={endsAt ? `Plus ends ${endsWhen(endsAt)}` : 'Plus is ending'}
+              pill={{ label: `Trial ends ${formatPlusDate(endsAt)}`, tone: 'amber' }}
+              onClose={onClose}
+              greet="sweat"
+            />
+            <div className="px-5 pb-4 pt-4">
+              {earnedFlies > 0 || earnedRare > 0 ? (
+                <PlusEarnedStrip
+                  earned={{ flies: earnedFlies, rareItems: earnedRare }}
+                  label="So far, Plus got you"
+                  className="mb-4"
+                />
+              ) : null}
+              <PerkLedger perks={SWITCHING_OFF} freeLabel="After" plusLabel="Now" />
+              {target?.kind === 'steps' ? (
+                <p className="mt-4 rounded-xl bg-card px-3 py-2.5 text-[12.5px] font-bold leading-snug">
+                  {target.steps}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="plus-dock shrink-0 px-5 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3.5">
             {target?.kind === 'url' ? (
-              <button
-                type="button"
-                onClick={keep}
-                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-[15px] font-black text-white shadow-[0_3px_0_0_#064e3b] transition-all hover:brightness-110 active:scale-[0.98]"
-              >
+              <PlusGoldButton onClick={keep}>
                 Keep Plus
-                <ExternalLink className="h-3.5 w-3.5 opacity-70" strokeWidth={2.75} />
-              </button>
-            ) : target?.kind === 'steps' ? (
-              <p className="mt-5 rounded-xl bg-card px-3 py-2.5 text-[12.5px] font-bold leading-snug text-foreground ring-1 ring-border/60">
-                {target.steps}
-              </p>
+                <ExternalLink className="ml-2 h-3.5 w-3.5 opacity-70" strokeWidth={2.75} aria-hidden />
+              </PlusGoldButton>
             ) : null}
-            <p className="mt-2.5 text-center text-[12px] font-semibold leading-snug text-muted-foreground">
+            <p className="mt-2.5 text-center text-[12.5px] font-bold leading-snug text-muted-foreground">
               {store
                 ? `Turn auto-renew back on in ${store}. No charge before ${formatPlusDate(endsAt)}.`
                 : 'Turn auto-renew back on to keep your perks.'}
@@ -276,7 +228,7 @@ function PlusEndingSheet({
             <button
               type="button"
               onClick={onClose}
-              className="mt-1 h-11 w-full text-[14px] font-black text-muted-foreground transition-colors hover:text-foreground"
+              className="mt-1 min-h-10 w-full rounded-xl text-[13.5px] font-black text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
               Not now
             </button>

@@ -173,6 +173,7 @@ export type UserDoc = {
   premiumUntil?: Date;
   plusSubscription?: Record<string, unknown>;
   plusEarned?: Record<string, unknown>;
+  plusPreview?: Record<string, unknown>;
   adDoubleClaim?: {
     id: string;
     fliesGranted: number;

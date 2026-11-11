@@ -218,7 +218,7 @@ function LockedPreview({
           </span>
         </span>
         <span className="plus-club-chip shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] leading-none">
-          Plus
+          Try Plus
         </span>
       </button>
     </div>

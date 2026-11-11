@@ -5,6 +5,8 @@ export interface Pt {
 
 export const TONGUE_WIDTH = 8;
 export const TONGUE_EDGE = '#e11d48';
+export const TONGUE_EDGE_WIDTH = 1;
+export const TONGUE_ROOT_SHADE = '#090506';
 export const TONGUE_GLOSS = 'rgba(255, 255, 255, 0.5)';
 
 const SAMPLES = 24;
@@ -208,7 +210,8 @@ export function tongueShape(
   }
 
   const thick =
-    (width - 1) * clamp(Math.sqrt(REST_LENGTH / Math.max(length, 1)), 0.8, 1);
+    (width - TONGUE_EDGE_WIDTH) *
+    clamp(Math.sqrt(REST_LENGTH / Math.max(length, 1)), 0.8, 1);
   const padR =
     thick * 0.7 * smooth(clamp(length / PAD_GROW, 0, 1)) * (1 + 0.45 * bulge);
 

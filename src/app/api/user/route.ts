@@ -18,6 +18,7 @@ import { excludeUserFromStats, isStatsExcludedFrogName } from '@/lib/analytics/s
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { adOffersFrom } from '@/lib/adOffers';
+import { plusPreviewState } from '@/lib/plus/preview';
 
 export async function GET(req: NextRequest) {
   let uid: string;
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     await connectMongo();
     
     const user = await UserModel.findById(uid)
-      .select('createdAt premiumUntil plusSubscription calendarSyncEnabled calendarAccessToken name frogName birthday onboardingCompleted weekStartsOn')
+      .select('createdAt premiumUntil plusSubscription plusPreview calendarSyncEnabled calendarAccessToken name frogName birthday onboardingCompleted weekStartsOn')
       .lean();
 
     if (!user) {
@@ -67,6 +68,7 @@ export async function GET(req: NextRequest) {
       onboardingCompleted: user.onboardingCompleted ?? null,
       weekStartsOn: normalizeWeekStart((user as { weekStartsOn?: unknown }).weekStartsOn),
       adOffers: adOffersFrom(economy.rewardedAds),
+      plusPreview: plusPreviewState(user, now.getTime()),
     });
   } catch (error) {
     console.error('Error fetching user data:', error);

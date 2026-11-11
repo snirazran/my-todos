@@ -31,6 +31,7 @@ import {
 } from '@/lib/catchSounds';
 import {
   TONGUE_EDGE,
+  TONGUE_EDGE_WIDTH,
   TONGUE_GLOSS,
   extendEase,
   hitPush,
@@ -350,7 +351,7 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
             d=""
             fill="url(#left-tongue-grad)"
             stroke={TONGUE_EDGE}
-            strokeWidth={1}
+            strokeWidth={TONGUE_EDGE_WIDTH}
             strokeLinejoin="round"
           />
           <path

@@ -17,15 +17,13 @@ import {
   rewardedAdFailureMessage,
   rewardedAdsAvailable,
   showRewardedAd,
-  takePlusOfferAfterAd,
 } from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { RewardCard, SkipAdsLink } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
-import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
+import { skipAdsPlacement } from '@/lib/plusPaywall';
 import { useAutoPopupHold } from '@/lib/popupGate';
 import { useTradeConfig } from '@/hooks/useTradeConfig';
 import { Icon } from '@/components/ui/Icon';
@@ -624,7 +622,6 @@ export function TradePanel({
         origin: { y: 0.6 },
         colors: ['#FFD700', '#FFA500', '#FF4500'],
       });
-      if (!isPremium && takePlusOfferAfterAd()) queuePlusPaywall(afterAdPlacement('trade_reroll'));
     } finally {
       setRerollBusy(false);
     }

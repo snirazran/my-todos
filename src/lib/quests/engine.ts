@@ -10,7 +10,6 @@ import { TRADE_MIN_ITEM_COUNT, type ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
-import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { plusFlyBonus, recordPlusEarned } from '@/lib/plus/earned';
 import {
   loadQuestCounters,
@@ -1955,7 +1954,6 @@ export async function claimQuestReward(args: {
   quest.markModified('claimedObjectiveIds');
 
   quest.claimedAt = new Date();
-  recordDoubleableClaim(user, summary);
   user.markModified('wardrobe');
 
   // Save quest and user in parallel
@@ -2033,7 +2031,6 @@ export async function claimObjectiveReward(args: {
       summary.grantedItemIds.push(reward.itemId);
     }
   }
-  if (doubles) recordDoubleableClaim(user, summary);
   user.markModified('wardrobe');
 
   quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];

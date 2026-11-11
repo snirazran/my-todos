@@ -2,22 +2,19 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { animate, motion, AnimatePresence, useAnimationControls, useMotionValue, useReducedMotion } from 'framer-motion';
-import { mutate } from 'swr';
+import { animate, motion, AnimatePresence, useMotionValue, useReducedMotion } from 'framer-motion';
+import useSWR, { mutate } from 'swr';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
-import { Bell, Check, ChevronLeft, ChevronRight, Crown, Loader2, ShieldAlert, Sparkles, X } from 'lucide-react';
+import { Check, ChevronLeft, Loader2, ShieldAlert, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { DEFAULT_SHOP_SALES } from '@/lib/skins/shopSales';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { FrogStampIndices } from '@/lib/frogStampEngine';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { pickEmote } from '@/lib/frogEmotes';
 import {
   getPlusPricing,
   isPaymentPending,
@@ -30,13 +27,22 @@ import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { auth } from '@/lib/firebase';
 import {
-  TRIAL_REMINDER_LEAD_MS,
+  ONBOARDING_PLUS_OFFERING,
   getPlusContext,
-  trialEndsAt,
+  trialDays,
   type PaywallContext,
   type TrialPeriod,
 } from '@/lib/plusPaywall';
-import { useNotificationStatus } from '@/hooks/useNotificationStatus';
+import { useAuth } from '@/components/auth/AuthContext';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import { SheetEnteredContext } from '@/lib/sheetEntered';
+import { PerkLedger, PlusEarnedStrip, PlusGoldButton, PlusStage } from '@/components/ui/plus/PlusKit';
+import {
+  PLUS_PREVIEW_KEY,
+  fetchPlusPreview,
+  usePlusPreview,
+  type PlusPreviewPayload,
+} from '@/hooks/usePlusPreview';
 import { showPlusWelcome } from '@/components/ui/PlusWelcome';
 import {
   GUEST_UPGRADE_PATH,
@@ -65,7 +71,7 @@ type PaywallSession = {
   step: string;
 };
 
-const PAYWALL_VARIANT = 'two_step_v1';
+const PAYWALL_VARIANT = 'one_page_v1';
 
 export const APPLE_EULA_URL =
   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
@@ -515,13 +521,19 @@ export function usePlusPaywall({
 }
 
 export function PlusUpgradeModal(props: PlusPaywallArgs) {
-  const { open, onClose } = props;
+  const { open, onClose, placement = 'unknown' } = props;
+  const { user } = useAuth();
+  const preview = usePlusPreview();
+  const { data: me } = useSWR<{ frogName?: string | null }>(
+    user && open ? '/api/user' : null,
+    bootstrapFetcher,
+    { revalidateOnFocus: false },
+  );
+  const frogName = props.frogName ?? me?.frogName ?? undefined;
   const look = usePaywallLook(open, props.previewItem);
   const {
     mounted,
     view,
-    step,
-    stepDirection,
     plan,
     purchasing,
     purchaseError,
@@ -537,8 +549,6 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
     returnFocusRef,
     moreBelow,
     bindScroll,
-    scrollRef,
-    paywallProps,
     selectPlan,
     dismissAccountPrompt,
     linkGuestAccount,
@@ -548,18 +558,18 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
     selected,
     paywallContext,
     changeView,
-    steps,
-    stepIndex,
-    onPlans,
-    goStep,
-    showBack,
-    goBack,
     pricesPending,
-    ctaLabel,
-    ctaContent,
-    caption,
-    freeWeek,
-  } = usePlusPaywall(props);
+  } = usePlusPaywall({
+    ...props,
+    frogName,
+    offering: props.offering ?? (preview?.offer ? ONBOARDING_PLUS_OFFERING : undefined),
+  });
+  const fromPreview = placement.startsWith('plus_preview');
+  const { data: previewData } = useSWR<PlusPreviewPayload>(
+    open && fromPreview ? PLUS_PREVIEW_KEY : null,
+    fetchPlusPreview,
+    { revalidateOnFocus: false },
+  );
   const [entered, setEntered] = useState(false);
   const [present, setPresent] = useState(open);
   const fade = useMotionValue(0);
@@ -588,6 +598,34 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
   }, [open, fade, lift, reduceMotion]);
 
   if (!mounted) return null;
+
+  const period = plan === 'yearly' ? 'year' : 'month';
+  const days = trialDays(selected?.trialPeriod);
+  const freeFor = days ? `${days} days` : selected?.trialDuration ?? null;
+  const cta = freeFor ? (days ? `Try ${days} days free` : 'Start my free trial') : 'Get Plus';
+  const discounted = !!selected?.regular && selected.regular.amount > selected.amount;
+  const was = discounted ? (
+    <s className="ml-1 font-semibold opacity-70">{selected!.regular!.priceString}</s>
+  ) : null;
+  const terms = !selected ? (
+    pricingFailed ? null : 'Checking your store’s prices…'
+  ) : selected.hasIntroPrice ? (
+    `Intro offer at checkout, then ${selected.priceString}/${period}. Cancel anytime.`
+  ) : (
+    <>
+      {freeFor ? `Free for ${freeFor}, then ` : ''}
+      {selected.priceString}/{period}{was}. Cancel anytime.
+    </>
+  );
+  const yearlyDeal = !!pricing?.yearly?.regular && pricing.yearly.regular.amount > pricing.yearly.amount;
+  const deadline = !yearlyDeal
+    ? null
+    : preview?.phase === 'offer' && preview.offerUntil
+      ? `Welcome price until ${new Date(preview.offerUntil).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`
+      : preview?.phase === 'ended'
+        ? 'Welcome price for the next 2 days'
+        : null;
+  const earned = fromPreview ? previewData?.earned : undefined;
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next && !purchasing && !linking) onClose(); }}>
@@ -620,100 +658,79 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
               >
                 <motion.div
                   style={{ opacity: fade, y: lift }}
-                  className={cn('plus-paywall fixed inset-0 z-[10009] m-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground shadow-2xl outline-none md:h-[min(760px,calc(100dvh-3rem))] md:w-[min(940px,calc(100vw-3rem))] md:rounded-[32px]', !open && 'pointer-events-none')}
+                  className={cn('plus-paywall fixed inset-0 z-[10009] m-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground shadow-2xl outline-none md:h-[min(600px,calc(100dvh-3rem))] md:w-[min(1000px,calc(100vw-3rem))] md:rounded-[32px]', !open && 'pointer-events-none')}
                 >
                   <Dialog.Title className="sr-only">Frogress Plus</Dialog.Title>
                   <Dialog.Description id="plus-description" className="sr-only">
-                    Double quest and gift rewards, every Special shop item and a weekly coach for your habits.
-                    Choose a subscription below. Prices and eligible offers come from your store.
+                    {paywallContext.sub} Choose a plan below. Prices and eligible offers come from your store.
                   </Dialog.Description>
-                  <PaywallEnteredContext.Provider value={entered}>
-                  <PaywallLookContext.Provider value={look}>
+                  <SheetEnteredContext.Provider value={entered}>
                   <div inert={needsAccount || undefined} className="flex min-h-0 flex-1 flex-col">
-                    <header className={cn('relative flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] short:pb-1 md:px-7 md:pt-4')}>
-                      {showBack ? (
-                        <button type="button" onClick={goBack} disabled={purchasing} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl pr-3 text-sm font-bold hover:bg-muted disabled:opacity-50">
-                          <ChevronLeft className="h-5 w-5" aria-hidden /> Back
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 text-base font-black tracking-tight">
-                          <Icon name="frogPlus" className="h-10 w-10 drop-shadow-[0_2px_0_rgba(22,8,48,0.3)]" />
-                          Frogress <span className="rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-[11px] tracking-wide text-[hsl(var(--primary-foreground))]">PLUS</span>
-                        </span>
-                      )}
-                      <Dialog.Close asChild>
-                        <button type="button" disabled={purchasing} onClick={() => markClose('close_button')} aria-label="Close Plus" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.14)] transition-[background-color,transform] hover:bg-white/15 active:scale-90 disabled:opacity-50">
-                          <X className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-                        </button>
-                      </Dialog.Close>
-                    </header>
-
                     <div className="flex min-h-0 flex-1">
-                      {isDesktop && view === 'offer' ? (
-                        <div className="flex w-[43%] shrink-0 p-4 pr-0 pt-1">
-                          <DesktopHero context={paywallContext} />
-                        </div>
+                      {isDesktop ? (
+                        <DesktopHero context={paywallContext} pass={props.previewItem ? { look } : null} />
                       ) : null}
                       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                        <div ref={bindScroll} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-4 md:px-7 md:[scrollbar-gutter:stable]">
+                        <header className="relative flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] short:pb-1 md:px-6 md:pt-4">
+                          {view === 'compare' ? (
+                            <button type="button" onClick={() => changeView('offer')} disabled={purchasing} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl pr-3 text-sm font-bold hover:bg-white/10 disabled:opacity-50">
+                              <ChevronLeft className="h-5 w-5" aria-hidden /> Back
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 text-base font-black tracking-tight">
+                              <Icon name="frogPlus" className="h-10 w-10 drop-shadow-[0_2px_0_rgba(22,8,48,0.3)]" />
+                              Frogress <span className="rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-[11px] tracking-wide text-[hsl(var(--primary-foreground))]">PLUS</span>
+                            </span>
+                          )}
+                          <Dialog.Close asChild>
+                            <button type="button" disabled={purchasing} onClick={() => markClose('close_button')} aria-label="Close Plus" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.14)] transition-[background-color,transform] hover:bg-white/15 active:scale-90 disabled:opacity-50">
+                              <X className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                            </button>
+                          </Dialog.Close>
+                        </header>
+                        <div ref={bindScroll} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-4 md:px-6">
                           {view === 'compare' ? <CompareView /> : (
-                            <motion.div
-                              key={step}
-                              initial={step !== 'offer' || stepDirection < 0 ? (reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24 * stepDirection }) : false}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
-                              className="flex min-h-full flex-col"
-                            >
-                              {step === 'checkout' ? (
-                                <section className="flex flex-1 flex-col justify-center py-2">
-                                  <MemberCard name={props.frogName} plan={plan} />
-                                  <h2 className="text-balance text-center text-[25px] font-black leading-[1.08] tracking-tight short:text-[21px] md:text-left md:text-[28px]">
-                                    {freeWeek
-                                      ? <>Start your<br /><span className="text-primary">free week</span></>
-                                      : selected?.trialDuration
-                                        ? <>Try Plus<br /><span className="text-primary">free for {selected.trialDuration}</span></>
-                                        : <>Pick your<br /><span className="text-primary">Plus plan</span></>}
-                                  </h2>
-                                  {selected?.trialPeriod ? <TrialRail trial={selected.trialPeriod} /> : null}
-                                  <div className="mt-6 short:mt-4">
-                                    <PlanPicker plan={plan} onSelect={selectPlan} pricing={pricing}
-                                      pricingFailed={pricingFailed} busy={purchasing}
-                                      onRetry={() => setPricingAttempt((attempt) => attempt + 1)} />
-                                  </div>
-                                  <PlanFooter busy={purchasing} onRestore={restorePurchases} />
-                                </section>
-                              ) : (
-                                <>
-                                  {!isDesktop ? <CoverHero context={paywallContext} /> : null}
-                                  <div className={cn(isDesktop && 'flex flex-1 flex-col justify-center')}>
-                                    <OfferBenefits context={paywallContext} onSeeAll={() => changeView('compare')} />
-                                  </div>
-                                </>
-                              )}
-                            </motion.div>
+                            <div className={cn('flex min-h-full flex-col', isDesktop && 'justify-center')}>
+                              {!isDesktop ? <CoverHero context={paywallContext} pass={props.previewItem ? { look } : null} /> : null}
+                              {earned && (earned.flies > 0 || earned.rareItems > 0) ? (
+                                <PlusEarnedStrip
+                                  earned={earned}
+                                  label={preview?.phase === 'active' ? 'So far, Plus got you' : 'In 3 days, Plus got you'}
+                                  className="mt-3.5 md:mb-4 md:mt-0"
+                                />
+                              ) : null}
+                              <PerkLedger perks={paywallContext.perks} onSeeAll={() => changeView('compare')} className="mt-3.5 short:mt-3 md:mt-0" />
+                            </div>
                           )}
                         </div>
-                        <footer data-more={moreBelow || undefined} className="plus-dock relative shrink-0 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 md:px-7 md:pb-5">                          {view === 'compare' ? (
-                            <PrimaryButton onClick={() => { changeView('offer'); goStep('checkout'); }}>Continue</PrimaryButton>
-                          ) : (
-                            <>
-                              <p aria-live="polite" role={purchaseError ? 'alert' : undefined} className={cn('mb-2.5 text-balance text-center leading-snug', purchaseError ? 'text-[13px] font-bold text-red-200' : onPlans ? 'text-[14px] font-black text-foreground' : 'text-[13px] font-bold text-muted-foreground')}>
-                                {purchaseError ?? caption}
-                              </p>
-                              <PrimaryButton onClick={onPlans ? startPurchase : () => goStep(steps[Math.min(steps.length - 1, stepIndex + 1)])} disabled={purchasing || (onPlans && (pricesPending || !selected))} loading={onPlans && pricesPending}>
-                                {ctaContent}
-                              </PrimaryButton>
-                            </>
-                          )}
-                          <button type="button" onClick={() => { markClose('continue_free'); onClose(); }} disabled={purchasing} className="mt-3 min-h-10 w-full rounded-xl text-center text-[13px] font-bold text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-50">
-                            Maybe later
-                          </button>
+                        <footer data-more={moreBelow || undefined} className="plus-dock relative shrink-0 px-5 pb-[max(0.625rem,env(safe-area-inset-bottom))] pt-3.5 md:px-6 md:pb-4">
+                          {deadline ? (
+                            <p className="mb-2 text-center text-[12.5px] font-black text-primary">{deadline}</p>
+                          ) : null}
+                          <PlanSwitch plan={plan} onSelect={selectPlan} pricing={pricing}
+                            pricingFailed={pricingFailed} busy={purchasing}
+                            onRetry={() => setPricingAttempt((attempt) => attempt + 1)} />
+                          <PlusGoldButton
+                            className="mt-3"
+                            onClick={startPurchase}
+                            disabled={purchasing || pricesPending || !selected}
+                            loading={pricesPending}
+                          >
+                            {purchasing
+                              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Processing…</>
+                              : pricesPending
+                                ? <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading prices" />
+                                : cta}
+                          </PlusGoldButton>
+                          <p aria-live="polite" role={purchaseError ? 'alert' : undefined} className={cn('mt-2.5 min-h-[18px] text-balance text-center text-[12.5px] font-bold leading-snug', purchaseError ? 'text-red-200' : 'text-muted-foreground')}>
+                            {purchaseError ?? terms}
+                          </p>
+                          <LegalRow busy={purchasing} onRestore={restorePurchases} />
                         </footer>
                       </div>
                     </div>
                   </div>
-                  </PaywallLookContext.Provider>
-                  </PaywallEnteredContext.Provider>
+                  </SheetEnteredContext.Provider>
 
               <PlusAccountPrompt
                 open={needsAccount}
@@ -735,9 +752,6 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
 
 export type PaywallPreviewItem ={ slot: WardrobeSlot; riveIndex: number };
 
-const BARE_LOOK: FrogStampIndices = { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
-const PaywallLookContext = React.createContext<FrogStampIndices>(BARE_LOOK);
-
 function usePaywallLook(open: boolean, preview?: PaywallPreviewItem | null) {
   const { ownedIndices } = useWardrobeIndices(open);
   const { skin, hat, body, hand_item } = ownedIndices;
@@ -749,9 +763,9 @@ function usePaywallLook(open: boolean, preview?: PaywallPreviewItem | null) {
   }, [skin, hat, body, hand_item, previewSlot, previewIndex]);
 }
 
-const PaywallEnteredContext = React.createContext(true);
-
 const COVER_SRC = '/premium-cover.webp';
+
+type HeroPass = { look: FrogStampIndices } | null;
 
 function PlusCover({ className, imageClassName }: { className?: string; imageClassName?: string }) {
   const reduceMotion = useReducedMotion();
@@ -781,195 +795,53 @@ function PlusCover({ className, imageClassName }: { className?: string; imageCla
   );
 }
 
-function CoverHero({ context }: { context: PaywallContext }) {
+function HeroTitle({ context, className }: { context: PaywallContext; className?: string }) {
+  return (
+    <h2 className={cn('text-balance font-black leading-[1.08] tracking-tight', className)}>
+      {context.headline}<br /><span className="text-primary">{context.accent}</span>
+    </h2>
+  );
+}
+
+function CoverHero({ context, pass }: { context: PaywallContext; pass: HeroPass }) {
   return (
     <section className="flex flex-col items-center text-center">
-      <div className="plus-stage-arc relative -mx-5 self-stretch">
-        <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[2px] bg-[#f5c84c]/60" />
-        <PlusCover className="plus-stage-cover aspect-video short:aspect-[2/1]" imageClassName="object-[50%_70%]" />
-      </div>
-      <h2 className="relative mt-4 text-balance text-[26px] font-black leading-[1.08] tracking-tight short:mt-3 short:text-[22px]">
-        {context.headline}<br /><span className="text-primary">{context.accent}</span>
-      </h2>
+      {pass ? (
+        <div className="-mx-5 self-stretch">
+          <PlusStage look={pass.look} greet="loveShy" fly={false} />
+        </div>
+      ) : (
+        <div className="plus-stage-arc relative -mx-5 self-stretch">
+          <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[2px] bg-[#f5c84c]/60" />
+          <PlusCover className="plus-stage-cover aspect-[9/4] short:aspect-[11/4]" imageClassName="object-[50%_46%]" />
+        </div>
+      )}
+      <HeroTitle context={context} className="relative mt-3 text-[26px] short:mt-2.5 short:text-[22px]" />
     </section>
   );
 }
 
-function DesktopHero({ context }: { context: PaywallContext }) {
+function DesktopHero({ context, pass }: { context: PaywallContext; pass: HeroPass }) {
   return (
-    <section className="plus-hero-panel relative isolate flex w-full flex-col overflow-hidden rounded-[28px]">
-      <h2 className="text-balance px-7 pt-7 text-[30px] font-black leading-[1.08] tracking-tight">
-        {context.headline}<br /><span className="text-primary">{context.accent}</span>
-      </h2>
-      <div className="flex flex-1 items-center px-4 pb-4">
-        <div className="plus-stage-arc w-full">
-          <PlusCover className="plus-stage-cover aspect-[16/10] w-full rounded-t-[20px]" imageClassName="object-[50%_70%]" />
+    <section className="relative flex w-[58%] max-w-[600px] shrink-0 flex-col overflow-hidden bg-[hsl(var(--plus-band))]">
+      {pass ? (
+        <PlusStage look={pass.look} greet="loveShy" fly={false} className="aspect-video h-auto w-full" />
+      ) : (
+        <div className="plus-stage-arc shrink-0">
+          <PlusCover className="plus-stage-cover aspect-video w-full" />
         </div>
+      )}
+      <div className="flex min-h-0 flex-1 flex-col justify-center px-9 pb-7 pt-4">
+        <HeroTitle context={context} className="text-[32px]" />
+        <p className="mt-3 max-w-[27rem] text-pretty text-[15px] font-semibold leading-snug text-muted-foreground">
+          {context.sub}
+        </p>
       </div>
     </section>
   );
 }
 
-function BenefitTitle({ title }: { title: string }) {
-  const match = title.match(/^(\d+\s?[×%]?)(\s.*)$/);
-  if (!match) return <>{title}</>;
-  return (
-    <>
-      <span className="text-primary">{match[1]}</span>
-      {match[2]}
-    </>
-  );
-}
-
-function OfferBenefits({ context, onSeeAll }: { context: PaywallContext; onSeeAll: () => void }) {
-  return (
-    <>
-      <ul className="mt-5 divide-y divide-white/10 rounded-[24px] bg-card px-4 shadow-[0_4px_0_0_rgba(26,8,56,0.35)] short:mt-3 md:mt-1">
-        {context.benefits.map((benefit, index) => (
-          <li key={benefit.title} className="plus-benefit-rise flex items-center gap-3.5 py-3.5 short:py-2.5" style={{ animationDelay: `${120 + index * 50}ms` }}>
-            <span
-              style={{ animationDelay: `${200 + index * 70}ms` }}
-              className="plus-benefit-pop plus-icon-tone grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#f3edff] shadow-[inset_0_-3px_0_rgba(70,30,130,0.2)] short:h-10 short:w-10"
-            >
-              {benefit.icon === 'store' ? <span aria-hidden className="h-14 w-14 shrink-0 -translate-y-1.5"><GiftRive color={0} paused /></span> : <Icon name={benefit.icon} className="h-10 w-10 short:h-8 short:w-8" />}
-            </span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block text-[16px] font-black leading-tight"><BenefitTitle title={benefit.title} /></span>
-              <span className="mt-0.5 block text-[13px] font-semibold leading-snug text-muted-foreground short:hidden">{benefit.body}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="plus-benefit-rise mt-2 flex justify-center short:mt-1" style={{ animationDelay: `${120 + context.benefits.length * 50}ms` }}>
-        <button type="button" onClick={onSeeAll} className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-[14px] font-black text-primary transition-colors hover:bg-white/10 active:bg-white/15 short:min-h-9">
-          See everything in Plus
-          <ChevronRight className="h-4 w-4" strokeWidth={2.75} aria-hidden />
-        </button>
-      </div>
-    </>
-  );
-}
-
-function PrimaryButton({ onClick, children, disabled, loading, className }: {
-  onClick: () => void | Promise<void>;
-  children: React.ReactNode;
-  disabled?: boolean;
-  loading?: boolean;
-  className?: string;
-}) {
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-busy={loading || undefined}
-      className={cn('plus-upgrade-button relative isolate flex min-h-[54px] w-full touch-manipulation items-center justify-center overflow-hidden rounded-2xl bg-[var(--plus-cta)] px-4 [--plus-button-base:var(--plus-cta-edge)] py-3 text-[17px] font-black text-[var(--plus-cta-ink)] hover:bg-[var(--plus-cta-hover)] disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none', loading && 'disabled:opacity-100', className)}>
-      {!disabled ? (
-        <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-[40%] -z-10 w-[35%] bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 motion-safe:animate-[plus-cta-shine_4.2s_ease-in-out_1.2s_infinite]" />
-      ) : null}
-      {children}
-    </button>
-  );
-}
-
-function MemberCard({ name, plan }: { name?: string; plan: PlanId }) {
-  const reduceMotion = useReducedMotion();
-  const look = React.useContext(PaywallLookContext);
-  const frog = React.useRef<FrogHandle>(null);
-  const seal = useAnimationControls();
-  const lastPlan = React.useRef(plan);
-  useEffect(() => {
-    if (lastPlan.current === plan) return;
-    lastPlan.current = plan;
-    frog.current?.fireEmote(pickEmote('pick'), { soft: true });
-    if (!reduceMotion) void seal.start({ rotate: [0, -12, 9, -4, 0], scale: [1, 1.12, 1], transition: { duration: 0.5, ease: 'easeOut' } });
-  }, [plan, reduceMotion, seal]);
-  const member = auth?.currentUser?.displayName?.trim().split(/\s+/)[0] || name?.trim() || 'You';
-  const [since] = useState(() => new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
-  return (
-    <div aria-hidden className="mb-5 flex justify-center short:mb-3 md:justify-start">
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 14, rotate: -2 }}
-        animate={{ opacity: 1, y: 0, rotate: 0 }}
-        transition={{ type: 'spring', duration: 0.5, bounce: 0.25, delay: 0.05 }}
-        className="plus-club-card relative isolate h-[140px] w-[min(100%,316px)] overflow-hidden rounded-[24px] short:h-[120px]"      >
-        <span className="absolute -bottom-[58px] right-0 -z-10 h-[156px] w-[156px] rounded-full bg-white/[0.09] short:-bottom-[66px]" />
-        <span className="absolute -bottom-[8px] right-1 h-[176px] w-[148px] short:h-[156px] short:w-[132px]">
-          <Frog ref={frog} width="100%" height="100%" indices={look} visualOffsetY={0} placeholder arrive="pop" arriveDelay={180} greet="loveShy" paused={!!reduceMotion} />
-        </span>
-        <span className="absolute left-5 top-[16px] flex items-center gap-1.5 short:top-[12px]">
-          <motion.span animate={seal} className="block">
-            <Icon name="frogPlus" className="h-7 w-7" />
-          </motion.span>
-          <span className="text-[11px] font-black uppercase leading-none tracking-[0.14em] text-[#d6c6ff]">Frogress Plus</span>
-        </span>
-        <span className="absolute bottom-[18px] left-5 right-[150px] short:bottom-[14px] short:right-[134px]">
-          <span className="block truncate pb-[3px] text-[26px] font-black leading-none tracking-[-0.01em] text-white short:text-[22px]">{member}</span>
-          <span className="mt-1.5 block truncate text-[12px] font-bold leading-none text-[#d6c6ff]">Member since {since}</span>
-        </span>
-      </motion.div>
-    </div>
-  );
-}
-
-function CalendarTile({ date, today = false }: { date: Date; today?: boolean }) {
-  return (
-    <span className={cn('flex h-11 w-10 flex-col overflow-hidden rounded-[11px] bg-white shadow-[0_3px_0_0_rgba(26,8,56,0.4)]', today && 'ring-2 ring-[var(--plus-cta)] ring-offset-2 ring-offset-[hsl(var(--card))]')}>
-      <span className={cn('py-[3px] text-center text-[9px] font-black uppercase leading-none tracking-wide', today ? 'bg-[var(--plus-cta)] text-[var(--plus-cta-ink)]' : 'bg-[hsl(var(--background))] text-white')}>
-        {date.toLocaleDateString('en-US', { month: 'short' })}
-      </span>
-      <span className="grid flex-1 place-items-center text-[17px] font-black leading-none tabular-nums text-[#3a1a78]">
-        {date.getDate()}
-      </span>
-    </span>
-  );
-}
-
-function TrialRail({ trial }: { trial: TrialPeriod }) {
-  const reduceMotion = useReducedMotion();
-  const notifications = useNotificationStatus();
-  const [start] = useState(() => new Date());
-  const end = trialEndsAt(trial, start);
-  const reminder = new Date(end.getTime() - TRIAL_REMINDER_LEAD_MS);
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const dayCount = (date: Date) => Math.round((date.getTime() - start.getTime()) / DAY_MS);
-  const shortDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const label = (date: Date) => (dayCount(end) <= 31 ? `Day ${dayCount(date)}` : shortDate(date));
-  const canRemind = notifications.isEnabled || notifications.canEnable;
-  const hasReminder = reminder.getTime() - start.getTime() >= 12 * 60 * 60 * 1000 && canRemind;
-  const nodes: Array<{ key: string; date: Date; today?: boolean; title: string; body: string }> = [
-    { key: 'today', date: start, today: true, title: 'Today', body: 'Plus unlocks' },
-    ...(hasReminder ? [{ key: 'reminder', date: reminder, title: label(reminder), body: 'Reminder' }] : []),
-    { key: 'end', date: end, title: label(end), body: 'First payment' },
-  ];
-  const inset = `${50 / nodes.length}%`;
-  return (
-    <div className="mt-6 short:mt-4">
-      <ol className="relative grid" style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))` }}>
-        <span aria-hidden className="absolute top-[22px] h-[3px] -translate-y-1/2 rounded-full bg-white/15" style={{ left: inset, right: inset }} />
-        <span aria-hidden className="absolute top-[22px] h-[3px] -translate-y-1/2 origin-left rounded-full bg-gradient-to-r from-[var(--plus-cta)] to-transparent motion-safe:animate-[plus-rail-grow_700ms_cubic-bezier(0.23,1,0.32,1)_200ms_both]" style={{ left: inset, right: inset }} />
-        {nodes.map((node, index) => (
-          <motion.li
-            key={node.key}
-            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 + index * 0.08, duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-            className="relative flex min-w-0 flex-col items-center px-1 text-center"
-          >
-            <CalendarTile date={node.date} today={node.today} />
-            <span className="mt-2 text-[14px] font-black leading-tight">{node.body}</span>
-            <span className="mt-0.5 text-[12.5px] font-bold leading-tight text-muted-foreground">{node.title}</span>
-          </motion.li>
-        ))}
-      </ol>
-      {hasReminder && !notifications.isEnabled ? (
-        <div className="mt-3 flex justify-center">
-          <button type="button" onClick={() => void notifications.enableOrConfigure()} className="inline-flex min-h-9 items-center rounded-xl bg-white/10 px-3 text-[13px] font-black text-primary transition-[background-color,transform] duration-150 hover:bg-white/15 active:scale-95">
-            Turn on the reminder
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRetry }: {
+function PlanSwitch({ plan, onSelect, pricing, pricingFailed, busy, onRetry }: {
   plan: PlanId;
   onSelect: (plan: PlanId) => void;
   pricing: Partial<Record<PlanId, PlusPriceInfo>> | null;
@@ -981,53 +853,49 @@ export function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRet
   const monthly = pricing?.monthly;
   const savings = yearly && monthly && yearly.currency === monthly.currency && monthly.amount > 0
     ? Math.round((1 - yearly.amount / (monthly.amount * 12)) * 100) : 0;
-  const reduceMotion = useReducedMotion();
   return (
     <fieldset disabled={busy} className="min-w-0">
       <legend className="sr-only">Choose your plan</legend>
-      <div className="grid grid-cols-1 gap-2.5">
-        {(['yearly', 'monthly'] as const).map((id, index) => {
+      <div className="grid grid-cols-2 gap-2.5">
+        {(['yearly', 'monthly'] as const).map((id) => {
           const price = pricing?.[id];
           const unavailable = pricing !== null && !price;
-          const selectedCard = plan === id;
+          const on = plan === id;
+          const off = price?.regular && price.regular.amount > price.amount
+            ? Math.round((1 - price.amount / price.regular.amount) * 100) : 0;
+          const badge = id !== 'yearly' ? null : off >= 5 ? `${off}% off` : savings >= 5 ? `Save ${savings}%` : null;
           return (
-            <motion.div
-              key={id}
-              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.16 + index * 0.06, duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <label className={cn(
-                'relative flex min-h-[60px] cursor-pointer items-center gap-3 rounded-[18px] px-4 py-3 transition-[box-shadow,background-color,transform] duration-150 ease-out active:scale-[0.985]',
-                selectedCard
-                  ? 'bg-card shadow-[inset_0_0_0_2px_hsl(var(--primary)),0_4px_0_0_rgba(26,8,56,0.35)]'
-                  : 'bg-white/[0.06] shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.14)] hover:bg-white/10',
-                (unavailable || busy) && 'cursor-default opacity-60',
-              )}>
-                <input type="radio" name="plus-plan" value={id} checked={selectedCard} disabled={busy || unavailable} onChange={() => onSelect(id)} className="peer sr-only" />
+            <label key={id} className={cn(
+              'relative flex min-h-[62px] cursor-pointer flex-col justify-center rounded-[18px] px-3 py-2 transition-[box-shadow,background-color,transform] duration-150 ease-out active:scale-[0.985]',
+              on
+                ? 'bg-card shadow-[inset_0_0_0_2px_hsl(var(--primary)),0_3px_0_0_rgba(26,8,56,0.35)]'
+                : 'bg-white/[0.06] shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.14)] hover:bg-white/10',
+              (unavailable || busy) && 'cursor-default opacity-60',
+            )}>
+              <input type="radio" name="plus-plan" value={id} checked={on} disabled={busy || unavailable} onChange={() => onSelect(id)} className="peer sr-only" />
+              <span className="pointer-events-none absolute inset-0 rounded-[18px] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary" />
+              <span className="flex items-center gap-1.5">
                 <span aria-hidden className={cn(
-                  'grid h-6 w-6 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] duration-150',
-                  selectedCard ? 'bg-primary text-primary-foreground' : 'shadow-[inset_0_0_0_2px_rgba(255,255,255,0.3)]',
+                  'grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] duration-150',
+                  on ? 'bg-primary text-primary-foreground' : 'shadow-[inset_0_0_0_2px_rgba(255,255,255,0.3)]',
                 )}>
-                  {selectedCard ? <Check className="h-3.5 w-3.5 motion-safe:animate-[plus-chip-in_200ms_ease-out]" strokeWidth={3.5} /> : null}
+                  {on ? <Check className="h-3 w-3 motion-safe:animate-[plus-chip-in_200ms_ease-out]" strokeWidth={3.5} /> : null}
                 </span>
-                <span className="pointer-events-none absolute inset-0 rounded-[18px] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary" />
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="text-[16px] font-black leading-tight">{id === 'yearly' ? 'Yearly' : 'Monthly'}</span>
-                  {id === 'yearly' && savings >= 5 ? (
-                    <span className="rounded-full bg-[hsl(var(--primary))] px-2 py-1 text-[11px] font-black leading-none text-[hsl(var(--primary-foreground))]">
-                      Save {savings}%
-                    </span>
-                  ) : null}
-                </span>
-                <span className="shrink-0 text-right tabular-nums">
-                  <span className={cn('font-black [overflow-wrap:anywhere]', price ? 'text-[17px]' : 'text-[15px] text-muted-foreground')}>
-                    {price ? price.priceString : unavailable ? 'Unavailable' : '—'}
+                <span className="text-[14px] font-black leading-none">{id === 'yearly' ? 'Yearly' : 'Monthly'}</span>
+                {badge ? (
+                  <span className="ml-auto whitespace-nowrap rounded-full bg-[hsl(var(--primary))] px-1.5 py-[3px] text-[10.5px] font-black leading-none text-[hsl(var(--primary-foreground))]">
+                    {badge}
                   </span>
-                  {price ? <span className="text-[13px] font-bold text-muted-foreground">/{id === 'yearly' ? 'yr' : 'mo'}</span> : null}
+                ) : null}
+              </span>
+              <span className="mt-1.5 flex items-baseline gap-0.5 tabular-nums">
+                <span className={cn('font-black leading-none', price ? 'text-[17px]' : 'text-[14px] text-muted-foreground')}>
+                  {price ? price.priceString : unavailable ? 'Unavailable' : '—'}
                 </span>
-              </label>
-            </motion.div>
+                {price ? <span className="text-[12px] font-bold text-muted-foreground">/{id === 'yearly' ? 'yr' : 'mo'}</span> : null}
+                {price && off >= 5 ? <s className="ml-1 text-[12px] font-bold text-muted-foreground">{price.regular!.priceString}</s> : null}
+              </span>
+            </label>
           );
         })}
       </div>
@@ -1036,18 +904,18 @@ export function PlanPicker({ plan, onSelect, pricing, pricingFailed, busy, onRet
   );
 }
 
-export function PlanFooter({ busy, onRestore }: {
+function LegalRow({ busy, onRestore }: {
   busy: boolean;
   onRestore: () => void | Promise<void>;
 }) {
   const isNative = Capacitor.isNativePlatform();
   const isIos = Capacitor.getPlatform() === 'ios';
+  const link = 'inline-flex min-h-7 items-center underline underline-offset-2 hover:text-foreground';
   return (
-    <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2.5 text-center text-[11px] font-semibold text-muted-foreground">
-      <span>Renews automatically. Cancel anytime.</span>
-      {isNative ? <button type="button" disabled={busy} onClick={onRestore} className="min-h-8 underline underline-offset-2 hover:text-foreground">Restore</button> : null}
-      <a href={isIos ? APPLE_EULA_URL : TERMS_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center underline underline-offset-2 hover:text-foreground">Terms</a>
-      <a href={PRIVACY_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center underline underline-offset-2 hover:text-foreground">Privacy</a>
+    <p className="mt-0.5 flex flex-wrap items-center justify-center gap-x-3 text-center text-[11px] font-semibold text-muted-foreground">
+      {isNative ? <button type="button" disabled={busy} onClick={onRestore} className={link}>Restore</button> : null}
+      <a href={isIos ? APPLE_EULA_URL : TERMS_URL} target="_blank" rel="noreferrer" className={link}>Terms</a>
+      <a href={PRIVACY_URL} target="_blank" rel="noreferrer" className={link}>Privacy</a>
     </p>
   );
 }
@@ -1072,10 +940,13 @@ const COMPARISON_GROUPS: Array<{
     { label: 'Lily Pads you can keep', free: '2', plus: '3' },
   ] },
   { title: 'Wardrobe & shop', icon: 'wardrobe', rows: [
+    { label: 'Special shop items a day', free: String(DEFAULT_SHOP_SALES.freeSlots), plus: String(DEFAULT_SHOP_SALES.freeSlots + DEFAULT_SHOP_SALES.plusSlots) },
+    { label: `Daily ${DEFAULT_SHOP_SALES.saleDiscountPercent}% off pick`, free: '—', plus: 'Included' },
+    { label: 'Daily legendary in the shop', free: '—', plus: 'Included' },
+    { label: 'Shop refreshes a day', free: `${DEFAULT_SHOP_SALES.adRerolls} ad`, plus: String(Math.max(DEFAULT_SHOP_SALES.plusRefreshes, DEFAULT_SHOP_SALES.freeRerolls)) },
+    { label: 'Trade reward rerolls', free: 'With ads', plus: 'No ads' },
     { label: 'Wishlist slots', free: '4', plus: '10' },
     { label: 'Saved looks', free: String(SAVED_LOOKS_FREE), plus: String(SAVED_LOOKS_PLUS) },
-    { label: 'Trade reward rerolls', free: 'With ads', plus: 'No ads' },
-    { label: 'Shop refreshes a day', free: `${DEFAULT_SHOP_SALES.freeRerolls} + ${DEFAULT_SHOP_SALES.adRerolls} ad`, plus: String(Math.max(DEFAULT_SHOP_SALES.plusRefreshes, DEFAULT_SHOP_SALES.freeRerolls)) },
   ] },
   { title: 'Planning & coaching', icon: 'planner', rows: [
     { label: 'Weekly coach read', free: '—', plus: 'Included' },
@@ -1086,7 +957,7 @@ const COMPARISON_GROUPS: Array<{
 function CompareValue({ value, plus = false }: { value: string; plus?: boolean }) {
   if (value === 'Included') {
     return (
-      <span className="inline-grid h-6 w-6 place-items-center rounded-full bg-amber-400 text-amber-950">
+      <span className="inline-grid h-6 w-6 place-items-center rounded-full bg-[var(--plus-cta)] text-[var(--plus-cta-ink)]">
         <Check className="h-3.5 w-3.5" strokeWidth={3.5} aria-hidden />
         <span className="sr-only">Included</span>
       </span>
@@ -1107,7 +978,7 @@ function CompareView() {
   return (
     <div className="mx-auto w-full max-w-xl pb-4 pt-2">
       <h2 className="text-[26px] font-black leading-tight tracking-tight">Everything in Plus</h2>
-      <p className="mt-1 text-sm font-medium text-muted-foreground">Your free experience stays. Plus adds these extras and supports our small team.</p>
+      <p className="mt-1 text-sm font-medium text-muted-foreground">Everything free stays free. Plus adds these on top.</p>
 
       <div className="sticky top-0 z-10 -mx-1 mt-4 grid grid-cols-[minmax(0,1fr)_64px_84px] items-end bg-background px-1 pb-2 pt-2">
         <span />
@@ -1136,7 +1007,7 @@ function CompareView() {
                   <tr key={row.label} className="border-t border-border/60">
                     <th scope="row" className="py-3 pl-3.5 pr-2 font-semibold leading-snug">{row.label}</th>
                     <td className="px-1 py-3 text-center text-xs font-semibold tabular-nums text-muted-foreground"><CompareValue value={row.free} /></td>
-                    <td className="bg-amber-400/10 px-1 py-3 text-center tabular-nums"><CompareValue value={row.plus} plus /></td>
+                    <td className="bg-[rgba(245,200,76,0.1)] px-1 py-3 text-center tabular-nums"><CompareValue value={row.plus} plus /></td>
                   </tr>
                 ))}
               </tbody>

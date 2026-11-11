@@ -15,7 +15,7 @@ export async function sendPlusPush(
   opts: {
     title: string;
     body: string;
-    type: 'plus_trial_reminder' | 'plus_trial_ending';
+    type: 'plus_trial_reminder' | 'plus_trial_ending' | 'plus_preview_ending';
     path?: string;
   },
 ) {

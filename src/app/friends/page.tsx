@@ -147,26 +147,6 @@ export default function FriendsPage() {
         presentFlyReward({
           amount: granted,
           balanceAfter,
-          placement: 'friend_reward_double',
-          double: data?.doubled
-            ? null
-            : async () => {
-                const response = await fetch('/api/friends/claim', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ tz, double: true }),
-                });
-                const result = await response.json().catch(() => ({}));
-                const bonus = Math.max(0, Math.floor(result?.granted ?? 0));
-                if (!response.ok || bonus <= 0) {
-                  throw new Error('Could not double your flies — try again later.');
-                }
-                return {
-                  bonus,
-                  balanceAfter:
-                    balanceAfter !== undefined ? balanceAfter + bonus : undefined,
-                };
-              },
         });
         void mutateFriends();
       }
