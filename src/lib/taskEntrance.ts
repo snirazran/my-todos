@@ -7,10 +7,23 @@ const fresh = new Map<string, number>();
 const playedIds = new Set<string>();
 const playedRows = new WeakSet<Element>();
 
+let holdingEntrances = false;
+const heldIds: string[] = [];
+
+export function holdTaskEntrances() {
+  holdingEntrances = true;
+}
+
 export function markFreshTasks(
   ids: ReadonlyArray<string | null | undefined> | null | undefined,
 ) {
   if (!ids) return;
+  if (holdingEntrances) {
+    ids.forEach((id) => {
+      if (id && heldIds.indexOf(id) < 0) heldIds.push(id);
+    });
+    return;
+  }
   const until = Date.now() + FRESH_TTL_MS;
   ids.forEach((id) => {
     if (!id) return;
@@ -604,4 +617,30 @@ export function playTaskEntrance(
     sparkBurst(row, fly, landAt + 90);
   }
   window.setTimeout(() => hapticTick(), landAt + 60);
+}
+
+const RELEASE_STAGGER_MS = 130;
+
+export function releaseHeldTaskEntrances(origin?: DOMRect | null) {
+  holdingEntrances = false;
+  const ids = heldIds.splice(0, heldIds.length);
+  if (ids.length === 0 || typeof document === 'undefined') return;
+  markFreshTasks(ids);
+  ids.forEach((id, index) => {
+    window.setTimeout(() => {
+      const row = document.querySelector<HTMLElement>(
+        `[data-row][data-task-id="${CSS.escape(id)}"]`,
+      );
+      if (!row) return;
+      if (origin) launchTaskEntranceFrom(origin);
+      playTaskEntrance(row, id, {
+        card: row.querySelector<HTMLElement>('[data-task-card]'),
+      });
+    }, index * RELEASE_STAGGER_MS);
+  });
+}
+
+export function burstSparksAt(host: HTMLElement, target: HTMLElement, delay = 0) {
+  if (prefersReducedMotion()) return;
+  sparkBurst(host, target, delay);
 }

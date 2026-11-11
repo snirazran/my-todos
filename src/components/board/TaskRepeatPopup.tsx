@@ -5,7 +5,12 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { RepeatView } from '@/components/ui/quick-add/RepeatView';
 import { EndDateCalendarSheet } from '@/components/ui/quick-add/EndDateCalendarSheet';
 import { CustomRepeatSheet } from '@/components/ui/quick-add/CustomRepeatSheet';
-import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
+import {
+  parseYmdLocal,
+  type RepeatMode,
+  type RepeatRule,
+} from '@/components/ui/quick-add/utils';
+import { PRIMARY_BUTTON } from '@/components/ui/quick-add/kit';
 import { todayYmd } from '@/components/board/helpers';
 
 interface TaskRepeatPopupProps {
@@ -41,7 +46,7 @@ export function TaskRepeatPopup({
   currentEndDate,
   currentRule,
   anchorYmd,
-  description = 'Choose when this task comes back.',
+  description = '',
   doneLabel = 'Done',
   onChange,
 }: TaskRepeatPopupProps) {
@@ -89,10 +94,10 @@ export function TaskRepeatPopup({
               ref={bindScroll}
               className="min-h-0 flex-1 overflow-y-auto overscroll-none px-5 pt-2 sm:pt-5"
             >
-              <h3 className="mb-1 text-center text-[17px] font-black text-foreground">
+              <h3 className="flex h-8 items-center justify-center text-[17px] font-black tracking-tight text-foreground">
                 Repeat
               </h3>
-              <p className="mb-4 text-center text-[12px] font-medium text-muted-foreground">
+              <p className="mb-4 min-h-0 text-center text-[13px] font-bold text-muted-foreground">
                 {description}
               </p>
 
@@ -106,14 +111,16 @@ export function TaskRepeatPopup({
                 onClearEndDate={() => setEndDate(null)}
                 customRule={rule}
                 onOpenCustom={() => setShowCustom(true)}
+                onCustomRule={(next) => {
+                  setRule(next);
+                  setMode('custom');
+                }}
+                anchorDow={parseYmdLocal(anchorYmd).getDay()}
               />
             </div>
 
-            <div className="shrink-0 border-t border-border/50 bg-card px-5 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3">
-              <button
-                onClick={commit}
-                className="h-11 w-full rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
-              >
+            <div className="shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-4">
+              <button type="button" onClick={commit} className={PRIMARY_BUTTON}>
                 {doneLabel}
               </button>
             </div>

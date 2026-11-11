@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  apiDayFromDisplay,
   labelForDisplayDay,
   type ApiDay,
   type DisplayDay,
@@ -29,8 +30,6 @@ import { CustomRepeatSheet } from './CustomRepeatSheet';
 import {
   allDisplayDays,
   monthlyRepeatLabel,
-  nowHm,
-  pad,
   repeatModeFor,
   weekdayDisplayDays,
   weekendDisplayDays,
@@ -40,6 +39,9 @@ import {
 } from './utils';
 import type { ActivePicker, RepeatChoice } from './types';
 import type { TagManager } from './useTagManager';
+import { PRIMARY_BUTTON, Squircle, type Tint } from './kit';
+import { MonthGrid } from './MonthGrid';
+import { hapticTick } from '@/lib/haptics';
 
 type Props = {
   activePicker: ActivePicker;
@@ -98,12 +100,14 @@ type Props = {
 
 function WhenRow({
   icon,
+  tint,
   label,
   value,
   set,
   onClick,
 }: {
   icon: React.ReactNode;
+  tint: Tint;
   label: string;
   value: string;
   set: boolean;
@@ -113,22 +117,25 @@ function WhenRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-14 w-full items-center gap-3 rounded-2xl bg-muted/60 px-4 text-left ring-1 ring-inset ring-border/60 transition-transform active:scale-[0.985]"
+      className="flex h-14 w-full items-center gap-3 pl-2.5 pr-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50"
     >
-      <span className={set ? 'text-primary' : 'text-muted-foreground'}>
+      <Squircle tint={tint} size="lg">
         {icon}
-      </span>
+      </Squircle>
       <span className="flex-1 text-[15px] font-extrabold text-foreground">
         {label}
       </span>
       <span
-        className={`text-[14px] font-bold ${
+        className={`text-[14px] font-extrabold ${
           set ? 'text-primary' : 'text-muted-foreground'
         }`}
       >
         {value}
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+      <ChevronRight
+        className="h-4 w-4 shrink-0 text-muted-foreground/60"
+        strokeWidth={3}
+      />
     </button>
   );
 }
@@ -216,15 +223,10 @@ export function PickerSheet(props: Props) {
     }
   };
 
-  const reminderTime = startTime || nowHm();
-  const [reminderHour24, reminderMinute] = reminderTime.split(':').map(Number);
-
-  const setReminderTimeParts = (hour24: number, minute: number) => {
-    setStartTime(`${pad(hour24)}:${pad(minute)}`);
-  };
-  const saveReminderTime = () => {
+  const saveReminderTime = (time: string, offset: string) => {
     setNotifyEnabled(true);
-    if (!startTime) setStartTime(nowHm());
+    setStartTime(time);
+    setReminder(offset);
     reminderSnapshotRef.current = null;
     setShowReminderPicker(false);
   };
@@ -274,8 +276,8 @@ export function PickerSheet(props: Props) {
           ref={bindScroll}
           className="mx-auto min-h-0 w-full flex-1 overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-8"
         >
-          <div className="relative mb-7 flex h-9 items-center justify-center">
-            <h2 className="text-[17px] font-black text-foreground">
+          <div className="relative mb-4 flex h-8 items-center justify-center">
+            <h2 className="text-[17px] font-black tracking-tight text-foreground">
               {displayPicker === 'tags'
                 ? 'Tags'
                 : displayPicker === 'date'
@@ -306,21 +308,28 @@ export function PickerSheet(props: Props) {
                 tomorrowKey={tomorrowKey}
                 selectedDateKey={selectedDateKey}
                 selectSingleDay={selectSingleDay}
-                openCalendar={() => setShowCalendarPicker(true)}
+                selectCalendarDate={selectCalendarDate}
+                weekStart={daysOrder ? daysOrder[0] : 0}
+                calendarMonthLabel={calendarMonthLabel}
+                calendarCells={calendarCells}
+                shiftCalendarMonth={shiftCalendarMonth}
               />
               {/* Repeat and reminder are both answers to "when", so they live
                   here rather than as their own chips — the toolbar could not
                   hold five labelled controls on one row. */}
-              <div className="mt-6 flex flex-col gap-2">
+              <div className="mt-3 overflow-hidden rounded-2xl bg-muted/50">
                 <WhenRow
-                  icon={<RepeatIcon className="h-[18px] w-[18px]" />}
+                  tint="green"
+                  icon={<RepeatIcon className="h-[18px] w-[18px]" strokeWidth={2.5} />}
                   label="Repeat"
                   value={repeatsOn ? repeatShortLabel : 'Never'}
                   set={repeatsOn}
                   onClick={() => setActivePicker('repeat')}
                 />
+                <div className="mx-3.5 border-t border-border/60" />
                 <WhenRow
-                  icon={<Bell className="h-[18px] w-[18px]" />}
+                  tint="amber"
+                  icon={<Bell className="h-[18px] w-[18px]" strokeWidth={2.5} />}
                   label="Reminder"
                   value={notifyEnabled && startTime ? startTime : 'None'}
                   set={notifyEnabled}
@@ -347,16 +356,22 @@ export function PickerSheet(props: Props) {
                 onClearEndDate={() => setRepeatEndDate(null)}
                 customRule={repeatRule}
                 onOpenCustom={() => setShowCustomSheet(true)}
+                onCustomRule={(rule) => {
+                  setRepeatRule(rule);
+                  setRepeat('custom');
+                }}
+                anchorDow={apiDayFromDisplay(repeatDay, daysOrder)}
+                weekOrder={daysOrder}
               />
               {/* Sticky: the frequency list is long enough to push Save off
                   screen, and a save you have to scroll for reads as missing. */}
-              <div className="sticky bottom-0 -mx-5 mt-5 bg-background px-5 pb-1 pt-3">
+              <div className="sticky bottom-0 -mx-5 mt-1 bg-background px-5 pb-1 pt-3">
                 <button
                   type="button"
                   onClick={() => setActivePicker(null)}
-                  className="h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+                  className={PRIMARY_BUTTON}
                 >
-                  Save
+                  Done
                 </button>
               </div>
             </>
@@ -365,24 +380,10 @@ export function PickerSheet(props: Props) {
         )}
       </BaseSheet>
 
-      <CalendarOverlay
-        open={activePicker === 'date' && showCalendarPicker}
-        calendarMonthLabel={calendarMonthLabel}
-        calendarCells={calendarCells}
-        shiftCalendarMonth={shiftCalendarMonth}
-        todayKey={todayKey}
-        selectedDateKey={selectedDateKey}
-        selectCalendarDate={selectCalendarDate}
-        onClose={() => setShowCalendarPicker(false)}
-      />
-
       <ReminderOverlay
         open={showReminderPicker}
-        reminderHour24={reminderHour24}
-        reminderMinute={reminderMinute}
-        setReminderTimeParts={setReminderTimeParts}
+        time={startTime}
         reminder={reminder}
-        setReminder={setReminder}
         saveReminderTime={saveReminderTime}
         onClose={cancelReminderPicker}
         canRemove={notifyEnabled}
@@ -422,6 +423,8 @@ export function PickerSheet(props: Props) {
 
 /* ─── Date view ─────────────────────────────────────────────────────────── */
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 function DateView({
   isLater,
   selectedDay,
@@ -431,7 +434,11 @@ function DateView({
   tomorrowKey,
   selectedDateKey,
   selectSingleDay,
-  openCalendar,
+  selectCalendarDate,
+  weekStart,
+  calendarMonthLabel,
+  calendarCells,
+  shiftCalendarMonth,
 }: {
   isLater: boolean;
   selectedDay: DisplayDay;
@@ -441,170 +448,122 @@ function DateView({
   tomorrowKey: string;
   selectedDateKey: string;
   selectSingleDay: (day: DisplayDay) => void;
-  openCalendar: () => void;
+  selectCalendarDate: (date: Date) => void;
+  weekStart: number;
+  calendarMonthLabel: string;
+  calendarCells: Array<Date | null>;
+  shiftCalendarMonth: (delta: number) => void;
 }) {
-  const isCustomDate =
-    selectedDateKey !== todayKey && selectedDateKey !== tomorrowKey && !isLater;
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 2);
+  while (nextWeek.getDay() !== weekStart) {
+    nextWeek.setDate(nextWeek.getDate() + 1);
+  }
+  const nextWeekKey = ymdLocal(nextWeek);
+
+  const quick: Array<{
+    label: string;
+    date: Date;
+    tint: Tint;
+    selected: boolean;
+    pick: () => void;
+  }> = [
+    {
+      label: 'Today',
+      date: today,
+      tint: 'sky',
+      selected: !isLater && selectedDay === todayIndex && selectedDateKey === todayKey,
+      pick: () => selectSingleDay(todayIndex),
+    },
+    {
+      label: 'Tomorrow',
+      date: tomorrow,
+      tint: 'amber',
+      selected: !isLater && selectedDateKey === tomorrowKey,
+      pick: () => selectSingleDay(tomorrowIndex),
+    },
+    {
+      label: 'Next week',
+      date: nextWeek,
+      tint: 'violet',
+      selected: !isLater && selectedDateKey === nextWeekKey,
+      pick: () => selectCalendarDate(nextWeek),
+    },
+  ];
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-2.5">
-        {[
-          { label: 'Today', day: todayIndex },
-          { label: 'Tomorrow', day: tomorrowIndex },
-        ].map(({ label, day }) => {
-          const isSelected = !isLater && selectedDay === day;
-          return (
-            <button
-              key={label}
-              type="button"
-              onClick={() => selectSingleDay(day)}
-              className={`h-14 rounded-2xl border text-[14px] font-extrabold transition-all ${
-                isSelected
-                  ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
-                  : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
-              }`}
+    <div>
+      <div role="radiogroup" aria-label="Day" className="mb-3 grid grid-cols-3 gap-2">
+        {quick.map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            role="radio"
+            aria-checked={option.selected}
+            onClick={() => {
+              hapticTick();
+              option.pick();
+            }}
+            className={`flex h-[72px] items-center gap-2.5 rounded-2xl pl-2.5 pr-2 text-left transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96] ${
+              option.selected
+                ? 'bg-primary/10 ring-2 ring-inset ring-primary/40'
+                : 'bg-muted/50 [@media(hover:hover)]:hover:bg-muted'
+            }`}
+          >
+            <Squircle
+              tint={option.tint}
+              size="lg"
+              className="h-10 w-10 text-[16px] font-black tabular-nums"
             >
-              {label}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={openCalendar}
-          className={`h-14 rounded-2xl border text-[14px] font-extrabold transition-all ${
-            isCustomDate
-              ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
-              : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
-          }`}
-        >
-          On a date...
-        </button>
+              {option.date.getDate()}
+            </Squircle>
+            <span className="flex min-w-0 flex-col">
+              <span
+                className={`truncate text-[13.5px] font-extrabold leading-tight ${
+                  option.selected ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                {option.label}
+              </span>
+              <span className="text-[12px] font-bold leading-tight text-muted-foreground">
+                {DAY_NAMES[option.date.getDay()]}
+              </span>
+            </span>
+          </button>
+        ))}
       </div>
+
+      <MonthGrid
+        monthLabel={calendarMonthLabel}
+        cells={calendarCells}
+        onShift={shiftCalendarMonth}
+        selectedKey={isLater ? null : selectedDateKey}
+        todayKey={todayKey}
+        onPick={selectCalendarDate}
+      />
     </div>
   );
 }
 
-/* ─── Calendar overlay ──────────────────────────────────────────────────── */
-
-function CalendarOverlay({
-  open,
-  calendarMonthLabel,
-  calendarCells,
-  shiftCalendarMonth,
-  todayKey,
-  selectedDateKey,
-  selectCalendarDate,
-  onClose,
-}: {
-  open: boolean;
-  calendarMonthLabel: string;
-  calendarCells: Array<Date | null>;
-  shiftCalendarMonth: (delta: number) => void;
-  todayKey: string;
-  selectedDateKey: string;
-  selectCalendarDate: (date: Date) => void;
-  onClose: () => void;
-}) {
-  return (
-    <BaseSheet
-      open={open}
-      onOpenChange={(v) => !v && onClose()}
-      zIndex={1502}
-      className="bg-background ring-1 ring-border/70 sm:mx-4 sm:max-w-[520px]"
-    >
-      {() => (
-        <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
-          <div className="mb-4 flex items-center justify-between pr-11">
-            <h3 className="text-[17px] font-extrabold text-foreground">
-              {calendarMonthLabel}
-            </h3>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => shiftCalendarMonth(-1)}
-                className="grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                aria-label="Previous month"
-              >
-                <ChevronDown className="h-4 w-4 rotate-90 stroke-[3]" />
-              </button>
-              <button
-                type="button"
-                onClick={() => shiftCalendarMonth(1)}
-                className="grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                aria-label="Next month"
-              >
-                <ChevronDown className="h-4 w-4 -rotate-90 stroke-[3]" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-2 grid grid-cols-7 text-center text-[13px] font-extrabold text-primary/70">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="py-1.5">
-                {day.slice(0, 1)}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-y-1.5 text-center">
-            {calendarCells.map((date, index) => {
-              if (!date) return <div key={`empty-${index}`} className="h-10" />;
-
-              const dateKey = ymdLocal(date);
-              const selected = dateKey === selectedDateKey;
-              const isToday = dateKey === todayKey;
-              const muted = dateKey < todayKey;
-
-              const base =
-                'mx-auto grid h-10 w-10 place-items-center rounded-full text-[14px] font-extrabold transition-all';
-              const stateClass = selected
-                ? 'bg-primary text-primary-foreground shadow-[0_4px_12px_rgba(22,163,74,0.35)] scale-105'
-                : isToday
-                  ? 'bg-primary/10 text-primary ring-1 ring-primary/40 hover:bg-primary/15'
-                  : muted
-                    ? 'text-muted-foreground/45 hover:bg-muted/40'
-                    : 'text-foreground hover:bg-primary/10 hover:text-primary';
-
-              return (
-                <button
-                  key={dateKey}
-                  type="button"
-                  onClick={() => selectCalendarDate(date)}
-                  className={`${base} ${stateClass}`}
-                >
-                  {date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </BaseSheet>
-  );
-}
 
 /* ─── Reminder time overlay ─────────────────────────────────────────────── */
 
 function ReminderOverlay({
   open,
-  reminderHour24,
-  reminderMinute,
-  setReminderTimeParts,
+  time,
   reminder,
-  setReminder,
   saveReminderTime,
   onClose,
   onRemove,
   canRemove = false,
 }: {
   open: boolean;
-  reminderHour24: number;
-  reminderMinute: number;
-  setReminderTimeParts: (h: number, m: number) => void;
+  time: string;
   reminder: string;
-  setReminder: (v: string) => void;
-  saveReminderTime: () => void;
+  saveReminderTime: (time: string, offset: string) => void;
   onClose: () => void;
   onRemove?: () => void;
   canRemove?: boolean;
@@ -622,11 +581,8 @@ function ReminderOverlay({
           className="mx-auto max-h-[88dvh] w-full overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6"
         >
           <NotifyView
-            reminderHour24={reminderHour24}
-            reminderMinute={reminderMinute}
-            setReminderTimeParts={setReminderTimeParts}
+            time={time}
             reminder={reminder}
-            setReminder={setReminder}
             onSave={saveReminderTime}
             canRemove={canRemove}
             onRemove={onRemove}

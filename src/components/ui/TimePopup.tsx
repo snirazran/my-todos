@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { NotifyView } from './quick-add/NotifyView';
-import { nowHm, pad } from './quick-add/utils';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 
 interface Props {
@@ -30,29 +29,15 @@ export function TimePopup({
   onSave,
 }: Props) {
   const [mounted, setMounted] = useState(false);
-  const [startTime, setStartTime] = useState(initialStartTime || nowHm());
-  const [reminder, setReminder] = useState(initialReminder || 'at_time');
   // Opening Notify means you want a reminder, so the picker is always ready.
   const hasExisting = !!initialReminder;
   const { canEnable: canEnableNotifs, enableOrConfigure } = useNotificationStatus();
 
   useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    if (!open) return;
-    setStartTime(initialStartTime || nowHm());
-    setReminder(initialReminder || 'at_time');
-  }, [open, initialStartTime, initialReminder]);
-
   if (!mounted) return null;
 
-  const [hour24, minute] = startTime.split(':').map(Number);
-
-  const setTimeParts = (h: number, m: number) => {
-    setStartTime(`${pad(h)}:${pad(m)}`);
-  };
-
-  const handleSave = async () => {
+  const handleSave = async (startTime: string, reminder: string) => {
     await onSave({ startTime, endTime: '', reminder });
     // A reminder is useless if the OS won't let us deliver it — nudge the user
     // to switch notifications on right after they save one.
@@ -76,14 +61,11 @@ export function TimePopup({
         <div className="w-full px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-1 sm:pb-6">
               <div className="mx-auto w-full">
                 <NotifyView
-                  reminderHour24={hour24}
-                  reminderMinute={minute}
-                  setReminderTimeParts={setTimeParts}
-                  reminder={reminder}
-                  setReminder={setReminder}
+                  time={initialStartTime}
+                  reminder={initialReminder}
                   onSave={handleSave}
-                  saveLabel={busy ? 'Saving...' : 'Save reminder'}
-                  saveDisabled={busy || !startTime}
+                  saveLabel={busy ? 'Saving...' : undefined}
+                  saveDisabled={busy}
                   canRemove={hasExisting}
                   onRemove={handleRemove}
                 />

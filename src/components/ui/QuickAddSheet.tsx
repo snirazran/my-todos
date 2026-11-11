@@ -48,7 +48,11 @@ import { useIntros } from '@/hooks/useIntros';
 import { useUIStore } from '@/lib/uiStore';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
-import { launchTaskEntranceFrom } from '@/lib/taskEntrance';
+import {
+  holdTaskEntrances,
+  launchTaskEntranceFrom,
+  releaseHeldTaskEntrances,
+} from '@/lib/taskEntrance';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
@@ -56,13 +60,20 @@ import { QuickAddTip } from './quick-add/QuickAddTip';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
 import {
   SAVED_TASKS_KEY,
-  SuggestionTabs,
   type SuggestionPick,
 } from './quick-add/SuggestionTabs';
-import { SavedTasksSheet } from './quick-add/SavedTasksSheet';
-import { Icon as AppIcon } from '@/components/ui/Icon';
+import { IdeasPanel, type SavedIdeaTask } from './quick-add/IdeasPanel';
+import {
+  IDEA_TAG_HEADROOM,
+  ideaCategory,
+  normalizeIdeaText,
+  type HabitIdea,
+  type IdeaCategory,
+} from '@/lib/habits/ideaLibrary';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { useDragScroll } from './quick-add/useDragScroll';
 import {
+  PRIMARY_BUTTON,
   TINT,
   TagPillContent,
   tagPillProps,
@@ -132,7 +143,7 @@ const ToolbarChip = React.forwardRef<
       aria-label={ariaLabel ?? label}
       data-hint={hint}
       onClick={onClick}
-      className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-muted/50 pl-1 pr-3.5 text-[14px] font-bold transition-[transform,background-color] active:scale-95 active:bg-muted sm:h-10 sm:pr-3 sm:text-[13.5px] [@media(hover:hover)]:hover:bg-muted ${
+      className={`inline-flex h-11 shrink-0 items-center gap-1.5 rounded-2xl bg-muted/50 pl-1 pr-2 text-[14px] font-bold transition-[transform,background-color] duration-150 ease-out active:scale-95 active:bg-muted sm:h-10 sm:gap-2 sm:pr-3 sm:text-[13.5px] [@media(hover:hover)]:hover:bg-muted ${
         active ? 'text-foreground' : 'text-muted-foreground'
       }`}
     >
@@ -160,6 +171,12 @@ import type {
   SavedTag,
 } from './quick-add/types';
 
+const IDEA_TAG_REQUEST_TTL_MS = 30000;
+const ideaTagRequests: Record<
+  string,
+  { at: number; request: Promise<string | null> }
+> = {};
+
 const BulkAddReviewSheet = dynamic(
   () => import('./quick-add/BulkAddReviewSheet'),
   { ssr: false },
@@ -181,10 +198,11 @@ export default function QuickAddSheet({
   hideRepeatPicker = false,
   focusCategoryIds,
   categoryTagMap,
-  submitLabel = 'Add Task',
+  submitLabel = 'Add goal',
   defaultRepeatDaily = false,
   sections = [],
   defaultSectionId = null,
+  existingTexts,
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
   const { showNotification } = useNotification();
@@ -229,15 +247,44 @@ export default function QuickAddSheet({
   const tagInputRef = useRef<HTMLInputElement>(null);
   const tagScroll = useDragScroll();
   const actionsScroll = useDragScroll();
-  const [tagFadeRight, setTagFadeRight] = useState(false);
-  const updateTagFade = useCallback(() => {
-    const el = tagScroll.ref.current;
-    if (!el) return;
-    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
-    const clampedScroll = Math.min(maxScroll, Math.max(0, el.scrollLeft));
-    if (el.scrollLeft !== clampedScroll) el.scrollLeft = clampedScroll;
-    setTagFadeRight(maxScroll - clampedScroll > 4);
-  }, [tagScroll.ref]);
+  const tagWrapRef = useRef<HTMLDivElement>(null);
+  const [visiblePillCount, setVisiblePillCount] = useState<number | null>(null);
+  const [frontTagIds, setFrontTagIds] = useState<string[]>([]);
+  const measureTags = useCallback(() => {
+    const wrap = tagWrapRef.current;
+    if (!wrap) {
+      setVisiblePillCount(null);
+      return;
+    }
+    const pills = wrap.querySelectorAll<HTMLElement>('[data-measure-tag]');
+    const rows = Number(wrap.dataset.rows) || 1;
+    const tops: number[] = [];
+    for (let i = 0; i < pills.length; i += 1) {
+      if (tops.indexOf(pills[i].offsetTop) < 0) tops.push(pills[i].offsetTop);
+    }
+    if (tops.length <= rows) {
+      const last = pills[pills.length - 1];
+      const fitsButton =
+        !last ||
+        tops.length < rows ||
+        wrap.clientWidth - (last.offsetLeft + last.offsetWidth) >= 52;
+      if (fitsButton) {
+        setVisiblePillCount(null);
+        return;
+      }
+    }
+    const lastTop = tops[Math.min(rows, tops.length) - 1];
+    let visible = 0;
+    for (let i = 0; i < pills.length; i += 1) {
+      if (pills[i].offsetTop <= lastTop) visible += 1;
+    }
+    while (visible > 1) {
+      const last = pills[visible - 1];
+      if (wrap.clientWidth - (last.offsetLeft + last.offsetWidth) >= 60) break;
+      visible -= 1;
+    }
+    setVisiblePillCount(visible);
+  }, []);
   const tagManager = useTagManager({
     open,
     selectedTags: tags,
@@ -320,8 +367,11 @@ export default function QuickAddSheet({
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [autoAddedTagIds, setAutoAddedTagIds] = useState<string[]>([]);
   const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
-  const [suggestionsReady, setSuggestionsReady] = useState(false);
-  const [hasSuggestionContent, setHasSuggestionContent] = useState(false);
+  const [pickedIdea, setPickedIdea] = useState<HabitIdea | null>(null);
+  const [pendingIdeaTag, setPendingIdeaTag] = useState<IdeaCategory | null>(null);
+  const [addedIdeaIds, setAddedIdeaIds] = useState<string[]>([]);
+  const [tabColor, setTabColor] = useState<string | null>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const pickSetTimeRef = useRef(false);
   const { seenIntros, markIntroSeen } = useIntros(open);
   const markIntroSeenRef = useRef(markIntroSeen);
@@ -358,12 +408,51 @@ export default function QuickAddSheet({
     .filter((c): c is string => !!c)
     .slice(0, 3);
 
+  const orderedTags = useMemo(() => {
+    if (frontTagIds.length === 0) return stripTags;
+    const front = frontTagIds
+      .map((id) => stripTags.find((t) => t.id === id))
+      .filter((t): t is SavedTag => !!t);
+    return front.concat(stripTags.filter((t) => frontTagIds.indexOf(t.id) < 0));
+  }, [stripTags, frontTagIds]);
+  const orderedTagKey = orderedTags.map((t) => `${t.id}:${t.name}`).join('|');
+  const hasPendingIdeaTag = !!pendingIdeaTag;
+  useLayoutEffect(() => {
+    measureTags();
+  }, [measureTags, orderedTagKey, hasPendingIdeaTag, isDesktop, open]);
   useEffect(() => {
-    updateTagFade();
-  }, [stripTags.length, open, updateTagFade]);
+    const wrap = tagWrapRef.current;
+    if (!open || !wrap || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measureTags);
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, [open, measureTags, orderedTagKey, hasPendingIdeaTag]);
+  const selectedTagsKey = tags.join(',');
+  const visibleTagCount =
+    visiblePillCount === null
+      ? orderedTags.length
+      : Math.max(0, visiblePillCount - (hasPendingIdeaTag ? 1 : 0));
+  const hiddenTagCount = orderedTags.length - visibleTagCount;
+  useLayoutEffect(() => {
+    measureTags();
+  }, [measureTags, selectedTagsKey]);
+  useEffect(() => {
+    if (hiddenTagCount === 0) return;
+    const visible = visibleTagCount;
+    const buried = tags.filter((id) => {
+      const at = orderedTags.findIndex((t) => t.id === id);
+      return at >= visible && frontTagIds.indexOf(id) < 0;
+    });
+    if (buried.length > 0) setFrontTagIds((prev) => buried.concat(prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTagsKey, hiddenTagCount, orderedTagKey]);
 
   const calendar = useCalendarMonth(new Date());
-  const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
+  const {
+    inset: keyboardInset,
+    height: viewportHeight,
+    offsetTop: viewportOffsetTop,
+  } = useKeyboardInset(open);
 
   useEffect(() => {
     setMounted(true);
@@ -438,19 +527,37 @@ export default function QuickAddSheet({
     onOpenChange,
   ]);
 
-  useEffect(() => {
+  const fitInput = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = '0px';
     el.style.height = `${el.scrollHeight}px`;
-  }, [text, open]);
+  }, []);
+  useEffect(() => {
+    fitInput();
+  }, [text, open, fitInput]);
+  useEffect(() => {
+    const box = inputRef.current?.parentElement;
+    if (!open || !box || typeof ResizeObserver === 'undefined') return;
+    let width = box.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (box.clientWidth === width) return;
+      width = box.clientWidth;
+      fitInput();
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [open, mounted, fitInput]);
 
 
   const [openSeen, setOpenSeen] = useState(false);
   if (open !== openSeen) {
     setOpenSeen(open);
-    setSuggestionsReady(open);
     if (open) {
+      setPickedIdea(null);
+      setPendingIdeaTag(null);
+      setAddedIdeaIds([]);
+      setFrontTagIds([]);
       setText(initialText);
       setBulkInitialTasks(null);
       setBulkOmittedCount(0);
@@ -494,7 +601,6 @@ export default function QuickAddSheet({
       setPickedNotes(undefined);
       setPickedChecklist(undefined);
       setShowSavedConfirm(false);
-      setHasSuggestionContent(false);
       setManagedTag(null);
       setPickedSectionId(defaultSectionId);
       setSectionPickedManually(!!defaultSectionId);
@@ -608,10 +714,156 @@ export default function QuickAddSheet({
   const { data: leapView } = useLeapView(open);
   const reduceMotion = useReducedMotion();
   const leapLily = repeatsOn && !!leapView?.enabled;
-  const [savedOpen, setSavedOpen] = useState(false);
-  const { data: savedBacklog } = useSWR<unknown>(open ? SAVED_TASKS_KEY : null, fetcher);
-  const savedCount = Array.isArray(savedBacklog) ? savedBacklog.length : 0;
+  const { data: savedBacklog } = useSWR<SavedIdeaTask[]>(
+    open ? SAVED_TASKS_KEY : null,
+    fetcher,
+  );
+  const savedTasks: SavedIdeaTask[] = Array.isArray(savedBacklog) ? savedBacklog : [];
+  const releaseIdea = () => {
+    if (!pickedIdea) return;
+    setPickedIdea(null);
+    setPendingIdeaTag(null);
+    setRepeat(defaultRepeat);
+    setPickedDays(
+      defaultRepeatDaily ? ([0, 1, 2, 3, 4, 5, 6] as DisplayDay[]) : [repeatDay],
+    );
+  };
+  const dropAutoTags = () => {
+    const removed = new Set(autoAddedTagIds);
+    setTags((prev) => prev.filter((id) => !removed.has(id)));
+    setAutoAddedTagIds([]);
+  };
+  const hasIdeaTagRoom =
+    tagManager.savedTags.length < tagManager.tagLimit - IDEA_TAG_HEADROOM;
+  const findIdeaTag = (category: IdeaCategory) => {
+    const names = [category.tagName.toLowerCase(), ...category.tagAliases];
+    for (let i = 0; i < names.length; i += 1) {
+      const match = tagManager.savedTags.find(
+        (t) => !t.disabled && t.name.trim().toLowerCase() === names[i],
+      );
+      if (match) return match;
+    }
+    return undefined;
+  };
+  const ensureIdeaTag = (category: IdeaCategory): Promise<string | null> => {
+    const existing = findIdeaTag(category);
+    if (existing) return Promise.resolve(existing.id);
+    const pending = ideaTagRequests[category.id];
+    if (pending && Date.now() - pending.at < IDEA_TAG_REQUEST_TTL_MS) {
+      return pending.request;
+    }
+    if (!hasIdeaTagRoom) return Promise.resolve(null);
+    const request = fetch('/api/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: category.tagName, color: category.color }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        mutate('/api/tags');
+        return typeof data?.tag?.id === 'string' ? (data.tag.id as string) : null;
+      })
+      .catch(() => null);
+    ideaTagRequests[category.id] = { at: Date.now(), request };
+    return request;
+  };
+  const clearSavedPick = () => {
+    setPickedBacklogTaskId(null);
+    setPickedBacklogText(null);
+    setPickedNotes(undefined);
+    setPickedChecklist(undefined);
+  };
+  const clearPickedTime = () => {
+    if (!pickSetTimeRef.current) return;
+    setStartTime('');
+    setEndTime('');
+    setNotifyEnabled(false);
+    pickSetTimeRef.current = false;
+  };
+  const pickIdea = (idea: HabitIdea) => {
+    const category = ideaCategory(idea.categoryId);
+    const tag = findIdeaTag(category);
+    const removed = new Set(autoAddedTagIds);
+    const kept = tags.filter((id) => !removed.has(id));
+    const alreadyTagged = !!tag && kept.indexOf(tag.id) >= 0;
+    setTags(tag && !alreadyTagged ? [...kept, tag.id] : kept);
+    setAutoAddedTagIds(tag && !alreadyTagged ? [tag.id] : []);
+    setPendingIdeaTag(
+      !tag && hasIdeaTagRoom ? category : null,
+    );
+    setText(idea.text);
+    setNlDismissed(idea.text);
+    setRepeatRule(null);
+    setRepeat('weekly');
+    setPickedDays(
+      idea.weekly ? [repeatDay] : ([0, 1, 2, 3, 4, 5, 6] as DisplayDay[]),
+    );
+    setPickedIdea(idea);
+    clearPickedTime();
+    clearSavedPick();
+    hapticTick();
+  };
+  const unpickIdea = () => {
+    if (pickedIdea && text === pickedIdea.text) setText('');
+    dropAutoTags();
+    releaseIdea();
+  };
+  const unpickSaved = () => {
+    if (pickedBacklogText !== null && text === pickedBacklogText) setText('');
+    dropAutoTags();
+    clearPickedTime();
+    clearSavedPick();
+  };
+  const clearComposer = () => {
+    if (pickedBacklogTaskId) unpickSaved();
+    else if (pickedIdea) unpickIdea();
+    setText('');
+  };
+  const instantAddIdea = (idea: HabitIdea) => {
+    if (addedIdeaIds.indexOf(idea.id) >= 0) return;
+    const category = ideaCategory(idea.categoryId);
+    const days: ApiDay[] = idea.weekly
+      ? [apiDayFromDisplay(repeatDay, daysOrder)]
+      : [0, 1, 2, 3, 4, 5, 6];
+    if (!isDesktop) holdTaskEntrances();
+    const attempt = async (): Promise<void> => {
+      setAddedIdeaIds((prev) =>
+        prev.indexOf(idea.id) >= 0 ? prev : [...prev, idea.id],
+      );
+      try {
+        const tagId = await ensureIdeaTag(category);
+        const tagIds = tagId ? [tagId] : [];
+        const section = tagId
+          ? sections.find((s) => (s.tagIds ?? []).indexOf(tagId) >= 0)
+          : undefined;
+        await onSubmit({
+          text: idea.text,
+          days,
+          repeat: 'weekly',
+          tags: tagIds,
+          repeatEndDate: null,
+          repeatRule: null,
+          sectionId: section?.id ?? defaultSectionId ?? undefined,
+        });
+        trackAnalyticsEvent('habit_idea_added', {
+          item_id: idea.id,
+          kind: idea.categoryId,
+          source: 'instant',
+        });
+      } catch (error) {
+        console.error('Add habit idea failed', error);
+        setAddedIdeaIds((prev) => prev.filter((id) => id !== idea.id));
+        showNotification(`Couldn't add "${idea.text}"`, () => attempt(), {
+          durationMs: 8000,
+          actionLabel: 'Retry',
+        });
+      }
+    };
+    hapticSuccess();
+    void attempt();
+  };
   const applySavedPick = (pick: SuggestionPick) => {
+    releaseIdea();
     setText(pick.text);
     setTags((prev) => {
       const removed = new Set(autoAddedTagIds);
@@ -657,31 +909,40 @@ export default function QuickAddSheet({
     320,
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
-  const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
-  const isShortScreen = availableSheetHeight < 700;
-  // The sheet hugs its content and sits at the bottom; this is just the cap so a
-  // long saved list can't grow past the screen (it scrolls internally instead).
-  const bottomGap = Math.round(availableSheetHeight * 0.02);
-  let sheetMaxHeight = Math.max(
-    360,
-    Math.min(
-      availableSheetHeight - bottomGap - 12,
-      isShortScreen ? availableSheetHeight : 600,
-    ),
+  const sheetMaxHeight = Math.round(availableSheetHeight * 0.88);
+  const cramped = !isDesktop && viewportHeight !== null && viewportHeight < 340;
+  const composing = !isDesktop && hasTaskText;
+  const tintColor = pickedIdea
+    ? ideaCategory(pickedIdea.categoryId).color
+    : composing
+      ? null
+      : tabColor;
+  const ideaTintRef = useRef('#22c55e');
+  if (tintColor) ideaTintRef.current = tintColor;
+  const ideaEmojiRef = useRef('');
+  if (pickedIdea) ideaEmojiRef.current = pickedIdea.emoji;
+  const detailsOpen = isDesktop || hasTaskText || questHintActive;
+  const ideaQuery =
+    (pickedIdea && text === pickedIdea.text) ||
+    (pickedBacklogText !== null && text === pickedBacklogText)
+      ? ''
+      : text;
+  const takenTexts = useMemo(
+    () => (existingTexts ?? []).map(normalizeIdeaText),
+    [existingTexts],
   );
-  if (keyboardActive && viewportHeight) {
-    sheetMaxHeight = Math.min(sheetMaxHeight, viewportHeight - 20);
-  }
-  if (isDesktop) {
-    sheetMaxHeight = Math.min(
-      sheetMaxHeight,
-      Math.round(availableSheetHeight * 0.8),
-    );
-  }
-  const suggestionsOffset = 360;
-  // Cap the saved list so it can't push the input card off-screen; below the cap
-  // it sizes to its content, above it scrolls inside.
-  const suggestionsMax = Math.min(420, Math.round(availableSheetHeight * 0.42));
+  useEffect(() => {
+    if (open) return;
+    const origin = closeRef.current?.getBoundingClientRect() ?? null;
+    const id = window.setTimeout(() => releaseHeldTaskEntrances(origin), 180);
+    return () => window.clearTimeout(id);
+  }, [open]);
+  useEffect(() => {
+    if (!pickedIdea || text.trim() !== '') return;
+    dropAutoTags();
+    releaseIdea();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
 
   useEffect(() => {
     if (!open) {
@@ -759,7 +1020,7 @@ export default function QuickAddSheet({
   useEffect(() => {
     if (!open || questHintActive || tagEditTipDismissed) return;
     if (!seenIntros || seenIntros.quickAddTagEdit) return;
-    if (tags.length === 0) return;
+    if (tags.length === 0 || tags.length === autoAddedTagIds.length) return;
     setTagEditTipOpen(true);
     markIntroSeenRef.current('quickAddTagEdit');
   }, [
@@ -863,6 +1124,7 @@ export default function QuickAddSheet({
   useEffect(() => {
     if (!open || !hasTaskText || questTagSuggestions.length > 0) return;
     if (suggestionEntries.length === 0) return;
+    if (pickedIdea && text === pickedIdea.text) return;
     const key = text.trim().toLowerCase();
     if (key.length < 4) return;
     const cache = aiCacheRef.current;
@@ -912,8 +1174,11 @@ export default function QuickAddSheet({
 
   const resolvedTagSuggestions =
     questTagSuggestions.length > 0 ? questTagSuggestions : aiTagSuggestions;
+  const ideaTextActive = !!pickedIdea && text === pickedIdea.text;
   const showQuestTagSuggestion =
-    resolvedTagSuggestions.length > 0 && text !== tagSuggestDismissed;
+    !ideaTextActive &&
+    resolvedTagSuggestions.length > 0 &&
+    text !== tagSuggestDismissed;
 
   const repeatMode =
     repeat === 'custom'
@@ -928,7 +1193,16 @@ export default function QuickAddSheet({
       weekend: 'Weekends',
       weekly: `Weekly · ${labelForDisplayDay(repeatDay as Exclude<DisplayDay, 7>, daysOrder).slice(0, 3)}`,
       monthly: 'Monthly',
-      custom: 'Custom',
+      custom:
+        repeatRule?.freq === 'weekly' &&
+        repeatRule.interval === 1 &&
+        repeatRule.byWeekday?.length
+          ? repeatRule.byWeekday.length <= 3
+            ? repeatRule.byWeekday
+                .map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d])
+                .join(', ')
+            : `${repeatRule.byWeekday.length} days a week`
+          : 'Custom',
       none: 'Repeat',
     }[repeatMode] ?? 'Repeat';
 
@@ -1003,6 +1277,8 @@ export default function QuickAddSheet({
     if (!submitData) return;
     submitLockRef.current = true;
     const savedTaskId = removeSavedTask ? pickedBacklogTaskId : null;
+    const ideaTag = pendingIdeaTag;
+    const idea = pickedIdea;
 
     hapticSuccess();
     markIntroSeenRef.current('quickAddNl');
@@ -1012,7 +1288,21 @@ export default function QuickAddSheet({
 
     const attempt = async (): Promise<void> => {
       try {
-        await onSubmit(submitData);
+        let data = submitData;
+        if (ideaTag) {
+          const tagId = await ensureIdeaTag(ideaTag);
+          if (tagId && data.tags.indexOf(tagId) < 0) {
+            data = { ...data, tags: [...data.tags, tagId] };
+          }
+        }
+        await onSubmit(data);
+        if (idea) {
+          trackAnalyticsEvent('habit_idea_added', {
+            item_id: idea.id,
+            kind: idea.categoryId,
+            source: 'composer',
+          });
+        }
       } catch (error) {
         console.error('Add task failed', error);
         showNotification(
@@ -1102,6 +1392,10 @@ export default function QuickAddSheet({
   };
 
   if (!mounted) return null;
+
+  const addTap = keyboardSafeTap(() => {
+    if (hasTaskText && !isSubmitting) void handleSubmit();
+  });
 
   const sheetVariants = {
     hidden: isDesktop ? { opacity: 0, y: 14 } : { y: '100%' },
@@ -1197,40 +1491,102 @@ export default function QuickAddSheet({
                     });
                   }
                 }}
-                style={{
-                  contain: 'layout paint style',
-                  // Mobile only: pin the sheet above the on-screen keyboard using
-                  // the real visualViewport inset so the Add Task button can never
-                  // hide behind it.
-                  bottom:
-                    isDesktop || !keyboardActive ? undefined : keyboardInset,
-                  transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
-                }}
-                className={`fixed z-[1400] flex max-h-[100dvh] transform-gpu pointer-events-none will-change-transform ${
+                style={{ contain: 'layout paint style' }}
+                className={`fixed inset-0 z-[1400] flex transform-gpu will-change-transform ${
                   isDesktop
-                    ? 'inset-0 items-start justify-center p-6 pt-[14vh]'
-                    : `inset-x-0 bottom-0 items-end px-3 pt-2 sm:px-6 ${
-                        keyboardActive ? 'pb-2' : 'pb-4 sm:pb-6'
-                      }`
+                    ? 'pointer-events-none items-start justify-center p-6 pt-[6vh]'
+                    : 'pond-panel flex-col bg-[linear-gradient(180deg,var(--pond-surface-top),var(--pond-surface-bottom))]'
                 }`}
               >
                 <div
-                  style={{ maxHeight: sheetMaxHeight }}
-                  className={`pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col sm:max-w-[620px] ${
-                    keyboardActive ? '' : 'pb-[env(safe-area-inset-bottom)]'
-                  }`}
+                  style={
+                    isDesktop
+                      ? { maxHeight: sheetMaxHeight }
+                      : {
+                          height: viewportHeight ?? undefined,
+                          transform: viewportOffsetTop
+                            ? `translateY(${viewportOffsetTop}px)`
+                            : undefined,
+                          transition: 'height 240ms cubic-bezier(0.32,0.72,0,1)',
+                        }
+                  }
+                  className={
+                    isDesktop
+                      ? 'pond-panel pointer-events-auto relative mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,var(--pond-surface-top),var(--pond-surface-bottom))] shadow-[0_0_0_1px_hsl(var(--border)/0.8),0_3px_0_0_rgba(0,0,0,0.14),0_22px_44px_-18px_rgba(15,23,42,0.4)]'
+                      : 'relative flex h-full w-full flex-none flex-col overflow-hidden pt-[env(safe-area-inset-top)]'
+                  }
                 >
-                  <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-5 pb-3.5 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.14),0_22px_44px_-18px_rgba(15,23,42,0.4)] sm:pt-5">
-                    {!isDesktop && (
-                      <div
-                        onPointerDown={(e) => dragControls.start(e)}
-                        className="-mx-5 -mt-2 mb-1 flex h-7 items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+                  <div
+                    aria-hidden
+                    style={
+                      {
+                        '--idea': ideaTintRef.current,
+                        opacity: tintColor ? 1 : 0,
+                      } as React.CSSProperties
+                    }
+                    className="pointer-events-none absolute inset-0 bg-[color:color-mix(in_srgb,var(--idea)_22%,white)] bg-[image:linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0))] transition-[background-color,opacity] duration-300 ease-out dark:bg-[color:color-mix(in_srgb,var(--idea)_24%,#0f1812)] dark:bg-[image:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.14))]"
+                  />
+                  <div className="relative flex min-h-0 flex-1 flex-col">
+                  {(
+                    <div
+                      onPointerDown={(e) => {
+                        if (!isDesktop) dragControls.start(e);
+                      }}
+                      className="relative flex h-[52px] flex-none touch-none items-center justify-between px-3 sm:h-[60px] sm:px-5"
+                    >
+                      <button
+                        ref={closeRef}
+                        type="button"
+                        aria-label="Close"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => onOpenChange(false)}
+                        className="relative z-10 grid h-10 w-10 place-items-center rounded-full bg-[hsl(var(--card-raised))] text-foreground/70 shadow-[0_0_0_1px_rgba(15,23,42,0.05),0_2px_0_0_rgba(15,23,42,0.05)] transition-transform duration-150 ease-out before:absolute before:-inset-0.5 active:scale-90 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_2px_0_0_rgba(0,0,0,0.3)]"
                       >
-                        <div className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
-                      </div>
-                    )}
+                        <X className="h-[18px] w-[18px]" strokeWidth={3} />
+                      </button>
+                      <h2
+                        className={`pointer-events-none absolute inset-x-0 text-center text-[17px] font-black tracking-tight transition-colors duration-300 ${
+                          tintColor ? 'text-foreground' : 'text-[color:var(--pond-ink)]'
+                        }`}
+                      >
+                        New goal
+                      </h2>
+                      {!isDesktop && (
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={() => openBulkAdd([])}
+                          className="relative z-10 inline-flex h-10 items-center gap-1.5 rounded-full px-2.5 text-[13.5px] font-extrabold text-[color:var(--pond-ink-muted)] transition-transform duration-150 ease-out active:scale-95"
+                        >
+                          <ListPlus className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                          Multiple
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div
+                    className={`mx-3 flex min-h-0 flex-col rounded-[24px] bg-popover px-3 pb-3 pt-1 shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_3px_0_0_rgba(15,23,42,0.08)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_3px_0_0_rgba(0,0,0,0.35)] sm:mx-5 sm:px-5 ${
+                      cramped ? 'overflow-y-auto' : 'flex-none overflow-hidden'
+                    }`}
+                  >
                     <div dir="ltr" className="w-full pt-1">
+                      <div
+                        aria-hidden
+                        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+                          pickedIdea
+                            ? 'grid-rows-[1fr] opacity-100'
+                            : 'grid-rows-[0fr] opacity-0'
+                        }`}
+                      >
+                        <div className="min-h-0 overflow-hidden">
+                          <span
+                            className="mt-2.5 grid h-11 w-11 place-items-center rounded-[14px] text-[23px] leading-none"
+                            style={{ backgroundColor: `${ideaTintRef.current}29` }}
+                          >
+                            {ideaEmojiRef.current}
+                          </span>
+                        </div>
+                      </div>
                       <div className="relative flex shrink-0 items-start gap-3">
                         <AnimatePresence initial={false}>
                           {tagColors.length > 0 && (
@@ -1241,7 +1597,7 @@ export default function QuickAddSheet({
                               animate={{ scaleY: 1, opacity: 1 }}
                               exit={{ scaleY: 0, opacity: 0 }}
                               transition={{ type: 'spring', stiffness: 520, damping: 30 }}
-                              className="absolute -left-5 top-[13px] flex h-7 w-[4px] origin-center flex-col overflow-hidden rounded-r-full sm:top-[15px]"
+                              className="absolute -left-3 top-[13px] sm:-left-5 flex h-7 w-[4px] origin-center flex-col overflow-hidden rounded-r-full sm:top-[15px]"
                             >
                               {tagColors.map((color, i) => (
                                 <span
@@ -1277,7 +1633,7 @@ export default function QuickAddSheet({
                             onPaste={handleTaskPaste}
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
-                            placeholder="Add a task"
+                            placeholder="Add a goal..."
                             aria-label="Task name"
                             disabled={isSubmitting}
                             spellCheck={false}
@@ -1305,48 +1661,15 @@ export default function QuickAddSheet({
                             </span>
                           )}
                         </div>
-                        {!isDesktop && (
-                        <button
-                          ref={sendRef}
-                          type="button"
-                          {...keyboardSafeTap(() => {
-                            if (hasTaskText && !isSubmitting) void handleSubmit();
-                          })}
-                          disabled={isSubmitting}
-                          aria-disabled={!hasTaskText}
-                          aria-label={submitLabel}
-                          className={`relative mt-1.5 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow,transform] duration-200 ease-out sm:mt-2 sm:h-[52px] sm:w-[52px] ${
-                            hasTaskText
-                              ? 'bg-[#447d3f] text-white shadow-[0_3px_0_0_#2c511a] active:translate-y-[3px] active:shadow-none [@media(hover:hover)]:hover:bg-[#3d7038]'
-                              : 'cursor-default bg-primary/[0.16] ring-1 ring-inset ring-primary/25'
-                          }`}
-                        >
-                          <AnimatePresence initial={false} mode="popLayout">
-                            {hasTaskText ? (
-                              <motion.span
-                                key="send"
-                                initial={{ scale: 0.3, opacity: 0, rotate: -60 }}
-                                animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                                exit={{ scale: 0.3, opacity: 0, rotate: 30 }}
-                                transition={{ type: 'spring', stiffness: 640, damping: 26 }}
-                                className="grid place-items-center"
-                              >
-                                <ArrowUp className="h-6 w-6" strokeWidth={3} />
-                              </motion.span>
-                            ) : (
-                              <motion.span
-                                key="fly"
-                                initial={{ scale: 0.4, opacity: 0, y: 8 }}
-                                animate={{ scale: 1, opacity: 1, y: 0 }}
-                                exit={{ scale: 0.5, opacity: 0, y: -14, rotate: -12 }}
-                                transition={{ type: 'spring', stiffness: 520, damping: 24 }}
-                                className="grid place-items-center"
-                              >
-                                <Fly size={40} y={-3} interactive={false} />
-                              </motion.span>
-                            )}
-                          </AnimatePresence>
-                        </button>
+                        {composing && (
+                          <button
+                            type="button"
+                            aria-label="Clear"
+                            {...keyboardSafeTap(clearComposer)}
+                            className="relative mt-3.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-foreground/[0.07] text-muted-foreground transition-transform duration-150 ease-out animate-in fade-in-0 zoom-in-90 before:absolute before:-inset-1.5 active:scale-90 dark:bg-white/10"
+                          >
+                            <X className="h-4 w-4" strokeWidth={3} />
+                          </button>
                         )}
                       </div>
 
@@ -1418,6 +1741,14 @@ export default function QuickAddSheet({
                         </div>
                       )}
 
+                      <div
+                        className={`grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+                          detailsOpen
+                            ? 'visible grid-rows-[1fr] opacity-100'
+                            : 'invisible grid-rows-[0fr] opacity-0'
+                        }`}
+                      >
+                      <div className="min-h-0 overflow-hidden">
                       <div className="h-3" />
 
                       {/* One row that scrolls. Every control keeps its word —
@@ -1430,7 +1761,7 @@ export default function QuickAddSheet({
                         }}
                         onScroll={actionsFade.update}
                         {...actionsScroll.handlers}
-                        className={`-mx-1 flex cursor-grab select-none items-center gap-2 overflow-x-auto overscroll-x-none no-scrollbar px-1 pb-0.5 touch-pan-x active:cursor-grabbing ${
+                        className={`-mx-1 flex cursor-grab select-none items-center gap-1.5 overflow-x-auto overscroll-x-none no-scrollbar px-1 pb-0.5 touch-pan-x active:cursor-grabbing sm:gap-2 ${
                           actionsFade.faded ? 'mask-fade-right' : ''
                         }`}
                       >
@@ -1447,21 +1778,7 @@ export default function QuickAddSheet({
                         {!hideRepeatPicker && (
                           <ToolbarChip
                             tint="green"
-                            icon={
-                              leapLily && leapView ? (
-                                <motion.span
-                                  key="leap-lily"
-                                  className="-my-1 inline-flex"
-                                  initial={reduceMotion ? false : { scale: 0.4, rotate: -14 }}
-                                  animate={{ scale: 1, rotate: 0 }}
-                                  transition={{ type: 'spring', stiffness: 520, damping: 18 }}
-                                >
-                                  <LilyInk index={leapView.league} ink={16} />
-                                </motion.span>
-                              ) : (
-                                <Repeat className="h-4 w-4" strokeWidth={2.5} />
-                              )
-                            }
+                            icon={<Repeat className="h-4 w-4" strokeWidth={2.5} />}
                             label={repeatsOn ? repeatShortLabel : 'Repeat'}
                             ariaLabel={
                               repeatsOn
@@ -1489,16 +1806,6 @@ export default function QuickAddSheet({
                           active={effectiveNotify}
                           onClick={openReminderPicker}
                         />
-                        {savedCount > 0 && (
-                          <ToolbarChip
-                            tint="green"
-                            icon={<AppIcon name="saved" className="h-[18px] w-[18px]" />}
-                            label={`${savedCount} saved`}
-                            ariaLabel={`Pick from ${savedCount} saved tasks`}
-                            active={!!pickedBacklogTaskId}
-                            onClick={() => setSavedOpen(true)}
-                          />
-                        )}
                         {sections.length > 0 && !isLater && (
                           <ToolbarChip
                             ref={sectionBtnRef}
@@ -1518,40 +1825,83 @@ export default function QuickAddSheet({
                             onClick={() => setActivePicker('tags')}
                           />
                         )}
-                        {!isDesktop && (
-                          <ToolbarChip
-                            tint="neutral"
-                            icon={<ListPlus className="h-4 w-4" strokeWidth={2.5} />}
-                            label="Multiple"
-                            ariaLabel="Add multiple tasks"
-                            onClick={() => openBulkAdd([])}
-                          />
-                        )}
                       </div>
 
                       {/* No rail until tags exist: a dashed "Create tag" button
                           was the loudest thing on an empty sheet, asking for
                           taxonomy before the first task. The toolbar's Tag chip
                           is the way in until then. */}
-                      {stripTags.length > 0 && (
-                      <div
-                        className="relative -mx-2 mt-1.5"
-                      >
+                      {(stripTags.length > 0 || pendingIdeaTag) && (
+                      <div className="relative mt-1.5">
                         <div
-                          ref={tagScroll.ref}
-                          data-hint="tag-picker"
-                          onScroll={updateTagFade}
-                          onMouseDown={tagScroll.handlers.onMouseDown}
-                          onMouseLeave={tagScroll.handlers.onMouseLeave}
-                          onMouseUp={tagScroll.handlers.onMouseUp}
-                          onMouseMove={tagScroll.handlers.onMouseMove}
-                          onWheel={tagScroll.handlers.onWheel}
-                          className={`grid auto-cols-max grid-flow-col ${stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'} cursor-grab select-none items-center justify-start gap-2 overflow-x-auto overscroll-x-none no-scrollbar px-2 py-1 touch-pan-x active:cursor-grabbing ${
-                            tagFadeRight ? 'mask-fade-right' : ''
-                          }`}
-                          style={{ overscrollBehaviorX: 'none' }}
+                          ref={tagWrapRef}
+                          data-rows={isDesktop ? 2 : 1}
+                          aria-hidden
+                          className="pointer-events-none invisible absolute inset-x-0 top-0 flex flex-wrap items-center gap-2 py-1"
                         >
-                        {stripTags.map((tag) => {
+                          {pendingIdeaTag && (
+                            <span
+                              data-measure-tag
+                              {...tagPillProps({
+                                color: pendingIdeaTag.color,
+                                selected: true,
+                                size: isDesktop ? 'sm' : 'md',
+                              })}
+                            >
+                              <TagPillContent
+                                name={pendingIdeaTag.tagName}
+                                color={pendingIdeaTag.color}
+                                selected
+                              />
+                            </span>
+                          )}
+                          {orderedTags.map((tag) => {
+                            const selected = tags.includes(tag.id) && !tag.disabled;
+                            return (
+                              <span
+                                key={tag.id}
+                                data-measure-tag
+                                {...tagPillProps({
+                                  color: tag.color,
+                                  selected,
+                                  locked: tag.disabled,
+                                  size: isDesktop ? 'sm' : 'md',
+                                })}
+                              >
+                                <TagPillContent
+                                  name={tag.name}
+                                  color={tag.color}
+                                  selected={selected}
+                                  locked={tag.disabled}
+                                />
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <div
+                          data-hint="tag-picker"
+                          className="relative flex flex-wrap items-center gap-2 py-1"
+                        >
+                        {pendingIdeaTag && (
+                          <button
+                            type="button"
+                            aria-pressed
+                            aria-label={`Remove the ${pendingIdeaTag.tagName} tag`}
+                            {...keyboardSafeTap(() => setPendingIdeaTag(null))}
+                            {...tagPillProps({
+                              color: pendingIdeaTag.color,
+                              selected: true,
+                              size: isDesktop ? 'sm' : 'md',
+                            })}
+                          >
+                            <TagPillContent
+                              name={pendingIdeaTag.tagName}
+                              color={pendingIdeaTag.color}
+                              selected
+                            />
+                          </button>
+                        )}
+                        {orderedTags.slice(0, visibleTagCount).map((tag) => {
                           const selected = tags.includes(tag.id);
                           return (
                             <button
@@ -1634,11 +1984,23 @@ export default function QuickAddSheet({
                         })}
                         <button
                           type="button"
-                          aria-label="Add tag"
-                          onClick={tagScroll.guard(() => setActivePicker('tags'))}
-                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted-foreground/35 sm:h-8 sm:w-8 text-muted-foreground transition-colors active:scale-95 [@media(hover:hover)]:hover:border-muted-foreground/60 [@media(hover:hover)]:hover:text-foreground"
+                          aria-label={
+                            hiddenTagCount > 0
+                              ? `Show all tags, ${hiddenTagCount} more`
+                              : 'Add tag'
+                          }
+                          onClick={() => setActivePicker('tags')}
+                          className={`grid h-9 min-w-9 shrink-0 place-items-center rounded-full text-[13px] font-black tabular-nums transition-[transform,background-color,border-color,color] duration-150 ease-out active:scale-95 sm:h-8 sm:min-w-8 ${
+                            hiddenTagCount > 0
+                              ? 'bg-muted/70 px-2.5 text-foreground/75 [@media(hover:hover)]:hover:bg-muted'
+                              : 'border-[1.5px] border-dashed border-muted-foreground/35 text-muted-foreground [@media(hover:hover)]:hover:border-muted-foreground/60 [@media(hover:hover)]:hover:text-foreground'
+                          }`}
                         >
-                          <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+                          {hiddenTagCount > 0 ? (
+                            `+${hiddenTagCount}`
+                          ) : (
+                            <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+                          )}
                         </button>
                         </div>
                       </div>
@@ -1653,69 +2015,100 @@ export default function QuickAddSheet({
                         }}
                       />
 
-                      <SuggestionTabs
-                        open={open}
-                        variant="chips"
-                        query={text}
-                        selectedId={pickedBacklogTaskId}
-                        onUnpick={() => {
-                          if (pickedBacklogText !== null && text === pickedBacklogText) {
-                            setText('');
-                          }
-                          const removed = new Set(autoAddedTagIds);
-                          setTags((prev) => prev.filter((id) => !removed.has(id)));
-                          setAutoAddedTagIds([]);
-                          if (pickSetTimeRef.current) {
-                            setStartTime('');
-                            setEndTime('');
-                            setNotifyEnabled(false);
-                            pickSetTimeRef.current = false;
-                          }
-                          setPickedBacklogTaskId(null);
-                          setPickedBacklogText(null);
-                          setPickedNotes(undefined);
-                          setPickedChecklist(undefined);
-                          inputRef.current?.focus();
-                        }}
-                        onContentChange={setHasSuggestionContent}
-                        onPick={applySavedPick}
-                      />
-
-                      {isDesktop && (
-                        <div className="-mx-5 -mb-3.5 mt-3.5 flex items-center justify-between gap-3 border-t border-border/60 bg-muted/30 px-5 py-3">
-                          <button
-                            type="button"
-                            onClick={() => openBulkAdd([])}
-                            className="-ml-2 inline-flex h-10 items-center gap-2 rounded-xl px-2.5 text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          >
-                            <ListPlus className="h-4 w-4" strokeWidth={2.5} />
-                            Add multiple
-                          </button>
-                          <span className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => onOpenChange(false)}
-                              className="h-10 rounded-xl px-3.5 text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              ref={sendRef}
-                              type="button"
-                              onClick={() => {
-                                if (hasTaskText && !isSubmitting) void handleSubmit();
-                              }}
-                              disabled={!hasTaskText || isSubmitting}
-                              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#447d3f] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow,background-color,opacity] hover:-translate-y-px hover:bg-[#3d7038] hover:shadow-[0_4px_0_0_#2c511a] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
-                            >
-                              <Plus className="h-4 w-4" strokeWidth={3} />
-                              {submitLabel}
-                            </button>
-                          </span>
-                        </div>
-                      )}
+                      </div>
+                      </div>
                     </div>
                   </div>
+                  {!isDesktop && (
+                    <div
+                      className={`grid flex-none transition-[grid-template-rows,opacity,visibility] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+                        hasTaskText
+                          ? 'visible grid-rows-[1fr] opacity-100'
+                          : 'invisible grid-rows-[0fr] opacity-0'
+                      }`}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        <div className="px-3 pb-1.5 pt-3">
+                          <button
+                            ref={sendRef}
+                            type="button"
+                            {...addTap}
+                            disabled={isSubmitting}
+                            className={PRIMARY_BUTTON}
+                          >
+                            <Plus className="h-5 w-5" strokeWidth={3.25} />
+                            {submitLabel}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!cramped && (
+                  <IdeasPanel
+                    open={open}
+                    compose={composing}
+                    isDesktop={isDesktop}
+                    query={ideaQuery}
+                    saved={savedTasks}
+                    savedTags={tagManager.savedTags}
+                    pickedIdeaId={pickedIdea?.id ?? null}
+                    pickedSavedId={pickedBacklogTaskId}
+                    addedIdeaIds={addedIdeaIds}
+                    existingTexts={takenTexts}
+                    tap={keyboardSafeTap}
+                    onPickIdea={pickIdea}
+                    onUnpickIdea={unpickIdea}
+                    onInstantAdd={instantAddIdea}
+                    onPickSaved={(task) =>
+                      applySavedPick({
+                        text: task.text,
+                        tagIds: task.tags ?? [],
+                        sourceTab: '__saved__',
+                        startTime: task.startTime,
+                        endTime: task.endTime,
+                        reminder: task.reminder,
+                        backlogTaskId: task.id,
+                        notes: task.notes,
+                        checklist: task.checklist,
+                      })
+                    }
+                    onUnpickSaved={unpickSaved}
+                    onListDrag={() => {
+                      if (document.activeElement === inputRef.current) {
+                        inputRef.current?.blur();
+                      }
+                    }}
+                    className={isDesktop ? 'h-[400px] min-h-[200px] shrink' : 'flex-1'}
+                    sheetClassName="rounded-t-[28px] bg-[hsl(var(--board-list))] shadow-[0_-1px_0_0_rgba(31,98,28,0.1),0_-10px_24px_-18px_rgba(31,98,28,0.35)] dark:bg-background dark:shadow-[0_-1px_0_0_rgba(255,255,255,0.07)]"
+                    onTabColor={setTabColor}
+                  />
+                  )}
+                  {isDesktop && (
+                    <div className="relative flex flex-none items-center justify-between gap-3 border-t border-border/60 bg-popover px-5 py-3">
+                      <button
+                        type="button"
+                        onClick={() => openBulkAdd([])}
+                        className="-ml-2 inline-flex h-10 items-center gap-2 rounded-xl px-2.5 text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <ListPlus className="h-4 w-4" strokeWidth={2.5} />
+                        Add multiple
+                      </button>
+                      <span className="flex items-center gap-2">
+                        <button
+                          ref={sendRef}
+                          type="button"
+                          onClick={() => {
+                            if (hasTaskText && !isSubmitting) void handleSubmit();
+                          }}
+                          disabled={!hasTaskText || isSubmitting}
+                          className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#447d3f] px-4 text-[14px] font-black text-white shadow-[0_3px_0_0_#2c511a] transition-[transform,box-shadow,background-color,opacity] hover:-translate-y-px hover:bg-[#3d7038] hover:shadow-[0_4px_0_0_#2c511a] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
+                        >
+                          <Plus className="h-4 w-4" strokeWidth={3} />
+                          {submitLabel}
+                        </button>
+                      </span>
+                    </div>
+                  )}
                   </div>
                 </div>
               </motion.div>
@@ -1771,11 +2164,6 @@ export default function QuickAddSheet({
                   tagInputRef={tagInputRef}
                 />
               </AnimatePresence>
-              <SavedTasksSheet
-                open={savedOpen}
-                onClose={() => setSavedOpen(false)}
-                onPick={applySavedPick}
-              />
             </>
           )}
         </AnimatePresence>,

@@ -978,6 +978,7 @@ const TaskRowBody = React.memo(function TaskRowBody(
               left: secondaryAction && !isDone ? 0.12 : 0.04,
             }}
             dragMomentum={false}
+            data-tongue-tug
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             // Hover handlers for robust desktop behavior
@@ -2231,8 +2232,7 @@ export default function TaskList({
     const isCompleting =
       forceState === true || (forceState === undefined && !task.completed);
 
-    if (isCompleting) hapticSuccess();
-    else hapticTick();
+    hapticTick();
 
     if (isCompleting) {
       if (!skipDelay) {

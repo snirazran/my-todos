@@ -17,6 +17,7 @@ import {
   tagPillProps,
 } from './kit';
 import { fetcher } from './utils';
+import { IDEA_CATEGORIES } from '@/lib/habits/ideaLibrary';
 import type { SavedTag } from './types';
 import type { TagManager } from './useTagManager';
 import { TagManagerSheet } from './TagManagerSheet';
@@ -100,7 +101,7 @@ export function TagsView({
     toggleTag,
   } = tagManager;
 
-  const placeholder = 'Add a tag';
+  const placeholder = 'Name a new tag';
 
   // True while the user is typing a brand-new tag (colour picker auto-opened by
   // the input's onChange). Drives the bottom button's "Create" label/action.
@@ -267,32 +268,44 @@ export function TagsView({
       ? `${tagLimit} free · ${savedTags.length - tagLimit} locked`
       : `${savedTags.length}/${tagLimit}`;
 
+  const ideaTags =
+    manageTagsMode || tagInput.trim() || savedTags.length >= tagLimit
+      ? []
+      : IDEA_CATEGORIES.filter((category) => {
+          const names = [category.tagName.toLowerCase()].concat(
+            category.tagAliases,
+          );
+          return !savedTags.some(
+            (t) => names.indexOf(t.name.trim().toLowerCase()) >= 0,
+          );
+        }).slice(0, Math.min(4, tagLimit - savedTags.length));
+
   return (
-    <div className="space-y-4">
-      {savedTags.length > 0 && !showColorPicker && (
+    <div className="space-y-3">
+      {(savedTags.length > 0 || ideaTags.length > 0) && !showColorPicker && (
         <div>
-          <div className="mb-2 flex h-9 items-center gap-2">
-            <Squircle tint="violet" size="sm">
-              <Tag className="h-3.5 w-3.5" strokeWidth={2.75} />
-            </Squircle>
-            <span className="text-[14px] font-black text-foreground">Your tags</span>
-            <span className="text-[12px] font-bold tabular-nums text-muted-foreground">
-              {counterLabel}
-            </span>
-            <button
-              type="button"
-              onClick={() => setManageTagsMode(!manageTagsMode)}
-              aria-pressed={manageTagsMode}
-              className={`ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-black transition-colors ${
-                manageTagsMode
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
-              }`}
-            >
-              <Pencil className="h-3 w-3" strokeWidth={2.75} />
-              {manageTagsMode ? 'Done' : 'Edit'}
-            </button>
-          </div>
+          {savedTags.length > 0 && (
+            <div className="mb-2 flex h-8 items-center justify-between">
+              <span className="text-[13px] font-bold tabular-nums text-muted-foreground">
+                {savedTags.length > tagLimit
+                  ? counterLabel
+                  : `${savedTags.length} of ${tagLimit} tags`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setManageTagsMode(!manageTagsMode)}
+                aria-pressed={manageTagsMode}
+                className={`-mr-1 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-extrabold transition-[background-color,color,transform] duration-150 ease-out active:scale-95 ${
+                  manageTagsMode
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+                }`}
+              >
+                <Pencil className="h-3 w-3" strokeWidth={2.75} />
+                {manageTagsMode ? 'Done editing' : 'Edit'}
+              </button>
+            </div>
+          )}
 
           <div className="flex max-h-[46vh] flex-wrap content-start items-start gap-2 overflow-y-auto py-0.5">
             {unlockedTags.map((st) => {
@@ -345,6 +358,26 @@ export function TagsView({
                         <Pencil className="h-3 w-3 shrink-0 opacity-60" strokeWidth={2.75} />
                       ) : undefined
                     }
+                  />
+                </button>
+              );
+            })}
+            {ideaTags.map((category) => {
+              const pill = tagPillProps({ color: category.color, suggest: true });
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  disabled={isCreatingTag}
+                  aria-label={`Create the ${category.tagName} tag`}
+                  onClick={() => quickCreateTag(category.tagName, category.color)}
+                  className={`${pill.className} disabled:opacity-50`}
+                  style={pill.style}
+                >
+                  <TagPillContent
+                    name={category.tagName}
+                    color={category.color}
+                    suggest
                   />
                 </button>
               );

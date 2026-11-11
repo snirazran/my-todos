@@ -61,6 +61,8 @@ export type QuickAddSheetProps = Readonly<{
   sections?: ReadonlyArray<{ id: string; name: string; tagIds?: string[] }>;
   /** Section to file the task under when the sheet opens. */
   defaultSectionId?: string | null;
+  /** Texts of tasks already on the list, so matching habit ideas show as added. */
+  existingTexts?: string[];
 }>;
 
 export type ActivePicker = 'tags' | 'date' | 'repeat' | null;

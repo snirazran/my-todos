@@ -9,10 +9,9 @@
  * height, snaps onto the fly, then retracts all the way back out the left edge
  * of the screen — carrying the fly off with it.
  *
- * Mechanically it's the same trick as the home animation (a quadratic SVG path
- * whose visible length is driven by stroke-dasharray every frame, with a
- * fly-image "tip" riding the leading edge), minus the camera/scroll-follow and
- * frog-mood machinery that the home version needs.
+ * Timing, easing and the tongue's shape come from the same tongueMotion module
+ * as the home animation, minus the camera/scroll-follow and frog-mood
+ * machinery that the home version needs.
  */
 
 import React, {
@@ -24,17 +23,30 @@ import React, {
   useState,
 } from 'react';
 import { hapticImpact } from '@/lib/haptics';
-import { playPop, playThwip, primeCatchSounds } from '@/lib/catchSounds';
+import {
+  playPop,
+  playSlurp,
+  playThwip,
+  primeCatchSounds,
+} from '@/lib/catchSounds';
+import {
+  TONGUE_EDGE,
+  TONGUE_GLOSS,
+  extendEase,
+  hitPush,
+  hitWave,
+  impactSquash,
+  lightSide,
+  retractEase,
+  tongueShape,
+  tongueTiming,
+  type TongueTiming,
+} from '@/lib/tongueMotion';
 
-const DURATION_MS = 850; // full extend + retract
-const HIT_AT = 0.42; // fraction of the run where the tongue reaches the fly
-const HOLD_END = 0.5; // short hit-stop: the tongue sticks to the fly briefly
-const EXTEND_EASE = (x: number) => 1 - Math.pow(1 - x, 4);
-const RETRACT_EASE = (x: number) => x * x * (3 - 2 * x);
 const ORIGIN_PAD = 72; // how far past the left edge the tongue is anchored
 const ORIGIN_RISE = 140; // how much higher than the fly the tongue enters
 const ARC_LIFT = 56; // upward bow of the tongue's curve
-const STROKE = 8;
+const BULGE_TAIL_MS = 70;
 const FLY_PX = 40;
 const COOLDOWN_MS = 200;
 
@@ -70,11 +82,16 @@ export const useLeftTongue = () => useContext(Ctx);
 interface Grab {
   key: string;
   origin: Pt; // off-screen left
-  control: Pt; // quadratic control point
   target: Pt; // the fly
+  timing: TongueTiming;
   startAt: number;
   onPersist: () => unknown;
 }
+
+const aimFor = (origin: Pt, target: Pt): Pt => ({
+  x: (origin.x + target.x) / 2,
+  y: target.y - ARC_LIFT,
+});
 
 export function LeftTongueProvider({ children }: { children: React.ReactNode }) {
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -86,6 +103,7 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   const pathEl = useRef<SVGPathElement | null>(null);
+  const glossEl = useRef<SVGPathElement | null>(null);
   const tipEl = useRef<SVGGElement | null>(null);
 
   useEffect(() => {
@@ -124,19 +142,17 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
 
     const target: Pt = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     const origin: Pt = { x: -ORIGIN_PAD, y: target.y - ORIGIN_RISE };
-    const control: Pt = {
-      x: (origin.x + target.x) / 2,
-      y: target.y - ARC_LIFT,
-    };
+    const distance = Math.hypot(target.x - origin.x, target.y - origin.y);
+    const timing = tongueTiming(distance);
 
     primeCatchSounds();
-    playThwip();
+    playThwip({ duration: timing.extend / 1000, reach: distance / 600 });
     busyRef.current = true;
     setGrab({
       key,
       origin,
-      control,
       target,
+      timing,
       startAt: performance.now(),
       onPersist,
     });
@@ -155,38 +171,34 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
     if (!grab) return;
 
     const p0 = grab.origin;
-
-    // Temp path used purely for getPointAtLength sampling.
-    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-
-    const applyTarget = (target: Pt) => {
-      const control: Pt = {
-        x: (p0.x + target.x) / 2,
-        y: target.y - ARC_LIFT,
-      };
-      const d = `M ${p0.x} ${p0.y} Q ${control.x} ${control.y} ${target.x} ${target.y}`;
-      tmp.setAttribute('d', d);
-      return { d, total: tmp.getTotalLength() };
-    };
+    const { timing } = grab;
+    const reduced = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+    const bulgeMs = timing.hold + BULGE_TAIL_MS;
 
     let target = grab.target;
-    let { d, total } = applyTarget(target);
+    let aim = aimFor(p0, target);
+    const side = lightSide(p0, target);
 
     const node = pathEl.current;
+    const gloss = glossEl.current;
     if (node) {
-      node.setAttribute('d', d);
+      node.setAttribute('d', '');
       node.style.visibility = 'visible';
-      node.style.strokeDasharray = `0 ${total}`;
-      node.style.strokeDashoffset = '0';
     }
 
     let hitDone = false;
+    let slurpDone = false;
     let raf = 0;
 
     const tick = () => {
-      const t = Math.max(0, Math.min(1, (performance.now() - grab.startAt) / DURATION_MS));
+      const t = Math.max(
+        0,
+        Math.min(1, (performance.now() - grab.startAt) / timing.total),
+      );
 
-      if (!hitDone && t <= HIT_AT) {
+      if (!hitDone && t <= timing.hitAt) {
         const el = flyRefs.current[grab.key];
         if (el) {
           const r = el.getBoundingClientRect();
@@ -195,29 +207,78 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
             const ny = r.top + r.height / 2;
             if (Math.abs(nx - target.x) > 0.5 || Math.abs(ny - target.y) > 0.5) {
               target = { x: nx, y: ny };
-              ({ d, total } = applyTarget(target));
-              if (node) node.setAttribute('d', d);
+              aim = aimFor(p0, target);
             }
           }
         }
       }
 
+      const sinceHit =
+        t > timing.hitAt ? (t - timing.hitAt) * timing.total : -1;
+      const retractU =
+        t > timing.holdEnd ? (t - timing.holdEnd) / (1 - timing.holdEnd) : 0;
+
       let forward: number;
-      if (t <= HIT_AT) forward = EXTEND_EASE(t / HIT_AT);
-      else if (t <= HOLD_END) forward = 1;
-      else forward = 1 - RETRACT_EASE((t - HOLD_END) / (1 - HOLD_END));
-      const len = total * forward;
+      let push = 0;
+      if (t <= timing.hitAt) {
+        forward = extendEase(t / timing.hitAt);
+      } else if (t <= timing.holdEnd) {
+        forward = 1;
+        if (!reduced) push = hitPush(sinceHit / timing.hold);
+      } else {
+        forward = 1 - retractEase(retractU);
+      }
 
-      if (node) node.style.strokeDasharray = `${len} ${total}`;
+      if (!slurpDone && t > timing.holdEnd) {
+        slurpDone = true;
+        playSlurp(timing.retract / 1000);
+      }
 
-      const pt = tmp.getPointAtLength(len);
+      const wave = reduced
+        ? 0
+        : hitWave(sinceHit, Math.hypot(target.x - p0.x, target.y - p0.y));
+      const bulge =
+        !reduced && sinceHit >= 0 && sinceHit < bulgeMs
+          ? Math.sin((Math.PI * sinceHit) / bulgeMs)
+          : 0;
+
+      const shape = tongueShape(p0, aim, target, forward, {
+        bulge,
+        push,
+        wave,
+        side,
+      });
+
+      if (node) node.setAttribute('d', shape.body);
+      if (gloss) {
+        gloss.setAttribute('d', shape.gloss);
+        gloss.setAttribute('stroke-width', `${shape.glossWidth}`);
+      }
+
       if (tipEl.current) {
-        tipEl.current.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+        let rot = 0;
+        let squashX = 1;
+        let squashY = 1;
+        if (!reduced && sinceHit >= 0) {
+          const squash = impactSquash(sinceHit);
+          squashX = 1 - 0.24 * squash;
+          squashY = 1 + 0.2 * squash;
+          if (retractU > 0) {
+            rot = Math.sin(retractU * Math.PI * 2.5) * 16 * (1 - retractU);
+          }
+        }
+        const heading = (Math.atan2(shape.dir.y, shape.dir.x) * 180) / Math.PI;
+        tipEl.current.setAttribute(
+          'transform',
+          `translate(${shape.tip.x}, ${shape.tip.y}) rotate(${rot}) rotate(${heading}) scale(${squashX}, ${squashY}) rotate(${-heading}) scale(${
+            1 + 0.12 * bulge
+          })`,
+        );
       }
 
       // Hand-off: at impact, hide the real fly in the card and reveal the
       // tongue's fly so it rides back out with the retracting tip.
-      if (!hitDone && t >= HIT_AT) {
+      if (!hitDone && t >= timing.hitAt) {
         hitDone = true;
         hapticImpact();
         playPop();
@@ -233,9 +294,10 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
       // Done — clean up visuals, persist, then clear hidden state.
       if (tipEl.current) tipEl.current.style.visibility = 'hidden';
       if (node) {
-        node.style.strokeDasharray = `0 ${total}`;
+        node.setAttribute('d', '');
         node.style.visibility = 'hidden';
       }
+      gloss?.setAttribute('d', '');
 
       void Promise.resolve(grab.onPersist())
         .catch((e) => console.error('LeftTongue persist failed', e))
@@ -256,9 +318,10 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
       cancelAnimationFrame(raf);
       if (tipEl.current) tipEl.current.style.visibility = 'hidden';
       if (node) {
-        node.style.strokeDasharray = `0 ${total}`;
+        node.setAttribute('d', '');
         node.style.visibility = 'hidden';
       }
+      gloss?.setAttribute('d', '');
     };
   }, [grab]);
 
@@ -284,11 +347,19 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
 
           <path
             ref={pathEl}
-            d="M0 0 L0 0"
+            d=""
+            fill="url(#left-tongue-grad)"
+            stroke={TONGUE_EDGE}
+            strokeWidth={1}
+            strokeLinejoin="round"
+          />
+          <path
+            ref={glossEl}
+            d=""
             fill="none"
-            stroke="url(#left-tongue-grad)"
-            strokeWidth={STROKE}
+            stroke={TONGUE_GLOSS}
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
 
           <g ref={tipEl} style={{ visibility: 'hidden' }}>

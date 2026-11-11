@@ -12,6 +12,7 @@ import { Check } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import { useKeyboardInset } from './useKeyboardInset';
+import { PRIMARY_BUTTON } from './kit';
 import {
   MAX_BULK_TASKS,
   MAX_TASK_TEXT_LENGTH,
@@ -29,7 +30,7 @@ type Props = {
   onConfirm: (tasks: string[]) => Promise<void>;
 };
 
-const PLACEHOLDER = ['Buy milk', 'Call the dentist', 'Renew passport'].join(
+const PLACEHOLDER = ['Drink a glass of water', 'Stretch for two minutes', 'Read 10 pages'].join(
   '\n',
 );
 
@@ -142,7 +143,7 @@ export default function BulkAddReviewSheet({
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Could not add these tasks. Please try again.',
+          : 'Could not add these goals. Please try again.',
       );
     }
   };
@@ -182,15 +183,15 @@ export default function BulkAddReviewSheet({
           aria-labelledby="bulk-add-title"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <header className="shrink-0 px-5 pb-3.5 pt-1 sm:px-7 sm:pb-4 sm:pt-7">
+          <header className="shrink-0 px-5 pb-3.5 pt-1 text-center sm:px-7 sm:pb-4 sm:pt-6">
             <h2
               id="bulk-add-title"
-              className="pr-10 text-[22px] font-black leading-tight tracking-tight text-foreground sm:text-[24px]"
+              className="flex h-8 items-center justify-center text-[17px] font-black tracking-tight text-foreground"
             >
-              Add multiple tasks
+              Add multiple goals
             </h2>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14px] font-semibold text-muted-foreground">
-              <span>One task per line</span>
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[13.5px] font-bold text-muted-foreground">
+              <span>One goal per line</span>
               {summary.length > 0 && (
                 <span
                   aria-hidden
@@ -216,7 +217,7 @@ export default function BulkAddReviewSheet({
               </p>
             )}
 
-            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[20px] border border-border/70 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow] duration-200 focus-within:border-primary/50 focus-within:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)] sm:min-h-[240px] sm:max-h-[min(48vh,450px)] sm:flex-none">
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[24px] bg-muted/50 transition-[background-color,box-shadow] duration-200 focus-within:bg-muted/70 focus-within:shadow-[inset_0_0_0_2px_hsl(var(--primary)/0.3)] sm:min-h-[240px] sm:max-h-[min(48vh,450px)] sm:flex-none">
               <div
                 ref={mirrorRef}
                 aria-hidden
@@ -236,7 +237,7 @@ export default function BulkAddReviewSheet({
                           'absolute -left-8 top-[6px] h-[18px] w-[18px] rounded-full border-2 transition-colors duration-200',
                           line.state === 'task' &&
                             'border-primary/50 motion-safe:animate-in motion-safe:zoom-in-50',
-                          line.state === 'sample' && 'border-muted-foreground/20',
+                          line.state === 'sample' && 'border-dashed border-muted-foreground/30',
                           line.state === 'long' && 'border-rose-500/70',
                           line.state === 'over' &&
                             'border-dashed border-muted-foreground/30',
@@ -254,7 +255,7 @@ export default function BulkAddReviewSheet({
                 onChange={(event) => setText(event.target.value)}
                 onScroll={syncMirror}
                 placeholder={PLACEHOLDER}
-                aria-label="Tasks, one per line"
+                aria-label="Goals, one per line"
                 disabled={submitting}
                 spellCheck={false}
                 autoComplete="off"
@@ -292,7 +293,7 @@ export default function BulkAddReviewSheet({
               type="button"
               onClick={submit}
               disabled={!canAdd}
-              className="flex h-14 w-full shrink-0 items-center justify-center gap-2 rounded-[20px] bg-[#447d3f] px-6 text-[16px] font-black text-white shadow-[0_4px_0_0_#2c511a] transition-[transform,box-shadow,opacity] active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none sm:h-12 sm:w-auto sm:min-w-[164px] sm:rounded-2xl sm:text-[15px]"
+              className={cn(PRIMARY_BUTTON, 'shrink-0 px-6 sm:w-auto sm:min-w-[164px]')}
             >
               {submitting ? (
                 'Adding…'
@@ -300,8 +301,8 @@ export default function BulkAddReviewSheet({
                 <>
                   <Check className="h-5 w-5 stroke-[3]" />
                   {tasks.length > 0
-                    ? `Add ${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`
-                    : 'Add tasks'}
+                    ? `Add ${tasks.length} ${tasks.length === 1 ? 'goal' : 'goals'}`
+                    : 'Add goals'}
                 </>
               )}
             </button>

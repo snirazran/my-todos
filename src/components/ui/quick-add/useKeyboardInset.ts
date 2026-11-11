@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 export function useKeyboardInset(active: boolean) {
   const [inset, setInset] = useState(0);
   const [height, setHeight] = useState<number | null>(null);
+  const [offsetTop, setOffsetTop] = useState(0);
   const layoutHeightRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -10,6 +11,7 @@ export function useKeyboardInset(active: boolean) {
       layoutHeightRef.current = null;
       setInset(0);
       setHeight(null);
+      setOffsetTop(0);
       return;
     }
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -31,6 +33,7 @@ export function useKeyboardInset(active: boolean) {
       );
       setInset(nextInset);
       setHeight(vv.height);
+      setOffsetTop(Math.max(0, vv.offsetTop));
     };
 
     update();
@@ -42,5 +45,5 @@ export function useKeyboardInset(active: boolean) {
     };
   }, [active]);
 
-  return { inset, height };
+  return { inset, height, offsetTop };
 }

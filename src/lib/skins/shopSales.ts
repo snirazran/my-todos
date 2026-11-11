@@ -7,8 +7,6 @@ export type ShopSalesConfig = {
   refreshHour: number;
   freeSlots: number;
   plusSlots: number;
-  specialEpicPercent: number;
-  plusEpicPercent: number;
   everydayRarities: Rarity[];
   everydayRarePercent: number;
   wishlistSlot: boolean;
@@ -23,8 +21,6 @@ export const DEFAULT_SHOP_SALES: ShopSalesConfig = {
   refreshHour: 4,
   freeSlots: 6,
   plusSlots: 6,
-  specialEpicPercent: 35,
-  plusEpicPercent: 60,
   everydayRarities: ['common', 'uncommon'],
   everydayRarePercent: 35,
   wishlistSlot: true,

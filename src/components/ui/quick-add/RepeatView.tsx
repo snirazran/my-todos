@@ -1,7 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Check, ChevronRight, ChevronUp } from 'lucide-react';
+import React from 'react';
+import {
+  Ban,
+  Briefcase,
+  CalendarRange,
+  Check,
+  ChevronRight,
+  Coffee,
+  Flag,
+  Repeat,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
+import { hapticTick } from '@/lib/haptics';
+import { Squircle, type Tint } from './kit';
 import {
   customRepeatLabel,
   formatEndDateLabel,
@@ -9,9 +22,41 @@ import {
   type RepeatRule,
 } from './utils';
 
+const SUNDAY_FIRST = [0, 1, 2, 3, 4, 5, 6];
+const DAY_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const DAY_LONG = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const WEEKEND = [0, 6];
+
+const PRESETS: Array<{
+  mode: RepeatMode;
+  label: string;
+  tint: Tint;
+  Icon: typeof Repeat;
+}> = [
+  { mode: 'none', label: 'Never', tint: 'neutral', Icon: Ban },
+  { mode: 'daily', label: 'Every day', tint: 'green', Icon: Repeat },
+  { mode: 'weekdays', label: 'Weekdays', tint: 'sky', Icon: Briefcase },
+  { mode: 'weekend', label: 'Weekends', tint: 'amber', Icon: Coffee },
+];
+
+const sameDays = (a: number[], b: number[]) =>
+  a.length === b.length && b.every((d) => a.indexOf(d) >= 0);
+
+const ROW =
+  'flex h-14 w-full items-center gap-3 pl-2.5 pr-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50';
+
 /**
- * The repeat option list used by both QuickAddSheet's PickerSheet and the task
- * detail card, so the picker looks and behaves identically in both places.
+ * The repeat picker body used by both QuickAddSheet's PickerSheet and the task
+ * detail card, so it looks and behaves identically in both places.
  *
  * Selecting an option updates the mode live (it does NOT close the sheet) so the
  * user can also configure when the repeat ends before dismissing.
@@ -26,6 +71,9 @@ export function RepeatView({
   onClearEndDate,
   customRule,
   onOpenCustom,
+  onCustomRule,
+  anchorDow,
+  weekOrder = SUNDAY_FIRST,
 }: {
   currentMode: RepeatMode;
   setRepeatMode: (mode: RepeatMode) => void;
@@ -42,144 +90,230 @@ export function RepeatView({
   customRule?: RepeatRule | null;
   /** Open the custom recurrence builder. */
   onOpenCustom: () => void;
+  /** Commit a rule built from the weekday bubbles. */
+  onCustomRule: (rule: RepeatRule) => void;
+  /** Weekday (0=Sun..6=Sat) the task sits on. */
+  anchorDow: number;
+  /** Weekdays in display order. */
+  weekOrder?: ReadonlyArray<number>;
 }) {
-  const [endsExpanded, setEndsExpanded] = useState(false);
+  const weeklyRule =
+    currentMode === 'custom' &&
+    customRule?.freq === 'weekly' &&
+    customRule.interval === 1
+      ? customRule
+      : null;
+  const activeDays: number[] =
+    currentMode === 'daily'
+      ? SUNDAY_FIRST
+      : currentMode === 'weekdays'
+        ? WEEKDAYS
+        : currentMode === 'weekend'
+          ? WEEKEND
+          : currentMode === 'weekly'
+            ? [anchorDow]
+            : weeklyRule
+              ? (weeklyRule.byWeekday ?? [])
+              : [];
 
-  const frequencies: Array<{ label: string; mode: RepeatMode }> = [
-    { label: 'Every day', mode: 'daily' },
-    { label: 'Every weekday', mode: 'weekdays' },
-    { label: 'Every weekend', mode: 'weekend' },
-    { label: `Every week on ${repeatDayLabel}`, mode: 'weekly' },
-    { label: monthlyLabel, mode: 'monthly' },
-  ];
+  const toggleDay = (day: number) => {
+    hapticTick();
+    const next =
+      activeDays.indexOf(day) >= 0
+        ? activeDays.filter((d) => d !== day)
+        : activeDays.concat(day);
+    if (next.length === 0) setRepeatMode('none');
+    else if (next.length === 7) setRepeatMode('daily');
+    else if (sameDays(next, WEEKDAYS)) setRepeatMode('weekdays');
+    else if (sameDays(next, WEEKEND)) setRepeatMode('weekend');
+    else if (next.length === 1 && next[0] === anchorDow) setRepeatMode('weekly');
+    else {
+      onCustomRule({
+        freq: 'weekly',
+        interval: 1,
+        byWeekday: next.slice().sort((a, b) => a - b),
+      });
+    }
+  };
 
-  const rowBase =
-    'flex h-[60px] w-full items-center justify-between px-4 text-left text-[15px] font-extrabold transition-colors';
+  const repeating = currentMode !== 'none';
+  const customActive = currentMode === 'custom' && !weeklyRule;
+  const summary =
+    currentMode === 'none'
+      ? "Doesn't repeat"
+      : currentMode === 'daily'
+        ? 'Every day'
+        : currentMode === 'weekdays'
+          ? 'Every weekday'
+          : currentMode === 'weekend'
+            ? 'Every weekend'
+            : currentMode === 'weekly'
+              ? `Every ${repeatDayLabel}`
+              : currentMode === 'monthly'
+                ? monthlyLabel
+                : customRule
+                  ? weeklyRule && weeklyRule.byWeekday?.length === 1
+                    ? `Every ${DAY_LONG[weeklyRule.byWeekday[0]]}`
+                    : customRepeatLabel(customRule)
+                  : 'Custom';
 
   return (
-    <div className="space-y-4">
-      {/* Does not repeat */}
-      <button
-        type="button"
-        onClick={() => setRepeatMode('none')}
-        className={`${rowBase} rounded-2xl border ${
-          currentMode === 'none'
-            ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
-            : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
-        }`}
+    <div>
+      <div
+        role="radiogroup"
+        aria-label="Repeat"
+        className="mb-3 grid grid-cols-4 gap-2"
       >
-        Does not repeat
-        {currentMode === 'none' && (
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
-            <Check className="h-4 w-4 stroke-[3]" />
-          </span>
-        )}
-      </button>
-
-      {/* Ends — only relevant for the preset repeating modes (custom carries
-          its own end date inside the custom builder) */}
-      {currentMode !== 'none' && currentMode !== 'custom' && (
-        <div className="overflow-hidden rounded-2xl border border-border bg-background">
-          <button
-            type="button"
-            onClick={() => setEndsExpanded((v) => !v)}
-            className={`${rowBase} text-foreground`}
-          >
-            Ends
-            <span className="flex items-center gap-1.5 text-[15px] font-extrabold text-primary">
-              {endDate ? formatEndDateLabel(endDate) : 'Never'}
-              <ChevronUp
-                className={`h-4 w-4 stroke-[3] transition-transform ${
-                  endsExpanded ? '' : 'rotate-180'
-                }`}
-              />
-            </span>
-          </button>
-
-          {endsExpanded && (
-            <>
-              <div className="border-t border-border" />
-              <button
-                type="button"
-                onClick={onClearEndDate}
-                className={`${rowBase} text-foreground hover:bg-primary/5`}
-              >
-                Never
-                {!endDate && (
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-4 w-4 stroke-[3]" />
-                  </span>
-                )}
-              </button>
-              <div className="border-t border-border" />
-              <button
-                type="button"
-                onClick={onPickEndDate}
-                className={`${rowBase} text-foreground hover:bg-primary/5`}
-              >
-                On a date
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  {endDate && (
-                    <span className="text-[15px] font-extrabold text-primary">
-                      {formatEndDateLabel(endDate)}
-                    </span>
-                  )}
-                  <ChevronRight className="h-4 w-4 stroke-[3]" />
-                </span>
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Frequency options */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-background">
-        {frequencies.map((option, i) => {
-          const active = option.mode === currentMode;
+        {PRESETS.map((preset) => {
+          const selected = preset.mode === currentMode;
           return (
-            <React.Fragment key={option.mode}>
-              {i > 0 && <div className="border-t border-border" />}
-              <button
-                type="button"
-                onClick={() => setRepeatMode(option.mode)}
-                className={`${rowBase} ${
-                  active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-foreground hover:bg-primary/5 hover:text-primary'
-                }`}
-              >
-                {option.label}
-                {active && (
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-4 w-4 stroke-[3]" />
-                  </span>
-                )}
-              </button>
-            </React.Fragment>
+            <button
+              key={preset.mode}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => {
+                hapticTick();
+                setRepeatMode(preset.mode);
+              }}
+              className={`flex h-[72px] flex-col items-center justify-center gap-1.5 rounded-2xl text-[12.5px] font-extrabold transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96] ${
+                selected
+                  ? 'bg-primary/10 text-primary ring-2 ring-inset ring-primary/40'
+                  : 'bg-muted/50 text-foreground/70 [@media(hover:hover)]:hover:bg-muted'
+              }`}
+            >
+              <Squircle tint={preset.tint} size="md">
+                <preset.Icon className="h-[18px] w-[18px]" strokeWidth={2.5} />
+              </Squircle>
+              {preset.label}
+            </button>
           );
         })}
+      </div>
 
-        <div className="border-t border-border" />
+      <div className="mb-3 rounded-[24px] bg-muted/50 px-3 pb-4 pt-4">
+        <p
+          aria-live="polite"
+          className="text-center text-[19px] font-black leading-tight tracking-tight text-foreground"
+        >
+          {summary}
+        </p>
+        <p className="mb-3.5 mt-0.5 h-[18px] text-center text-[13px] font-bold text-muted-foreground">
+          {repeating && endDate ? `until ${formatEndDateLabel(endDate)}` : ''}
+        </p>
+        <div className="flex items-center justify-between gap-1.5">
+          {weekOrder.map((day) => {
+            const on = activeDays.indexOf(day) >= 0;
+            return (
+              <button
+                key={day}
+                type="button"
+                aria-pressed={on}
+                aria-label={DAY_LONG[day]}
+                onClick={() => toggleDay(day)}
+                className={`grid aspect-square max-w-[46px] flex-1 place-items-center rounded-full text-[13px] font-black transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:translate-y-[2px] ${
+                  on
+                    ? 'bg-[#447d3f] text-white shadow-[0_2px_0_0_#2c511a] active:shadow-none'
+                    : 'bg-[hsl(var(--card-raised))] text-foreground/60 shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_2px_0_0_rgba(15,23,42,0.06)] active:shadow-[0_0_0_1px_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_0_0_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                {DAY_SHORT[day]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl bg-muted/50">
         <button
           type="button"
-          onClick={onOpenCustom}
-          className={`${rowBase} ${
-            currentMode === 'custom'
-              ? 'bg-primary/10 text-primary'
-              : 'text-foreground hover:bg-primary/5 hover:text-primary'
-          }`}
+          aria-pressed={currentMode === 'monthly'}
+          onClick={() => {
+            hapticTick();
+            setRepeatMode('monthly');
+          }}
+          className={ROW}
         >
-          {currentMode === 'custom' && customRule
-            ? endDate
-              ? `${customRepeatLabel(customRule)} · until ${formatEndDateLabel(endDate)}`
-              : customRepeatLabel(customRule)
-            : 'Custom…'}
-          {currentMode === 'custom' && (
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
-              <Check className="h-4 w-4 stroke-[3]" />
+          <Squircle tint="violet" size="lg">
+            <CalendarRange className="h-[18px] w-[18px]" strokeWidth={2.5} />
+          </Squircle>
+          <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold text-foreground">
+            {monthlyLabel}
+          </span>
+          {currentMode === 'monthly' && (
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground dark:bg-[#4a8a44] dark:text-white">
+              <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
             </span>
           )}
         </button>
+
+        <div className="mx-3.5 border-t border-border/60" />
+        <button type="button" onClick={onOpenCustom} className={ROW}>
+          <Squircle tint="teal" size="lg">
+            <SlidersHorizontal className="h-[18px] w-[18px]" strokeWidth={2.5} />
+          </Squircle>
+          <span className="shrink-0 text-[15px] font-extrabold text-foreground">
+            Custom
+          </span>
+          <span className="min-w-0 flex-1 truncate text-right text-[14px] font-extrabold text-primary">
+            {customActive && customRule ? customRepeatLabel(customRule) : ''}
+          </span>
+          <ChevronRight
+            className="h-4 w-4 shrink-0 text-muted-foreground/60"
+            strokeWidth={3}
+          />
+        </button>
+
+        <div>
+          <div>
+            <div className="mx-3.5 border-t border-border/60" />
+            <div
+              className={`flex items-center transition-opacity duration-200 ease-out ${
+                repeating ? 'opacity-100' : 'opacity-40'
+              }`}
+            >
+              <button
+                type="button"
+                disabled={!repeating}
+                onClick={onPickEndDate}
+                className={ROW}
+              >
+                <Squircle tint="rose" size="lg">
+                  <Flag className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                </Squircle>
+                <span className="shrink-0 text-[15px] font-extrabold text-foreground">
+                  Ends
+                </span>
+                <span
+                  className={`min-w-0 flex-1 truncate text-right text-[14px] font-extrabold ${
+                    endDate ? 'text-primary' : 'text-muted-foreground'
+                  }`}
+                >
+                  {repeating && endDate ? formatEndDateLabel(endDate) : 'Never'}
+                </span>
+                {!(repeating && endDate) && (
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 text-muted-foreground/60"
+                    strokeWidth={3}
+                  />
+                )}
+              </button>
+              {repeating && endDate && (
+                <button
+                  type="button"
+                  aria-label="Remove end date"
+                  onClick={() => {
+                    hapticTick();
+                    onClearEndDate();
+                  }}
+                  className="relative mr-2.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-foreground/[0.07] text-muted-foreground transition-transform duration-150 ease-out before:absolute before:-inset-1.5 active:scale-90 dark:bg-white/10"
+                >
+                  <X className="h-3.5 w-3.5" strokeWidth={3} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

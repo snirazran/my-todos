@@ -1,12 +1,7 @@
-import {
-  rarityRank,
-  type ItemDef,
-  type Rarity,
-} from './catalog';
+import type { ItemDef } from './catalog';
 import { isAvailableAt } from './availability';
 import {
   DEFAULT_SHOP_SALES,
-  SHOP_TIERS,
   rerollsAllowed,
   type ShopSalesConfig,
 } from './shopSales';
@@ -106,21 +101,6 @@ function hashString(s: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
-}
-
-/**
- * FNV over `seed:0`, `seed:1`… leaves neighbouring slot draws correlated, which
- * clustered rarities onto the same few days. Seed a real PRNG once per
- * (day, reroll) and pull the slots off it instead.
- */
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /**
@@ -227,52 +207,22 @@ export function getShopRotation({
       .map(({ item }) => item);
   const legendaryItem = ranked(legendaries, `shop-legendary:${dayKey}`)[0] ?? null;
 
-  const specialTier = (item: ItemDef) => rarityRank[item.rarity] >= rarityRank.rare;
-  const inSpecial = (item: ItemDef) => specialTier(item) && !isEverydayItem(item, config);
-  const special = eligible.filter(inSpecial);
-  const borrowable = eligible.filter(
-    (item) => rarityRank[item.rarity] >= rarityRank.uncommon && !inSpecial(item),
-  );
+  const rares = eligible.filter((item) => item.rarity === 'rare');
+  const inSpecial = (item: ItemDef) => !isEverydayItem(item, config);
+  const special = rares.filter(inSpecial);
+  const borrowable = rares.filter((item) => !inSpecial(item));
 
-  const salePool =
-    [special, borrowable.filter(specialTier), borrowable].find((pool) => pool.length > 0) ?? [];
+  const salePool = special.length > 0 ? special : borrowable;
   const saleItem = ranked(salePool, `shop-sale:${dayKey}`)[0] ?? null;
 
-  const queues = new Map<Rarity, ItemDef[]>();
-  for (const rarity of SHOP_TIERS) {
-    queues.set(
-      rarity,
-      ranked(
-        special.filter((item) => item.rarity === rarity && item.id !== saleItem?.id),
-        `shop:${seed}:${rarity}`,
-      ),
-    );
-  }
-  const fill = ranked(
-    borrowable.filter((item) => item.id !== saleItem?.id),
-    `shop-fill:${seed}`,
-  ).sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]);
-  const take = (rarity: Rarity): ItemDef | null => {
-    const order = [rarity, ...[...SHOP_TIERS].reverse().filter((tier) => tier !== rarity)];
-    for (const tier of order) {
-      const next = queues.get(tier)?.shift();
-      if (next) return next;
-    }
-    return fill.shift() ?? null;
-  };
+  const queue = [
+    ...ranked(special.filter((item) => item.id !== saleItem?.id), `shop:${seed}:rare`),
+    ...ranked(borrowable.filter((item) => item.id !== saleItem?.id), `shop-fill:${seed}`),
+  ];
 
   const total = free + plusSlots;
-  const rand = mulberry32(hashString(`shop-slots:${seed}`));
-  const picks: ItemDef[] = [];
   const openSlots = total - (saleItem ? 1 : 0) - (legendaryItem ? 1 : 0);
-  const offsetSlots = saleItem ? 1 : 0;
-  for (let i = 0; i < openSlots; i++) {
-    const epicPercent =
-      i + offsetSlots < free ? config.specialEpicPercent : config.plusEpicPercent;
-    const item = take(rand() * 100 < epicPercent ? 'epic' : 'rare');
-    if (!item) break;
-    picks.push(item);
-  }
+  const picks = queue.slice(0, Math.max(0, openSlots));
 
   let wishlistIndex: number | null = null;
   const freeCount = Math.min(saleItem ? free - 1 : free, picks.length);

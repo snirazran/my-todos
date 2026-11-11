@@ -102,6 +102,7 @@ function ShopTile({
   plus,
   discount,
   plusPrice,
+  hidePrice,
   wished,
   affordable,
   variants,
@@ -113,6 +114,7 @@ function ShopTile({
   plus?: boolean;
   discount?: number;
   plusPrice?: boolean;
+  hidePrice?: boolean;
   wished: boolean;
   affordable: boolean;
   variants?: ItemDef[];
@@ -125,7 +127,9 @@ function ShopTile({
   const colors = variants && variants.length > 1 ? `, ${variants.length} colors` : '';
   const status = owned
     ? 'owned'
-    : plusPrice
+    : hidePrice
+      ? 'Plus pick'
+      : plusPrice
       ? `${entry.price} flies with Plus`
       : plus
         ? `Plus pick, ${entry.price} flies`
@@ -177,6 +181,8 @@ function ShopTile({
             <Check className="h-3.5 w-3.5" strokeWidth={4} />
             Owned
           </span>
+        ) : hidePrice ? (
+          <span className="text-[12px] text-[#5b34c2] dark:text-[#c9b6ff]">Plus</span>
         ) : (
           <>
             <FlyAmount
@@ -472,6 +478,33 @@ export function ShopWindow({
               ? 'ad'
               : 'plus';
 
+  const stripRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [stripShown, setStripShown] = useState(false);
+  useEffect(() => {
+    if (isMd || isGuest) return;
+    const scroller = document.getElementById('main-scroll');
+    const target: HTMLElement | Window = scroller ?? window;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const strip = stripRef.current;
+      const sheet = sheetRef.current;
+      if (!strip || !sheet) return;
+      const stripBottom = strip.getBoundingClientRect().bottom;
+      setStripShown(sheet.getBoundingClientRect().top <= stripBottom + 24);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+    update();
+    target.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      target.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [isMd, isGuest]);
+
   const frozenEveryday = useRef<Set<string> | null>(null);
   const [shuffleSeed] = useState(() => Math.floor(Math.random() * 0x7fffffff));
   const everyday = useMemo<ShopEntry[][]>(() => {
@@ -593,6 +626,7 @@ export function ShopWindow({
         plus={deal.plusOnly}
         discount={deal.sale ? deal.discountPercent : undefined}
         plusPrice={deal.sale && !isPremium}
+        hidePrice={deal.plusOnly && !isPremium}
         wished={group.some((row) => wishlistedIds.has(row.item.id) || row.deal.wishlistSlot)}
         affordable={canAfford(price)}
         variants={multi ? group.map((row) => row.item) : undefined}
@@ -631,6 +665,27 @@ export function ShopWindow({
   return (
     <div role="region" aria-label="Shop" className="relative flex flex-1 flex-col">
       <h1 className="sr-only">Shop</h1>
+      {!isGuest && (
+        <div className="sticky top-0 z-30 h-0 md:hidden">
+          <div
+            ref={stripRef}
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute left-[calc(50%-50vw)] top-0 h-[calc(env(safe-area-inset-top)+3.5rem)] w-screen border-b border-border/60 bg-background/90 shadow-[0_6px_16px_-12px_rgba(15,23,42,0.45)] backdrop-blur-md transition-opacity duration-200',
+              stripShown ? 'opacity-100' : 'opacity-0',
+            )}
+          />
+          <div className="absolute left-0 top-[calc(env(safe-area-inset-top)+0.5rem)]">
+            <FlyCounter
+              key={balance === undefined ? 'pending' : 'ready'}
+              balance={balance ?? 0}
+              variant="mobile"
+              onClick={onGetFlies}
+              flyTarget
+            />
+          </div>
+        </div>
+      )}
       <div
         aria-hidden
         style={backgroundFadeMaskStyle}
@@ -640,17 +695,6 @@ export function ShopWindow({
       </div>
 
       <div className="relative z-[1] h-[calc(312px+env(safe-area-inset-top))] shrink-0 md:h-[438px]">
-        {!isGuest && (
-          <div className="absolute left-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-20 md:hidden">
-            <FlyCounter
-              key={balance === undefined ? 'pending' : 'ready'}
-              balance={balance ?? 0}
-              variant="mobile"
-              onClick={onGetFlies}
-              flyTarget
-            />
-          </div>
-        )}
         <button
           type="button"
           onClick={onOpenCatalog}
@@ -696,7 +740,7 @@ export function ShopWindow({
         </div>
       </div>
 
-      <div className="relative z-10 -mx-4 flex-1 rounded-t-[24px] bg-background px-4 pb-10 pt-5 md:-mx-6 md:px-6 md:pb-16 md:pt-6">
+      <div ref={sheetRef} className="relative z-10 -mx-4 flex-1 rounded-t-[24px] bg-background px-4 pb-10 pt-5 md:-mx-6 md:px-6 md:pb-16 md:pt-6">
         <div
           aria-hidden
           className="pointer-events-none absolute -bottom-px left-1/2 top-0 -z-10 hidden w-screen -translate-x-1/2 rounded-t-[32px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] md:block"

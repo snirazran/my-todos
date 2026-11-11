@@ -13,6 +13,7 @@ const CLIENT_EVENTS = new Set([
   'app_opened',
   'page_viewed',
   'starter_plan_shown',
+  'habit_idea_added',
   'ad_requested',
   'ad_impression',
   'ad_completed',

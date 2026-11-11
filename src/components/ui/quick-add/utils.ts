@@ -5,6 +5,13 @@ export const nowHm = () => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+export const nextHalfHourHm = () => {
+  const d = new Date();
+  const total = d.getHours() * 60 + d.getMinutes() + 10;
+  const rounded = (Math.ceil(total / 30) * 30) % 1440;
+  return `${pad(Math.floor(rounded / 60))}:${pad(rounded % 60)}`;
+};
+
 export function ymdLocal(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

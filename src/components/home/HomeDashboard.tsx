@@ -167,6 +167,11 @@ export default function HomeDashboard() {
     reorderSections,
   } = useTaskData();
 
+  const quickAddExistingTexts = useMemo(
+    () => tasks.map((task) => task.text),
+    [tasks],
+  );
+
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const frogRef = useRef<FrogHandle>(null);
@@ -1164,6 +1169,7 @@ export default function HomeDashboard() {
         categoryTagMap={questOnboarding?.categoryTagMap}
         sections={user ? sections : []}
         defaultSectionId={quickSectionId}
+        existingTexts={quickAddExistingTexts}
         onBulkSubmit={async (bulkTasks) => {
           if (!user) throw new Error('Sign in to add tasks.');
           const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;

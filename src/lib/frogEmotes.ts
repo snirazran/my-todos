@@ -78,9 +78,9 @@ export type FrogMoment =
   | 'dayCleared';
 
 const MOMENT_POOLS: Record<FrogMoment, readonly FrogEmote[]> = {
-  catch: ['love', 'hop', 'love', 'hop', 'loveShy', 'loveHeartbeat'],
-  combo: ['celebrate', 'hop', 'celebrate'],
-  bigCombo: ['tada', 'celebrate'],
+  catch: ['love', 'loveShy'],
+  combo: ['love', 'loveShy'],
+  bigCombo: ['loveBurst'],
   miss: ['sweat', 'dizzy'],
   taskAdded: ['hop', 'love', 'loveShy'],
   equip: ['loveShy', 'love', 'hop'],

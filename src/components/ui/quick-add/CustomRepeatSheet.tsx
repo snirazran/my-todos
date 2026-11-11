@@ -5,6 +5,7 @@ import { Check, ChevronRight, ChevronUp } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Wheel } from './Wheel';
 import { EndDateCalendarSheet } from './EndDateCalendarSheet';
+import { PRIMARY_BUTTON } from './kit';
 import {
   dayOfMonthFromYmd,
   formatEndDateLabel,
@@ -164,22 +165,22 @@ export function CustomRepeatSheet({
       >
         {() => (
           <div className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
-            <div className="relative mb-5 flex h-9 items-center justify-center">
-              <h2 className="text-[18px] font-extrabold text-foreground">
+            <div className="relative mb-4 flex h-8 items-center justify-center">
+              <h2 className="text-[17px] font-black tracking-tight text-foreground">
                 Repeat
               </h2>
             </div>
 
             {/* Tabs */}
-            <div className="mb-4 flex rounded-2xl bg-muted p-1">
+            <div className="mb-3 flex rounded-2xl bg-muted/60 p-1">
               {TABS.map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => switchFreq(t)}
-                  className={`flex-1 rounded-xl py-2.5 text-[14px] font-extrabold capitalize transition-all ${
+                  className={`flex-1 rounded-xl py-2.5 text-[14px] font-extrabold capitalize transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.97] ${
                     freq === t
-                      ? 'bg-background text-primary shadow-sm'
+                      ? 'bg-[hsl(var(--card-raised))] text-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_2px_0_0_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_0_0_rgba(0,0,0,0.3)]'
                       : 'text-muted-foreground'
                   }`}
                 >
@@ -189,7 +190,7 @@ export function CustomRepeatSheet({
             </div>
 
             {/* Every + day picker */}
-            <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-background">
+            <div className="mb-3 overflow-hidden rounded-2xl bg-muted/50">
               <button
                 type="button"
                 onClick={() => setEveryExpanded((v) => !v)}
@@ -208,7 +209,7 @@ export function CustomRepeatSheet({
 
               {everyExpanded && (
                 <>
-                  <div className="mx-4 border-t border-border" />
+                  <div className="mx-4 border-t border-border/60" />
                   <div className="px-4 py-2">
                     <Wheel
                       className="mx-auto max-w-[160px]"
@@ -227,7 +228,7 @@ export function CustomRepeatSheet({
 
               {freq === 'weekly' && (
                 <>
-                  <div className="mx-4 border-t border-border" />
+                  <div className="mx-4 border-t border-border/60" />
                   <div className="flex flex-wrap gap-1.5 px-3 py-3">
                     {WEEKDAY_PILLS.map((d) => {
                       const active = weekdays.includes(d.api);
@@ -236,10 +237,10 @@ export function CustomRepeatSheet({
                           key={d.api}
                           type="button"
                           onClick={() => toggleWeekday(d.api)}
-                          className={`flex-1 rounded-xl py-2 text-[12px] font-extrabold transition-colors ${
+                          className={`h-10 flex-1 rounded-full text-[12px] font-black transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:translate-y-[2px] ${
                             active
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                              ? 'bg-[#447d3f] text-white shadow-[0_2px_0_0_#2c511a]'
+                              : 'bg-[hsl(var(--card-raised))] text-foreground/60 shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_2px_0_0_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_0_0_rgba(0,0,0,0.3)]'
                           }`}
                         >
                           {d.label}
@@ -252,7 +253,7 @@ export function CustomRepeatSheet({
 
               {freq === 'monthly' && (
                 <>
-                  <div className="mx-4 border-t border-border" />
+                  <div className="mx-4 border-t border-border/60" />
                   <div className="grid grid-cols-7 gap-1.5 px-3 py-3">
                     {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
                       const active = monthdays.includes(d);
@@ -261,10 +262,10 @@ export function CustomRepeatSheet({
                           key={d}
                           type="button"
                           onClick={() => toggleMonthday(d)}
-                          className={`grid h-9 place-items-center rounded-xl text-[13px] font-extrabold transition-colors ${
+                          className={`grid h-10 place-items-center rounded-full text-[13px] font-black tabular-nums transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:translate-y-[2px] ${
                             active
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                              ? 'bg-[#447d3f] text-white shadow-[0_2px_0_0_#2c511a]'
+                              : 'bg-[hsl(var(--card-raised))] text-foreground/60 shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_2px_0_0_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_0_0_rgba(0,0,0,0.3)]'
                           }`}
                         >
                           {d}
@@ -277,7 +278,7 @@ export function CustomRepeatSheet({
             </div>
 
             {/* Ends */}
-            <div className="overflow-hidden rounded-2xl border border-border bg-background">
+            <div className="overflow-hidden rounded-2xl bg-muted/50">
               <button
                 type="button"
                 onClick={() => setEndsExpanded((v) => !v)}
@@ -295,7 +296,7 @@ export function CustomRepeatSheet({
               </button>
               {endsExpanded && (
                 <>
-                  <div className="mx-4 border-t border-border" />
+                  <div className="mx-4 border-t border-border/60" />
                   <button
                     type="button"
                     onClick={() => setEndDate(null)}
@@ -308,7 +309,7 @@ export function CustomRepeatSheet({
                       </span>
                     )}
                   </button>
-                  <div className="mx-4 border-t border-border" />
+                  <div className="mx-4 border-t border-border/60" />
                   <button
                     type="button"
                     onClick={() => setShowCalendar(true)}
@@ -331,7 +332,7 @@ export function CustomRepeatSheet({
             <button
               type="button"
               onClick={commitAndClose}
-              className="mt-5 h-11 w-full rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+              className={`mt-4 ${PRIMARY_BUTTON}`}
             >
               Done
             </button>

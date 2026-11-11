@@ -32,6 +32,8 @@ const LEGACY_FIELDS = [
   'raritySaleDaysPercent',
   'maxDiscountPercent',
   'plusRerolls',
+  'specialEpicPercent',
+  'plusEpicPercent',
 ] as const;
 
 const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
@@ -41,14 +43,6 @@ const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
     refreshHour: { type: Number, default: DEFAULT_SHOP_SALES.refreshHour },
     freeSlots: { type: Number, default: DEFAULT_SHOP_SALES.freeSlots },
     plusSlots: { type: Number, default: DEFAULT_SHOP_SALES.plusSlots },
-    specialEpicPercent: {
-      type: Number,
-      default: DEFAULT_SHOP_SALES.specialEpicPercent,
-    },
-    plusEpicPercent: {
-      type: Number,
-      default: DEFAULT_SHOP_SALES.plusEpicPercent,
-    },
     everydayRarities: {
       type: [String],
       default: () => [...DEFAULT_SHOP_SALES.everydayRarities],
@@ -100,18 +94,6 @@ export function sanitizeShopSales(
     refreshHour: num(source.refreshHour, DEFAULT_SHOP_SALES.refreshHour, 0, 23),
     freeSlots: num(source.freeSlots, DEFAULT_SHOP_SALES.freeSlots, 1, 12),
     plusSlots: num(source.plusSlots, DEFAULT_SHOP_SALES.plusSlots, 0, 12),
-    specialEpicPercent: num(
-      source.specialEpicPercent,
-      DEFAULT_SHOP_SALES.specialEpicPercent,
-      0,
-      100,
-    ),
-    plusEpicPercent: num(
-      source.plusEpicPercent,
-      DEFAULT_SHOP_SALES.plusEpicPercent,
-      0,
-      100,
-    ),
     everydayRarities: rarityList(
       source.everydayRarities,
       DEFAULT_SHOP_SALES.everydayRarities,

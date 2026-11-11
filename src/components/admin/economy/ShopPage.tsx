@@ -73,7 +73,7 @@ export function ShopPage() {
               subtitle={`Rolls over at ${String(config.refreshHour).padStart(2, '0')}:00 in each player's own time. The crown is the Plus sale, the heart the wishlist slot.`}
             >
               <div className="space-y-4">
-                <ShelfRow label="Special · everyone" note={`${config.specialEpicPercent}% epic, the rest rare`}>
+                <ShelfRow label="Special · everyone" note="Rares only">
                   {Array.from({ length: config.freeSlots }).map((_, index) => {
                     const sale = index === 0;
                     const wish = config.wishlistSlot && index === 1;
@@ -92,7 +92,7 @@ export function ShopPage() {
                     );
                   })}
                 </ShelfRow>
-                <ShelfRow label="Special · Plus only" note={`${config.plusEpicPercent}% epic, the rest rare`}>
+                <ShelfRow label="Special · Plus only" note="Rares + one legendary">
                   {config.plusSlots === 0 ? (
                     <span className="text-[12px] font-bold text-muted-foreground">None</span>
                   ) : (
@@ -166,12 +166,6 @@ export function ShopPage() {
                     </Field>
                     <Field label="Extra Plus slots">
                       <NumberInput value={config.plusSlots} max={12} onChange={(plusSlots) => shop.patch({ plusSlots })} />
-                    </Field>
-                    <Field label="Epic chance · everyone">
-                      <NumberInput value={config.specialEpicPercent} max={100} suffix="%" onChange={(specialEpicPercent) => shop.patch({ specialEpicPercent })} />
-                    </Field>
-                    <Field label="Epic chance · Plus">
-                      <NumberInput value={config.plusEpicPercent} max={100} suffix="%" onChange={(plusEpicPercent) => shop.patch({ plusEpicPercent })} />
                     </Field>
                   </FieldGrid>
                   <ToggleRow

@@ -129,7 +129,8 @@ const PLACEHOLDER_WIDTH = 94.6;
 const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
 const HUNGRY_MOOD_INDEX = 1;
-const MOUTH_HUNGRY_Y_ADJ = 5;
+const MOUTH_HUNGRY_Y_ADJ = 3;
+const MOUTH_REOPEN_GUARD_MS = 400;
 const HIT_TEST_TOLERANCE_PX = 10;
 const HIT_TEST_MIN_ALPHA = 8;
 export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
@@ -160,6 +161,8 @@ export interface FrogHandle {
    *  `soft` plays only when nothing else is playing. */
   fireEmote: (emote: FrogEmote, options?: { soft?: boolean }) => boolean;
   poke: () => void;
+  openMouth?: () => void;
+  closeMouth?: () => void;
 }
 
 interface FrogProps {
@@ -478,9 +481,13 @@ const Frog = memo(
 
     /* ---- mouth trigger: open on grab, explicit close when it ends ---- */
     const wasMouthOpenRef = useRef(false);
+    const mouthOpenedAtRef = useRef(-Infinity);
     useEffect(() => {
       if (mouthOpen) {
         wasMouthOpenRef.current = true;
+        if (performance.now() - mouthOpenedAtRef.current < MOUTH_REOPEN_GUARD_MS) {
+          return;
+        }
         triggerOpenMouth();
         triggerOpenMouthSnake();
         mouthTrigger?.fire();
@@ -936,6 +943,18 @@ const Frog = memo(
       },
       poke() {
         poke();
+      },
+      openMouth() {
+        wasMouthOpenRef.current = true;
+        mouthOpenedAtRef.current = performance.now();
+        triggerOpenMouth();
+        triggerOpenMouthSnake();
+        mouthTrigger?.fire();
+      },
+      closeMouth() {
+        if (!wasMouthOpenRef.current) return;
+        wasMouthOpenRef.current = false;
+        triggerCloseMouth();
       },
     }));
 

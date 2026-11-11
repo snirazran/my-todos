@@ -11,6 +11,8 @@ import { SkipAdsLink } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { FlyAmount } from '@/components/ui/FlyAmount';
 import { Icon } from '@/components/ui/Icon';
+import { GiftRive } from '@/components/ui/gift-box/GiftBox';
+import { ItemArt } from '@/components/ui/skins/DressingRoom';
 import { byId as catalogById } from '@/lib/skins/catalog';
 import { useRewardGate } from '@/hooks/useRewardGate';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
@@ -53,12 +55,14 @@ function RewardChips({
             key={itemId}
             className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-black text-white backdrop-blur"
           >
-            {item?.icon ? (
-              <img
-                src={item.icon}
-                alt={item?.name ?? 'Item'}
-                className="h-8 w-8 object-contain"
-              />
+            {item?.slot === 'container' ? (
+              <span aria-hidden className="-my-2 -ml-1 h-11 w-11 shrink-0">
+                <GiftRive color={item.riveIndex} width={44} height={44} />
+              </span>
+            ) : item ? (
+              <span aria-hidden className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full">
+                <ItemArt item={item} />
+              </span>
             ) : null}
             {item?.name ?? 'Item'}
             {count > 1 ? ` ×${count}` : ''}

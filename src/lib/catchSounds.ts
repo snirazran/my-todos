@@ -87,9 +87,11 @@ const COMBO_SCALE = [0, 2, 4, 7, 9, 12, 14, 16];
 const comboPitch = (combo: number) =>
   semitone(COMBO_SCALE[Math.max(0, Math.min(combo, COMBO_SCALE.length - 1))]);
 
+const NOISE_SECONDS = 0.6;
+
 function getNoise(ctx: AudioContext): AudioBuffer {
   if (noiseBuffer) return noiseBuffer;
-  const len = Math.floor(ctx.sampleRate * 0.1);
+  const len = Math.floor(ctx.sampleRate * NOISE_SECONDS);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
   const data = buf.getChannelData(0);
   for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
@@ -97,27 +99,39 @@ function getNoise(ctx: AudioContext): AudioBuffer {
   return buf;
 }
 
-export function playThwip() {
+const vary = (semitones: number) =>
+  semitone((Math.random() * 2 - 1) * semitones);
+
+const noiseOffset = (seconds: number) =>
+  Math.random() * Math.max(0, NOISE_SECONDS - seconds - 0.02);
+
+export function playThwip(options?: { duration?: number; reach?: number }) {
   if (!catchSoundsEnabled()) return;
   try {
     const ctx = getCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
+    const dur = Math.min(0.26, Math.max(0.07, options?.duration ?? 0.08));
+    const reach = Math.min(1, Math.max(0, options?.reach ?? 0.5));
+    const tune = vary(1.5);
 
     const src = ctx.createBufferSource();
     src.buffer = getNoise(ctx);
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.value = 1.2;
-    bp.frequency.setValueAtTime(350, now);
-    bp.frequency.exponentialRampToValueAtTime(2200, now + 0.07);
+    bp.frequency.setValueAtTime(360 * tune, now);
+    bp.frequency.exponentialRampToValueAtTime(
+      (1800 + 800 * reach) * tune,
+      now + dur * 0.85,
+    );
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.001, now);
     gain.gain.exponentialRampToValueAtTime(0.12, now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
     src.connect(bp).connect(gain).connect(ctx.destination);
-    src.start(now);
-    src.stop(now + 0.1);
+    src.start(now, noiseOffset(dur));
+    src.stop(now + dur + 0.02);
   } catch {
     // ignore
   }
@@ -129,7 +143,8 @@ export function playPop(combo = 0) {
     const ctx = getCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const pitch = comboPitch(combo);
+    const pitch = comboPitch(combo) * vary(0.3);
+    const tail = 0.08 + Math.random() * 0.025;
 
     const osc = ctx.createOscillator();
     osc.type = 'sine';
@@ -138,10 +153,10 @@ export function playPop(combo = 0) {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.001, now);
     gain.gain.exponentialRampToValueAtTime(0.26, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + tail);
     osc.connect(gain).connect(ctx.destination);
     osc.start(now);
-    osc.stop(now + 0.1);
+    osc.stop(now + tail + 0.01);
 
     const click = ctx.createBufferSource();
     click.buffer = getNoise(ctx);
@@ -152,8 +167,52 @@ export function playPop(combo = 0) {
     cGain.gain.setValueAtTime(0.08, now);
     cGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
     click.connect(hp).connect(cGain).connect(ctx.destination);
-    click.start(now);
+    click.start(now, noiseOffset(0.035));
     click.stop(now + 0.035);
+
+    const smack = ctx.createBufferSource();
+    smack.buffer = getNoise(ctx);
+    const body = ctx.createBiquadFilter();
+    body.type = 'bandpass';
+    body.Q.value = 2.4;
+    const smackTune = vary(2);
+    body.frequency.setValueAtTime(950 * smackTune, now);
+    body.frequency.exponentialRampToValueAtTime(420 * smackTune, now + 0.05);
+    const sGain = ctx.createGain();
+    sGain.gain.setValueAtTime(0.001, now);
+    sGain.gain.exponentialRampToValueAtTime(0.09, now + 0.006);
+    sGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    smack.connect(body).connect(sGain).connect(ctx.destination);
+    smack.start(now, noiseOffset(0.07));
+    smack.stop(now + 0.07);
+  } catch {
+    // ignore
+  }
+}
+
+export function playSlurp(duration = 0.28) {
+  if (!catchSoundsEnabled()) return;
+  try {
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const dur = Math.min(0.42, Math.max(0.12, duration));
+    const tune = vary(1.5);
+
+    const src = ctx.createBufferSource();
+    src.buffer = getNoise(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 4.5;
+    bp.frequency.setValueAtTime(480 * tune, now);
+    bp.frequency.exponentialRampToValueAtTime(1500 * tune, now + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.05, now + dur * 0.55);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(bp).connect(gain).connect(ctx.destination);
+    src.start(now, noiseOffset(dur));
+    src.stop(now + dur + 0.02);
   } catch {
     // ignore
   }
@@ -170,7 +229,7 @@ export function playGulp(combo = 0, golden = false) {
     if (gulpBuffer) {
       const src = ctx.createBufferSource();
       src.buffer = gulpBuffer;
-      src.playbackRate.value = pitch;
+      src.playbackRate.value = pitch * vary(0.5);
       const gain = ctx.createGain();
       gain.gain.value = 0.8;
       src.connect(gain).connect(ctx.destination);
