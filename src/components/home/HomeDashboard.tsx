@@ -116,9 +116,6 @@ const demoTasks: Task[] = [
 
 const HOME_FILTER_BASE = { showCompleted: false };
 
-const DAY_CLEARED_WINDOW_MS = 8000;
-const DAY_CLEARED_DELAY_MS = 700;
-
 export default function HomeDashboard() {
   const { user, loading } = useAuth();
   const sessionLoading = loading;
@@ -545,15 +542,6 @@ export default function HomeDashboard() {
 
   const openTaskCount = data.filter((t) => !t.completed).length;
   const dayCleared = data.length > 0 && openTaskCount === 0;
-  const completedAtRef = useRef(0);
-  const wasClearedRef = useRef(dayCleared);
-  useEffect(() => {
-    const cleared = dayCleared && !wasClearedRef.current;
-    wasClearedRef.current = dayCleared;
-    if (!cleared || Date.now() - completedAtRef.current > DAY_CLEARED_WINDOW_MS) return;
-    const t = window.setTimeout(() => frogRef.current?.fireEmote('tada'), DAY_CLEARED_DELAY_MS);
-    return () => window.clearTimeout(t);
-  }, [dayCleared]);
   const giftDone = doneCount;
   const giftTotal = data.length;
   const flyBalance = user ? flyStatus.balance : 5;
@@ -680,7 +668,6 @@ export default function HomeDashboard() {
       await waitForSheetsClosed();
     }
 
-    completedAtRef.current = Date.now();
     await triggerTongue({
       key: taskId,
       completed,
