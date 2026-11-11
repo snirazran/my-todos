@@ -10,9 +10,9 @@ export async function ensureInviteConfig(): Promise<InviteConfigDoc> {
     headline: 'Share Frogress, get rewards!',
     subheading: 'Invite a friend to gift them a skin and earn rewards for yourself!',
     rewards: [
-      { tier: 1, label: '1st friend', description: '', itemId: null, flies: 100, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }] },
-      { tier: 2, label: '2nd friend', description: '', itemId: null, flies: 250, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 250 }] },
-      { tier: 3, label: '3rd friend', description: '', itemId: null, flies: 500, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 500 }] },
+      { tier: 1, label: '1st friend', description: '', itemId: null, flies: 10, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 10 }] },
+      { tier: 2, label: '2nd friend', description: '', itemId: null, flies: 25, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 25 }] },
+      { tier: 3, label: '3rd friend', description: '', itemId: null, flies: 50, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }] },
     ],
     giftOptions: [],
     shareTitle: 'Come join me on Frogress!',

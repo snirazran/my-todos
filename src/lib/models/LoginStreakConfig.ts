@@ -32,44 +32,38 @@ export const DEFAULT_REPEAT_PAYOUT_PERCENTS = [100, 85, 70];
 export const DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT = 60;
 
 /**
- * The pledge ladder. Flies per day climb with the length of the promise
- * (10.0 / 11.4 / 12.0 / 13.6) so a longer pledge is always worth more per day
- * than a short one — that gradient is what makes the ladder pull upward. Plus
- * doubles the flies at grant time; a free player buys the same double with one
- * rewarded ad. Gifts are never duplicated — they open twice instead.
+ * The pledge ladder. A longer pledge is always worth more than a short one,
+ * counting its gift and Lily Pad — that gradient is what makes the ladder pull
+ * upward. Plus doubles the flies at grant time. Gifts are never duplicated —
+ * they open twice instead.
  */
 export const DEFAULT_GOAL_TIERS: LoginStreakGoalTier[] = [
   {
     days: 7,
     rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 70 },
-      { type: 'BOX', itemId: 'gift_box_rare', amount: 1 },
+      { type: 'FLIES', amountMode: 'fixed', amount: 3 },
     ],
   },
   {
     days: 14,
     rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 160 },
-      { type: 'BOX', itemId: 'gift_box_legendary', amount: 1 },
+      { type: 'FLIES', amountMode: 'fixed', amount: 5 },
       { type: 'SHIELD', amount: 1 },
     ],
   },
   {
     days: 30,
     rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 360 },
-      { type: 'BOX', itemId: 'gift_box_legendary', amount: 1 },
-      { type: 'SHIELD', amount: 1 },
-      { type: 'SKIN_ROLL', minRarity: 'rare' },
+      { type: 'FLIES', amountMode: 'fixed', amount: 20 },
+      { type: 'BOX', itemId: 'gift_box_rare', amount: 1 },
     ],
   },
   {
     days: 50,
     rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 680 },
-      { type: 'BOX', itemId: 'gift_box_legendary', amount: 2 },
-      { type: 'SHIELD', amount: 2 },
-      { type: 'SKIN_ROLL', minRarity: 'epic' },
+      { type: 'FLIES', amountMode: 'fixed', amount: 15 },
+      { type: 'BOX', itemId: 'gift_box_legendary', amount: 1 },
+      { type: 'SHIELD', amount: 1 },
     ],
   },
 ];

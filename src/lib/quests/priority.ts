@@ -38,7 +38,7 @@ const EFFORT_EXPONENT = 0.85;
  * single next action can realistically bank, so neither side clamps and the
  * term keeps discriminating instead of reading 1.00 for everything.
  */
-const REWARD_REFERENCE_FLIES = 40;
+const REWARD_REFERENCE_FLIES = 4;
 
 /**
  * How long before a scheduled start an item counts as the thing to do now.

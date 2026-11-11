@@ -24,7 +24,7 @@ const CatalogItemSchema = new Schema<CatalogItemDoc>(
     rarity: { type: String, required: true, enum: ['common', 'uncommon', 'rare', 'epic', 'legendary'], default: 'common' },
     riveIndex: { type: Number, required: true },
     icon: { type: String, default: '' },
-    priceFlies: { type: Number, default: 100 },
+    priceFlies: { type: Number, default: 15 },
     availableFrom: { type: Date, default: null },
     availableUntil: { type: Date, default: null },
     hidden: { type: Boolean, default: false },

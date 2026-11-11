@@ -176,30 +176,30 @@ const rare = (extraFlies = 0) => [gift(FANCY_GIFT_ID), ...(extraFlies ? [flies(e
 const legendary = (extraFlies = 0) => [gift(AMAZING_GIFT_ID), ...(extraFlies ? [flies(extraFlies)] : [])];
 
 const FREE_LANE: QuestRewards[] = [
-  [flies(30)],
+  [flies(3)],
   basic(), basic(), basic(), basic(), basic(), basic(), basic(),
-  [flies(30)],
+  [flies(3)],
   basic(), basic(),
   rare(),
-  [flies(30)],
+  [flies(3)],
   basic(), basic(),
   legendary(),
-  [flies(30)],
+  [flies(3)],
   basic(), basic(), basic(),
   legendary(),
-  [flies(30)],
+  [flies(3)],
   basic(), basic(),
-  [flies(30)], [flies(30)],
+  [flies(3)], [flies(3)],
   rare(),
   legendary(),
-  [flies(30)],
+  [flies(3)],
   rare(),
 ];
 
 const PLUS_LATE_LANE: QuestRewards[] = [
-  rare(), rare(30), rare(), rare(30), legendary(), rare(), rare(40), rare(),
-  legendary(30), rare(), rare(30), rare(), legendary(), rare(40), rare(), rare(30),
-  rare(40), legendary(30), rare(50), legendary(40), rare(50), legendary(30), rare(50), legendary(50),
+  rare(), rare(3), rare(), rare(3), legendary(), rare(), rare(4), rare(),
+  legendary(3), rare(), rare(3), rare(), legendary(), rare(4), rare(), rare(3),
+  rare(4), legendary(3), rare(5), legendary(4), rare(5), legendary(3), rare(5), legendary(5),
 ];
 
 function plusLane(tier: number, skinIds: SeasonSkinIds): QuestRewards {
@@ -223,7 +223,7 @@ export function buildSeasonPassLadder(
   return Array.from({ length: count }, (_, index) => {
     const tier = index + 1;
     const free = FREE_LANE[index % FREE_LANE.length];
-    const plus = tier <= 30 ? plusLane(tier, skinIds) : rare(30);
+    const plus = tier <= 30 ? plusLane(tier, skinIds) : rare(3);
     return {
       tier,
       freeRewards: free.map((reward) => ({ ...reward })),

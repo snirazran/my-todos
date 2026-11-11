@@ -8,9 +8,10 @@ import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { PremiumFrogAura } from './PremiumFrogAura';
 import { useInventory } from '@/hooks/useInventory';
 import { useLoginStreak } from '@/hooks/useLoginStreak';
+import { useIntros } from '@/hooks/useIntros';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import type { FrogSpeechContext } from '@/lib/frogSpeech';
+import { FLIES_RESCALED_LINE, type FrogSpeechContext } from '@/lib/frogSpeech';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
   takePushGreeting,
@@ -183,6 +184,17 @@ export function FrogDisplay({
     setCue({ text: greeting.text, at: greeting.at });
     frogRef.current?.fireEmote(greeting.emote);
   }, [pendingGreeting, speechEnabled, fixedSpeech, frogRef]);
+
+  const { seenIntros, markIntroSeen } = useIntros(speechEnabled);
+  const fliesRescalePending = seenIntros?.fliesRescale === false;
+  const markIntroSeenRef = React.useRef(markIntroSeen);
+  markIntroSeenRef.current = markIntroSeen;
+
+  React.useEffect(() => {
+    if (!fliesRescalePending || !speechEnabled || fixedSpeech) return;
+    setCue({ text: FLIES_RESCALED_LINE, at: Date.now() });
+    markIntroSeenRef.current('fliesRescale');
+  }, [fliesRescalePending, speechEnabled, fixedSpeech]);
 
   const wardrobeBadge = unseenCount + unseenContainerCount;
 

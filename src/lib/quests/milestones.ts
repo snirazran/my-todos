@@ -112,10 +112,10 @@ const flies = (amount: number) => [
   { type: 'FLIES' as const, amountMode: 'fixed' as const, amount },
 ];
 
-function ladder(targets: number[], maxFlies = 30): MilestoneStep[] {
+function ladder(targets: number[], maxFlies = 5): MilestoneStep[] {
   return targets.map((target, index) => ({
     target,
-    rewards: flies(Math.min(maxFlies, 5 + 5 * Math.floor(index / 2))),
+    rewards: flies(Math.min(maxFlies, 1 + Math.floor(index / 2))),
   }));
 }
 

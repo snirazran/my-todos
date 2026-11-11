@@ -11,7 +11,8 @@ export type IntroKey =
   | 'quickAddTagEdit'
   | 'firstRun'
   | 'tapToWear'
-  | 'tryOn';
+  | 'tryOn'
+  | 'fliesRescale';
 
 type IntrosResponse = { seenIntros?: Partial<Record<IntroKey, boolean>> };
 

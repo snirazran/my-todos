@@ -1,5 +1,8 @@
 export type FrogSpeechEvent = 'welcome' | 'tap' | 'catch';
 
+export const FLIES_RESCALED_LINE =
+  'Fewer, fatter flies!\nPrices shrank 10× too,\nso you buy the same.';
+
 export type FrogFacts = {
   done: number;
   total: number;

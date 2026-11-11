@@ -63,7 +63,7 @@ function dayKeyIn(date: Date, tz: string) {
   }
 }
 
-const EARNED_FLIES_WORTH_NAMING = 10;
+const EARNED_FLIES_WORTH_NAMING = 3;
 
 function endingBody(rawEarned: unknown) {
   const { flies, rareItems } = readPlusEarned(rawEarned);

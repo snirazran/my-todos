@@ -68,7 +68,7 @@ export const PLUS_PRICING = {
 
 export const LEGAL_LAST_UPDATED = {
   privacy: 'August 2, 2026',
-  terms: 'September 1, 2026',
+  terms: 'November 12, 2026',
   refund: 'July 26, 2026',
   support: 'August 30, 2026',
 } as const;

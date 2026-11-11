@@ -9,7 +9,10 @@ import QuestRecipeModel, {
   type QuestRecipeDoc,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
-import QuestStreakConfigModel, { STREAK_CONFIG_ID } from '@/lib/models/QuestStreakConfig';
+import QuestStreakConfigModel, {
+  STREAK_CONFIG_ID,
+  SWEEP_DEFAULTS,
+} from '@/lib/models/QuestStreakConfig';
 import EconomyUpdateSnapshotModel, {
   type EconomyUpdateBefore,
   type EconomyUpdateChange,
@@ -21,6 +24,11 @@ import { invalidateCatalogCache } from '@/lib/skins/getCatalog';
 import { RARITY_ORDER, isTradeOnlyRarity, type Rarity } from '@/lib/skins/catalog';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 import type { QuestReward } from '@/lib/quests/types';
+import {
+  DAILY_SLOT_FLIES,
+  ECONOMY_BACKGROUND_PRICES,
+  ECONOMY_ITEM_PRICES,
+} from '@/lib/economy/rescaleTargets';
 
 export type PityValues = Pick<
   GiftRules,
@@ -53,10 +61,10 @@ export const RECOMMENDED_ECONOMY_UPDATE: {
   backgroundPrices: RarityPrices;
 } = {
   pity: { softPityLuck: 70, softPityBonusPoints: 5, hardPityLuck: 100, epicPityLuck: 30 },
-  dailySlotFlies: [10, 20, 30],
-  cleanSweepFlies: 20,
-  itemPrices: { common: 150, uncommon: 350, rare: 700, epic: 1600, legendary: 5000 },
-  backgroundPrices: { legendary: 5000 },
+  dailySlotFlies: DAILY_SLOT_FLIES,
+  cleanSweepFlies: SWEEP_DEFAULTS.cleanSweepFlies,
+  itemPrices: ECONOMY_ITEM_PRICES,
+  backgroundPrices: ECONOMY_BACKGROUND_PRICES,
 };
 
 const PITY_KEYS = ['softPityLuck', 'softPityBonusPoints', 'hardPityLuck', 'epicPityLuck'] as const;

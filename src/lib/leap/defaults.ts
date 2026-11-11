@@ -26,15 +26,12 @@ export const LEGACY_WEEK_GIFTS = [SIMPLE_GIFT, SIMPLE_GIFT, FANCY_GIFT, FANCY_GI
 export const LEGACY_LEAP_MARK_FLIES = 25;
 
 export const DEFAULT_LEAP_MARKS: Record<LeapMarkId, LeapMarkConfig> = {
-  hold: { percent: 40, minDays: 2, minScheduled: 2, flies: 10 },
-  leap: { percent: 70, minDays: 3, minScheduled: 3, flies: 40 },
+  hold: { percent: 40, minDays: 2, minScheduled: 2, flies: 1 },
+  leap: { percent: 70, minDays: 3, minScheduled: 3, flies: 4 },
 };
 
 export const DEFAULT_LEAP_LUCKY_DROPS: LeapLuckyDrop[] = [
-  { weight: 50, rewards: [{ type: 'FLIES', amount: 10 }] },
-  { weight: 35, rewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }] },
-  { weight: 12, rewards: [{ type: 'BOX', itemId: FANCY_GIFT }] },
-  { weight: 3, rewards: [{ type: 'SHIELD', amount: 1 }] },
+  { weight: 100, rewards: [{ type: 'FLIES', amount: 3 }] },
 ];
 
 export const DEFAULT_LEAP_FIRST_HOP_REWARDS: BonusRewards = [
@@ -47,7 +44,7 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
     multiplier: 1,
     leapPercent: 50,
     weekRewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }],
-    plusWeekRewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }],
+    plusWeekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
     reachRewards: [],
     plusReachRewards: [],
   },
@@ -56,13 +53,13 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
     multiplier: 1.25,
     leapPercent: 60,
     weekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
-    plusWeekRewards: [{ type: 'BOX', itemId: SIMPLE_GIFT }],
+    plusWeekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
     reachRewards: [
-      { type: 'FLIES', amount: 100 },
+      { type: 'FLIES', amount: 10 },
       { type: 'BOX', itemId: FANCY_GIFT },
     ],
     plusReachRewards: [
-      { type: 'FLIES', amount: 50 },
+      { type: 'FLIES', amount: 20 },
       { type: 'BOX', itemId: FANCY_GIFT },
     ],
   },
@@ -70,14 +67,17 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
     label: 'Lily Bloom',
     multiplier: 1.5,
     leapPercent: 70,
-    weekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
-    plusWeekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
+    weekRewards: [
+      { type: 'BOX', itemId: FANCY_GIFT },
+      { type: 'BOX', itemId: SIMPLE_GIFT },
+    ],
+    plusWeekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
     reachRewards: [
-      { type: 'FLIES', amount: 150 },
-      { type: 'BOX', itemId: AMAZING_GIFT },
+      { type: 'FLIES', amount: 15 },
+      { type: 'BOX', itemId: FANCY_GIFT },
     ],
     plusReachRewards: [
-      { type: 'FLIES', amount: 75 },
+      { type: 'FLIES', amount: 30 },
       { type: 'RARITY_ITEM', rarity: 'rare' },
     ],
   },
@@ -86,13 +86,13 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
     multiplier: 1.75,
     leapPercent: 75,
     weekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
-    plusWeekRewards: [{ type: 'BOX', itemId: FANCY_GIFT }],
+    plusWeekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
     reachRewards: [
-      { type: 'FLIES', amount: 200 },
+      { type: 'FLIES', amount: 20 },
       { type: 'RARITY_ITEM', rarity: 'epic' },
     ],
     plusReachRewards: [
-      { type: 'FLIES', amount: 100 },
+      { type: 'FLIES', amount: 40 },
       { type: 'BOX', itemId: AMAZING_GIFT },
     ],
   },
@@ -100,14 +100,20 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
     label: 'Lily Garden',
     multiplier: 2,
     leapPercent: 80,
-    weekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
-    plusWeekRewards: [{ type: 'BOX', itemId: AMAZING_GIFT }],
+    weekRewards: [
+      { type: 'BOX', itemId: AMAZING_GIFT },
+      { type: 'BOX', itemId: FANCY_GIFT },
+    ],
+    plusWeekRewards: [
+      { type: 'BOX', itemId: AMAZING_GIFT },
+      { type: 'BOX', itemId: FANCY_GIFT },
+    ],
     reachRewards: [
-      { type: 'FLIES', amount: 300 },
+      { type: 'FLIES', amount: 30 },
       { type: 'RARITY_ITEM', rarity: 'legendary' },
     ],
     plusReachRewards: [
-      { type: 'FLIES', amount: 150 },
+      { type: 'FLIES', amount: 50 },
       { type: 'RARITY_ITEM', rarity: 'epic' },
     ],
   },
@@ -115,9 +121,9 @@ export const DEFAULT_LEAP_LEAGUES: LeapLeague[] = [
 
 export const LEAP_DEFAULTS: LeapConfigView = {
   isActive: true,
-  hopFlies: 2,
-  hopsPaidPerDay: 8,
-  comebackFlies: 5,
+  hopFlies: 1,
+  hopsPaidPerDay: 5,
+  comebackFlies: 2,
   comebackLookbackDays: 7,
   comebacksPerDay: 1,
   luckyChancePercent: 10,

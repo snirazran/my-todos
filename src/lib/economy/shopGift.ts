@@ -18,11 +18,11 @@ export type ShopGiftStatus = {
   first?: boolean;
 };
 
-export const SHOP_GIFT_MIN_FLIES = 15;
-export const SHOP_GIFT_MAX_FLIES = 30;
-export const SHOP_GIFT_FULL_BELOW_BALANCE = 100;
-export const SHOP_GIFT_FLOOR_FROM_BALANCE = 2000;
-export const SHOP_GIFT_FIRST_FLIES = 150;
+export const SHOP_GIFT_MIN_FLIES = 2;
+export const SHOP_GIFT_MAX_FLIES = 2;
+export const SHOP_GIFT_FULL_BELOW_BALANCE = 10;
+export const SHOP_GIFT_FLOOR_FROM_BALANCE = 200;
+export const SHOP_GIFT_FIRST_FLIES = 15;
 
 export function shopGiftBaseFlies(balance: number): number {
   const low = Math.log(SHOP_GIFT_FULL_BELOW_BALANCE);

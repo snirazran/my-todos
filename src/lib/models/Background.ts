@@ -52,7 +52,7 @@ const BackgroundSchema = new Schema<BackgroundDoc>(
       enum: ['common', 'uncommon', 'rare', 'epic', 'legendary'],
       default: 'common',
     },
-    priceFlies: { type: Number, default: 200 },
+    priceFlies: { type: Number, default: 20 },
     images: {
       mobile: { type: String, default: '' },
       tablet: { type: String, default: '' },

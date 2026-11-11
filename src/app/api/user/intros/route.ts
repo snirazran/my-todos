@@ -13,6 +13,7 @@ const INTRO_KEYS = new Set([
   'firstRun',
   'tapToWear',
   'tryOn',
+  'fliesRescale',
 ]);
 
 export async function GET() {

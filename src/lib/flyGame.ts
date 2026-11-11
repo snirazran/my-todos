@@ -1,7 +1,7 @@
 import { containsProfanity } from '@/lib/profanity';
 
 export const FLY_GAME_DURATION_MS = 30_000;
-export const FLY_GAME_MAX_REWARD = 150;
+export const FLY_GAME_MAX_REWARD = 15;
 export const FLY_GAME_STORAGE_KEY = 'frogress.fly-game.v1';
 
 export type FlyGameKind = 'normal' | 'gold' | 'time' | 'trap';
@@ -59,5 +59,5 @@ export function sanitizeFlyGameName(value: unknown) {
 }
 
 export function flyGameReward(score: number) {
-  return Math.min(FLY_GAME_MAX_REWARD, Math.max(0, Math.floor(score)));
+  return Math.min(FLY_GAME_MAX_REWARD, Math.ceil(Math.max(0, Math.floor(score)) / 10));
 }

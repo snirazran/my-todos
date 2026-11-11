@@ -36,9 +36,7 @@ export type ChecklistTier = {
 export const DEFAULT_CHECKLIST_TIERS: readonly ChecklistTier[] = [
   { minItems: 1, markers: [] },
   { minItems: 3, markers: ['final'] },
-  { minItems: 5, markers: ['3', 'final'] },
-  { minItems: 8, markers: ['33%', '67%', 'final'] },
-  { minItems: 12, markers: ['25%', '50%', '75%', 'final'] },
+  { minItems: 8, markers: ['50%', 'final'] },
 ];
 
 function tierFor(

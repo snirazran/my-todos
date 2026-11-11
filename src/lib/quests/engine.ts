@@ -864,7 +864,7 @@ function longestExtendableStreakRun(
 
 // "Close enough" margin for shop-dependent objectives: a normal day's free
 // quest income, so the missing flies are earnable within the quest window.
-const NEARLY_AFFORDABLE_FLIES = 10;
+const NEARLY_AFFORDABLE_FLIES = 2;
 
 const MIN_CUTOFF_RUNWAY_HOURS = 1;
 

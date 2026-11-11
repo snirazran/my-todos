@@ -129,8 +129,8 @@ export type FlyEconomyConfig = {
 
 export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
   taskIncome: {
-    dailyCapFree: 30,
-    dailyCapPlus: 30,
+    dailyCapFree: 15,
+    dailyCapPlus: 15,
     payingCompletionsPerDay: 15,
     backdateGraceHours: 48,
   },
@@ -158,7 +158,7 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     freeSlipEveryDays: 30,
   },
   buddy: {
-    bonusFlies: 5,
+    bonusFlies: 1,
     dailyPayouts: 3,
     perPairDailyPayouts: 2,
     duoWeekTasks: 5,
@@ -168,11 +168,11 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
   },
   friendsPond: {
     tasksPerGeneration: 5,
-    fliesPerGeneration: 2,
+    fliesPerGeneration: 1,
     claimGateTasks: 3,
-    dailyCapFree: 20,
-    dailyCapPlus: 40,
-    perFriendDailyCap: 6,
+    dailyCapFree: 3,
+    dailyCapPlus: 6,
+    perFriendDailyCap: 2,
     expiryHours: 48,
     weeklyBonusFriends: 3,
     weeklyBonusDays: 5,
@@ -184,8 +184,8 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     monthlyCap: 10,
   },
   rewardedAds: {
-    reward: 10,
-    dailyCap: 6,
+    reward: 2,
+    dailyCap: 3,
     cooldownSeconds: 10,
     totalDailyCap: 6,
     doubleRewardPerDay: 2,
@@ -200,16 +200,16 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
   },
   shopGift: {
     enabled: true,
-    fullBelowBalance: 100,
-    floorFromBalance: 1500,
-    maxFlies: 12,
-    minFlies: 3,
+    fullBelowBalance: 10,
+    floorFromBalance: 200,
+    maxFlies: 2,
+    minFlies: 2,
     luckyChancePercent: 10,
     luckyMultiplier: 2,
     plusMultiplier: 2,
   },
   circuitBreaker: {
-    dailyCap: 400,
+    dailyCap: 100,
   },
   timezone: {
     changesPerDay: 1,

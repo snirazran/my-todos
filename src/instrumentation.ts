@@ -7,6 +7,8 @@ export async function register() {
   }
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   await import('./sentry.server.config');
+  const { startEconomyScale } = await import('@/lib/economyScaleTicker');
+  await startEconomyScale();
   const { startFrogodoroTicker } = await import('@/lib/frogodoroTicker');
   startFrogodoroTicker();
   const { startLoginStreakTicker } = await import('@/lib/streakTicker');

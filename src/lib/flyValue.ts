@@ -19,10 +19,6 @@ export type StreakTier = {
  */
 export const DEFAULT_STREAK_TIERS: readonly StreakTier[] = [
   { minDays: 1, flies: 1 },
-  { minDays: 3, flies: 2 },
-  { minDays: 7, flies: 3 },
-  { minDays: 14, flies: 4 },
-  { minDays: 30, flies: 5 },
 ];
 
 export type StreakMilestone = {
@@ -35,16 +31,16 @@ export type StreakMilestone = {
 };
 
 export const DEFAULT_STREAK_MILESTONES: readonly StreakMilestone[] = [
-  { atDays: 3, flies: 5 },
-  { atDays: 7, flies: 15, giftItemId: 'gift_box_1' },
-  { atDays: 14, flies: 30, giftItemId: 'gift_box_rare' },
-  { atDays: 30, flies: 60, giftItemId: 'gift_box_legendary', shields: 1 },
+  { atDays: 3, flies: 2 },
+  { atDays: 7, flies: 5 },
+  { atDays: 14, flies: 10 },
+  { atDays: 30, flies: 20, giftItemId: 'gift_box_rare', shields: 1 },
 ];
 
 /** What every further cycle pays once the fixed milestones are exhausted. */
 export const DEFAULT_STREAK_REPEAT = {
   everyDays: 30,
-  flies: 50,
+  flies: 20,
   giftItemId: 'gift_box_rare',
   shields: 0,
 };

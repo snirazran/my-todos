@@ -68,15 +68,15 @@ export const DAILY_RECIPE_LAYOUT_VERSION = 2;
 
 export function defaultDailySlots(): RecipeSlot[] {
   return [
-    slot([{ type: 'count', action: 'complete', minTarget: 1, maxTarget: 1 }], flies(5)),
+    slot([{ type: 'count', action: 'complete', minTarget: 1, maxTarget: 1 }], flies(1)),
     slot(
       [
         { type: 'season_step', minTarget: 1, maxTarget: 1, weight: 100 },
         { type: 'count', action: 'complete', minTarget: 3, maxTarget: 3, weight: 1 },
       ],
-      flies(10),
+      flies(2),
     ),
-    slot([{ type: 'prompt', minTarget: 1, maxTarget: 1 }], flies(8)),
+    slot([{ type: 'prompt', minTarget: 1, maxTarget: 1 }], flies(2)),
   ];
 }
 

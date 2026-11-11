@@ -35,9 +35,9 @@ export const SHIELD_CONFIG_VERSION = 2;
 
 export const SHIELD_DEFAULTS = {
   isActive: true,
-  priceFlies: 350,
-  twoPackPriceFlies: 600,
-  rescuePriceFlies: 500,
+  priceFlies: 35,
+  twoPackPriceFlies: 60,
+  rescuePriceFlies: 50,
   capFree: 2,
   capPlus: 3,
   plusMonthlyGrant: 1,

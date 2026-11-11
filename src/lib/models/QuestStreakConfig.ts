@@ -74,33 +74,25 @@ const entry = (chance: number, reward: SweepReward): SweepRollEntry => ({
 });
 
 export const SWEEP_DEFAULT_STANDARD_ROLL: SweepRollEntry[] = [
-  entry(50, { type: 'FLIES', amountMode: 'fixed', amount: 15 }),
-  entry(22, { type: 'BOX', itemId: 'gift_box_1', amount: 1 }),
-  entry(14, { type: 'FLIES', amountMode: 'fixed', amount: 35 }),
-  entry(8, { type: 'BOX', itemId: 'gift_box_rare', amount: 1 }),
-  entry(4, { type: 'FLIES', amountMode: 'fixed', amount: 70 }),
-  entry(1.5, { type: 'BOX', itemId: 'gift_box_legendary', amount: 1 }),
-  entry(0.5, { type: 'SHIELD', amount: 1 }),
+  entry(70, { type: 'FLIES', amountMode: 'fixed', amount: 1 }),
+  entry(25, { type: 'FLIES', amountMode: 'fixed', amount: 2 }),
+  entry(5, { type: 'FLIES', amountMode: 'fixed', amount: 4 }),
 ];
 
 export const SWEEP_DEFAULT_GOLDEN_ROLL: SweepRollEntry[] = [
-  entry(32, { type: 'BOX', itemId: 'gift_box_rare', amount: 1 }),
-  entry(28, { type: 'FLIES', amountMode: 'fixed', amount: 60 }),
-  entry(16, { type: 'BOX', itemId: 'gift_box_legendary', amount: 1 }),
-  entry(14, { type: 'FLIES', amountMode: 'fixed', amount: 120 }),
-  entry(6, { type: 'SHIELD', amount: 1 }),
-  entry(3, { type: 'RARITY_ITEM', rarity: 'epic', amount: 1 }),
-  entry(1, { type: 'RARITY_ITEM', rarity: 'legendary', amount: 1 }),
+  entry(60, { type: 'FLIES', amountMode: 'fixed', amount: 3 }),
+  entry(30, { type: 'FLIES', amountMode: 'fixed', amount: 5 }),
+  entry(10, { type: 'FLIES', amountMode: 'fixed', amount: 10 }),
 ];
 
 export const SWEEP_DEFAULT_MEGA_REWARDS: SweepReward[] = [
-  { type: 'BOX', itemId: 'gift_box_legendary', amount: 1 },
-  { type: 'FLIES', amountMode: 'fixed', amount: 100 },
+  { type: 'BOX', itemId: 'gift_box_rare', amount: 1 },
+  { type: 'FLIES', amountMode: 'fixed', amount: 10 },
 ];
 
 export const SWEEP_DEFAULTS = {
   isActive: true,
-  cleanSweepFlies: 12,
+  cleanSweepFlies: 2,
   goldenEveryDays: 3,
   megaEveryDays: 9,
 } as const;
