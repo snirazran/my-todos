@@ -13,6 +13,7 @@ export type SavedTag = {
   name: string;
   color: string;
   disabled?: boolean;
+  uses?: number;
 };
 
 export type QuickAddSubmit = {

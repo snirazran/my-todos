@@ -108,21 +108,87 @@ export async function GET(req: NextRequest) {
     const isPremium = user?.premiumUntil
       ? new Date(user.premiumUntil) > now
       : false;
-    const tags = (user?.tags ?? [])
+    const normalized = (user?.tags ?? [])
       .map((tag: any, index: number) => normalizeUserTag(tag, index))
-      .filter(Boolean)
-      .map((tag: any, index: number) => ({
-        id: tag.id,
-        name: tag.name,
-        color: tag.color,
-        key: tag._key ?? `${tag.id}-${index}`,
-        disabled: !isPremium && index >= FREE_TAG_LIMIT,
-      }));
+      .filter(Boolean);
+    const uses = await countTagUses(userId, normalized);
+    const tags = normalized.map((tag: any, index: number) => ({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      key: tag._key ?? `${tag.id}-${index}`,
+      disabled: !isPremium && index >= FREE_TAG_LIMIT,
+      uses: uses.get(tag.id) ?? 0,
+    }));
 
     return NextResponse.json({ tags, isPremium });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+}
+const TAG_USAGE_WINDOW_DAYS = 90;
+
+async function countTagUses(
+  userId: string,
+  tags: { id: string; name: string }[],
+): Promise<Map<string, number>> {
+  const uses = new Map<string, number>();
+  if (tags.length === 0) return uses;
+  const idByRef = new Map<string, string>();
+  for (const tag of tags) {
+    idByRef.set(tag.id, tag.id);
+    if (!idByRef.has(tag.name)) idByRef.set(tag.name, tag.id);
+  }
+  const since = addDaysYMD(
+    new Date().toISOString().slice(0, 10),
+    -TAG_USAGE_WINDOW_DAYS,
+  );
+  try {
+    const rows = await TaskModel.aggregate<{ _id: string; count: number }>([
+      {
+        $match: {
+          userId,
+          deletedAt: { $exists: false },
+          'tags.0': { $exists: true },
+          $or: [
+            { type: 'regular', date: { $gte: since } },
+            { type: 'backlog' },
+            {
+              type: 'weekly',
+              $or: [
+                { repeatEndDate: { $exists: false } },
+                { repeatEndDate: null },
+                { repeatEndDate: { $gte: since } },
+              ],
+            },
+          ],
+        },
+      },
+      { $unwind: '$tags' },
+      {
+        $group: {
+          _id: {
+            tag: '$tags',
+            unit: {
+              $cond: [
+                { $eq: ['$type', 'weekly'] },
+                { $ifNull: ['$repeatGroupId', '$id'] },
+                '$id',
+              ],
+            },
+          },
+        },
+      },
+      { $group: { _id: '$_id.tag', count: { $sum: 1 } } },
+    ]);
+    for (const row of rows) {
+      const id = idByRef.get(row._id);
+      if (id) uses.set(id, (uses.get(id) ?? 0) + row.count);
+    }
+  } catch (e) {
+    console.error('Failed to count tag uses', e);
+  }
+  return uses;
 }
 
 /**

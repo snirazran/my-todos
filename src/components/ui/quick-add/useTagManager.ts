@@ -23,6 +23,18 @@ type Options = {
 
 const NO_TAGS: SavedTag[] = [];
 
+function byMostUsed(tags: SavedTag[]) {
+  return tags
+    .map((tag, index) => ({ tag, index }))
+    .sort(
+      (a, b) =>
+        Number(!!a.tag.disabled) - Number(!!b.tag.disabled) ||
+        (b.tag.uses ?? 0) - (a.tag.uses ?? 0) ||
+        a.index - b.index,
+    )
+    .map(({ tag }) => tag);
+}
+
 export function useTagManager({
   open,
   selectedTags,
@@ -32,7 +44,8 @@ export function useTagManager({
   onMaxSelectedTags,
 }: Options) {
   const { data: tagsData } = useSWR(open ? '/api/tags' : null, fetcher);
-  const savedTags: SavedTag[] = tagsData?.tags ?? NO_TAGS;
+  const rawTags: SavedTag[] = tagsData?.tags ?? NO_TAGS;
+  const savedTags = useMemo(() => byMostUsed(rawTags), [rawTags]);
   const isPremium: boolean = !!tagsData?.isPremium;
   const tagLimit = isPremium ? PREMIUM_TAG_LIMIT : FREE_TAG_LIMIT;
 
