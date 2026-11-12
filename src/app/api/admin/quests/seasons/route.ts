@@ -140,9 +140,6 @@ export async function POST(req: NextRequest) {
       const template = await loadSeasonTemplate();
       const item = (await getCachedCatalog()).find((entry) => entry.id === itemId);
       if (!item) return json({ error: 'That item is not in the catalog' }, 400);
-      if (item.rarity !== template.slotRarities[slot as SeasonSkinSlot]) {
-        return json({ error: 'That rung only takes the rarity set in the pass rules' }, 400);
-      }
       const skinIds = {
         ...normalizeSeasonSkinIds(season.skinIds),
         [slot]: itemId,

@@ -31,6 +31,8 @@ import {
   FANCY_GIFT_ID,
   SEASON_PASS_LIMITS,
   SEASON_SKIN_POOL_SLOTS,
+  SEASON_GIFT_ID,
+  SEASON_GIFT_NAME,
   SEASON_SKIN_SLOTS,
   SIMPLE_GIFT_ID,
   type QuestSeasonTierReward,
@@ -560,7 +562,7 @@ export function AdminSeasonManager({
         {SEASON_SKIN_SLOTS.map((slot) => {
           const itemId = skinAt(season, slot);
           const item = itemId ? rewardCatalog[itemId] : undefined;
-          const rarity = template?.slotRarities[slot.key] ?? slot.rarity;
+          const rarity = (item?.rarity as Rarity | undefined) ?? template?.slotRarities[slot.key] ?? slot.rarity;
           const rolling = busy === `reroll:${slot.key}` || busy === 'reroll';
           return (
             <div key={slot.key} className="rounded-2xl border border-border/40 bg-background/70 p-3">
@@ -634,6 +636,17 @@ export function AdminSeasonManager({
   );
 
   const renderLadder = (season: AdminSeason) => {
+    const ladderCatalog: Record<string, QuestRewardCatalogItem> = {
+      ...rewardCatalog,
+      [SEASON_GIFT_ID]: {
+        id: SEASON_GIFT_ID,
+        name: SEASON_GIFT_NAME,
+        slot: 'background',
+        rarity: 'rare',
+        riveIndex: 0,
+        imageUrl: coverOf(season.images) || undefined,
+      },
+    };
     const free = laneTotals(season.tierRewards, 'free');
     const plus = laneTotals(season.tierRewards, 'plus');
     const skinTiers = new Map<string, true>();
@@ -724,7 +737,7 @@ export function AdminSeasonManager({
                         <RewardTile
                           key={index}
                           reward={reward}
-                          rewardCatalog={rewardCatalog}
+                          rewardCatalog={ladderCatalog}
                           isPremium={false}
                           compact
                           className="h-9 w-9 rounded-lg"
@@ -1262,7 +1275,6 @@ function SkinChooserDialog({
 
   const options = rewardItems.filter(
     (item) =>
-      item.rarity === rarity &&
       pool.includes(item.slot as WardrobeSlot) &&
       item.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -1271,9 +1283,9 @@ function SkinChooserDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Choose a {rarity} skin</DialogTitle>
+          <DialogTitle>Choose an item</DialogTitle>
           <DialogDescription>
-            Only {rarity} items from the allowed slots fit this rung.
+            Any item from the allowed slots. A reroll still draws a {rarity} one.
           </DialogDescription>
         </DialogHeader>
         <label className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-background px-3">

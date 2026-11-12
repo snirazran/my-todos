@@ -38,7 +38,7 @@ export function SeasonSetsRow({
               key={set.seasonId}
               aria-label={`${set.name} set, ${status}`}
               className={cn(
-                'flex w-[10rem] shrink-0 items-center gap-2.5 rounded-[16px] bg-card p-1.5 pr-3',
+                'flex max-w-[17rem] shrink-0 items-center gap-2.5 rounded-[16px] bg-card p-1.5 pr-3.5',
                 complete ? 'ring-2 ring-amber-400' : 'ring-1 ring-border/70',
               )}
             >
@@ -49,7 +49,7 @@ export function SeasonSetsRow({
                 )}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[12.5px] font-black leading-tight text-foreground">
+                <span className="block truncate whitespace-nowrap text-[12.5px] font-black leading-tight text-foreground">
                   {set.name}
                 </span>
                 <span

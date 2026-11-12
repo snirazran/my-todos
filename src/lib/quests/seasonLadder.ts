@@ -203,7 +203,6 @@ const piece = (itemId: string): QuestReward => ({
 });
 
 const FREE_FLIES = [2, 2, 3, 2, 3, 5, 2, 3, 3, 2, 3];
-const PLUS_FLIES = 5;
 const PLUS_HERO_AT = 0.75;
 
 function spread(candidates: number[], count: number): number[] {
@@ -281,7 +280,7 @@ export function buildSeasonPassLadder(
     } else if (tier === plusHeroTier + 2 || isPlusGiftTier(tier)) {
       premiumRewards = [gift(FANCY_GIFT_ID)];
     } else {
-      premiumRewards = [flies(PLUS_FLIES)];
+      premiumRewards = [gift(SIMPLE_GIFT_ID)];
     }
     return { tier, freeRewards, premiumRewards };
   });
