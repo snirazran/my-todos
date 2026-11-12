@@ -45,6 +45,7 @@ import { GiftRive } from './gift-box/GiftBox';
 import { useInventory } from '@/hooks/useInventory';
 import {
   enqueueQuestRewardReveal,
+  useQuestRevealActive,
   type QuestRewardSummary,
   type RevealCatalog,
 } from './questRewardReveal';
@@ -278,14 +279,17 @@ export function QuestsPanel({
     void refreshQuestHomeView();
   };
 
+  const revealActive = useQuestRevealActive();
   const queueRewardReveal = (
     summary?: QuestRewardSummary,
     moment?: RatingMoment,
+    giftsOnly = false,
   ) =>
     enqueueQuestRewardReveal(summary, {
       catalog: (data?.rewardCatalog ?? {}) as RevealCatalog,
       isPremium: data?.isPremium ?? false,
       moment,
+      giftsOnly,
     });
 
   useEffect(() => {
@@ -432,7 +436,7 @@ export function QuestsPanel({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      queueRewardReveal(payload.rewardSummary, 'quest_reward');
+      queueRewardReveal(payload.rewardSummary, 'quest_reward', true);
       // A Lily Pad has no reveal art of its own, so the only thing that would
       // otherwise change is a silent shield count.
       if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
@@ -612,7 +616,7 @@ export function QuestsPanel({
                   )
                 }
                 onUpgrade={() => openPlus('season_plus_track')}
-                paused={false}
+                paused={revealActive}
               />
               <PlusUpgradeModal open={plusOpen} placement={plusPlacement} onClose={() => setPlusOpen(false)} />
               <FrogPromptSheet
@@ -1136,10 +1140,12 @@ export function SeasonRewardTile({
   compact = false,
   oversample = 1,
   tagRight = false,
+  muted = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, ItemDef>;
   lane: 'free' | 'plus';
+  muted?: boolean;
   paused?: boolean;
   compact?: boolean;
   oversample?: number;
@@ -1175,7 +1181,7 @@ export function SeasonRewardTile({
         foil={rarity}
         oversample={oversample}
         hideQuantityBadge={!compact || reward.type !== 'FLIES'}
-        className="h-full w-full"
+        className={cn('h-full w-full', muted && 'saturate-[0.85]')}
       />
       {showTag && (
         <span
@@ -1245,7 +1251,7 @@ function SeasonSetRow({
                 <SeasonRewardTile
                   reward={{ type: 'ITEM', itemId: id, amount: 1 }}
                   rewardCatalog={rewardCatalog}
-                  lane="free"
+                  lane="plus"
                   paused
                   compact
                 />
@@ -1669,7 +1675,7 @@ function QuestSeasonEventOverlay({
             <div className="relative z-10">
               <div className="pb-36">
                 <div className="text-foreground">
-                  <SeasonSetRow season={season} rewardCatalog={rewardCatalog} />
+                  {!paused && <SeasonSetRow season={season} rewardCatalog={rewardCatalog} />}
                   <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-center gap-x-3 border-b border-border/50 bg-background px-[max(1.25rem,calc((100%_-_30rem)/2_+_1.25rem))] md:px-5 py-3 [@media(max-width:379px)]:px-3">
                     <div className="flex justify-center">
                       <SeasonLanePill lane="free" />
@@ -1694,6 +1700,14 @@ function QuestSeasonEventOverlay({
                             <div
                               aria-hidden="true"
                               className="mx-auto aspect-square w-[var(--tile)] rounded-[16px] border-2 border-dashed border-border/50"
+                            />
+                          );
+                        }
+                        if (paused) {
+                          return (
+                            <div
+                              aria-hidden="true"
+                              className="mx-auto aspect-square w-[var(--tile)] rounded-[16px] bg-muted/40"
                             />
                           );
                         }
@@ -1749,6 +1763,7 @@ function QuestSeasonEventOverlay({
                               lane={lane}
                               paused={paused || !isCurrent}
                               tagRight={extra.length > 0}
+                              muted={status === 'LOCKED'}
                             />
                             {extra.length > 0 && (
                               <div className="absolute -left-5 -top-5 z-10 w-[46%] -rotate-[8deg]">
@@ -1790,7 +1805,6 @@ function QuestSeasonEventOverlay({
                         );
                         const shell = cn(
                           'relative mx-auto block aspect-square w-[var(--tile)]',
-                          status === 'LOCKED' && 'saturate-[0.85]',
                         );
                         return action ? (
                           <button

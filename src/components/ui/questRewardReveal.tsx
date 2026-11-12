@@ -359,6 +359,7 @@ export function enqueueQuestRewardReveal(
     showFlyGainPill?: boolean;
     moment?: RatingMoment;
     source?: Element | DOMRect | null;
+    giftsOnly?: boolean;
   },
 ): number {
   const { catalog, isPremium } = options;
@@ -409,6 +410,7 @@ export function enqueueQuestRewardReveal(
   for (const itemId of uniqueItemIds) {
     const item = catalog[itemId];
     if (!item) continue;
+    if (options.giftsOnly && item.slot !== 'container') continue;
     const count = itemCounts[itemId];
     const key = `${item.id}-${revealIdCounter}`;
     revealIdCounter += 1;
@@ -434,7 +436,7 @@ export function enqueueQuestRewardReveal(
   }
   for (const bgId of Object.keys(bgCounts)) {
     const meta = catalog[bgId] as (ItemDef & { imageUrl?: string }) | undefined;
-    if (!meta) continue;
+    if (!meta || options.giftsOnly) continue;
     const count = bgCounts[bgId];
     const key = `${bgId}-${revealIdCounter}`;
     revealIdCounter += 1;
