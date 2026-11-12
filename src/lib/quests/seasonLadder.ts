@@ -246,22 +246,15 @@ export function buildSeasonPassLadder(
 
   const chestSlots: number[] = [];
   for (let tier = 2; tier <= count - 3; tier += 5) chestSlots.push(tier);
-  const chestCount = Math.min(chestSlots.length, Math.floor(pieces.length / 2));
-  const chestTiers = Array.from(
-    { length: chestCount },
-    (_, index) => chestSlots[Math.round((index * chestSlots.length) / chestCount)],
-  );
 
   let flyCursor = 0;
   return Array.from({ length: count }, (_, index) => {
     const tier = index + 1;
     let freeRewards: QuestRewards;
     if (tier === count && count > 1) {
-      freeRewards = [heroId ? piece(heroId) : gift(AMAZING_GIFT_ID)];
+      freeRewards = [gift(AMAZING_GIFT_ID)];
     } else if (tier === count - 2) {
       freeRewards = [gift(FANCY_GIFT_ID)];
-    } else if (chestTiers.indexOf(tier) >= 0) {
-      freeRewards = [gift(SEASON_GIFT_ID)];
     } else if (chestSlots.indexOf(tier) >= 0 || (tier % 5 === 4 && tier < count - 5)) {
       freeRewards = [gift(SIMPLE_GIFT_ID)];
     } else {
