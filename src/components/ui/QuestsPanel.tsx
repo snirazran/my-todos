@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
@@ -280,6 +281,7 @@ export function QuestsPanel({
   };
 
   const revealActive = useQuestRevealActive();
+  const { showNotification } = useNotification();
   const queueRewardReveal = (
     summary?: QuestRewardSummary,
     moment?: RatingMoment,
@@ -437,6 +439,20 @@ export function QuestsPanel({
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
       queueRewardReveal(payload.rewardSummary, 'quest_reward', true);
+      const catalog = (data?.rewardCatalog ?? {}) as Record<string, { name?: string; slot?: string }>;
+      const added = Array.from(
+        new Set<string>([
+          ...(payload.rewardSummary?.grantedItemIds ?? []),
+          ...(payload.rewardSummary?.grantedBackgroundIds ?? []),
+        ]),
+      )
+        .map((id) => catalog[id])
+        .filter((item) => !!item?.name && item.slot !== 'container');
+      if (added.length === 1) {
+        showNotification(`${added[0].name} added to your closet`);
+      } else if (added.length > 1) {
+        showNotification(`${added.length} items added to your closet`);
+      }
       // A Lily Pad has no reveal art of its own, so the only thing that would
       // otherwise change is a silent shield count.
       if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
