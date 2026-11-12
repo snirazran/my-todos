@@ -149,6 +149,13 @@ export default function FriendsPage() {
           balanceAfter,
         });
         void mutateFriends();
+      } else {
+        setClaimError(
+          data?.capped
+            ? "You've caught all the flies you can today. Come back tomorrow!"
+            : 'Nothing to collect right now.',
+        );
+        void mutateFriends();
       }
     } catch (error) {
       setClaimError(error instanceof Error ? error.message : 'Could not collect your flies. Try again.');

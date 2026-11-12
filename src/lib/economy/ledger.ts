@@ -177,6 +177,8 @@ const BREAKER_EXEMPT_MATCH = {
     { source: { $in: ['purchase', 'admin'] } },
     { 'meta.welcome': true },
     { source: 'shop_gift', 'meta.first': true },
+    { source: 'leap', 'meta.retro': true },
+    { 'meta.reported': 'milestone' },
   ],
 };
 
@@ -192,7 +194,7 @@ export async function fliesCountedTowardBreaker(
   return row?.total ?? 0;
 }
 
-async function breakerHeadroom(userId: string, dayKey: string) {
+export async function breakerHeadroom(userId: string, dayKey: string) {
   const config = await loadFlyEconomyConfig();
   const spentToday = await fliesCountedTowardBreaker(userId, dayKey);
   return Math.max(0, config.circuitBreaker.dailyCap - spentToday);

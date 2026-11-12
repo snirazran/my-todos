@@ -27,7 +27,7 @@ import {
   type PondState,
 } from '@/lib/friends/pond';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
-import { fliesGrantedOnDay } from '@/lib/economy/ledger';
+import { breakerHeadroom, fliesGrantedOnDay } from '@/lib/economy/ledger';
 import { resolveEconomyTimezone } from '@/lib/economy/guards';
 import { getZonedToday } from '@/lib/utils';
 import { previousDayKey } from '@/lib/quests/streak';
@@ -205,14 +205,15 @@ export async function GET(req: NextRequest) {
     const premium =
       !!me?.premiumUntil && new Date(me.premiumUntil) > new Date();
     const cap = pondDailyCap(economyConfig, premium);
-    const claimedToday = await fliesGrantedOnDay(userId, today, [
-      'friend_pond',
-      'friend_pond_double',
+    const [claimedToday, breakerLeft] = await Promise.all([
+      fliesGrantedOnDay(userId, today, ['friend_pond', 'friend_pond_double']),
+      breakerHeadroom(userId, today),
     ]);
 
     const owed = pondOwed(state, generatedToday);
     const claimable = Math.min(
       Math.max(0, cap - claimedToday),
+      breakerLeft,
       owed.reduce((sum, entry) => sum + entry.amount, 0),
     );
 
