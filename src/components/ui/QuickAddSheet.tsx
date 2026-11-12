@@ -921,7 +921,7 @@ export default function QuickAddSheet({
   if (tintColor) ideaTintRef.current = tintColor;
   const ideaEmojiRef = useRef('');
   if (pickedIdea) ideaEmojiRef.current = pickedIdea.emoji;
-  const detailsOpen = isDesktop || hasTaskText || questHintActive;
+  const detailsOpen = hasTaskText || questHintActive;
   const ideaQuery =
     (pickedIdea && text === pickedIdea.text) ||
     (pickedBacklogText !== null && text === pickedBacklogText)

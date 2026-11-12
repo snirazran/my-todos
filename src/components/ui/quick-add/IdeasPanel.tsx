@@ -408,6 +408,11 @@ export function IdeasPanel({
 
   const showResults = searching && !compose;
   const listKey = showResults ? 'search' : activeTab;
+  const listHeading = showResults
+    ? 'Matches'
+    : activeTab === 'saved'
+      ? 'Your saved goals'
+      : 'Suggestions';
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
   }, [listKey]);
@@ -553,9 +558,15 @@ export function IdeasPanel({
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-4 no-scrollbar sm:px-5"
             style={{ paddingBottom: bottomPad + 16 }}
           >
+            <h3
+              key={`${listKey}-heading`}
+              className="mb-2 px-1 text-[13px] font-extrabold text-muted-foreground animate-in fade-in-0 duration-150"
+            >
+              {listHeading}
+            </h3>
             <div
               key={listKey}
-              className="grid grid-cols-1 gap-2 animate-in fade-in-0 duration-150 sm:grid-cols-2"
+              className="grid grid-cols-1 gap-2.5 animate-in fade-in-0 duration-150 sm:grid-cols-2"
             >
               {showResults && search
                 ? resultRows(search)
@@ -573,7 +584,7 @@ export function IdeasPanel({
             onTouchMove={onListDrag}
             className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-2 no-scrollbar animate-in fade-in-0 duration-150"
           >
-            <div className="grid grid-cols-1 gap-2">{resultRows(search)}</div>
+            <div className="grid grid-cols-1 gap-2.5">{resultRows(search)}</div>
           </div>
         )}
       </div>
