@@ -96,15 +96,15 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   if (base !== placement) return getPlusContext(base, frogName);
   const name = frogName?.trim() || 'your frog';
   const context: PaywallContext = {
-    headline: 'You do the work.',
-    accent: 'Get twice the rewards.',
-    sub: `Double flies from quests, two prizes in every gift and every Special outfit for ${name}.`,
+    headline: `Spoil ${name}.`,
+    accent: 'Twice the goodies.',
+    sub: 'Double flies from quests, two prizes per gift and every Special outfit.',
     benefits: [],
     perks: perksLed(),
   };
   if (placement === 'onboarding') return {
     ...context,
-    benefits: [COACH, { icon: 'x2', title: 'Twice the reward for your effort', body: 'Double flies from quests, two prizes per gift.' }, SUPPORT],
+    benefits: [COACH, { icon: 'x2', title: 'More for every win', body: 'Double flies from quests, two prizes per gift.' }, SUPPORT],
   };
   if (placement === 'plus_preview_ended') return {
     ...context,
@@ -120,8 +120,8 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   };
   if (placement === 'plus_trial_ended') return {
     ...context,
-    headline: 'You kept showing up.',
-    accent: 'Get double for it again.',
+    headline: 'Miss the extras?',
+    accent: `Bring Plus back for ${name}.`,
   };
   if (placement === 'first_gift') return {
     ...context,
@@ -141,21 +141,21 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     ...context,
     headline: 'Same progress.',
     accent: 'Twice the rewards.',
-    sub: 'Add the Plus track and collect a second reward at every tier you reach.',
+    sub: `A second reward for ${name} at every tier you reach.`,
     perks: perksLed('season'),
   };
   if (placement === 'leap_leagues') return {
     ...context,
     headline: 'Same habits.',
     accent: 'Two gifts a week.',
-    sub: 'You already keep your habits. Open a second gift every week you hit your goal.',
+    sub: `A second gift for ${name} every week you hit your goal.`,
     perks: perksLed('league', 'flies', 'lilyPad'),
   };
   if (placement === 'streak_rescue' || placement === 'shield_offer') return {
     ...context,
     headline: 'Life happens.',
     accent: 'Your streak can stay.',
-    sub: 'A free Lily Pad every month covers a day off, so one rough day never costs your streak.',
+    sub: 'Take a day off. A free Lily Pad every month keeps your streak safe.',
     perks: perksLed('lilyPad'),
   };
   if (placement === 'trade_reroll' || placement === 'shop_reroll') return {

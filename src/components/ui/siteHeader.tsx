@@ -1592,7 +1592,7 @@ function MainView({
               {plusTrialOffered() === false ? 'Get Frogress Plus' : 'Try Plus free'}
             </span>
             <span className="plus-club-sub mt-0.5 block text-[12.5px] font-bold leading-snug">
-              Your effort, double the rewards
+              Twice the goodies for {frogName}
             </span>
           </span>
           <ChevronRight aria-hidden className="h-5 w-5 shrink-0 opacity-70" strokeWidth={3} />
