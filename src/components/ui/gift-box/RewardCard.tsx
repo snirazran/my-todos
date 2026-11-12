@@ -7,7 +7,8 @@ import {
   Variants,
 } from 'framer-motion';
 import { mutate as mutateGlobal } from 'swr';
-import { Check, ChevronRight, Loader2, Crown, Dices, Gift, Play } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Dices, Gift, Play } from 'lucide-react';
+import { PlusBonusTag } from '@/components/ui/plus/PlusBonusTag';
 import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
@@ -1117,16 +1118,7 @@ export const RewardCard = ({
             transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 }}
             className="absolute left-0 right-0 flex flex-col items-center gap-1 -top-[4.5rem] z-30"
           >
-            <span className="flex items-center gap-1.5 text-[13px] font-black text-white/50">
-              <Crown className="w-3.5 h-3.5 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
-              Premium
-            </span>
-            <span className="flex items-center gap-1.5 text-[13px] font-black text-white/50">
-              <span className="px-2 py-0.5 text-base font-black tracking-wide text-amber-300 rounded-lg bg-amber-500/15 border border-amber-400/25 shadow-[0_0_16px_rgba(251,191,36,0.25)]">
-                x2
-              </span>
-              Multiplier
-            </span>
+            <PlusBonusTag>×2</PlusBonusTag>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1350,7 +1342,7 @@ export const RewardCard = ({
                     tone="reroll"
                     icon={<Dices className="h-6 w-6" strokeWidth={2.5} />}
                     label="Reroll"
-                    hint="Swap for another"
+                    hint={reroll.mode === 'included' ? 'Free with Plus' : 'Swap for another'}
                     badge={reroll.mode === 'ad' ? 'ad' : 'plus'}
                     ariaLabel={`Reroll for another item. ${
                       reroll.mode === 'ad'

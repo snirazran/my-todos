@@ -36,7 +36,7 @@ import {
 import { useAuth } from '@/components/auth/AuthContext';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { SheetEnteredContext } from '@/lib/sheetEntered';
-import { PerkLedger, PlusEarnedStrip, PlusGoldButton, PlusStage } from '@/components/ui/plus/PlusKit';
+import { PerkLedger, PlusEarnedStrip, PlusGoldButton, PlusSetStrip, PlusStage } from '@/components/ui/plus/PlusKit';
 import {
   PLUS_PREVIEW_KEY,
   fetchPlusPreview,
@@ -626,6 +626,7 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
         ? 'Welcome price for the next 2 days'
         : null;
   const earned = fromPreview ? previewData?.earned : undefined;
+  const previewSet = fromPreview ? previewData?.seasonSet : undefined;
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next && !purchasing && !linking) onClose(); }}>
@@ -697,6 +698,13 @@ export function PlusUpgradeModal(props: PlusPaywallArgs) {
                                   earned={earned}
                                   label={preview?.phase === 'active' ? 'So far, Plus got you' : 'In 3 days, Plus got you'}
                                   className="mt-3.5 md:mb-4 md:mt-0"
+                                />
+                              ) : null}
+                              {previewSet ? (
+                                <PlusSetStrip
+                                  set={previewSet}
+                                  ended={preview?.phase !== 'active'}
+                                  className="mt-2.5 md:mb-4 md:mt-0"
                                 />
                               ) : null}
                               <PerkLedger perks={paywallContext.perks} onSeeAll={() => changeView('compare')} className="mt-3.5 short:mt-3 md:mt-0" />

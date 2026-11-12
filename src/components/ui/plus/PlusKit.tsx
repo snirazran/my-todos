@@ -237,6 +237,37 @@ export function PlusStage({
   );
 }
 
+export function PlusSetStrip({
+  set,
+  ended,
+  className,
+}: {
+  set: { name: string; total: number; have: number };
+  ended: boolean;
+  className?: string;
+}) {
+  const missing = Math.max(0, set.total - set.have);
+  if (missing === 0) return null;
+  const pieces = missing === 1 ? 'piece is' : 'pieces are';
+  return (
+    <div
+      className={cn(
+        'plus-benefit-rise flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center text-[13.5px] font-bold text-muted-foreground',
+        className,
+      )}
+    >
+      <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 font-black tabular-nums text-foreground">
+        {set.name} set · {set.have} of {set.total}
+      </span>
+      <span>
+        {ended
+          ? `${missing} more ${pieces} on the Plus lane.`
+          : `${missing} more ${pieces} on the Plus lane. Claim them while Plus is on.`}
+      </span>
+    </div>
+  );
+}
+
 export function PlusEarnedStrip({
   earned,
   label,

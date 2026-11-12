@@ -11,6 +11,7 @@ export const PLUS_PREVIEW_KEY = '/api/plus/preview';
 export type PlusPreviewPayload = {
   preview: PlusPreviewState;
   earned: { flies: number; rareItems: number };
+  seasonSet?: { name: string; total: number; have: number } | null;
 };
 
 export function usePlusPreview(): PlusPreviewState | null {

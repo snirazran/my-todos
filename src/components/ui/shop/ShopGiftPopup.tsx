@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Crown, Sparkles, X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
+import { PlusBonusTag } from '@/components/ui/plus/PlusBonusTag';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { patchInventoryShopGiftClaimed } from '@/hooks/useInventory';
@@ -315,10 +316,7 @@ export function ShopGiftPopup({
                             </span>
                           )}
                           {reveal.plus && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-black text-emerald-700 dark:text-emerald-300">
-                              <Crown className="h-3.5 w-3.5" />
-                              Plus ×{reveal.plusMultiplier}
-                            </span>
+                            <PlusBonusTag>×{reveal.plusMultiplier}</PlusBonusTag>
                           )}
                         </div>
                         <p className="mt-2 text-[13px] font-bold text-muted-foreground">

@@ -2141,6 +2141,10 @@ body.dragging {
   color: #e6dcff;
 }
 
+.plus-bonus-tag {
+  box-shadow: 0 2px 0 var(--plus-button-base), inset 0 1.5px 0 rgba(245, 200, 76, 0.9);
+}
+
 .plus-club-chip {
   display: inline-flex;
   align-items: center;

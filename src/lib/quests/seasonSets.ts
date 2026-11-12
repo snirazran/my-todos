@@ -36,3 +36,32 @@ export async function loadSeasonSetSummaries(now: Date = new Date()): Promise<Se
     return [];
   }
 }
+
+export type SeasonSetProgress = { name: string; total: number; have: number };
+
+export async function loadRunningSeasonSetProgress(
+  inventory: Record<string, number> | null | undefined,
+  now: Date = new Date(),
+): Promise<SeasonSetProgress | null> {
+  try {
+    const season = await QuestSeasonModel.findOne(
+      {
+        isActive: true,
+        startsAt: { $lte: now },
+        endsAt: { $gt: now },
+        'seasonSet.ids.1': { $exists: true },
+      },
+      { name: 1, seasonSet: 1 },
+    ).lean<QuestSeasonDoc>();
+    const set = normalizeSeasonSet(season?.seasonSet);
+    if (!season || !set) return null;
+    const owned = inventory ?? {};
+    return {
+      name: season.name,
+      total: set.ids.length,
+      have: set.ids.filter((id) => (owned[id] ?? 0) > 0).length,
+    };
+  } catch {
+    return null;
+  }
+}

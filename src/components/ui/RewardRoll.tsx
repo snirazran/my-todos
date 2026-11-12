@@ -22,6 +22,7 @@ import {
   type RevealCatalog,
 } from '@/components/ui/questRewardReveal';
 import { cn } from '@/lib/utils';
+import { PlusBonusTag } from '@/components/ui/plus/PlusBonusTag';
 
 type RolledSummary = QuestRewardSummary & {
   rolled?: {
@@ -667,8 +668,9 @@ function RewardRollOverlay({
               style={{ animationDelay: '250ms' }}
             >
               {premiumDouble ? (
-                <p className="mb-3 text-[13px] font-black text-amber-300">
-                  Plus ×2 · {(winner.amount ?? 0) * 2} flies
+                <p className="mb-3 flex items-center gap-2 text-[13px] font-black text-white">
+                  <PlusBonusTag>×2</PlusBonusTag>
+                  {(winner.amount ?? 0) * 2} flies
                 </p>
               ) : null}
               {megaTiles.length > 0 && (

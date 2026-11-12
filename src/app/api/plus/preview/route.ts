@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { readPlusEarned } from '@/lib/plus/earned';
+import { loadRunningSeasonSetProgress } from '@/lib/quests/seasonSets';
 import {
   PLUS_PREVIEW_DAYS,
   PLUS_PREVIEW_OFFER_MS,
@@ -14,7 +15,8 @@ import {
 } from '@/lib/plus/preview';
 
 const DAY_MS = 86_400_000;
-const FIELDS = 'createdAt onboardingCompleted premiumUntil plusSubscription plusPreview plusEarned';
+const FIELDS =
+  'createdAt onboardingCompleted premiumUntil plusSubscription plusPreview plusEarned wardrobe.inventory';
 
 type LeanUser = {
   createdAt?: Date;
@@ -23,18 +25,20 @@ type LeanUser = {
   plusSubscription?: unknown;
   plusPreview?: unknown;
   plusEarned?: unknown;
+  wardrobe?: { inventory?: Record<string, number> };
 };
 
 async function load(userId: string) {
   return UserModel.findById(userId).select(FIELDS).lean<LeanUser | null>();
 }
 
-function respond(user: LeanUser | null) {
+async function respond(user: LeanUser | null) {
   const earned = readPlusEarned(user?.plusEarned);
   return NextResponse.json(
     {
       preview: plusPreviewState(user),
       earned: { flies: earned.flies, rareItems: earned.rareItems },
+      seasonSet: await loadRunningSeasonSetProgress(user?.wardrobe?.inventory),
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
