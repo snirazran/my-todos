@@ -56,7 +56,7 @@ function getCtx(): AudioContext | null {
       window.AudioContext ?? (window as WindowWithWebkit).webkitAudioContext;
     if (!Ctor) return null;
     if (!ctxRef) ctxRef = new Ctor();
-    if (ctxRef.state === 'suspended') void ctxRef.resume();
+    if (ctxRef.state === 'suspended') void ctxRef.resume().catch(() => {});
     return ctxRef;
   } catch {
     return null;

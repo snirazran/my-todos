@@ -192,6 +192,8 @@ export const preloadRiveAsset = (assetPath: string): Promise<string> => {
     })
     .catch((err) => {
       console.error(err);
+      // A transient fetch failure must not prevent later preload attempts.
+      promiseCache.delete(assetPath);
       return assetPath;
     });
 

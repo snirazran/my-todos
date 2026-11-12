@@ -83,7 +83,7 @@ export function playTransitionBeep() {
     if (!Ctor) return;
     if (!beepCtx) beepCtx = new Ctor();
     const ctx = beepCtx;
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
 
     const now = ctx.currentTime;
     // Two quick ascending notes (A5 → E6) with a soft attack/decay.

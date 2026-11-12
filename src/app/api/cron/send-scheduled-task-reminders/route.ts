@@ -6,7 +6,7 @@ import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import { getZonedToday } from '@/lib/utils';
+import { getZonedYMD } from '@/lib/utils';
 import {
   dayCandidateFilter,
   isCompletedOnDate,
@@ -164,20 +164,35 @@ export async function GET(req: NextRequest) {
 
   const results: Array<{ userId: string; sent: number; checked: number }> = [];
 
+  // Fetch candidate tasks in bounded batches instead of issuing one query per user.
+  const tasksByUser = new Map<string, TaskDoc[]>();
+  for (let i = 0; i < users.length; i += 100) {
+    const batch = users.slice(i, i + 100);
+    const candidates = await TaskModel.find({
+      $or: batch.map((user) => {
+        const userId = String((user as any)._id);
+        const prefs = (user as any).notificationPrefs as NotificationPrefs;
+        return dayCandidateFilter(userId, getZonedYMD(now, prefs.timezone || 'UTC'));
+      }),
+      startTime: { $exists: true, $ne: '' },
+      reminder: { $exists: true, $ne: '' },
+    }).lean<TaskDoc[]>().exec();
+    for (const task of candidates) {
+      const key = String(task.userId);
+      const bucket = tasksByUser.get(key) ?? [];
+      bucket.push(task);
+      tasksByUser.set(key, bucket);
+    }
+  }
+
   for (const user of users) {
     const userId = String((user as any)._id);
     const prefs = (user as any).notificationPrefs as NotificationPrefs;
     const timezone = prefs.timezone || 'UTC';
-    const todayYMD = getZonedToday(timezone);
+    const todayYMD = getZonedYMD(now, timezone);
     const currentHour = getCurrentHourInTz(timezone);
 
-    const tasks = await TaskModel.find({
-      ...dayCandidateFilter(userId, todayYMD),
-      startTime: { $exists: true, $ne: '' },
-      reminder: { $exists: true, $ne: '' },
-    })
-      .lean<TaskDoc[]>()
-      .exec();
+    const tasks = tasksByUser.get(userId) ?? [];
 
     let sentForUser = 0;
     const cursors: CopyCursors = { ...(prefs.copyCursor ?? {}) };
