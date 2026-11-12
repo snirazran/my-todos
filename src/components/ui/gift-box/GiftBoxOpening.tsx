@@ -26,6 +26,7 @@ import { BonusHeroButton, type BonusPart, FlyGlyph, RewardCard, SkipAdsLink } fr
 import { afterAdPlacement, skipAdsPlacement } from '@/lib/plusPaywall';
 import { queueFirstGiftPaywall } from '@/lib/plus/firstGiftPaywall';
 import { queuePlusPaywall } from '@/lib/plus/queuedPaywall';
+import { PlusBonusTag } from '@/components/ui/plus/PlusBonusTag';
 import { pickFunnySentence } from './funnySentences';
 import { useAutoPopupHold } from '@/lib/popupGate';
 
@@ -67,6 +68,7 @@ export default function GiftBoxOpening({
   const [bonusPrizeMeta, setBonusPrizeMeta] = useState<PrizeMeta | null>(null);
   const [doubleClaimId, setDoubleClaimId] = useState<string | null>(null);
   const [isBonusReveal, setIsBonusReveal] = useState(false);
+  const [bonusFromPlus, setBonusFromPlus] = useState(false);
   const [revealCount, setRevealCount] = useState(0);
   const [adBusy, setAdBusy] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
@@ -184,6 +186,7 @@ export default function GiftBoxOpening({
       const nextMeta = bonusPrizeMeta;
       setBonusPrize(null);
       setBonusPrizeMeta(null);
+      setBonusFromPlus(true);
       setIsBonusReveal(true);
       setRevealCount((c) => c + 1);
       setPrize(next);
@@ -247,6 +250,7 @@ export default function GiftBoxOpening({
         flies.onDoubled(data.flies.fliesGranted, data.flies.flyBalanceAfter, source);
       }
       if (data.granted && data.prize) {
+        setBonusFromPlus(viaPlus);
         setIsBonusReveal(true);
         setRevealCount((c) => c + 1);
         setPrize(data.prize);
@@ -362,7 +366,17 @@ export default function GiftBoxOpening({
               exit={{ opacity: 0 }}
               className="flex w-full flex-col items-center"
             >
-              {isBonusReveal && (
+              {isBonusReveal && bonusFromPlus && (
+                <motion.span
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mb-3 inline-flex"
+                >
+                  <PlusBonusTag>bonus gift</PlusBonusTag>
+                </motion.span>
+              )}
+              {isBonusReveal && !bonusFromPlus && (
                 <motion.span
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
