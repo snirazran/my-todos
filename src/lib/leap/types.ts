@@ -20,37 +20,18 @@ export type LeapMarkConfig = {
   percent: number;
   minDays: number;
   minScheduled: number;
-  flies: number;
 };
-
-export type LeapLuckyDrop = { weight: number; rewards: BonusRewards };
 
 export type LeapLeague = {
   label: string;
-  multiplier: number;
   leapPercent: number;
-  /** Paid every week the Leap is landed while in this league. */
   weekRewards: BonusRewards;
-  /** Paid once, the first time the league is reached. */
-  reachRewards: BonusRewards;
-  /** Plus adds this the first time the league is reached. */
-  plusReachRewards: BonusRewards;
-  /** Plus adds this every week the Leap is landed in this league. */
   plusWeekRewards: BonusRewards;
 };
 
 export type LeapConfigView = {
   isActive: boolean;
-  hopFlies: number;
-  hopsPaidPerDay: number;
-  comebackFlies: number;
-  comebackLookbackDays: number;
-  comebacksPerDay: number;
-  luckyChancePercent: number;
-  luckyPityHops: number;
-  luckyDropsPerDay: number;
   firstHopRewards: BonusRewards;
-  luckyDrops: LeapLuckyDrop[];
   marks: Record<LeapMarkId, LeapMarkConfig>;
   leagues: LeapLeague[];
 };
@@ -77,14 +58,18 @@ export type LeapMarkView = {
 export type LeapLeagueView = {
   index: number;
   label: string;
-  multiplier: number;
   weekRewards: BonusRewards;
-  reachRewards: BonusRewards;
-  plusReachRewards: BonusRewards;
   plusWeekRewards: BonusRewards;
-  /** Flies the weekly prize pays in this league, before Plus doubling. */
-  weekFlies: number;
   reached: boolean;
+};
+
+export type LeapChestView = {
+  league: number;
+  rewards: BonusRewards;
+  plusRewards: BonusRewards;
+  landed: boolean;
+  claimed: boolean;
+  plusClaimed: boolean;
 };
 
 export type LeapWeekView = {
@@ -99,9 +84,7 @@ export type LeapWeekView = {
   openToday: number;
   hold: LeapMarkView;
   leap: LeapMarkView;
-  /** Flies the Leap mark pays, league and Plus applied. */
-  leapFlies: number;
-  holdFlies: number;
+  chest: LeapChestView;
   habits: number;
 };
 
@@ -130,6 +113,7 @@ export type LeapWeekResult = {
   stayAt?: number;
   newItemIds?: string[];
   newBackgroundIds?: string[];
+  newFlies?: number;
 };
 
 export type LeapJoin = { weekKey: string; giftIds: string[] };
@@ -146,9 +130,6 @@ export type LeapView = {
   repeating: number;
   join: LeapJoin | null;
   shields: { count: number; cap: number };
-  hopFlies: number;
-  firstDropPending: boolean;
-  forgoneFlies: number;
   weekResult: LeapWeekResult | null;
   rewardCatalog: Record<string, unknown>;
   /** Real items a guaranteed-rarity prize can draw, by rarity, for previews. */
@@ -164,14 +145,10 @@ export type LeapGrantSummary = {
 
 export type LeapHopResult = {
   hops: number;
-  hopFlies: number;
-  comebackFlies: number;
-  lucky: (LeapGrantSummary & { first: boolean }) | null;
-  marks: Array<LeapGrantSummary & { id: LeapMarkId }>;
-  fliesGranted: number;
+  landed: boolean;
+  marks: LeapMarkId[];
+  firstGift: LeapGrantSummary | null;
   grantedItemIds: string[];
-  grantedBackgroundIds: string[];
-  shieldsGranted: number;
   meter: {
     hops: number;
     target: number;
@@ -185,5 +162,11 @@ export type LeapHopResult = {
   joined: boolean;
   isPremium: boolean;
   catalog: Record<string, unknown>;
+};
+
+export type LeapClaimResult = LeapGrantSummary & {
+  free: boolean;
+  plus: boolean;
   balanceAfter?: number;
+  catalog?: Record<string, unknown>;
 };

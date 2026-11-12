@@ -8,10 +8,31 @@ import { holdAutoPopups, useAutoPopupHold, whenScreenIsFree } from '@/lib/popupG
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import type { LeapJoin, LeapWeekResult } from '@/lib/leap/types';
-import { leagueArt } from './leapCopy';
+import { leagueArt, leapChestState } from './leapCopy';
 import { LeapDaySheet, revealLeapPrizes } from './LeapDaySheet';
 import { LeapJoinSheet, openJoinGifts } from './LeapJoinSheet';
+import { LeapLandedSheet, type LandedChoice } from './LeapLandedSheet';
+import { LEAP_LANDED_EVENT } from './syncLeapHop';
+import { requestLeapClaim, revealLeapClaim } from './useLeapClaim';
 import { patchLeap, useLeapView } from './useLeapView';
+
+const LANDED_SEEN_KEY = 'leap-landed-seen';
+
+function landedSeen(weekKey: string) {
+  try {
+    return window.localStorage.getItem(LANDED_SEEN_KEY) === weekKey;
+  } catch {
+    return false;
+  }
+}
+
+function markLandedSeen(weekKey: string) {
+  try {
+    window.localStorage.setItem(LANDED_SEEN_KEY, weekKey);
+  } catch {
+    return;
+  }
+}
 
 const LEAP_DAY_HOLD = 'leap-day';
 const REVEAL_AFTER_CLOSE_MS = 320;
@@ -24,15 +45,20 @@ export function LeapHost() {
   const [join, setJoin] = useState<LeapJoin | null>(null);
   const [joinOpen, setJoinOpen] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [landedOpen, setLandedOpen] = useState(false);
+  const [landedTick, setLandedTick] = useState(0);
   const shownRef = useRef<string | null>(null);
   const joinShownRef = useRef(false);
+  const landedShownRef = useRef<string | null>(null);
+  const setPremiumModalOpen = useUIStore((state) => state.setPremiumModalOpen);
 
-  const stageOpen = open || joinOpen;
+  const stageOpen = open || joinOpen || landedOpen;
   const otherSheet = useSheetStore((state) => state.count > 1);
   const revealActive = useQuestRevealActive();
   const cinematic = useUIStore((state) => state.isCinematicActive);
   const hinting = useUIStore((state) => !!state.activeHint);
-  const crowded = stageOpen && (otherSheet || revealActive || cinematic || hinting);
+  const [plusPeek, setPlusPeek] = useState(false);
+  const crowded = stageOpen && !plusPeek && (otherSheet || revealActive || cinematic || hinting);
 
   const pendingJoin = view?.enabled ? view.join : null;
   const pending = view?.enabled ? view.weekResult : null;
@@ -68,8 +94,54 @@ export function LeapHost() {
     );
   }, [pending, pendingJoin, joinOpen, retry]);
 
+  const chestReady = !!view?.enabled && leapChestState(view) === 'ready';
+  const chestWeek = view?.week.weekKey ?? '';
+  useEffect(() => {
+    const onLanded = () => setLandedTick((count) => count + 1);
+    window.addEventListener(LEAP_LANDED_EVENT, onLanded);
+    return () => window.removeEventListener(LEAP_LANDED_EVENT, onLanded);
+  }, []);
+
+  useEffect(() => {
+    if (!chestReady || !chestWeek || pendingJoin || pending || joinOpen || open) return;
+    if (landedShownRef.current === chestWeek || landedSeen(chestWeek)) return;
+    return whenScreenIsFree(
+      () => {
+        holdAutoPopups(LEAP_DAY_HOLD);
+        landedShownRef.current = chestWeek;
+        setLandedOpen(true);
+      },
+      { dropAfterMs: 120_000, initialDelayMs: 1600 },
+    );
+  }, [chestReady, chestWeek, pendingJoin, pending, joinOpen, open, retry, landedTick]);
+
+  const onLandedChoice = async (choice: LandedChoice) => {
+    if (choice === 'plus') {
+      setPlusPeek(true);
+      setPremiumModalOpen(true, 'leap_leagues');
+      return;
+    }
+    if (chestWeek) markLandedSeen(chestWeek);
+    setPlusPeek(false);
+    if (choice === 'open') {
+      const result = await requestLeapClaim();
+      if (result.view) void mutate(result.view, { revalidate: false });
+      setLandedOpen(false);
+      if (result.claim) {
+        const claim = result.claim;
+        window.setTimeout(() => revealLeapClaim(claim, result.view ?? view), REVEAL_AFTER_CLOSE_MS);
+      }
+      return;
+    }
+    setLandedOpen(false);
+  };
+
   useEffect(() => {
     if (!crowded) return;
+    if (landedOpen) {
+      landedShownRef.current = null;
+      setLandedOpen(false);
+    }
     if (joinOpen) {
       joinShownRef.current = false;
       setJoinOpen(false);
@@ -79,7 +151,7 @@ export function LeapHost() {
       setOpen(false);
     }
     setRetry((count) => count + 1);
-  }, [crowded, joinOpen, open]);
+  }, [crowded, joinOpen, open, landedOpen]);
 
   useEffect(() => {
     if (open || !result) return;
@@ -109,6 +181,9 @@ export function LeapHost() {
             void patchLeap({ joinSeen: true }).then(() => mutate());
           }}
         />
+      )}
+      {view.enabled && (
+        <LeapLandedSheet view={view} open={landedOpen} onChoice={onLandedChoice} />
       )}
       {result && (
         <LeapDaySheet

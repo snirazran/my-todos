@@ -9,14 +9,14 @@ import {
 } from '@/lib/shields/engine';
 import { daysBetweenYMD, shiftYMD } from '@/lib/weekStart';
 import type { QuestReward } from '@/lib/quests/types';
+import { chestView, claimLeapChest } from './chest';
 import { creditHops, weekTargets } from './hop';
-import { scaleFlies } from './rewards';
-import { payPlusBacklog } from './settle';
 import { clampLeague } from './state';
 import { loadLeapContext, type LeapContext } from './sync';
 import { groupHabits } from './week';
 import type {
   BonusRewards,
+  LeapClaimResult,
   LeapConfigView,
   LeapHopResult,
   LeapMarkId,
@@ -30,12 +30,7 @@ const PREVIEW_PER_RARITY = 6;
 function previewRarities(config: LeapConfigView): string[] {
   const seen: Record<string, true> = {};
   config.leagues.forEach((league) => {
-    [
-      ...league.reachRewards,
-      ...league.plusReachRewards,
-      ...league.weekRewards,
-      ...league.plusWeekRewards,
-    ].forEach(
+    [...league.weekRewards, ...league.plusWeekRewards].forEach(
       (reward) => {
         if (reward.type === 'RARITY_ITEM') seen[reward.rarity] = true;
       },
@@ -78,11 +73,8 @@ function buildRarityPreview(args: {
 function catalogRewardSets(config: LeapConfigView): QuestReward[][] {
   const sets: BonusRewards[] = [
     config.firstHopRewards,
-    ...config.luckyDrops.map((drop) => drop.rewards),
     ...config.leagues.flatMap((league) => [
       league.weekRewards,
-      league.reachRewards,
-      league.plusReachRewards,
       league.plusWeekRewards,
     ]),
   ];
@@ -118,16 +110,19 @@ export function disabledLeapView(): LeapView {
       openToday: 0,
       hold: EMPTY_MARK('hold'),
       leap: EMPTY_MARK('leap'),
-      leapFlies: 0,
-      holdFlies: 0,
+      chest: {
+        league: 0,
+        rewards: [],
+        plusRewards: [],
+        landed: false,
+        claimed: false,
+        plusClaimed: false,
+      },
       habits: 0,
     },
     repeating: 0,
     join: null,
     shields: { count: 0, cap: 0 },
-    hopFlies: 0,
-    firstDropPending: false,
-    forgoneFlies: 0,
     weekResult: null,
     rewardCatalog: {},
     rarityPreview: {},
@@ -137,7 +132,6 @@ export function disabledLeapView(): LeapView {
 export async function buildLeapView(ctx: LeapContext): Promise<LeapView> {
   const { config, state, ledger, weekDoc, isPremium, todayKey, currentWeek } =
     ctx;
-  const multiplier = Math.max(1, weekDoc.multiplier ?? 1);
   const reached = new Set<LeapMarkId>(weekDoc.marks ?? []);
   const targets = weekTargets(ctx);
   const markView = (id: LeapMarkId): LeapMarkView => {
@@ -208,12 +202,8 @@ export async function buildLeapView(ctx: LeapContext): Promise<LeapView> {
     leagues: config.leagues.map((entry, index) => ({
       index,
       label: entry.label,
-      multiplier: entry.multiplier,
       weekRewards: entry.weekRewards,
-      reachRewards: entry.reachRewards,
-      plusReachRewards: entry.plusReachRewards,
       plusWeekRewards: entry.plusWeekRewards,
-      weekFlies: scaleFlies(config.marks.leap.flies, entry.multiplier, false),
       reached: index <= state.bestLeague,
     })),
     week: {
@@ -228,8 +218,7 @@ export async function buildLeapView(ctx: LeapContext): Promise<LeapView> {
       openToday: ledger.openToday,
       hold: markView('hold'),
       leap: markView('leap'),
-      leapFlies: scaleFlies(config.marks.leap.flies, multiplier, isPremium),
-      holdFlies: scaleFlies(config.marks.hold.flies, multiplier, isPremium),
+      chest: chestView({ config, weekDoc, fallbackLeague: state.league }),
       habits: ledger.habits.length,
     },
     repeating: groupHabits(
@@ -240,9 +229,6 @@ export async function buildLeapView(ctx: LeapContext): Promise<LeapView> {
       count: shieldState.count,
       cap: shieldCapFor(shieldConfig, isPremium),
     },
-    hopFlies: scaleFlies(config.hopFlies, multiplier, isPremium),
-    firstDropPending: !state.luck.firstDone && config.firstHopRewards.length > 0,
-    forgoneFlies: state.forgoneFlies,
     weekResult: state.pendingResult,
     rewardCatalog: buildRewardCatalog(
       fullCatalog,
@@ -260,14 +246,6 @@ export async function getLeapView(args: {
   const ctx = await loadLeapContext(args);
   if (!ctx) return { view: disabledLeapView(), hop: null };
   const hop = await creditHops(ctx);
-  if (ctx.isPremium) {
-    await payPlusBacklog({
-      userId: ctx.userId,
-      config: ctx.config,
-      state: ctx.state,
-      dayKey: ctx.todayKey,
-    });
-  }
   return { view: await buildLeapView(ctx), hop };
 }
 
@@ -278,4 +256,32 @@ export async function creditLeapHops(args: {
   const ctx = await loadLeapContext(args);
   if (!ctx) return null;
   return creditHops(ctx);
+}
+
+export async function claimLeapChestForUser(args: {
+  userId: string;
+  timezone: string;
+}): Promise<{ view: LeapView; claim: LeapClaimResult } | null> {
+  const ctx = await loadLeapContext(args);
+  if (!ctx) return null;
+  await creditHops(ctx);
+  const claim = await claimLeapChest({
+    userId: ctx.userId,
+    config: ctx.config,
+    weekDoc: ctx.weekDoc,
+    fallbackLeague: ctx.state.league,
+    isPremium: ctx.isPremium,
+    dayKey: ctx.todayKey,
+  });
+  const granted = [...claim.grantedItemIds, ...claim.grantedBackgroundIds];
+  if (granted.length) {
+    claim.catalog = buildRewardCatalog(await getFullCatalog(), [
+      claim.grantedItemIds.map((itemId) => ({ type: 'ITEM' as const, itemId })),
+      claim.grantedBackgroundIds.map((backgroundId) => ({
+        type: 'BACKGROUND' as const,
+        backgroundId,
+      })),
+    ]);
+  }
+  return { view: await buildLeapView(ctx), claim };
 }

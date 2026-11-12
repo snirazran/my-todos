@@ -7,13 +7,10 @@ export {
   LEAP_CONFIG_VERSION,
   RETIRED_LEAGUE_LABELS,
   DEFAULT_LEAP_MARKS,
-  DEFAULT_LEAP_LUCKY_DROPS,
   DEFAULT_LEAP_FIRST_HOP_REWARDS,
   DEFAULT_LEAP_LEAGUES,
+  DEFAULT_CHEST_FLIES,
   LEAP_DEFAULTS,
-  LEAP_NUMBER_LIMITS,
-  LEGACY_WEEK_GIFTS,
-  LEGACY_LEAP_MARK_FLIES,
 } from '@/lib/leap/defaults';
 
 export interface LeapConfigDoc extends LeapConfigView {
@@ -32,22 +29,7 @@ const LeapConfigSchema = new Schema<LeapConfigDoc>(
     configId: { type: String, required: true, unique: true, index: true },
     configVersion: { type: Number, default: LEAP_CONFIG_VERSION },
     isActive: { type: Boolean, default: LEAP_DEFAULTS.isActive },
-    hopFlies: { type: Number, default: LEAP_DEFAULTS.hopFlies },
-    hopsPaidPerDay: { type: Number, default: LEAP_DEFAULTS.hopsPaidPerDay },
-    comebackFlies: { type: Number, default: LEAP_DEFAULTS.comebackFlies },
-    comebackLookbackDays: {
-      type: Number,
-      default: LEAP_DEFAULTS.comebackLookbackDays,
-    },
-    comebacksPerDay: { type: Number, default: LEAP_DEFAULTS.comebacksPerDay },
-    luckyChancePercent: {
-      type: Number,
-      default: LEAP_DEFAULTS.luckyChancePercent,
-    },
-    luckyPityHops: { type: Number, default: LEAP_DEFAULTS.luckyPityHops },
-    luckyDropsPerDay: { type: Number, default: LEAP_DEFAULTS.luckyDropsPerDay },
     firstHopRewards: mixed(LEAP_DEFAULTS.firstHopRewards),
-    luckyDrops: mixed(LEAP_DEFAULTS.luckyDrops),
     marks: mixed(LEAP_DEFAULTS.marks),
     leagues: mixed(LEAP_DEFAULTS.leagues),
   },

@@ -233,8 +233,8 @@ function PlusFliesCard() {
   return (
     <button type="button" onClick={() => openPremium(true, 'fly_shop_free_flies')} className="plus-upgrade-button plus-club group mb-1 mt-4 flex min-h-[60px] w-full items-center gap-2.5 rounded-[18px] py-2 pl-2 pr-3 text-left">
       <Icon name="frogPlus" className="-my-2 h-14 w-14 shrink-0" />
-      <span className="min-w-0 flex-1"><span className="block text-[15px] font-black leading-tight">Double every quest reward</span><span className="plus-club-sub mt-0.5 block text-xs font-bold">2× flies with Frogress Plus</span></span>
-      <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
+      <span className="min-w-0 flex-1"><span className="block text-[15px] font-black leading-tight">Earn double on every quest</span><span className="plus-club-sub mt-0.5 block text-xs font-bold">2× flies with Frogress Plus</span></span>
+      <ChevronRight aria-hidden className="h-5 w-5 shrink-0 opacity-70" strokeWidth={3} />
     </button>
   );
 }

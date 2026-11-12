@@ -90,10 +90,10 @@ export default function PlusPreview() {
           <span className="min-w-0 flex-1">
             <span className="block text-[16px] font-black leading-tight tracking-tight">Try Frogress Plus</span>
             <span className="plus-club-sub mt-0.5 block text-[12.5px] font-bold leading-snug">
-              <span className="text-[#f5c84c]">2×</span> rewards, every Special item
+              <span className="font-black text-[#3a2700]">2×</span> rewards, every Special item
             </span>
           </span>
-          <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
+          <ChevronRight aria-hidden className="h-5 w-5 shrink-0 opacity-70" strokeWidth={3} />
         </button>
         <LeapPlusButton title="Unlock Plus" subtitle="Extra reward every tier" onClick={() => {}} />
         <button

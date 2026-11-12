@@ -8,13 +8,11 @@ export type LeapState = {
   v: 2;
   league: number;
   bestLeague: number;
-  plusPaidThrough: number;
   landed: number;
   settledThrough: string;
   startedWeek: string;
   coveredWeek: string;
-  luck: { sinceDrop: number; firstDone: boolean };
-  forgoneFlies: number;
+  firstGiftDone: boolean;
   hopsTotal: number;
   pendingResult: LeapWeekResult | null;
   pendingJoin: LeapJoin | null;
@@ -42,16 +40,11 @@ export function readLeapState(user: any): LeapState | null {
     v: 2,
     league: n(raw.league),
     bestLeague: n(raw.bestLeague),
-    plusPaidThrough: n(raw.plusPaidThrough),
     landed: n(raw.landed),
     settledThrough: s(raw.settledThrough),
     startedWeek: s(raw.startedWeek),
     coveredWeek: s(raw.coveredWeek),
-    luck: {
-      sinceDrop: n(raw.luck?.sinceDrop),
-      firstDone: !!raw.luck?.firstDone,
-    },
-    forgoneFlies: n(raw.forgoneFlies),
+    firstGiftDone: !!raw.luck?.firstDone,
     hopsTotal: n(raw.hopsTotal),
     pendingResult:
       raw.pendingResult && typeof raw.pendingResult === 'object'
@@ -114,25 +107,21 @@ export async function ensureLeapState(args: {
     v: 2,
     league,
     bestLeague: league,
-    plusPaidThrough: league,
     landed: fromDraft ? n(draft.landed) : 0,
     settledThrough:
       (fromDraft && s(draft.settledThrough)) || shiftYMD(args.currentWeek, -7),
     startedWeek: (fromDraft && s(draft.startedWeek)) || args.currentWeek,
     coveredWeek: '',
-    luck: {
-      sinceDrop: fromDraft ? n(draft.luck?.sinceDrop) : 0,
-      firstDone: fromDraft ? !!draft.luck?.firstDone : false,
-    },
-    forgoneFlies: fromDraft ? n(draft.forgoneFlies) : n(legacy.forgoneFlies),
+    firstGiftDone: fromDraft ? !!draft.luck?.firstDone : false,
     hopsTotal: fromDraft ? n(draft.hopsTotal) : 0,
     pendingResult: null,
     pendingJoin: null,
   };
 
+  const { firstGiftDone, ...stored } = state;
   const res = await UserModel.updateOne(
     { _id: args.userId, 'quests.leap.v': { $ne: 2 } },
-    { $set: { 'quests.leap': state } },
+    { $set: { 'quests.leap': { ...stored, luck: { firstDone: firstGiftDone } } } },
   );
   if (res.modifiedCount === 0) {
     const fresh = await UserModel.findById(args.userId).select('quests').lean();
@@ -142,11 +131,6 @@ export async function ensureLeapState(args: {
     await continueLegacyLeapTasks(args.userId, args.currentWeek);
   }
   return state;
-}
-
-export function leagueMultiplier(config: LeapConfigView, league: number) {
-  const entry = config.leagues[Math.min(Math.max(0, league), config.leagues.length - 1)];
-  return Math.max(1, entry?.multiplier ?? 1);
 }
 
 export function clampLeague(config: LeapConfigView, league: number) {

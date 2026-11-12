@@ -178,6 +178,7 @@ const BREAKER_EXEMPT_MATCH = {
     { 'meta.welcome': true },
     { source: 'shop_gift', 'meta.first': true },
     { source: 'leap', 'meta.retro': true },
+    { source: 'leap', 'meta.chest': true },
     { 'meta.reported': 'milestone' },
   ],
 };

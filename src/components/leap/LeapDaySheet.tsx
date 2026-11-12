@@ -23,15 +23,15 @@ function copyFor(result: LeapWeekResult, view: LeapView | undefined) {
     return {
       title: 'Your first week is done',
       body: upNext
-        ? `Reach the promotion zone this week to advance to the ${upNext} League.`
-        : 'Reach the promotion zone this week to advance.',
+        ? `Hit your weekly goal to open your gift and reach the ${upNext} League.`
+        : 'Hit your weekly goal to open your gift.',
     };
   }
   switch (result.outcome) {
     case 'up':
       return {
         title: `You advanced to the ${after} League!`,
-        body: upNext ? `Next up: the ${upNext} League.` : "That's the top league!",
+        body: upNext ? 'A better gift waits here every week.' : 'The best gift in the pond is yours to win.',
       };
     case 'top':
       return { title: 'You stayed on top!', body: `The ${after} League is still yours.` };
@@ -40,12 +40,12 @@ function copyFor(result: LeapWeekResult, view: LeapView | undefined) {
     case 'down':
       return {
         title: `You were demoted to the ${after} League`,
-        body: `Reach the promotion zone to climb back to ${before}.`,
+        body: `Hit your weekly goal to climb back to ${before}.`,
       };
     default:
       return {
         title: `You stayed in the ${after} League`,
-        body: 'Reach the promotion zone this week to advance.',
+        body: 'Hit your weekly goal this week to open your gift and move up.',
       };
   }
 }
@@ -53,13 +53,13 @@ function copyFor(result: LeapWeekResult, view: LeapView | undefined) {
 export function revealLeapPrizes(result: LeapWeekResult, view: LeapView | undefined) {
   const items = result.newItemIds ?? [];
   const backgrounds = result.newBackgroundIds ?? [];
-  if (!view || (!items.length && !backgrounds.length)) return;
+  const flies = Math.max(0, result.newFlies ?? 0);
+  if (!view || (!items.length && !backgrounds.length && flies <= 0)) return;
   enqueueQuestRewardReveal(
-    { fliesGranted: 0, grantedItemIds: items, grantedBackgroundIds: backgrounds },
+    { fliesGranted: flies, grantedItemIds: items, grantedBackgroundIds: backgrounds },
     {
       catalog: view.rewardCatalog as RevealCatalog,
-      isPremium: view.isPremium,
-      showFlyGainPill: false,
+      isPremium: false,
     },
   );
 }
@@ -72,9 +72,11 @@ function useResultStage(
 ): LeapStageProps {
   const reduceMotion = useReducedMotion();
   const { title, body } = copyFor(result, view);
-  const gifts = result.grantedItemIds.filter((id) => id.startsWith('gift_box'));
-  const newPrizes = (result.newItemIds?.length ?? 0) + (result.newBackgroundIds?.length ?? 0);
-  const newGift = (result.newItemIds ?? []).some((id) => id.startsWith('gift_box'));
+  const gifts = (result.newItemIds ?? []).filter((id) => id.startsWith('gift_box'));
+  const newPrizes =
+    (result.newItemIds?.length ?? 0) +
+    (result.newBackgroundIds?.length ?? 0) +
+    Math.max(0, result.newFlies ?? 0);
   const leagues = view?.leagues.length
     ? view.leagues.map((league) => league.label)
     : [labelFor(view, result.leagueBefore)];
@@ -96,7 +98,7 @@ function useResultStage(
         scheduled={result.scheduled}
         lineAt={stayLine ? stayAt : moveUpAt}
         lineLabel={stayLine ? `${stayAt} to stay` : `${moveUpAt} to move up`}
-        flies={result.fliesGranted}
+        flies={Math.max(0, result.newFlies ?? 0)}
         gifts={gifts.length}
         giftColor={giftRiveIndexFor(view?.rewardCatalog ?? {}, gifts[0])}
         paused={!active || !!reduceMotion}
@@ -104,7 +106,7 @@ function useResultStage(
     ),
     actions: (
       <LeapStageButton onClick={() => onClose(newPrizes > 0)}>
-        {newPrizes > 0 ? (newGift ? 'Open your gift' : 'See your prize') : "Let's go"}
+        {newPrizes > 0 ? 'Open your gift' : "Let's go"}
       </LeapStageButton>
     ),
   };

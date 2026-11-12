@@ -60,10 +60,8 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
   const settled = context.metric('leap_week_settled');
   const held = context.metric('leap_hold_reached');
   const landed = context.metric('leap_landed');
-  const lucky = context.metric('leap_lucky_drop');
-  const comebacks = context.metric('leap_comeback');
+  const gifts = context.metric('leap_chest_claimed');
   const lilies = context.metric('leap_lily_reached');
-  const retro = context.metric('leap_retro_claimed');
   const sweepRolls = context.metric('sweep_roll_claimed');
   const seasonReward = context.metric('season_reward_claimed');
 
@@ -112,17 +110,15 @@ export async function buildQuests(context: ReportContext): Promise<StatSection> 
       { label: 'Habit weeks settled', total: settled },
       { label: 'Hold reached', total: held },
       { label: 'Leap landed', total: landed },
-      { label: 'Lucky drops', total: lucky },
-      { label: 'Comeback bonuses', total: comebacks },
+      { label: 'Gifts opened', total: gifts },
       { label: 'New Lily leagues reached', total: lilies },
-      { label: 'Plus back-pay collected', total: retro },
     ].map((row) => ({
       outcome: row.label,
       events: row.total.events,
       users: row.total.users,
       of_weeks: rate(row.total.events, settled.events),
     })),
-    note: 'Hold and Leap fire mid-week the moment they are crossed; habit weeks count at settlement, so the newest week lags.',
+    note: 'Hold and Leap fire mid-week the moment they are crossed; habit weeks count at settlement, so the newest week lags. A gift left unopened is opened automatically at settlement.',
   };
 
   const seasonTable: StatTable = {

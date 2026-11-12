@@ -99,6 +99,7 @@ export function PurchaseSheet({
   const [phase, setPhase] = useState<'confirm' | 'success'>('confirm');
   const [busy, setBusy] = useState(false);
   const [buying, setBuying] = useState<{ balance: number; ownedCount: number } | null>(null);
+  const [balanceRowAtBuy, setBalanceRowAtBuy] = useState(false);
   const [tradeInfoOpen, setTradeInfoOpen] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const tileRef = useRef<HTMLDivElement>(null);
@@ -174,7 +175,7 @@ export function PurchaseSheet({
   const progress = price > 0 ? Math.min(100, (balance / price) * 100) : 0;
   const showFoil =
     !!target && (target.rarity === 'epic' || target.rarity === 'legendary');
-  const showBalance = phase === 'success' || owned;
+  const showBalance = phase === 'success' ? balanceRowAtBuy : owned;
   const showGoal =
     phase === 'confirm' && !owned && !tradeOnly && !canAfford && !isGuest && !plusLocked;
 
@@ -187,6 +188,7 @@ export function PurchaseSheet({
     if (busy) return;
     setBusy(true);
     setBuying({ balance: liveBalance, ownedCount });
+    setBalanceRowAtBuy(showBalance);
     const ok = await onBuy();
     setBusy(false);
     setBuying(null);
@@ -270,16 +272,23 @@ export function PurchaseSheet({
                 <div
                   ref={tileRef}
                   className={cn(
-                    'closet-tile relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-[22px]',
-                    previewWide ? 'aspect-[16/10]' : 'h-[min(232px,27dvh)]',
-                    CLOSET_TONE[target.rarity],
-                    showFoil && phase === 'confirm' && 'closet-foil',
-                    target.rarity === 'legendary' && phase === 'confirm' && 'closet-foil-gold',
+                    'closet-tile relative z-[1] flex w-full shrink-0 items-center justify-center rounded-[22px]',
+                    previewWide ? 'aspect-[16/10] overflow-hidden' : 'h-[min(232px,27dvh)]',
                   )}
                 >
-                  {phase === 'success' && (
-                    <PurchaseBurst rarity={target.rarity} size={320} />
-                  )}
+                  <div
+                    aria-hidden
+                    className={cn(
+                      'pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-[22px]',
+                      CLOSET_TONE[target.rarity],
+                      showFoil && phase === 'confirm' && 'closet-foil',
+                      target.rarity === 'legendary' && phase === 'confirm' && 'closet-foil-gold',
+                    )}
+                  >
+                    {phase === 'success' && (
+                      <PurchaseBurst rarity={target.rarity} size={320} />
+                    )}
+                  </div>
                   <motion.div
                     key={phase}
                     initial={phase === 'success' ? { scale: 0.9 } : false}
@@ -340,7 +349,7 @@ export function PurchaseSheet({
                       </span>
                     )}
                     {plusLocked && (
-                      <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#5b34c2]/10 pl-1 pr-2.5 text-[12.5px] font-black text-[#5b34c2] dark:bg-[#c9b6ff]/15 dark:text-[#c9b6ff]">
+                      <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#f5c84c]/25 pl-1 pr-2.5 text-[12.5px] font-black text-[#7a5410] dark:bg-[#f5c84c]/15 dark:text-[#fde68a]">
                         <Icon name="frogPlus" className="h-5 w-5" />
                         Plus pick
                       </span>
@@ -500,13 +509,13 @@ export function PurchaseSheet({
                   >
                     <Icon
                       name="frogPlus"
-                      className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
+                      className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(110,76,6,0.35)]"
                     />
-                    <span className="relative text-[16px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
-                      Unlock Plus
+                    <span className="relative text-[16px] font-black leading-tight">
+                      Get it with Plus
                     </span>
                     <span className="plus-club-sub relative mt-0.5 text-[11.5px] font-bold leading-tight">
-                      Buy today&rsquo;s Plus picks
+                      Every Special pick, every day
                     </span>
                   </button>
                   {wishlistButton('Save for later', 'On your wishlist')}

@@ -14,8 +14,6 @@ type Reward = Record<string, unknown>;
 export type RescaleLeagueRewards = {
   weekRewards: Reward[];
   plusWeekRewards: Reward[];
-  reachRewards: Reward[];
-  plusReachRewards: Reward[];
 };
 
 export type RescaleTargets = {
@@ -23,12 +21,6 @@ export type RescaleTargets = {
   backgroundPrices: Record<string, number>;
   flyEconomy: Record<string, Record<string, unknown>>;
   leap: {
-    hopFlies: number;
-    hopsPaidPerDay: number;
-    comebackFlies: number;
-    luckyDrops: Array<{ weight: number; rewards: Reward[] }>;
-    holdFlies: number;
-    leapFlies: number;
     leagues: RescaleLeagueRewards[];
   };
   sweep: {
@@ -267,22 +259,8 @@ export async function runEconomyRescale(
     const col = db.collection('leapConfigs');
     const doc = await col.findOne({ configId: 'leap' });
     if (!doc) return { matched: 0, changed: 0 };
-    await remember('leap', {
-      hopFlies: doc.hopFlies,
-      hopsPaidPerDay: doc.hopsPaidPerDay,
-      comebackFlies: doc.comebackFlies,
-      luckyDrops: doc.luckyDrops,
-      marks: doc.marks,
-      leagues: doc.leagues,
-    });
-    const set: Document = {
-      hopFlies: targets.leap.hopFlies,
-      hopsPaidPerDay: targets.leap.hopsPaidPerDay,
-      comebackFlies: targets.leap.comebackFlies,
-      luckyDrops: targets.leap.luckyDrops,
-      'marks.hold.flies': targets.leap.holdFlies,
-      'marks.leap.flies': targets.leap.leapFlies,
-    };
+    await remember('leap', { leagues: doc.leagues });
+    const set: Document = {};
     if (Array.isArray(doc.leagues)) {
       set.leagues = doc.leagues.map((league: unknown, index: number) => {
         const target = targets.leap.leagues[index];

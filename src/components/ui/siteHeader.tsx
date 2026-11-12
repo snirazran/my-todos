@@ -1,6 +1,7 @@
 ﻿// components/SiteHeader.tsx
 'use client';
 
+import { plusTrialOffered } from '@/lib/plus/trialOffer';
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
@@ -1584,17 +1585,17 @@ function MainView({
           className="plus-upgrade-button plus-club group relative isolate flex min-h-[60px] w-full items-center gap-2.5 rounded-[18px] py-2 pl-2 pr-3 text-left focus-visible:outline-none"
         >
           <span className="-my-3 shrink-0 transition-transform duration-200 ease-out group-hover:-rotate-6 group-hover:scale-105">
-            <Icon name="frogPlus" className="h-[58px] w-[58px]" />
+            <Icon name="frogPlus" className="plus-cta-frog h-[58px] w-[58px]" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[16px] font-black leading-tight tracking-tight">
-              Try Frogress Plus
+              {plusTrialOffered() === false ? 'Get Frogress Plus' : 'Try Plus free'}
             </span>
             <span className="plus-club-sub mt-0.5 block text-[12.5px] font-bold leading-snug">
-              <span className="text-[#f5c84c]">2×</span> rewards, every Special item
+              Your effort, double the rewards
             </span>
           </span>
-          <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
+          <ChevronRight aria-hidden className="h-5 w-5 shrink-0 opacity-70" strokeWidth={3} />
         </button>
       )}
 

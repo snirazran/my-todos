@@ -68,17 +68,9 @@ export function buildRescaleTargets(): RescaleTargets {
       circuitBreaker: { dailyCap: economy.circuitBreaker.dailyCap },
     }),
     leap: copy({
-      hopFlies: LEAP_DEFAULTS.hopFlies,
-      hopsPaidPerDay: LEAP_DEFAULTS.hopsPaidPerDay,
-      comebackFlies: LEAP_DEFAULTS.comebackFlies,
-      luckyDrops: LEAP_DEFAULTS.luckyDrops,
-      holdFlies: LEAP_DEFAULTS.marks.hold.flies,
-      leapFlies: LEAP_DEFAULTS.marks.leap.flies,
       leagues: LEAP_DEFAULTS.leagues.map((league) => ({
         weekRewards: league.weekRewards,
         plusWeekRewards: league.plusWeekRewards,
-        reachRewards: league.reachRewards,
-        plusReachRewards: league.plusReachRewards,
       })),
     }) as RescaleTargets['leap'],
     sweep: copy({

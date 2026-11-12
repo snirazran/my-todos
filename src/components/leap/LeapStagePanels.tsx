@@ -152,7 +152,7 @@ export function LeapWeekReceipt({
       )}
       {rewards && (
         <div className="mt-3 space-y-1.5 border-t border-[color:var(--leap-divider)] pt-3">
-          {flies > 0 && <ReceiptRow label="Flies earned" value={<FlyAmount amount={flies} size={15} />} />}
+          {flies > 0 && <ReceiptRow label="Flies won" value={<FlyAmount amount={flies} size={15} />} />}
           {gifts > 0 && (
             <ReceiptRow
               label={gifts === 1 ? 'Gift won' : 'Gifts won'}

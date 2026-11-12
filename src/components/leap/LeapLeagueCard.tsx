@@ -12,37 +12,39 @@ import {
   Clock,
   Lock,
   Play,
-  Users,
   X,
 } from 'lucide-react';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { LeapBoardView } from '@/lib/leap/board';
 import { Icon } from '@/components/ui/Icon';
-import { FlyAmount } from '@/components/ui/FlyAmount';
 import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
 import {
   QUEST_CARD_CLASS,
   QuestGoButton,
   QuestSectionHeader,
 } from '@/components/ui/QuestCards';
-import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { openShieldSheet } from '@/hooks/useShields';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { preloadFrogFile, preloadGiftFile } from '@/lib/riveLoader';
 import { useUIStore } from '@/lib/uiStore';
 import { cn } from '@/lib/utils';
-import { tileRewards } from '@/lib/leap/format';
-import type { LeapView } from '@/lib/leap/types';
+import { QuestTrack } from '@/components/ui/QuestTrack';
+import type { BonusRewards, LeapView } from '@/lib/leap/types';
 import { LILY_ART_BOTTOM, LILY_ART_TOP } from './LeapRail';
 import { LeapLeaguesSheet } from './LeapLeaguesSheet';
-import { LeapPlusButton } from './LeapPlusButton';
-import { LeapPrizeTile, plusBonusLeague, waitingPlusLeagues } from './LeapPrizeTile';
+import { LeapPlusRow } from './LeapPlusRow';
+import { LeapPrizeTile } from './LeapPrizeTile';
+import { PondBackdrop } from '@/components/ui/PondBackdrop';
+import { PondLife } from './PondLife';
+import { useLeapClaim } from './useLeapClaim';
 import {
   habitsWord,
   leagueArt,
   leagueName,
   leagueTitle,
   leapCompeting,
+  leapChestRewards,
+  leapChestState,
   leapDaysLeft,
   leapHasHabits,
   leapRepeating,
@@ -50,68 +52,146 @@ import {
   leapStatus,
   leapStayMark,
   leapTarget,
-  leapWeekRewards,
   nextLeagueName,
+  weekdayOf,
 } from './leapCopy';
 import { useLeapView } from './useLeapView';
 
-function CollectRow({ view }: { view: LeapView }) {
-  const [busy, setBusy] = useState(false);
-  const { mutate } = useLeapView();
-  if (!view.isPremium || view.forgoneFlies <= 0) return null;
+function mergedChestRewards(rewards: BonusRewards): BonusRewards {
+  const flies = rewards.reduce(
+    (sum, reward) => (reward.type === 'FLIES' ? sum + Math.max(0, reward.amount ?? 0) : sum),
+    0,
+  );
+  return [
+    ...(flies > 0 ? [{ type: 'FLIES' as const, amount: flies }] : []),
+    ...rewards.filter((reward) => reward.type !== 'FLIES'),
+  ];
+}
+
+function nextChestDay(view: LeapView) {
+  return weekdayOf(view.week.weekKey);
+}
+
+function LeapChestRow({ view, large = false }: { view: LeapView; large?: boolean }) {
+  const startHintGuide = useUIStore((state) => state.startHintGuide);
+  const { claim, busy, error } = useLeapClaim();
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const state = leapChestState(view);
+  const next = nextLeagueName(view);
+  const target = leapTarget(view);
+  const hops = view.week.hops;
+  const merged = mergedChestRewards(leapChestRewards(view));
+  const rewards = [
+    ...merged.filter((reward) => reward.type !== 'FLIES'),
+    ...merged.filter((reward) => reward.type === 'FLIES'),
+  ];
+  const ready = state === 'ready' || state === 'plusReady';
+  const opened = state === 'opened';
+  const repeating = leapRepeating(view);
+
+  const title =
+    state === 'ready'
+      ? 'Your gift is ready!'
+      : state === 'plusReady'
+        ? 'Your Plus gift is ready!'
+        : opened
+          ? next
+            ? `Moving up to ${next}`
+            : 'Top gift won'
+          : state === 'progress'
+            ? `Finish ${habitsWord(target)} to open your gift`
+            : leapStatus(view);
+
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const res = await fetch('/api/leap/retro', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ timezone }),
-          });
-          const payload = await res.json().catch(() => ({}));
-          if (res.ok && payload.view) void mutate(payload.view, { revalidate: false });
-        } finally {
-          setBusy(false);
-        }
-      }}
-      className="mx-3 mb-3 mt-3 flex w-[calc(100%-1.5rem)] items-center justify-between gap-2 rounded-xl bg-amber-400/12 px-3 py-2 text-left transition active:scale-[0.99] disabled:opacity-60"
+    <div
+      ref={rowRef}
+      className={cn(
+        'flex items-center gap-3 px-3.5 transition-colors duration-300',
+        large ? 'py-3.5' : 'py-3',
+        ready && 'bg-[var(--season-tint,#fffbeb)] dark:bg-[var(--season-soft,rgba(245,158,11,0.1))]',
+      )}
     >
-      <span className="inline-flex items-center gap-1.5 text-[12.5px] font-black text-foreground">
-        <FlyAmount amount={view.forgoneFlies} /> earned before Plus
+      {rewards.length > 0 && (
+        <span className="flex shrink-0 items-center gap-3 pt-2.5">
+          {rewards.slice(0, 2).map((reward, index) => (
+            <LeapPrizeTile
+              key={index}
+              reward={reward}
+              view={view}
+              size="md"
+              offset={index}
+              done={opened}
+            />
+          ))}
+        </span>
+      )}
+      <span className={cn('flex min-w-0 flex-1 flex-col', large ? 'gap-2' : 'gap-1.5')}>
+        <span
+          className={cn(
+            'flex min-w-0 items-center gap-1.5 font-bold leading-tight text-foreground',
+            large ? 'text-[15px]' : 'text-[14px]',
+          )}
+        >
+          {opened && (
+            <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#4f9149] text-white">
+              <Check className="h-2.5 w-2.5" strokeWidth={4} />
+            </span>
+          )}
+          <span className="min-w-0 text-pretty">{title}</span>
+        </span>
+        {state === 'progress' || ready ? (
+          <QuestTrack
+            progress={ready ? Math.max(1, target) : hops}
+            target={Math.max(1, target)}
+            size={large ? 'lg' : 'md'}
+            action={
+              ready
+                ? {
+                    label: busy ? 'Opening…' : 'Open',
+                    disabled: busy,
+                    onPress: () => void claim({ source: rowRef.current }),
+                  }
+                : null
+            }
+          />
+        ) : opened ? (
+          <span className="text-[12.5px] font-semibold leading-tight text-muted-foreground">
+            New gift {nextChestDay(view)}
+          </span>
+        ) : null}
+        {error && (
+          <span role="alert" className="text-[12.5px] font-semibold leading-tight text-destructive">
+            {error}
+          </span>
+        )}
       </span>
-      <span className="text-[12.5px] font-black text-primary">
-        {busy ? '…' : 'Collect'}
-      </span>
-    </button>
+      {!repeating ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            startHintGuide('take-leap');
+          }}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--season-accent,#58a83f)] px-3 text-[13px] font-black text-[var(--season-on-accent,#fff)] shadow-[0_3px_0_0_var(--season-accent-lip,#2f6b1f)] transition-[transform,box-shadow] duration-150 active:translate-y-[2px] active:shadow-none"
+        >
+          <Play className="h-3 w-3 fill-current" />
+          Show me
+        </button>
+      ) : state === 'progress' ? (
+        <QuestGoButton onPress={() => startHintGuide('take-leap')} />
+      ) : null}
+    </div>
   );
 }
 
-function PlusRow({ view }: { view: LeapView }) {
+function PlusChestStrip({ view }: { view: LeapView }) {
   const setPremiumModalOpen = useUIStore((state) => state.setPremiumModalOpen);
-  if (view.isPremium) return null;
-  const waiting = waitingPlusLeagues(view);
-  const next = plusBonusLeague(view);
-  const shown = waiting[0] ?? next;
-  if (!shown) return null;
-  const prizes = shown.plusReachRewards.slice(0, 2).map((reward, i) => (
-    <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i} />
-  ));
+  const { chest } = view.week;
+  if (view.isPremium || chest.plusRewards.length === 0) return null;
+  if (!leapHasHabits(view) || !(leapCompeting(view) || chest.landed)) return null;
   return (
-    <div className="border-t border-border/50 px-3 pb-3 pt-2">
-      <LeapPlusButton
-        title={
-          waiting.length
-            ? `${waiting.length} Plus ${waiting.length === 1 ? 'prize' : 'prizes'} waiting`
-            : `Plus bonus at ${shown.label}`
-        }
-        subtitle={waiting.length ? 'You already earned them' : 'Unlock it with Plus'}
-        prizes={prizes}
-        onClick={() => setPremiumModalOpen(true, 'leap_leagues')}
-      />
+    <div className="border-t border-border/50 px-3 pb-3.5 pt-3">
+      <LeapPlusRow view={view} onClick={() => setPremiumModalOpen(true, 'leap_leagues')} />
     </div>
   );
 }
@@ -238,75 +318,15 @@ function SheetSection({
 }
 
 function LeapGoalCard({ view }: { view: LeapView }) {
-  const startHintGuide = useUIStore((state) => state.startHintGuide);
-  const repeating = leapRepeating(view);
   const competing = leapHasHabits(view) && leapCompeting(view);
-  const target = leapTarget(view);
-  const hops = view.week.hops;
   const landed = view.week.leap.reached;
-  const next = nextLeagueName(view);
   const stay = leapStayMark(view);
   const prev = view.league > 0 ? leagueName(view, view.league - 1) : null;
-  const left = Math.max(0, target - hops);
-  const rewards = tileRewards(leapWeekRewards(view));
-  const atRisk = competing && !landed && !!stay && hops < stay && view.league > 0;
-
-  const title = !repeating
-    ? 'Make a task repeat to join'
-    : !competing
-      ? leapStatus(view)
-      : landed
-        ? next
-          ? `You’re moving up to ${next}!`
-          : 'Top prize won this week!'
-        : next
-          ? `Reach ${habitsWord(target)} to move up`
-          : `Reach ${habitsWord(target)} for the top prize`;
-  const detail = !repeating
-    ? 'Every repeating task you finish counts as a habit.'
-    : !competing
-      ? leapRule(view)
-      : landed
-        ? 'Extra habits this week still earn flies.'
-        : `${habitsWord(left)} to go · ${leapDaysLeft(view)} left`;
+  const atRisk = competing && !landed && !!stay && view.week.hops < stay && view.league > 0;
 
   return (
     <div className={QUEST_CARD_CLASS}>
-      <div className="flex items-center gap-3 px-3.5 py-3.5">
-        {competing && rewards.length ? (
-          <span className={cn('min-h-12 min-w-12 shrink-0 rounded-xl', landed && 'opacity-45 grayscale-[0.4]')}>
-            <QuestRewardTileBadge
-              rewards={rewards}
-              catalog={view.rewardCatalog as never}
-              isPremium={view.isPremium}
-              small
-            />
-          </span>
-        ) : null}
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[15px] font-black leading-tight text-foreground">
-            {landed && (
-              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--season-accent,#4f9149)] text-white">
-                <Check className="h-3 w-3" strokeWidth={4} />
-              </span>
-            )}
-            <span className="min-w-0">{title}</span>
-          </span>
-          <span className="mt-1 block text-[12.5px] font-semibold leading-snug text-muted-foreground">{detail}</span>
-        </span>
-        {!repeating ? (
-          <button
-            type="button"
-            onClick={() => startHintGuide('take-leap')}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--season-accent,#58a83f)] px-3 text-[13px] font-black text-[var(--season-on-accent,#fff)] shadow-[0_3px_0_0_var(--season-accent-lip,#2f6b1f)] transition-all active:translate-y-[2px] active:shadow-none"
-          >
-            <Play className="h-3 w-3 fill-current" />
-            Show me
-          </button>
-        ) : !landed && competing ? (
-          <QuestGoButton onPress={() => startHintGuide('take-leap')} />
-        ) : null}
-      </div>
+      <LeapChestRow view={view} large />
       {atRisk && (
         <div className="flex items-center gap-2.5 border-t border-border/50 bg-rose-500/[0.06] px-3.5 py-2.5">
           <ChevronsDown className="h-4 w-4 shrink-0 text-rose-500" strokeWidth={3} />
@@ -316,8 +336,7 @@ function LeapGoalCard({ view }: { view: LeapView }) {
           </span>
         </div>
       )}
-      <PlusRow view={view} />
-      <CollectRow view={view} />
+      <PlusChestStrip view={view} />
     </div>
   );
 }
@@ -384,12 +403,12 @@ const HOW_IT_WORKS: Array<{ title: string; body: string }> = [
     body: 'Every repeating task you finish counts as one habit.',
   },
   {
-    title: 'Reach the weekly goal',
-    body: 'Hit the goal to win the prize and move up a league.',
+    title: 'Hit the weekly goal',
+    body: 'You win your league gift right away, with flies on top.',
   },
   {
-    title: 'Start fresh each week',
-    body: 'Everyone in your league leaps together, and a new week starts every week.',
+    title: 'Move up for better gifts',
+    body: 'Each week you hit the goal, you move up a league. Higher leagues hold better gifts.',
   },
 ];
 
@@ -750,7 +769,6 @@ function LeapLeagueSheet({
   }, [open, onClose, picked]);
 
   if (typeof document === 'undefined') return null;
-  const hasHabits = leapHasHabits(view);
   const total = view.leagues.length;
 
   return createPortal(
@@ -771,6 +789,9 @@ function LeapLeagueSheet({
           >
             <div className="no-scrollbar min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain">
               <div className="leap-pond relative" style={{ background: 'var(--leap-water)' }}>
+                <PondBackdrop className="absolute inset-0 -z-10 h-full w-full" />
+                <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[rgba(26,112,122,0.5)] via-[rgba(22,96,112,0.74)] to-[rgba(18,78,98,0.9)] dark:from-[rgba(14,58,68,0.7)] dark:to-[rgba(10,40,54,0.94)]" />
+                <PondLife />
                 <div className="mx-auto w-full max-w-[36rem] pb-10 pt-[calc(0.75rem+env(safe-area-inset-top))] md:pb-12 md:pt-8">
                   <div className="flex items-center justify-between gap-2 px-4 md:px-6">
                     <span className="inline-flex h-7 items-center rounded-full bg-[var(--leap-chip)] px-2.5 text-[11.5px] font-black uppercase tracking-[0.08em] text-white">
@@ -807,7 +828,7 @@ function LeapLeagueSheet({
                         onClick={() => setPicked(view.league)}
                         className="inline-flex h-8 items-center gap-1 rounded-full bg-[var(--leap-card)] px-3 text-[12.5px] font-black text-[var(--leap-ink)] shadow-[0_2px_0_var(--leap-card-shadow)] ring-1 ring-[var(--leap-card-line)] transition active:scale-95"
                       >
-                        League prizes
+                        League gifts
                         <ChevronRight className="h-3.5 w-3.5" strokeWidth={3} />
                       </button>
                     </div>
@@ -869,22 +890,11 @@ export function LeapLeagueCard() {
 
   if (!view || !enabled) return null;
   const hasHabits = leapHasHabits(view);
-  const competing = hasHabits && leapCompeting(view);
-  const target = leapTarget(view);
-  const hops = view.week.hops;
-  const landed = view.week.leap.reached;
-  const next = nextLeagueName(view);
   const league = leagueTitle(leagueName(view));
-  const left = Math.max(0, target - hops);
-  const status = !competing
-    ? leapStatus(view)
-    : landed
-      ? next
-        ? `Moving up to ${next}!`
-        : 'Top prize won this week'
-      : next
-        ? `${habitsWord(left)} to reach ${next}`
-        : `${habitsWord(left)} to win the top prize`;
+  const openSheet = () => {
+    setSeasonVars(readSeasonVars(ref.current));
+    setOpen(true);
+  };
 
   return (
     <div ref={ref} id="leap">
@@ -899,51 +909,33 @@ export function LeapLeagueCard() {
           ) : null
         }
       />
-      <button
-        type="button"
-        onClick={() => {
-          setSeasonVars(readSeasonVars(ref.current));
-          setOpen(true);
-        }}
-        className={cn(QUEST_CARD_CLASS, 'leap-stage block w-full text-left transition-transform active:scale-[0.99]')}
-      >
-        <span className="flex items-center gap-3 px-3.5 py-3">
-          <span
-            className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[var(--season-soft,rgba(79,145,73,0.12))]"
-          >
-            <LilyIcon index={view.league} box={56} width={48} className="absolute inset-0" />
+      <div className={cn(QUEST_CARD_CLASS, 'leap-stage')}>
+        <div onClick={openSheet} className="cursor-pointer">
+          <LeapChestRow view={view} />
+        </div>
+        <PlusChestStrip view={view} />
+        <button
+          type="button"
+          onClick={openSheet}
+          aria-label={`Open the ${league}`}
+          className="flex w-full touch-manipulation items-center gap-2.5 border-t border-border/50 bg-foreground/[0.025] py-2 pl-2.5 pr-3 text-left transition-colors duration-150 active:bg-foreground/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        >
+          <LilyIcon index={view.league} box={36} width={34} />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[13.5px] font-black leading-tight text-foreground">{league}</span>
+            <span className="truncate text-[12px] font-semibold leading-tight text-muted-foreground">
+              {crowdLine(board, leagueName(view))}
+            </span>
           </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="truncate text-[15.5px] font-black leading-tight text-foreground">{league}</span>
-            {competing && target > 0 ? (
-              <span className="flex items-center gap-2">
-                <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.08]">
-                  <span
-                    className="absolute inset-y-0 left-0 rounded-full bg-[var(--season-fill-strong,#58a54f)] transition-[width] duration-700"
-                    style={{ width: `${Math.min(100, Math.round((100 * hops) / target))}%` }}
-                  />
-                </span>
-                <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
-                  {hops}/{target}
-                </span>
-              </span>
-            ) : null}
-            <span className="truncate text-[12.5px] font-semibold leading-tight text-muted-foreground">{status}</span>
-          </span>
-          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={2.75} />
-        </span>
-        <span className="flex items-center gap-2.5 border-t border-border/50 bg-foreground/[0.025] px-3.5 py-2.5">
-          {board?.faces.length ? <CrowdFaces faces={board.faces} /> : <Users className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.75} />}
-          <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-muted-foreground">
-            {crowdLine(board, leagueName(view))}
-          </span>
+          {board?.faces.length ? <CrowdFaces faces={board.faces} size={24} /> : null}
           {board && board.myHops > 0 ? (
             <span className="shrink-0 rounded-full bg-[var(--season-soft,rgba(79,145,73,0.12))] px-2 py-0.5 text-[12px] font-black tabular-nums text-[var(--season-soft-text,#2f6b2c)] dark:text-[var(--season-soft-text-dark,#6ee7b7)]">
               #{board.myRank.toLocaleString()}
             </span>
           ) : null}
-        </span>
-      </button>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.75} />
+        </button>
+      </div>
 
       <LeapLeagueSheet
         view={view}

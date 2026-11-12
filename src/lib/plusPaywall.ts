@@ -48,7 +48,7 @@ export const INCLUDED = 'Included';
 export const NOT_INCLUDED = '—';
 
 export const PLUS_PERKS = {
-  flies: { label: 'Quest and habit flies', free: '1×', plus: '2×' },
+  flies: { label: 'Flies from quests', free: '1×', plus: '2×' },
   gifts: { label: 'Prizes in every gift', free: '1', plus: '2' },
   special: {
     label: 'Special items a day',
@@ -62,7 +62,7 @@ export const PLUS_PERKS = {
   },
   season: { label: 'Season Plus rewards', free: NOT_INCLUDED, plus: INCLUDED },
   lilyPad: { label: 'Free Lily Pads a month', free: NOT_INCLUDED, plus: '1' },
-  league: { label: 'Prizes per new league', free: '1', plus: '2' },
+  league: { label: 'Weekly league gifts', free: '1', plus: '2' },
   coach: { label: 'Weekly coach read', free: NOT_INCLUDED, plus: INCLUDED },
   looks: {
     label: 'Saved looks',
@@ -96,38 +96,38 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   if (base !== placement) return getPlusContext(base, frogName);
   const name = frogName?.trim() || 'your frog';
   const context: PaywallContext = {
-    headline: 'Join the Plus club.',
-    accent: 'Twice the rewards.',
-    sub: `Double rewards, every Special item and the Plus season track for ${name}.`,
+    headline: 'You do the work.',
+    accent: 'Get twice the rewards.',
+    sub: `Double flies from quests, two prizes in every gift and every Special outfit for ${name}.`,
     benefits: [],
     perks: perksLed(),
   };
   if (placement === 'onboarding') return {
     ...context,
-    benefits: [COACH, { icon: 'x2', title: 'Double prizes', body: 'For every quest, habit and gift.' }, SUPPORT],
+    benefits: [COACH, { icon: 'x2', title: 'Twice the reward for your effort', body: 'Double flies from quests, two prizes per gift.' }, SUPPORT],
   };
   if (placement === 'plus_preview_ended') return {
     ...context,
     headline: 'Your 3 days are up.',
     accent: `Keep Plus for ${name}?`,
-    sub: 'Your Plus preview ended. Nothing was charged.',
+    sub: 'Nothing was charged. Join to keep earning double.',
   };
   if (placement.startsWith('plus_preview')) return {
     ...context,
     headline: 'Enjoying Plus?',
     accent: 'Keep it after your preview.',
-    sub: 'Your preview ends by itself. Join to keep every perk.',
+    sub: 'Your preview ends by itself. Join to keep earning double.',
   };
   if (placement === 'plus_trial_ended') return {
     ...context,
-    headline: 'Miss your perks?',
-    accent: 'Pick Plus back up.',
+    headline: 'You kept showing up.',
+    accent: 'Get double for it again.',
   };
   if (placement === 'first_gift') return {
     ...context,
     headline: 'Loved that gift?',
     accent: 'Get two prizes every time.',
-    sub: 'Two prizes in every gift, double flies and every Special item.',
+    sub: `Two prizes in every gift, double flies and every Special outfit for ${name}.`,
     perks: perksLed('gifts'),
   };
   if (placement === 'wardrobe_looks') return {
@@ -140,22 +140,22 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
   if (placement === 'season_plus_track') return {
     ...context,
     headline: 'Same progress.',
-    accent: 'More to collect.',
-    sub: 'Add the Plus reward track to your season. Every tier you reach has more to discover.',
+    accent: 'Twice the rewards.',
+    sub: 'Add the Plus track and collect a second reward at every tier you reach.',
     perks: perksLed('season'),
   };
   if (placement === 'leap_leagues') return {
     ...context,
     headline: 'Same habits.',
-    accent: 'Bigger league prizes.',
-    sub: 'Extra prizes at every league and double flies from every habit.',
+    accent: 'Two gifts a week.',
+    sub: 'You already keep your habits. Open a second gift every week you hit your goal.',
     perks: perksLed('league', 'flies', 'lilyPad'),
   };
   if (placement === 'streak_rescue' || placement === 'shield_offer') return {
     ...context,
     headline: 'Life happens.',
     accent: 'Your streak can stay.',
-    sub: 'A free Lily Pad every month covers a day off.',
+    sub: 'A free Lily Pad every month covers a day off, so one rough day never costs your streak.',
     perks: perksLed('lilyPad'),
   };
   if (placement === 'trade_reroll' || placement === 'shop_reroll') return {
@@ -190,7 +190,7 @@ export function getPlusContext(placement: string, frogName?: string): PaywallCon
     ...context,
     headline: 'Know what keeps you going.',
     accent: 'A coach read every week.',
-    sub: 'One clear read of your week, with one thing to try.',
+    sub: 'One clear read of your own week, with one thing to try next.',
     perks: perksLed('coach'),
   };
   return context;

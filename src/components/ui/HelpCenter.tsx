@@ -109,7 +109,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What is Leap?',
-        a: 'Leap is your weekly habit league. Every task that repeats is a habit, and every one you tick off pays flies right away, sometimes with a gift. Finish enough habits in a week to reach the promotion zone and you advance to the next league: Lily Leaf, Lily Bud, Lily Bloom, Lily Bouquet, then Lily Garden. Each league has its own prizes, and higher leagues pay more for every habit. From Lily Bud up, finish too few and you land in the demotion zone and drop one league, unless a Lily Pad saves you. A week with no habits never costs you a league. Tap any lily on the Leap card to see its prizes.',
+        a: 'Leap is your weekly habit league. Every task that repeats is a habit. Finish enough habits in a week to hit your goal and your league gift opens, with flies and a gift inside. Hitting the goal also moves you up a league: Lily Leaf, Lily Bud, Lily Bloom, Lily Bouquet, then Lily Garden. Higher leagues hold better gifts. With Plus you open a second gift every week you hit the goal. From Lily Bud up, finish too few habits and you drop one league, unless a Lily Pad saves you. A week with no habits never costs you a league. Tap the Leap card to see every league’s gift.',
       },
     ],
   },

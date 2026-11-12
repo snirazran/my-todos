@@ -159,13 +159,6 @@ export async function applyBonusRewards(args: {
   return summary;
 }
 
-export function scaleFlies(amount: number, multiplier: number, isPremium: boolean) {
-  return Math.max(
-    0,
-    Math.round(Math.max(0, amount) * Math.max(0, multiplier) * (isPremium ? 2 : 1)),
-  );
-}
-
 export function rewardFlies(rewards: BonusRewards) {
   return rewards.reduce(
     (sum, reward) =>
@@ -197,7 +190,6 @@ export async function grantLeapRewards(args: {
   occurrenceKey: string;
   dayKey: string;
   isPremium: boolean;
-  flyMultiplier: number;
   meta?: Record<string, unknown>;
   plusOnly?: boolean;
 }): Promise<LeapGrantSummary> {
@@ -206,11 +198,7 @@ export async function grantLeapRewards(args: {
   if (!rewards.length) return summary;
   await connectMongo();
 
-  const requestedFlies = scaleFlies(
-    rewardFlies(rewards),
-    args.flyMultiplier,
-    isPremium,
-  );
+  const requestedFlies = Math.floor(rewardFlies(rewards));
   let flies = 0;
   if (requestedFlies > 0) {
     const settlement = await settleFlyGrant({
@@ -219,6 +207,7 @@ export async function grantLeapRewards(args: {
       occurrenceKey: args.occurrenceKey,
       dayKey: args.dayKey,
       targetAmount: requestedFlies,
+      skipBreaker: true,
       meta: args.meta,
     });
     flies = Math.max(0, settlement.delta);
@@ -315,9 +304,11 @@ export async function grantLeapRewards(args: {
     }
   }
 
-  await recordPlusEarned(userId, {
-    flies: args.plusOnly ? flies : isPremium ? plusFlyBonus(flies, 2) : 0,
-    rareItems: args.plusOnly ? await countRareOutfits(summary.grantedItemIds) : 0,
-  });
+  if (args.plusOnly) {
+    await recordPlusEarned(userId, {
+      flies,
+      rareItems: await countRareOutfits(summary.grantedItemIds),
+    });
+  }
   return summary;
 }

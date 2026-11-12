@@ -2109,72 +2109,76 @@ body.dragging {
 }
 
 .plus-club {
-  --plus-button-base: #c9971f;
-  background-color: #6336d0;
-  background-image: linear-gradient(180deg, #7647e4 0%, #5529ba 100%);
-  color: #fff;
+  --plus-button-base: #a87a0e;
+  background-color: #f5c84c;
+  color: #3a2700;
 }
 
 .plus-club.plus-upgrade-button:not(:disabled) {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
     var(--tw-ring-shadow, 0 0 #0000), 0 4px 0 var(--plus-button-base),
-    inset 0 1.5px 0 rgba(245, 200, 76, 0.9);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55);
 }
 
 .plus-club.plus-upgrade-button:not(:disabled):active {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
     var(--tw-ring-shadow, 0 0 #0000), 0 1px 0 var(--plus-button-base),
-    inset 0 1.5px 0 rgba(245, 200, 76, 0.9);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55);
 }
 
 .plus-club:focus-visible,
 .plus-club-soft:focus-visible {
-  outline: 2px solid #f5c84c;
+  outline: 2px solid #a87a0e;
   outline-offset: 3px;
 }
 
-.plus-club:hover:not(:disabled) {
-  background-image: linear-gradient(180deg, #8153ec 0%, #5c2fc4 100%);
+@media (hover: hover) and (pointer: fine) {
+  .plus-club:hover:not(:disabled) {
+    background-color: #f8d36b;
+  }
+  .plus-club-soft:hover:not(:disabled) {
+    background-color: #ffefc2;
+  }
 }
 
 .plus-club-sub {
-  color: #e6dcff;
+  color: #6b4a08;
 }
 
 .plus-bonus-tag {
-  box-shadow: 0 2px 0 var(--plus-button-base), inset 0 1.5px 0 rgba(245, 200, 76, 0.9);
+  box-shadow: 0 2px 0 var(--plus-button-base), inset 0 1.5px 0 rgba(255, 255, 255, 0.55);
 }
 
 .plus-club-chip {
   display: inline-flex;
   align-items: center;
-  background-color: #f5c84c;
-  color: #3a2700;
+  background-color: #3a2700;
+  color: #ffe9a8;
   font-weight: 900;
-  box-shadow: 0 2px 0 #b98a17, inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .dark .plus-club {
-  --plus-button-base: #a87a0e;
-  background-image: linear-gradient(180deg, #6a3dd6 0%, #4a22a6 100%);
+  --plus-button-base: #8a640b;
 }
 
 .plus-club-soft {
-  --plus-button-base: #c9b3f7;
-  border: 2px solid #d9c9fb;
-  background-color: #f4eeff;
-  color: #4b1fa3;
-}
-
-.plus-club-soft:hover:not(:disabled) {
-  background-color: #ece2ff;
+  --plus-button-base: #e3c264;
+  border: 2px solid #f0d58a;
+  background-color: #fff6d9;
+  color: #6b4a08;
 }
 
 .dark .plus-club-soft {
-  --plus-button-base: rgba(20, 6, 45, 0.9);
-  border-color: rgba(167, 139, 250, 0.35);
-  background-color: rgba(106, 59, 214, 0.2);
-  color: #dccdff;
+  --plus-button-base: rgba(0, 0, 0, 0.5);
+  border-color: rgba(245, 200, 76, 0.4);
+  background-color: rgba(245, 200, 76, 0.14);
+  color: #fde9a8;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dark .plus-club-soft:hover:not(:disabled) {
+    background-color: rgba(245, 200, 76, 0.22);
+  }
 }
 
 .plus-stage-arc {
@@ -3905,6 +3909,14 @@ body.dragging {
     linear-gradient(180deg, #1c5c66 0%, #154a57 46%, #10394a 100%);
 }
 
+.leap-scene {
+  --leap-glow: rgba(255, 246, 196, 0.55);
+  --leap-ring: rgba(255, 255, 255, 0.5);
+  --leap-burst: rgba(255, 255, 255, 0.85);
+  --leap-ink-muted: #ffffff;
+  --leap-note: #fde68a;
+}
+
 .leap-pond-bob {
   animation: leap-pond-bob 4.8s ease-in-out infinite;
 }
@@ -3922,6 +3934,66 @@ body.dragging {
 @media (prefers-reduced-motion: reduce) {
   .leap-pond-bob {
     animation: none;
+  }
+}
+
+.leap-ripple {
+  animation: leap-ripple 4.5s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+
+@keyframes leap-ripple {
+  from {
+    transform: scale(0.32);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+.leap-drift {
+  animation: leap-drift 16s ease-in-out infinite alternate;
+}
+
+.leap-drift-slow {
+  animation: leap-drift 22s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes leap-drift {
+  from {
+    transform: translate3d(-4%, -3%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(9%, 7%, 0) scale(1.12);
+  }
+}
+
+.leap-firefly {
+  animation: leap-firefly 6s ease-in-out infinite;
+}
+
+@keyframes leap-firefly {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translate3d(6px, -14px, 0);
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leap-ripple,
+  .leap-drift,
+  .leap-drift-slow,
+  .leap-firefly {
+    animation: none;
+  }
+  .leap-ripple {
+    opacity: 0;
   }
 }
 

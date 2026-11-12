@@ -20,7 +20,7 @@ export function PlusBonusTag({
       )}
     >
       <Icon name="frogPlus" className={size === 'sm' ? 'h-5 w-5 shrink-0' : 'h-6 w-6 shrink-0'} />
-      <span className="text-[#ffe08a]">Plus</span>
+      <span>Plus</span>
       {children != null && <span className="tabular-nums">{children}</span>}
     </span>
   );

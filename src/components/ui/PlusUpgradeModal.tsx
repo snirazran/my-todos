@@ -1,5 +1,6 @@
 'use client';
 
+import { notePlusTrialOffered } from '@/lib/plus/trialOffer';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { animate, motion, AnimatePresence, useMotionValue, useReducedMotion } from 'framer-motion';
@@ -234,6 +235,13 @@ export function usePlusPaywall({
     getPlusPricing(offering)
       .then((prices) => {
         if (uid && (prices.yearly || prices.monthly)) cachedPricing = { uid, offering, prices };
+        if (prices.yearly || prices.monthly) {
+          notePlusTrialOffered(
+            [prices.yearly, prices.monthly].some(
+              (price) => !!price && (!!price.trialPeriod || !!price.trialDuration),
+            ),
+          );
+        }
         if (cancelled) return;
         setPricing(prices);
         setPricingFailed(!prices.yearly && !prices.monthly);
@@ -941,8 +949,6 @@ const COMPARISON_GROUPS: Array<{
     { label: 'Golden fly companion', free: '—', plus: 'Included' },
   ] },
   { title: 'Habits & Leap', icon: 'leap', rows: [
-    { label: 'Flies from every habit', free: '1×', plus: '2×' },
-    { label: 'Prizes at each new league', free: '1', plus: '2' },
     { label: 'Weekly league gifts', free: '1', plus: '2' },
     { label: 'Free Lily Pad', free: '—', plus: '1 / month' },
     { label: 'Lily Pads you can keep', free: '2', plus: '3' },

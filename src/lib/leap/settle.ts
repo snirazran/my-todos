@@ -10,9 +10,9 @@ import {
   readShieldState,
 } from '@/lib/shields/engine';
 import { shiftYMD, type WeekStartDay } from '@/lib/weekStart';
-import { emptyGrant, grantLeapRewards, mergeGrant } from './rewards';
-import { payMark } from './marks';
-import { clampLeague, leagueMultiplier, readLeapState, type LeapState } from './state';
+import { claimLeapChest } from './chest';
+import { recordMark } from './marks';
+import { clampLeague, readLeapState, type LeapState } from './state';
 import {
   markTargets,
   marksMet,
@@ -22,7 +22,6 @@ import {
 } from './week';
 import type {
   LeapConfigView,
-  LeapGrantSummary,
   LeapMarkId,
   LeapWeekOutcome,
   LeapWeekResult,
@@ -30,90 +29,6 @@ import type {
 
 const MAX_WEEKS_PER_SETTLE = 26;
 const PLAYED_OUTCOMES: LeapWeekOutcome[] = ['up', 'top', 'stay', 'covered', 'down'];
-
-async function payReach(args: {
-  userId: string;
-  config: LeapConfigView;
-  state: LeapState;
-  isPremium: boolean;
-  dayKey: string;
-  grant: LeapGrantSummary;
-}) {
-  const { userId, config, state, isPremium, dayKey, grant } = args;
-  for (let index = state.bestLeague + 1; index <= state.league; index += 1) {
-    const league = config.leagues[index];
-    if (!league) continue;
-    mergeGrant(
-      grant,
-      await grantLeapRewards({
-        userId,
-        rewards: league.reachRewards,
-        occurrenceKey: `leap:reach:${index}`,
-        dayKey,
-        isPremium: false,
-        flyMultiplier: 1,
-        meta: { league: league.label },
-      }),
-    );
-    if (isPremium && state.plusPaidThrough === index - 1) {
-      mergeGrant(
-        grant,
-        await grantLeapRewards({
-          userId,
-          rewards: league.plusReachRewards,
-          occurrenceKey: `leap:reachplus:${index}`,
-          dayKey,
-          isPremium: false,
-          flyMultiplier: 1,
-          meta: { league: league.label, plus: true },
-          plusOnly: true,
-        }),
-      );
-      state.plusPaidThrough = index;
-    }
-    state.bestLeague = index;
-    void recordAnalyticsEvent({
-      userId,
-      name: 'leap_lily_reached',
-      properties: { lily: league.label, league: index, is_premium: isPremium },
-    }).catch(() => {});
-  }
-}
-
-export async function payPlusBacklog(args: {
-  userId: string;
-  config: LeapConfigView;
-  state: LeapState;
-  dayKey: string;
-}): Promise<LeapGrantSummary | null> {
-  const { userId, config, state, dayKey } = args;
-  if (state.plusPaidThrough >= state.bestLeague) return null;
-  const claimed = await UserModel.updateOne(
-    { _id: userId, 'quests.leap.plusPaidThrough': state.plusPaidThrough },
-    { $set: { 'quests.leap.plusPaidThrough': state.bestLeague } },
-  );
-  if (claimed.modifiedCount === 0) return null;
-  const grant = emptyGrant();
-  for (let index = state.plusPaidThrough + 1; index <= state.bestLeague; index += 1) {
-    const league = config.leagues[index];
-    if (!league) continue;
-    mergeGrant(
-      grant,
-      await grantLeapRewards({
-        userId,
-        rewards: league.plusReachRewards,
-        occurrenceKey: `leap:reachplus:${index}`,
-        dayKey,
-        isPremium: false,
-        flyMultiplier: 1,
-        meta: { league: league.label, plus: true, backlog: true },
-        plusOnly: true,
-      }),
-    );
-  }
-  state.plusPaidThrough = state.bestLeague;
-  return grant;
-}
 
 export async function settleLeapWeeks(args: {
   userId: string;
@@ -167,6 +82,7 @@ export async function settleLeapWeeks(args: {
   let weeksSettled = 0;
   const newItemIds: string[] = [];
   const newBackgroundIds: string[] = [];
+  let newFlies = 0;
   const weekDocs = await LeapWeekModel.find({
     userId,
     weekKey: { $gte: first, $lte: lastWeek },
@@ -191,16 +107,17 @@ export async function settleLeapWeeks(args: {
     });
     if (ledger.scheduled === 0 && !existing && state.league === 0) continue;
 
-    const multiplier = existing?.multiplier ?? leagueMultiplier(config, state.league);
     const weekDoc =
       existing ??
       (await LeapWeekModel.findOneAndUpdate(
         { userId, weekKey: week },
-        { $setOnInsert: { multiplier, league: state.league } },
+        { $setOnInsert: { league: state.league } },
         { upsert: true, new: true },
       ).lean<LeapWeekDoc>());
 
-    const grant = emptyGrant();
+    const settledItemIds: string[] = [];
+    const settledBackgroundIds: string[] = [];
+    let settledFlies = 0;
     const targets = markTargets(
       config,
       targetBasis(ledger.scheduled, weekDoc?.scheduledCap),
@@ -212,20 +129,30 @@ export async function settleLeapWeeks(args: {
     const paidMarks = new Set<LeapMarkId>(weekDoc?.marks ?? []);
     for (const id of met) {
       if (paidMarks.has(id) || !weekDoc?._id) continue;
-      const paid = await payMark({
+      const recorded = await recordMark({
         userId,
         weekDocId: weekDoc._id,
         weekKey: week,
         id,
-        config,
         league: weekDoc.league ?? state.league,
-        multiplier,
-        isPremium,
-        dayKey: args.todayKey,
         hops: ledger.hops,
         scheduled: ledger.scheduled,
       });
-      if (paid) mergeGrant(grant, paid);
+      if (recorded && id === 'leap') weekDoc.landedAt = new Date();
+    }
+    if (weekDoc?._id && weekDoc.landedAt) {
+      const chest = await claimLeapChest({
+        userId,
+        config,
+        weekDoc,
+        fallbackLeague: state.league,
+        isPremium,
+        dayKey: args.todayKey,
+        auto: true,
+      });
+      settledFlies += chest.fliesGranted;
+      settledItemIds.push(...chest.grantedItemIds);
+      settledBackgroundIds.push(...chest.grantedBackgroundIds);
     }
     const reached = new Set<LeapMarkId>([...Array.from(paidMarks), ...met]);
     const leagueBefore = state.league;
@@ -256,14 +183,16 @@ export async function settleLeapWeeks(args: {
     }
 
     if (state.league > state.bestLeague) {
-      await payReach({
+      state.bestLeague = state.league;
+      void recordAnalyticsEvent({
         userId,
-        config,
-        state,
-        isPremium,
-        dayKey: args.todayKey,
-        grant,
-      });
+        name: 'leap_lily_reached',
+        properties: {
+          lily: config.leagues[state.league]?.label ?? '',
+          league: state.league,
+          is_premium: isPremium,
+        },
+      }).catch(() => {});
     }
 
     if (weekDoc?._id) {
@@ -278,10 +207,6 @@ export async function settleLeapWeeks(args: {
             leagueAfter: state.league,
             settledAt: new Date(),
           },
-          $inc: { fliesGranted: grant.fliesGranted },
-          ...(grant.grantedItemIds.length
-            ? { $push: { grantedItemIds: { $each: grant.grantedItemIds } } }
-            : {}),
         },
       );
     }
@@ -302,8 +227,9 @@ export async function settleLeapWeeks(args: {
     }
 
     weeksSettled += 1;
-    newItemIds.push(...grant.grantedItemIds);
-    newBackgroundIds.push(...grant.grantedBackgroundIds);
+    newItemIds.push(...settledItemIds);
+    newBackgroundIds.push(...settledBackgroundIds);
+    newFlies += settledFlies;
     if (outcome === 'quiet') continue;
     const firstWeek = played === 0;
     played += 1;
@@ -317,8 +243,8 @@ export async function settleLeapWeeks(args: {
       leagueBefore,
       leagueAfter: state.league,
       newBest: state.bestLeague > bestBefore,
-      fliesGranted: (weekDoc?.fliesGranted ?? 0) + grant.fliesGranted,
-      grantedItemIds: [...(weekDoc?.grantedItemIds ?? []), ...grant.grantedItemIds],
+      fliesGranted: weekDoc?.fliesGranted ?? 0,
+      grantedItemIds: [...(weekDoc?.grantedItemIds ?? [])],
       shieldsLeft: 0,
       weeksSettled,
       firstWeek,
@@ -331,6 +257,7 @@ export async function settleLeapWeeks(args: {
     result.weeksSettled = weeksSettled;
     result.newItemIds = newItemIds;
     result.newBackgroundIds = newBackgroundIds;
+    result.newFlies = newFlies;
     result.shieldsLeft = (await readShields()).count;
     state.pendingResult = result;
   }
@@ -341,7 +268,6 @@ export async function settleLeapWeeks(args: {
       $set: {
         'quests.leap.league': state.league,
         'quests.leap.bestLeague': state.bestLeague,
-        'quests.leap.plusPaidThrough': state.plusPaidThrough,
         'quests.leap.landed': state.landed,
         'quests.leap.coveredWeek': state.coveredWeek,
         'quests.leap.pendingResult': state.pendingResult,

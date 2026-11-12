@@ -68,15 +68,41 @@ export function leapStayMark(view: LeapView) {
   return goal > 0 && goal < leapTarget(view) ? goal : undefined;
 }
 
-export function leapWeekRewards(view: LeapView): BonusRewards {
-  const league = view.leagues[view.league];
-  return [
-    ...(view.week.leapFlies > 0
-      ? [{ type: 'FLIES' as const, amount: view.week.leapFlies }]
-      : []),
-    ...(league?.weekRewards ?? []),
-    ...(view.isPremium ? league?.plusWeekRewards ?? [] : []),
-  ];
+export type LeapChestState = 'idle' | 'progress' | 'ready' | 'plusReady' | 'opened';
+
+export function leapChestState(view: LeapView): LeapChestState {
+  const { chest } = view.week;
+  if (chest.landed) {
+    if (!chest.claimed) return 'ready';
+    if (view.isPremium && !chest.plusClaimed && chest.plusRewards.length > 0) return 'plusReady';
+    return 'opened';
+  }
+  return leapHasHabits(view) && leapCompeting(view) ? 'progress' : 'idle';
+}
+
+export function leapChestRewards(view: LeapView): BonusRewards {
+  const { chest } = view.week;
+  return view.isPremium ? [...chest.rewards, ...chest.plusRewards] : chest.rewards;
+}
+
+export function leapPlusChestWaiting(view: LeapView) {
+  const { chest } = view.week;
+  return !view.isPremium && chest.landed && !chest.plusClaimed && chest.plusRewards.length > 0;
+}
+
+export function leapChestLine(view: LeapView): string {
+  const state = leapChestState(view);
+  const next = nextLeagueName(view);
+  if (state === 'ready') return 'Your gift is ready to open';
+  if (state === 'plusReady') return 'Your Plus gift is ready to open';
+  if (state === 'opened') {
+    return next ? `Gift opened. You move up to ${next} next week.` : 'Gift opened. You stay on top.';
+  }
+  if (state === 'progress') {
+    const left = leapLeft(view);
+    return `${habitsWord(left)} to open your gift`;
+  }
+  return leapStatus(view);
 }
 
 export const habitsWord = (count: number) => `${count} habit${count === 1 ? '' : 's'}`;
@@ -137,7 +163,7 @@ export function leapStatus(view: LeapView): string {
   const near = left <= Math.max(3, Math.ceil(leapTarget(view) * 0.3));
   if (near) {
     const more = `${left} more habit${left === 1 ? '' : 's'}`;
-    return next ? `${more} to the promotion zone` : `${more} for the top prize`;
+    return `${more} to open your gift`;
   }
   return week.hops > 0
     ? `${habitsWord(week.hops)} done this week`
@@ -146,16 +172,16 @@ export function leapStatus(view: LeapView): string {
 
 export function leapHint(view: LeapView): string {
   if (!leapRepeating(view)) {
-    return 'Make any task repeat. Every time you finish it, you earn flies and climb the leagues.';
+    return 'Make any task repeat. Finish enough of them in a week to open your league gift.';
   }
   if (!leapHasHabits(view) || !leapCompeting(view)) {
-    return 'Every repeating task you finish earns flies and counts toward your weekly league.';
+    return 'Every repeating task you finish counts toward this week’s gift.';
   }
   const next = nextLeagueName(view);
   const target = habitsWord(leapTarget(view));
   const goal = next
-    ? `Finish ${target} this week to advance to the ${leagueTitle(next)}.`
-    : `Finish ${target} this week to win the top prize.`;
+    ? `Finish ${target} this week to open your gift and advance to the ${leagueTitle(next)}.`
+    : `Finish ${target} this week to open the top gift.`;
   const stay = leapStayMark(view);
   const keep = stay
     ? ` Finish ${habitsWord(stay)} to stay in the ${leagueTitle(leagueName(view))}.`
@@ -169,7 +195,7 @@ export function joinFrogLine(view: LeapView): string {
   const { week } = view;
   const next = nextLeagueName(view);
   if (leapHasHabits(view) && leapCompeting(view) && !week.leap.reached && next) {
-    return `Every habit you finish moves us up. ${leapTarget(view)} by ${weekEndDay(week.weekKey)} and we leap to ${next}!`;
+    return `${leapTarget(view)} habits by ${weekEndDay(week.weekKey)} opens our gift, and we leap to ${next}!`;
   }
   return `Every habit you finish counts. Our first league week starts ${weekdayOf(week.weekKey)}.`;
 }

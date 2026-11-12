@@ -3,9 +3,7 @@ import LeapConfigModel, {
   LEAP_CONFIG_ID,
   LEAP_CONFIG_VERSION,
   LEAP_DEFAULTS,
-  LEAP_NUMBER_LIMITS,
-  LEGACY_LEAP_MARK_FLIES,
-  LEGACY_WEEK_GIFTS,
+  DEFAULT_CHEST_FLIES,
   RETIRED_LEAGUE_LABELS,
   type LeapConfigDoc,
 } from '@/lib/models/LeapConfig';
@@ -15,7 +13,6 @@ import {
   type BonusRewards,
   type LeapConfigView,
   type LeapLeague,
-  type LeapLuckyDrop,
   type LeapMarkConfig,
   type LeapMarkId,
 } from './types';
@@ -31,6 +28,15 @@ const RETIRED_FIELDS = [
   'postSetEveryLeaps',
   'postSetRewards',
   'postSetPlusRewards',
+  'hopFlies',
+  'hopsPaidPerDay',
+  'comebackFlies',
+  'comebackLookbackDays',
+  'comebacksPerDay',
+  'luckyChancePercent',
+  'luckyPityHops',
+  'luckyDropsPerDay',
+  'luckyDrops',
 ] as const;
 
 const clampNumber = (
@@ -106,7 +112,6 @@ function sanitizeMarks(value: unknown): Record<LeapMarkId, LeapMarkConfig> {
       percent: whole(entry.percent, fallback.percent, 1, 100),
       minDays: whole(entry.minDays, fallback.minDays, 1, 7),
       minScheduled: whole(entry.minScheduled, fallback.minScheduled, 1, 100),
-      flies: whole(entry.flies, fallback.flies, 0, 10000),
     };
   }
   return out;
@@ -131,12 +136,6 @@ export function normalizeLeapConfig(
   doc: Partial<LeapConfigDoc> | null | undefined,
 ): LeapConfigView {
   const source = (doc ?? {}) as Record<string, unknown>;
-  const num = (key: keyof LeapConfigView) =>
-    clampNumber(
-      source[key],
-      LEAP_DEFAULTS[key] as number,
-      LEAP_NUMBER_LIMITS[key],
-    );
   const marks = sanitizeMarks(source.marks);
   const leagues = sanitizeList<LeapLeague>(
     source.leagues,
@@ -146,7 +145,6 @@ export function normalizeLeapConfig(
         typeof entry.label === 'string' && entry.label.trim()
           ? entry.label.trim().slice(0, 40)
           : 'Lily',
-      multiplier: clampNumber(entry.multiplier, 1, { min: 1, max: 5 }),
       leapPercent: whole(
         entry.leapPercent,
         LEAP_DEFAULTS.leagues[index]?.leapPercent ?? marks.leap.percent,
@@ -154,8 +152,6 @@ export function normalizeLeapConfig(
         100,
       ),
       weekRewards: sanitizeBonusRewards(entry.weekRewards),
-      reachRewards: sanitizeBonusRewards(entry.reachRewards),
-      plusReachRewards: sanitizeBonusRewards(entry.plusReachRewards),
       plusWeekRewards:
         entry.plusWeekRewards === undefined
           ? LEAP_DEFAULTS.leagues[index]?.plusWeekRewards ?? []
@@ -167,27 +163,10 @@ export function normalizeLeapConfig(
       typeof source.isActive === 'boolean'
         ? source.isActive
         : LEAP_DEFAULTS.isActive,
-    hopFlies: Math.round(num('hopFlies')),
-    hopsPaidPerDay: Math.round(num('hopsPaidPerDay')),
-    comebackFlies: Math.round(num('comebackFlies')),
-    comebackLookbackDays: Math.round(num('comebackLookbackDays')),
-    comebacksPerDay: Math.round(num('comebacksPerDay')),
-    luckyChancePercent: num('luckyChancePercent'),
-    luckyPityHops: Math.round(num('luckyPityHops')),
-    luckyDropsPerDay: Math.round(num('luckyDropsPerDay')),
     firstHopRewards:
       source.firstHopRewards === undefined
         ? LEAP_DEFAULTS.firstHopRewards
         : sanitizeBonusRewards(source.firstHopRewards),
-    luckyDrops: sanitizeList<LeapLuckyDrop>(
-      source.luckyDrops,
-      LEAP_DEFAULTS.luckyDrops,
-      (entry) => {
-        const weight = clampNumber(entry.weight, 0, { min: 0, max: 100000 });
-        const rewards = sanitizeBonusRewards(entry.rewards);
-        return weight > 0 && rewards.length ? { weight, rewards } : null;
-      },
-    ),
     marks,
     leagues: leagues.length ? leagues : LEAP_DEFAULTS.leagues,
   };
@@ -220,6 +199,12 @@ async function refreshLeapOnboardingCopy() {
   await QuestModel.updateMany(filter, update, options);
 }
 
+function withChestFlies(rewards: unknown, amount: number) {
+  const list = sanitizeBonusRewards(rewards);
+  if (amount <= 0 || list.some((reward) => reward.type === 'FLIES')) return list;
+  return [{ type: 'FLIES' as const, amount }, ...list];
+}
+
 async function upgradeLeapConfig(doc: LeapConfigDoc) {
   const unset: Record<string, ''> = {};
   for (const field of RETIRED_FIELDS) {
@@ -235,30 +220,31 @@ async function upgradeLeapConfig(doc: LeapConfigDoc) {
     set.leagues = leagues.map((entry, index) => {
       if (!entry || typeof entry !== 'object') return entry;
       const fallback = LEAP_DEFAULTS.leagues[index];
-      if (!fallback) return entry;
-      const next = { ...(entry as Record<string, unknown>) };
-      if (next.label === RETIRED_LEAGUE_LABELS[index]) next.label = fallback.label;
-      if ((doc.configVersion ?? 0) < 4) {
-        const week = next.weekRewards as Array<{ type?: string; itemId?: string }> | undefined;
-        const untouched =
-          Array.isArray(week) &&
-          week.length === 1 &&
-          week[0]?.type === 'BOX' &&
-          week[0]?.itemId === LEGACY_WEEK_GIFTS[index];
-        if (untouched) next.weekRewards = fallback.weekRewards;
-        if (next.plusWeekRewards === undefined) next.plusWeekRewards = fallback.plusWeekRewards;
-      }
-      return next;
+      const raw = entry as Record<string, unknown>;
+      const chestFlies =
+        DEFAULT_CHEST_FLIES[index] ??
+        DEFAULT_CHEST_FLIES[DEFAULT_CHEST_FLIES.length - 1];
+      return {
+        label:
+          fallback && raw.label === RETIRED_LEAGUE_LABELS[index]
+            ? fallback.label
+            : raw.label,
+        leapPercent: raw.leapPercent,
+        weekRewards: withChestFlies(raw.weekRewards, chestFlies),
+        plusWeekRewards: withChestFlies(
+          raw.plusWeekRewards === undefined
+            ? fallback?.plusWeekRewards ?? []
+            : raw.plusWeekRewards,
+          chestFlies,
+        ),
+      };
     });
   }
-  const marks = sanitizeMarks(doc.marks);
-  if ((doc.configVersion ?? 0) < 4 && marks.leap.flies === LEGACY_LEAP_MARK_FLIES) {
-    marks.leap = { ...marks.leap, flies: LEAP_DEFAULTS.marks.leap.flies };
-  }
-  set.marks = marks;
+  set.marks = sanitizeMarks(doc.marks);
   await LeapConfigModel.updateOne(
     { configId: LEAP_CONFIG_ID },
     { $set: set, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
+    { strict: false },
   );
   await refreshLeapOnboardingCopy().catch(() => {});
 }

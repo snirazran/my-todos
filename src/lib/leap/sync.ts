@@ -7,7 +7,7 @@ import { getZonedToday } from '@/lib/utils';
 import { normalizeWeekStart, shiftYMD, type WeekStartDay } from '@/lib/weekStart';
 import { loadLeapConfig } from './config';
 import { settleLeapWeeks } from './settle';
-import { ensureLeapState, leagueMultiplier, type LeapState } from './state';
+import { ensureLeapState, type LeapState } from './state';
 import {
   LEAP_TASK_FIELDS,
   leapHabitFilter,
@@ -80,16 +80,14 @@ export async function loadLeapContext(args: {
       { userId, weekKey: currentWeek },
       {
         $setOnInsert: {
-          multiplier:
-            overlap?.multiplier ?? leagueMultiplier(config, state.league),
           league: overlap?.league ?? state.league,
           ...(overlap
             ? {
                 hopKeys: overlap.hopKeys ?? [],
                 marks: overlap.marks ?? [],
-                hopsPaidByDay: overlap.hopsPaidByDay ?? {},
-                luckyByDay: overlap.luckyByDay ?? {},
-                comebacksByDay: overlap.comebacksByDay ?? {},
+                landedAt: overlap.landedAt ?? null,
+                chestClaimedAt: overlap.chestClaimedAt ?? null,
+                plusChestClaimedAt: overlap.plusChestClaimedAt ?? null,
               }
             : {}),
         },

@@ -182,7 +182,7 @@ function ShopTile({
             Owned
           </span>
         ) : hidePrice ? (
-          <span className="text-[12px] text-[#5b34c2] dark:text-[#c9b6ff]">Plus</span>
+          <span className="text-[12px] text-[#7a5410] dark:text-[#fde68a]">Plus</span>
         ) : (
           <>
             <FlyAmount
@@ -781,7 +781,7 @@ export function ShopWindow({
                   <ShelfHeader
                     label="Plus picks"
                     icon={<Icon name="frogPlus" className="-my-1 h-5 w-5" />}
-                    tone="text-[#5b34c2] dark:text-[#c9b6ff]"
+                    tone="text-[#7a5410] dark:text-[#fde68a]"
                     className={cn(freePicks.length > 0 && 'mt-4')}
                   />
                   <div className={PICK_GRID}>

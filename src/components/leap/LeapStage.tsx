@@ -15,16 +15,18 @@ import { SheetEnteredContext, useEntrance } from '@/lib/sheetEntered';
 import { hapticCelebrate } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { leagueArt } from './leapCopy';
+import { PondBackdrop } from '@/components/ui/PondBackdrop';
+import { PondLife } from './PondLife';
 
 const SLOT_SHIFT = 72;
 const SIDE_SCALE = 0.5;
 
 const RINGS = [
-  { w: 230, h: 58, opacity: 1 },
-  { w: 340, h: 86, opacity: 0.7 },
-  { w: 460, h: 116, opacity: 0.45 },
-  { w: 590, h: 150, opacity: 0.22 },
+  { w: 250, h: 62, opacity: 0.9 },
+  { w: 400, h: 100, opacity: 0.45 },
 ];
+
+const LOOP_RINGS = [0, 1.5, 3];
 
 function Ripples({ burst, large }: { burst: number; large: boolean }) {
   const reduceMotion = useReducedMotion();
@@ -52,6 +54,17 @@ function Ripples({ burst, large }: { burst: number; large: boolean }) {
           style={{ ...ring(entry.w, entry.h), opacity: entry.opacity }}
         />
       ))}
+      {LOOP_RINGS.map((delay) => (
+        <span
+          key={delay}
+          className="leap-ripple absolute left-0 top-0 rounded-[50%] border-2 border-[color:var(--leap-burst)]"
+          style={{ ...ring(520, 132), animationDelay: `${delay}s` }}
+        />
+      ))}
+      <span
+        className="absolute left-0 top-0 rounded-[50%] bg-[rgba(6,38,48,0.3)] blur-[7px]"
+        style={ring(150, 26)}
+      />
       {!reduceMotion &&
         burst > 0 &&
         [0, 1, 2].map((index) => (
@@ -87,7 +100,7 @@ export function LilyPodium({
     <div
       className={cn(
         'relative w-full',
-        large ? 'mb-11 h-[176px]' : 'mb-8 h-[120px] short-screen:h-[100px]',
+        large ? 'h-[196px]' : 'h-[138px] short-screen:h-[108px]',
       )}
       aria-hidden
     >
@@ -103,8 +116,8 @@ export function LilyPodium({
             className={cn(
               'absolute bottom-0 left-1/2 h-full',
               large
-                ? '-ml-[128px] w-[256px]'
-                : '-ml-[88px] w-[176px] short-screen:-ml-[75px] short-screen:w-[150px]',
+                ? '-ml-[142px] w-[284px]'
+                : '-ml-[101px] w-[202px] short-screen:-ml-[80px] short-screen:w-[160px]',
             )}
             initial={false}
             animate={{
@@ -125,15 +138,14 @@ export function LilyPodium({
               alt=""
               draggable={false}
               className={cn(
-                'h-full w-full select-none object-contain object-bottom transition-[filter] duration-500',
-                center &&
-                  'drop-shadow-[0_6px_10px_rgba(22,70,40,0.18)] dark:drop-shadow-[0_0_14px_rgba(245,179,1,0.35)]',
+                'h-full w-full select-none object-contain object-bottom',
+                center && 'leap-pond-bob drop-shadow-[0_10px_14px_rgba(6,38,48,0.38)]',
               )}
             />
             <motion.span
               className={cn(
-                'absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap text-center font-black leading-[1.15] text-[color:var(--leap-ink-muted)]',
-                large ? 'text-[30px]' : 'text-[26px]',
+                'absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap text-center font-black leading-[1.15] text-[color:var(--leap-ink-muted)] [text-shadow:0_1px_0_rgba(25,83,43,0.55),0_2px_10px_rgba(0,0,0,0.35)]',
+                large ? 'text-[26px]' : 'text-[22px]',
               )}
               initial={false}
               animate={{ opacity: center || !shown ? 0 : 1 }}
@@ -184,7 +196,7 @@ export type LeapStageProps = {
   from: number;
   to: number;
   nextNote?: string | null;
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   body?: string;
   frogLine: string;
@@ -198,7 +210,6 @@ export function LeapStageBody({
   from,
   to,
   nextNote,
-  eyebrow,
   title,
   body,
   frogLine,
@@ -264,17 +275,20 @@ export function LeapStageBody({
           transition: { delay, type: 'spring' as const, stiffness: 260, damping: 24 },
         };
 
-  const hero = (
-    <div className="flex w-full flex-col items-center text-center">
-      <p
-        className={cn(
-          'font-black uppercase tracking-[0.14em] text-[color:var(--leap-eyebrow)]',
-          wide ? 'text-[13px]' : 'text-[12px]',
-        )}
-      >
-        {eyebrow}
-      </p>
-      <div className={cn('w-full', wide ? 'mt-5' : 'mt-2')}>
+  const scene = (
+    <div
+      className={cn(
+        'leap-scene relative shrink-0 overflow-hidden',
+        wide
+          ? 'h-[460px] rounded-[40px] shadow-[0_18px_40px_-22px_rgba(8,40,50,0.7)]'
+          : 'h-[calc(env(safe-area-inset-top)+clamp(12.5rem,33dvh,17rem))] short-screen:h-[calc(env(safe-area-inset-top)+11rem)]',
+      )}
+    >
+      <PondBackdrop className="absolute inset-0 h-full w-full" />
+      <div className="absolute inset-0 dark:bg-black/25" />
+      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[rgba(12,74,84,0.42)] to-transparent" />
+      <PondLife scene />
+      <div className={cn('absolute inset-x-0', wide ? 'bottom-10' : 'bottom-9')}>
         <LilyPodium
           leagues={leagues}
           focus={focus}
@@ -283,13 +297,16 @@ export function LeapStageBody({
           burst={landed ? 1 : 0}
         />
       </div>
+    </div>
+  );
+
+  const heading = (
+    <div className={cn('flex w-full flex-col', wide ? 'items-start text-left' : 'items-center text-center')}>
       <motion.h2
         {...reveal(0)}
         className={cn(
           'text-balance font-black tracking-tight text-[color:var(--leap-ink)]',
-          wide
-            ? 'mt-4 text-[44px] leading-[1.04]'
-            : 'mt-3 text-[26px] leading-[1.1] short-screen:mt-2 short-screen:text-[23px]',
+          wide ? 'text-[40px] leading-[1.04]' : 'text-[26px] leading-[1.1] short-screen:text-[23px]',
         )}
       >
         {title}
@@ -357,16 +374,14 @@ export function LeapStageBody({
   const actionBlock = <div className="flex w-full flex-col items-center gap-3">{actions}</div>;
 
   return (
-    <div
-      className="leap-stage relative flex h-full min-h-0 flex-1 flex-col"
-      style={{ background: 'var(--leap-water)' }}
-    >
+    <div className="leap-stage relative flex h-full min-h-0 flex-1 flex-col bg-background">
 
       {wide ? (
         <div className="no-scrollbar relative flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-12 py-10">
           <div className="m-auto grid w-full max-w-[64rem] grid-cols-[1.1fr_1fr] items-center gap-16">
-            {hero}
+            {scene}
             <div className="w-full max-w-[26rem] justify-self-center">
+              {heading}
               {frogPanel}
               <motion.div {...reveal(0.3)} className="mt-6">
                 {actionBlock}
@@ -378,7 +393,7 @@ export function LeapStageBody({
               type="button"
               aria-label="Close"
               onClick={onDismiss}
-              className="absolute right-6 top-6 grid h-11 w-11 place-items-center rounded-full bg-[color:var(--leap-chip)] text-[color:var(--leap-ink-muted)] transition-colors hover:text-[color:var(--leap-ink)] active:scale-95"
+              className="absolute right-6 top-6 grid h-11 w-11 place-items-center rounded-full bg-[color:var(--leap-chip)] text-[color:var(--leap-ink-muted)] transition-[color,transform] duration-150 hover:text-[color:var(--leap-ink)] active:scale-95"
             >
               <X className="h-5 w-5" />
             </button>
@@ -386,10 +401,13 @@ export function LeapStageBody({
         </div>
       ) : (
         <>
-          <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+1.75rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)]">
-            <div className="m-auto flex w-full max-w-sm shrink-0 flex-col items-center">
-              {hero}
-              {frogPanel}
+          <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain pb-2">
+            {scene}
+            <div className="relative z-10 -mt-7 flex-1 rounded-t-[28px] bg-background px-6 pt-6 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] short-screen:pt-5">
+              <div className="mx-auto flex w-full max-w-sm flex-col items-center">
+                {heading}
+                {frogPanel}
+              </div>
             </div>
           </div>
           <motion.div

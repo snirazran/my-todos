@@ -338,18 +338,18 @@ const LEAP_HOLD: Say[] = [
 ];
 
 const LEAP_PROMOTION: Say[] = [
-  (c) => `Finishing ${habits(c.n)} tonight puts us in the promotion zone. The ${c.league} League awaits.`,
-  (c) => `The ${c.league} League is close. ${habits(c.n)} tonight gets us into the promotion zone.`,
-  (c) => `Promotion zone in sight: ${habits(c.n)} tonight and we're in.`,
-  (c) => `${habits(c.n)} tonight and we're in the promotion zone. I'm ready to celebrate.`,
-  (c) => `One good evening from the promotion zone. Finishing ${habits(c.n)} gets us there.`,
-  (c) => `I can see the ${c.league} League from here. ${habits(c.n)} tonight reaches the promotion zone.`,
+  (c) => `Finishing ${habits(c.n)} tonight opens our gift. The ${c.league} League awaits.`,
+  (c) => `The ${c.league} League is close. ${habits(c.n)} tonight opens our weekly gift.`,
+  (c) => `Our gift is in sight: ${habits(c.n)} tonight and it opens.`,
+  (c) => `${habits(c.n)} tonight and our gift opens. I'm ready to celebrate.`,
+  (c) => `One good evening from our gift. Finishing ${habits(c.n)} opens it.`,
+  (c) => `I can see the ${c.league} League from here. ${habits(c.n)} tonight opens our gift.`,
 ];
 
 const LEAP_UP: Say[] = [
-  (c) => `We made the ${c.league} League! Your habits did that. Every habit now pays more flies.`,
-  (c) => `Welcome to the ${c.league} League. Your habits got us here, and every habit now pays more flies.`,
-  (c) => `Promoted! We're in the ${c.league} League now, and every habit pays more flies. Fancy.`,
+  (c) => `We made the ${c.league} League! Your habits did that. A better gift waits here every week.`,
+  (c) => `Welcome to the ${c.league} League. Your habits got us here, and the weekly gift just got better.`,
+  (c) => `Promoted! We're in the ${c.league} League now, with a better gift every week. Fancy.`,
 ];
 
 const LEAP_COVERED: Say[] = [

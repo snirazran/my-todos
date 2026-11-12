@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import { SWRConfig } from 'swr';
 import { useTheme } from 'next-themes';
-import { ArrowLeft, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import TaskCard from '@/components/board/TaskCard';
 import type { Task } from '@/components/board/helpers';
 import { LeapLeagueCard } from '@/components/leap/LeapLeagueCard';
 import { LeapDayContent, LeapDaySheet } from '@/components/leap/LeapDaySheet';
 import { LeapJoinContent, LeapJoinSheet } from '@/components/leap/LeapJoinSheet';
+import { LeapLandedContent, LeapLandedSheet } from '@/components/leap/LeapLandedSheet';
+import { LeapSandboxContext } from '@/components/leap/useLeapClaim';
 import {
   LEAP_LAB_JOINS,
   LEAP_LAB_RESULTS,
@@ -21,7 +22,13 @@ import { cn } from '@/lib/utils';
 
 type MomentPick =
   | { kind: 'join'; index: number }
+  | { kind: 'landed'; index: number }
   | { kind: 'result'; index: number };
+
+const LANDED_MOMENTS = [
+  { label: 'Free player', id: 'chest-ready' },
+  { label: 'Plus member', id: 'chest-plus-ready' },
+];
 
 function PhoneFrame({ children }: { children: ReactNode }) {
   return (
@@ -99,7 +106,7 @@ function ScenarioData({ view, children }: { view: LeapView; children: ReactNode 
         revalidateOnFocus: false,
       }}
     >
-      {children}
+      <LeapSandboxContext.Provider value>{children}</LeapSandboxContext.Provider>
     </SWRConfig>
   );
 }
@@ -109,6 +116,7 @@ export function AdminLeapLab() {
   const [catalog, setCatalog] = useState<Record<string, unknown>>({});
   const [result, setResult] = useState<LeapWeekResult | null>(null);
   const [joinIndex, setJoinIndex] = useState<number | null>(null);
+  const [landedIndex, setLandedIndex] = useState<number | null>(null);
   const [pick, setPick] = useState<MomentPick>({ kind: 'join', index: 0 });
   const [pickKey, setPickKey] = useState(0);
 
@@ -140,18 +148,27 @@ export function AdminLeapLab() {
     [catalog],
   );
   const openJoin = joinIndex === null ? null : joins[joinIndex];
+  const landedViews = LANDED_MOMENTS.map(
+    (moment) => scenarios.find((entry) => entry.id === moment.id)?.view,
+  );
+  const openLanded = landedIndex === null ? null : landedViews[landedIndex];
   const choose = (next: MomentPick) => {
     setPick(next);
     setPickKey((key) => key + 1);
   };
   const playPick = () => {
     if (pick.kind === 'join') setJoinIndex(pick.index);
+    else if (pick.kind === 'landed') setLandedIndex(pick.index);
     else setResult(LEAP_LAB_RESULTS[pick.index]?.result ?? null);
   };
   const moments: Array<{ label: string; value: MomentPick }> = [
     ...joins.map((entry, index) => ({
       label: `Join: ${entry.label}`,
       value: { kind: 'join' as const, index },
+    })),
+    ...LANDED_MOMENTS.map((entry, index) => ({
+      label: `Goal hit: ${entry.label}`,
+      value: { kind: 'landed' as const, index },
     })),
     ...LEAP_LAB_RESULTS.map((entry, index) => ({
       label: `Results: ${entry.label}`,
@@ -172,6 +189,12 @@ export function AdminLeapLab() {
           wide={wide}
           onClose={() => {}}
         />
+      );
+    }
+    const landedView = pick.kind === 'landed' ? landedViews[pick.index] : undefined;
+    if (landedView) {
+      return (
+        <LeapLandedContent key={key} view={landedView} active quiet wide={wide} onChoice={() => {}} />
       );
     }
     if (pick.kind === 'result' && LEAP_LAB_RESULTS[pick.index]) {
@@ -253,7 +276,7 @@ export function AdminLeapLab() {
         <div>
           <h2 className="text-[18px] font-black text-foreground">Full-screen moments</h2>
           <p className="text-[13px] font-semibold text-muted-foreground">
-            Joining the league (once, first habit) and the Monday results (once a week). Play opens the real
+            Joining the league (once, first habit), hitting the weekly goal (the chest), and the Monday results (once a week). Play opens the real
             full-screen version.
           </p>
         </div>
@@ -300,6 +323,10 @@ export function AdminLeapLab() {
           open={!!openJoin}
           onClose={() => setJoinIndex(null)}
         />
+      )}
+
+      {openLanded && (
+        <LeapLandedSheet view={openLanded} open={!!openLanded} onChoice={() => setLandedIndex(null)} />
       )}
 
       {result && (

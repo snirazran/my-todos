@@ -20,14 +20,11 @@ function makeView(args: {
   repeating?: number;
   shields?: number;
   isPremium?: boolean;
-  forgone?: number;
-  firstDropPending?: boolean;
+  chest?: 'ready' | 'opened' | 'plusOpened';
   join?: LeapJoin | null;
 }): LeapView {
   const isPremium = !!args.isPremium;
   const leagues = LEAP_DEFAULTS.leagues;
-  const multiplier = leagues[args.league]?.multiplier ?? 1;
-  const plus = isPremium ? 2 : 1;
   const scheduledDays = args.days ?? (args.scheduled > 0 ? 7 : 0);
   const activeDays = args.activeDays ?? Math.min(args.hops, 3);
   const targets = markTargets(LEAP_DEFAULTS, args.scheduled, scheduledDays, args.league);
@@ -50,12 +47,8 @@ function makeView(args: {
     leagues: leagues.map((entry, index) => ({
       index,
       label: entry.label,
-      multiplier: entry.multiplier,
       weekRewards: entry.weekRewards,
-      reachRewards: entry.reachRewards,
-      plusReachRewards: entry.plusReachRewards,
       plusWeekRewards: entry.plusWeekRewards,
-      weekFlies: Math.round(LEAP_DEFAULTS.marks.leap.flies * entry.multiplier),
       reached: index <= args.league,
     })),
     week: {
@@ -70,16 +63,19 @@ function makeView(args: {
       openToday: args.openToday ?? 2,
       hold: mark('hold'),
       leap: mark('leap'),
-      leapFlies: Math.round(LEAP_DEFAULTS.marks.leap.flies * multiplier * plus),
-      holdFlies: Math.round(LEAP_DEFAULTS.marks.hold.flies * multiplier * plus),
+      chest: {
+        league: args.league,
+        rewards: leagues[args.league]?.weekRewards ?? [],
+        plusRewards: leagues[args.league]?.plusWeekRewards ?? [],
+        landed: met.includes('leap'),
+        claimed: args.chest === 'opened' || args.chest === 'plusOpened',
+        plusClaimed: args.chest === 'plusOpened',
+      },
       habits: args.scheduled > 0 ? 3 : 0,
     },
     repeating: args.repeating ?? (args.scheduled > 0 ? 3 : 0),
     join: args.join ?? null,
     shields: { count: args.shields ?? 0, cap: isPremium ? 3 : 2 },
-    hopFlies: Math.round(LEAP_DEFAULTS.hopFlies * multiplier * plus),
-    firstDropPending: !!args.firstDropPending,
-    forgoneFlies: args.forgone ?? 0,
     weekResult: null,
     rewardCatalog: {},
     rarityPreview: {},
@@ -90,7 +86,7 @@ export const LEAP_LAB_SCENARIOS: LeapLabScenario[] = [
   {
     id: 'no-habits',
     label: 'No habits yet',
-    view: makeView({ league: 0, scheduled: 0, hops: 0, openToday: 0, firstDropPending: true }),
+    view: makeView({ league: 0, scheduled: 0, hops: 0, openToday: 0 }),
   },
   {
     id: 'none-this-week',
@@ -100,7 +96,7 @@ export const LEAP_LAB_SCENARIOS: LeapLabScenario[] = [
   {
     id: 'last-day-join',
     label: 'Joined on the last day',
-    view: makeView({ league: 0, scheduled: 5, hops: 0, days: 1, daysLeft: 1, openToday: 5, firstDropPending: true }),
+    view: makeView({ league: 0, scheduled: 5, hops: 0, days: 1, daysLeft: 1, openToday: 5 }),
   },
   {
     id: 'weekly-once',
@@ -110,7 +106,7 @@ export const LEAP_LAB_SCENARIOS: LeapLabScenario[] = [
   {
     id: 'day-1',
     label: 'New user, day 1',
-    view: makeView({ league: 0, scheduled: 12, hops: 0, daysLeft: 7, firstDropPending: true }),
+    view: makeView({ league: 0, scheduled: 12, hops: 0, daysLeft: 7 }),
   },
   {
     id: 'bronze-mid',
@@ -133,20 +129,24 @@ export const LEAP_LAB_SCENARIOS: LeapLabScenario[] = [
     view: makeView({ league: 2, scheduled: 21, hops: 5, daysLeft: 2, shields: 1 }),
   },
   {
-    id: 'silver-landed',
-    label: 'Lily Bud, promotion zone',
-    view: makeView({
-      league: 1,
-      scheduled: 15,
-      hops: 12,
-      isPremium: true,
-      forgone: 140,
-    }),
+    id: 'chest-ready',
+    label: 'Goal hit, gift ready',
+    view: makeView({ league: 1, scheduled: 15, hops: 9 }),
+  },
+  {
+    id: 'chest-opened-free',
+    label: 'Gift opened, Plus gift waiting',
+    view: makeView({ league: 1, scheduled: 15, hops: 11, chest: 'opened' }),
+  },
+  {
+    id: 'chest-plus-ready',
+    label: 'Plus member, gifts ready',
+    view: makeView({ league: 2, scheduled: 15, hops: 12, isPremium: true }),
   },
   {
     id: 'diamond',
-    label: 'Lily Garden',
-    view: makeView({ league: 4, scheduled: 21, hops: 18, shields: 2 }),
+    label: 'Lily Garden, both gifts opened',
+    view: makeView({ league: 4, scheduled: 21, hops: 18, shields: 2, isPremium: true, chest: 'plusOpened' }),
   },
 ];
 
@@ -168,7 +168,7 @@ const RESULT_BASE: Omit<LeapWeekResult, 'outcome' | 'leagueBefore' | 'leagueAfte
   hops: 14,
   scheduled: 17,
   newBest: false,
-  fliesGranted: 96,
+  fliesGranted: 25,
   grantedItemIds: ['gift_box_rare'],
   shieldsLeft: 1,
   weeksSettled: 1,
@@ -176,13 +176,13 @@ const RESULT_BASE: Omit<LeapWeekResult, 'outcome' | 'leagueBefore' | 'leagueAfte
 
 export const LEAP_LAB_RESULTS: Array<{ label: string; result: LeapWeekResult }> = (
   [
-    ['Advanced', 'up', 1, 2, { newBest: true, moveUpAt: 12, stayAt: 7, newItemIds: ['gift_box_rare'] }],
-    ['First week, advanced', 'up', 0, 1, { newBest: true, firstWeek: true, hops: 9, scheduled: 12, moveUpAt: 6, newItemIds: ['gift_box_1'] }],
-    ['First week, stayed', 'stay', 0, 0, { firstWeek: true, hops: 4, scheduled: 12, moveUpAt: 6, fliesGranted: 18, grantedItemIds: ['gift_box_1'] }],
+    ['Advanced', 'up', 1, 2, { newBest: true, moveUpAt: 12, stayAt: 7 }],
+    ['First week, advanced', 'up', 0, 1, { newBest: true, firstWeek: true, hops: 9, scheduled: 12, moveUpAt: 6, newItemIds: ['gift_box_1'], newFlies: 20 }],
+    ['First week, stayed', 'stay', 0, 0, { firstWeek: true, hops: 4, scheduled: 12, moveUpAt: 6, fliesGranted: 0, grantedItemIds: [] }],
     ['Stayed on top', 'top', 4, 4, { moveUpAt: 14, stayAt: 7 }],
-    ['Stayed', 'stay', 2, 2, { hops: 8, moveUpAt: 12, stayAt: 7 }],
-    ['Lily Pad saved it', 'covered', 3, 3, { hops: 2, shieldsLeft: 0, moveUpAt: 13, stayAt: 7 }],
-    ['Demoted', 'down', 3, 2, { hops: 1, fliesGranted: 2, grantedItemIds: [], moveUpAt: 13, stayAt: 7 }],
+    ['Stayed', 'stay', 2, 2, { hops: 8, moveUpAt: 12, stayAt: 7, fliesGranted: 0, grantedItemIds: [] }],
+    ['Lily Pad saved it', 'covered', 3, 3, { hops: 2, shieldsLeft: 0, moveUpAt: 13, stayAt: 7, fliesGranted: 0, grantedItemIds: [] }],
+    ['Demoted', 'down', 3, 2, { hops: 1, fliesGranted: 0, grantedItemIds: [], moveUpAt: 13, stayAt: 7 }],
   ] as Array<[string, LeapWeekOutcome, number, number, Partial<LeapWeekResult>]>
 ).map(([label, outcome, leagueBefore, leagueAfter, extra]) => ({
   label,

@@ -70,7 +70,7 @@ const features = [
   {
     icon: 'lilyPad' as const,
     title: 'Weekly Leap',
-    description: 'Every habit you tick pays right away. Climb your weekly league from Lily Leaf to Lily Garden.',
+    description: 'Hit your weekly habit goal to open a gift. Climb your league from Lily Leaf to Lily Garden.',
   },
 ];
 

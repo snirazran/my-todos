@@ -3,8 +3,8 @@
 import type { ReactNode } from 'react';
 import { Check, Flag } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { leagueTitle } from './leapCopy';
-import { LeapPrizeTile, plusBonusLeague, waitingPlusLeagues } from './LeapPrizeTile';
+import { habitsWord, leapLeft, leapPlusChestWaiting } from './leapCopy';
+import { LeapPrizeTile } from './LeapPrizeTile';
 import { useLeapView } from './useLeapView';
 
 export function LeapPlusProof({
@@ -16,10 +16,10 @@ export function LeapPlusProof({
 }) {
   const { data: view } = useLeapView();
   if (!view?.enabled) return <>{fallback}</>;
-  const waiting = waitingPlusLeagues(view);
-  const target = waiting[0] ?? plusBonusLeague(view);
-  if (!target) return <>{fallback}</>;
-  const earned = waiting.length > 0;
+  const { chest } = view.week;
+  if (!chest.plusRewards.length) return <>{fallback}</>;
+  const earned = leapPlusChestWaiting(view);
+  const left = leapLeft(view);
 
   return (
     <div className={cn('min-w-0 rounded-2xl border border-white/15 bg-white/[0.08] p-3', className)}>
@@ -30,37 +30,37 @@ export function LeapPlusProof({
           <Flag className="h-3.5 w-3.5 shrink-0 text-[#ffe399]" strokeWidth={2.75} aria-hidden />
         )}
         <span className="min-w-0">
-          {earned ? `${leagueTitle(target.label)} reached` : `Reach the ${leagueTitle(target.label)}`}
+          {earned
+            ? 'You landed this week’s Leap'
+            : left > 0
+              ? `${habitsWord(left)} to this week’s gift`
+              : 'This week’s Leap gift'}
         </span>
       </p>
       <div className="mt-2.5 space-y-2">
-        {!earned && target.reachRewards.length > 0 && (
-          <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-[10px] font-bold text-[#d1dfca]">FREE</span>
-            <span className="flex items-center gap-1.5">
-              {target.reachRewards.slice(0, 2).map((reward, i) => (
-                <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i} />
-              ))}
-            </span>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-[10px] font-bold text-[#d1dfca]">FREE</span>
+          <span className="flex items-center gap-2.5 pt-2">
+            {chest.rewards.slice(0, 2).map((reward, i) => (
+              <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i} done={chest.claimed} />
+            ))}
+          </span>
+        </div>
         <div className="flex items-center justify-between gap-2 rounded-xl bg-[#ffe399] px-2 py-1.5 text-[#493610]">
           <span className="text-[10px] font-black leading-tight">
             PLUS
             <br />
             ADDS
           </span>
-          <span className="flex items-center gap-1.5">
-            {target.plusReachRewards.slice(0, 2).map((reward, i) => (
-              <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i + 2} />
+          <span className="flex items-center gap-2.5 pt-2">
+            {chest.plusRewards.slice(0, 2).map((reward, i) => (
+              <LeapPrizeTile key={i} reward={reward} view={view} size="sm" offset={i + 2} lane="plus" />
             ))}
           </span>
         </div>
       </div>
       <p className="mt-2 text-[11px] font-medium leading-snug text-[#e0eadb]">
-        {earned
-          ? `${waiting.length === 1 ? 'Already earned' : `${waiting.length} leagues earned`}. Yours the moment you join.`
-          : 'A bonus at every league'}
+        {earned ? 'Already earned. Yours the moment you join.' : 'A second gift every week you land it'}
       </p>
     </div>
   );

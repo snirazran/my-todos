@@ -13,28 +13,14 @@ import type { BonusReward, BonusRewards, LeapLeagueView, LeapView } from '@/lib/
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useUIStore } from '@/lib/uiStore';
 import { cn } from '@/lib/utils';
-import { leagueArt, leapTarget } from './leapCopy';
-import { waitingPlusLeagues } from './LeapPrizeTile';
+import { leagueArt, leapPlusChestWaiting, leapTarget } from './leapCopy';
 import { LeapPlusButton } from './LeapPlusButton';
+import { PondBackdrop } from '@/components/ui/PondBackdrop';
+import { PondLife } from './PondLife';
 import { LILY_ART_BOTTOM, LILY_ART_TOP } from './LeapRail';
 
-type PrizeTab = 'unlock' | 'weekly';
 type Lane = 'free' | 'plus';
 type Catalog = Parameters<typeof SeasonRewardTile>[0]['rewardCatalog'];
-
-const TABS: Array<{ id: PrizeTab; label: string; note: string }> = [
-  { id: 'unlock', label: 'New league', note: 'Reach a league for the first time to win its prizes.' },
-  { id: 'weekly', label: 'Every week', note: 'Finish a week in the promotion zone to win these.' },
-];
-
-function prizesFor(league: LeapLeagueView, tab: PrizeTab): { free: BonusRewards; plus: BonusRewards } {
-  if (tab === 'unlock') return { free: league.reachRewards, plus: league.plusReachRewards };
-  const flies: BonusRewards = league.weekFlies > 0 ? [{ type: 'FLIES', amount: league.weekFlies }] : [];
-  return {
-    free: [...flies, ...league.weekRewards],
-    plus: [...flies, ...league.plusWeekRewards],
-  };
-}
 
 type RowState = 'here' | 'reached' | 'next' | 'locked';
 
@@ -106,6 +92,7 @@ function LaneTile({
         compact={compact}
         oversample={compact ? 2 : 1}
         tagRight={tagRight}
+        flyScale={0.82}
       />
     );
   }
@@ -168,56 +155,48 @@ function LaneCell({
   onPlus?: () => void;
 }) {
   if (rewards.length === 0) return <div />;
-  const main = rewards.find((reward) => reward.type !== 'FLIES') ?? rewards[0];
-  const extra = rewards.filter((reward) => reward !== main);
-  const body = (
-    <>
-      {glow && (
+  const flies = rewards.reduce(
+    (sum, reward) => (reward.type === 'FLIES' ? sum + Math.max(0, reward.amount ?? 0) : sum),
+    0,
+  );
+  const tiles: BonusRewards = [
+    ...rewards.filter((reward) => reward.type !== 'FLIES'),
+    ...(flies > 0 ? [{ type: 'FLIES' as const, amount: flies }] : []),
+  ];
+  const badge = done ? (
+    <span className="absolute -bottom-1.5 -right-1.5 z-20 grid h-6 w-6 place-items-center rounded-full bg-[#4f9149] shadow-[0_2px_0_#356b30] ring-[3px] ring-background">
+      <Check className="h-3.5 w-3.5 text-white" strokeWidth={4} />
+    </span>
+  ) : locked ? (
+    <span className="absolute -bottom-1.5 -right-1.5 z-20 grid h-6 w-6 place-items-center rounded-full bg-gradient-to-b from-[#ffe28d] to-[#f2b83d] shadow-[0_2px_0_#b7791f] ring-[3px] ring-background">
+      <Lock className="h-3 w-3 text-[#6b4a12]" strokeWidth={3} />
+    </span>
+  ) : null;
+  const body = tiles.map((reward, index) => (
+    <span key={index} className="relative block aspect-square w-[var(--tile)]">
+      {index === 0 && glow && (
         <span
           aria-hidden="true"
           className="absolute -inset-1.5 rounded-[20px] bg-amber-300/45 animate-ping-ring motion-reduce:hidden dark:hidden"
         />
       )}
-      {sparkle && <SeasonSparkles />}
-      <LaneTile
-        reward={main}
-        view={view}
-        lane={lane}
-        paused={paused}
-        offset={offset}
-        tagRight={extra.length > 0}
-      />
-      {extra.length > 0 && (
-        <div className="absolute -left-5 -top-5 z-10 w-[46%] -rotate-[8deg]">
-          <LaneTile reward={extra[0]} view={view} lane={lane} paused offset={offset + 1} compact />
-          {extra.length > 1 && (
-            <span className="absolute -bottom-2 -left-1 grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1 text-[10px] font-black text-background">
-              +{extra.length - 1}
-            </span>
-          )}
-        </div>
-      )}
-      {done && (
-        <span className="absolute -bottom-1.5 -right-1.5 z-20 grid h-7 w-7 place-items-center rounded-full bg-[#4f9149] shadow-[0_2px_0_#356b30] ring-[3px] ring-background">
-          <Check className="h-4 w-4 text-white" strokeWidth={4} />
-        </span>
-      )}
-      {locked && (
-        <span className="absolute -bottom-1.5 -right-1.5 z-20 grid h-7 w-7 place-items-center rounded-full bg-gradient-to-b from-[#ffe28d] to-[#f2b83d] shadow-[0_2px_0_#b7791f] ring-[3px] ring-background">
-          <Lock className="h-3.5 w-3.5 text-[#6b4a12]" strokeWidth={3} />
-        </span>
-      )}
-    </>
+      {index === 0 && sparkle && <SeasonSparkles />}
+      <LaneTile reward={reward} view={view} lane={lane} paused={paused} offset={offset + index} />
+      {index === tiles.length - 1 && badge}
+    </span>
+  ));
+  const shell = cn(
+    'flex flex-wrap items-start justify-center gap-x-2.5 gap-y-5',
+    muted && 'saturate-[0.85]',
   );
-  const shell = cn('relative mx-auto block aspect-square w-[var(--tile)]', muted && 'saturate-[0.85]');
   return onPlus ? (
     <button
       type="button"
       onClick={onPlus}
-      aria-label="Get the Plus prizes"
+      aria-label="Add the Plus gift"
       className={cn(
         shell,
-        'touch-manipulation rounded-[16px] transition-transform duration-150 active:scale-95 [@media(hover:hover)]:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-4 focus-visible:ring-offset-background',
+        'touch-manipulation rounded-[16px] transition-transform duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-4 focus-visible:ring-offset-background',
       )}
     >
       {body}
@@ -286,9 +265,7 @@ export function LeapLeaguesSheet({
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   const setPremiumModalOpen = useUIStore((state) => state.setPremiumModalOpen);
   const { indices } = useWardrobeIndices(open);
-  const [tab, setTab] = useState<PrizeTab>('unlock');
-  const waiting = waitingPlusLeagues(view).length;
-  const active = TABS.find((entry) => entry.id === tab) ?? TABS[0];
+  const plusWaiting = leapPlusChestWaiting(view);
   const order = view.leagues.map((league, index) => ({ league, index }));
   const target = leapTarget(view);
   const weekProgress = target > 0 ? Math.min(1, view.week.hops / target) : 0;
@@ -311,7 +288,6 @@ export function LeapLeaguesSheet({
 
   useEffect(() => {
     if (!open) return;
-    setTab('unlock');
     const timer = window.setTimeout(() => {
       rowRefs.current[focus]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }, 320);
@@ -319,8 +295,7 @@ export function LeapLeaguesSheet({
   }, [open, focus]);
 
   const getPlus = () => {
-    onClose();
-    window.setTimeout(() => setPremiumModalOpen(true, 'leap_leagues'), 260);
+    setPremiumModalOpen(true, 'leap_leagues');
   };
 
   if (typeof document === 'undefined') return null;
@@ -341,62 +316,38 @@ export function LeapLeaguesSheet({
           style={style}
         >
           <div className={cn('relative shrink-0', seasonal && 'leap-pond')} style={{ background: 'var(--leap-water)' }}>
+            {seasonal && (
+              <>
+                <PondBackdrop className="absolute inset-0 -z-10 h-full w-full" />
+                <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[rgba(10,52,64,0.72)] via-[rgba(14,70,84,0.5)] to-[rgba(14,70,84,0.3)] dark:from-black/70 dark:to-black/40" />
+                <PondLife scene className="-z-10" />
+              </>
+            )}
             <div className="mx-auto w-full max-w-[36rem] px-4 pb-10 pt-[calc(1rem+env(safe-area-inset-top))] md:px-6 md:pb-12 md:pt-10">
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close league prizes"
+                aria-label="Close league gifts"
                 className="absolute right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 grid h-11 w-11 touch-manipulation place-items-center rounded-full bg-[var(--leap-card)] text-[var(--leap-ink)] shadow-[0_2px_0_var(--leap-card-shadow)] ring-1 ring-[var(--leap-card-line)] transition-transform active:scale-95 md:right-6 md:top-6"
               >
                 <X className="h-5 w-5" strokeWidth={2.75} />
               </button>
-              <span className="inline-flex h-7 items-center rounded-full bg-[var(--leap-chip)] px-2.5 text-[11.5px] font-black uppercase tracking-[0.08em] text-[var(--leap-eyebrow)]">
-                Weekly Leap
-              </span>
               <h2
                 id="leap-prizes-title"
-                className="mt-2 pr-12 text-[28px] font-black leading-tight tracking-tight text-[var(--leap-ink)]"
+                className="pr-12 text-[28px] font-black leading-tight tracking-tight text-[var(--leap-ink)] [text-shadow:0_1px_0_rgba(10,52,64,0.6),0_2px_12px_rgba(0,0,0,0.35)]"
               >
-                League prizes
+                League gifts
               </h2>
-              <p className="mt-1 text-[14px] font-semibold leading-snug text-[var(--leap-ink-muted)]">
-                {active.note}
+              <p className="mt-1 max-w-[26ch] text-[14.5px] font-bold leading-snug text-white [text-shadow:0_1px_0_rgba(10,52,64,0.6),0_2px_10px_rgba(0,0,0,0.35)]">
+                Hit your weekly goal to win your league’s gift.
               </p>
-              <div
-                role="tablist"
-                aria-label="Prize type"
-                className="mt-4 grid grid-cols-2 gap-1 rounded-[14px] bg-[var(--leap-chip)] p-1"
-              >
-              {TABS.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === entry.id}
-                  onClick={() => setTab(entry.id)}
-                  className={cn(
-                    'relative h-9 rounded-[10px] text-[13.5px] font-black transition-colors',
-                    tab === entry.id ? 'text-[var(--leap-tab-ink,var(--leap-ink))]' : 'text-[var(--leap-ink-muted)]',
-                  )}
-                >
-                  {tab === entry.id && (
-                    <motion.span
-                      layoutId="leap-prize-tab"
-                      transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-                      className="absolute inset-0 rounded-[10px] bg-card shadow-[0_2px_0_rgba(31,98,28,0.12)]"
-                    />
-                  )}
-                  <span className="relative">{entry.label}</span>
-                </button>
-              ))}
-              </div>
             </div>
           </div>
 
           <div className="relative z-10 -mt-6 flex min-h-0 flex-1 flex-col rounded-t-[28px] bg-background shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)]">
             <div className="no-scrollbar min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain">
-              <div className="w-full [--tile:clamp(5.5rem,25vw,7rem)] md:[--tile:7.75rem]">
-                <div className="sticky top-0 z-30 grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] items-center gap-x-3 border-b border-border/50 bg-background px-[max(1.25rem,calc((100%_-_32rem)/2_+_1.25rem))] pb-3 pt-5 [@media(max-width:379px)]:px-3">
+              <div className="w-full [--tile:clamp(3.75rem,17vw,4.75rem)] md:[--tile:5.75rem]">
+                <div className="sticky top-0 z-30 grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] items-center gap-x-3 rounded-t-[28px] border-b border-border/50 bg-background px-[max(1.25rem,calc((100%_-_32rem)/2_+_1.25rem))] pb-3 pt-5 [@media(max-width:379px)]:px-3">
                   <div className="flex justify-center">
                     <SeasonLanePill lane="free" />
                   </div>
@@ -420,9 +371,12 @@ export function LeapLeaguesSheet({
                         : index === view.league + 1
                           ? 'next'
                           : 'locked';
-                  const unlocked = tab === 'unlock' && league.reached && index > 0;
-                  const plusWaiting = unlocked && !view.isPremium && league.plusReachRewards.length > 0;
-                  const { free, plus } = prizesFor(league, tab);
+                  const mine = index === view.week.chest.league && view.week.chest.landed;
+                  const freeDone = mine && view.week.chest.claimed;
+                  const plusDone = mine && view.isPremium && view.week.chest.plusClaimed;
+                  const plusGlow = mine && plusWaiting;
+                  const free = league.weekRewards;
+                  const plus = league.plusWeekRewards;
                   const above = order[position - 1];
                   const below = order[position + 1];
                   const segment = (row: { league: LeapLeagueView; index: number }) =>
@@ -443,7 +397,7 @@ export function LeapLeaguesSheet({
                       }}
                       className={cn(
                         'relative grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] items-center gap-x-3 border-b border-border/50 px-[max(1.25rem,calc((100%_-_32rem)/2_+_1.25rem))] last:border-b-0 [@media(max-width:379px)]:px-3',
-                        empty ? 'py-5' : 'py-6',
+                        empty ? 'py-5' : 'pb-5 pt-7',
                         state === 'here' && 'bg-[#4f9149]/[0.07] dark:bg-emerald-400/[0.06]',
                       )}
                     >
@@ -456,9 +410,9 @@ export function LeapLeaguesSheet({
                           rewards={free}
                           view={view}
                           offset={index}
-                          paused={state !== 'next'}
+                          paused={state !== 'here'}
                           muted={state === 'locked'}
-                          done={unlocked}
+                          done={freeDone}
                           locked={false}
                           glow={false}
                           sparkle={false}
@@ -496,12 +450,12 @@ export function LeapLeaguesSheet({
                           rewards={plus}
                           view={view}
                           offset={index + 2}
-                          paused={state !== 'next' && !plusWaiting}
+                          paused={state !== 'here' && !plusGlow}
                           muted={state === 'locked'}
-                          done={unlocked && view.isPremium}
+                          done={plusDone}
                           locked={!view.isPremium}
-                          glow={plusWaiting}
-                          sparkle={!view.isPremium || plusWaiting}
+                          glow={plusGlow}
+                          sparkle={!view.isPremium || plusGlow}
                           onPlus={view.isPremium ? undefined : getPlus}
                         />
                       </div>
@@ -515,8 +469,8 @@ export function LeapLeaguesSheet({
               <div className="shrink-0 border-t border-border/60 bg-background">
                 <div className="mx-auto w-full max-w-[36rem] px-4 pb-[calc(env(safe-area-inset-bottom)+0.875rem)] pt-1 md:px-6 md:pb-6">
                   <LeapPlusButton
-                    title={waiting > 0 ? `${waiting} Plus ${waiting === 1 ? 'prize' : 'prizes'} ready` : 'Get the Plus prizes'}
-                    subtitle={waiting > 0 ? 'You already earned them. Claim with Plus.' : 'Extra prizes as you climb'}
+                    title={plusWaiting ? 'Your Plus gift is waiting' : 'Open two gifts every week'}
+                    subtitle={plusWaiting ? 'You already earned it this week' : 'One for your goal, one more with Plus'}
                     onClick={getPlus}
                   />
                 </div>

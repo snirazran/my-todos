@@ -985,6 +985,7 @@ function SeasonRewardPreview({
   bare = false,
   oversample = 1,
   dense = false,
+  flyScale = 0.62,
   foil = null,
   className,
 }: {
@@ -998,6 +999,7 @@ function SeasonRewardPreview({
   bare?: boolean;
   oversample?: number;
   dense?: boolean;
+  flyScale?: number;
   foil?: Rarity | null;
   className?: string;
 }) {
@@ -1060,7 +1062,7 @@ function SeasonRewardPreview({
           box > 0 && (
             <div className="relative z-10">
               <Fly
-                size={Math.round(box * (dense ? 0.92 : 0.62))}
+                size={Math.round(box * (dense ? 0.92 : flyScale))}
                 y={-1}
                 paused={paused}
                 interactive={false}
@@ -1157,10 +1159,12 @@ export function SeasonRewardTile({
   oversample = 1,
   tagRight = false,
   muted = false,
+  flyScale,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, ItemDef>;
   lane: 'free' | 'plus';
+  flyScale?: number;
   muted?: boolean;
   paused?: boolean;
   compact?: boolean;
@@ -1194,6 +1198,7 @@ export function SeasonRewardTile({
         still={paused}
         bare
         dense={compact}
+        flyScale={flyScale}
         foil={rarity}
         oversample={oversample}
         hideQuantityBadge={!compact || reward.type !== 'FLIES'}
@@ -1599,15 +1604,15 @@ function QuestSeasonEventOverlay({
             >
               <Icon
                 name="frogPlus"
-                className="plus-cta-frog pointer-events-none absolute -left-1 -top-5 h-14 w-14 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
+                className="plus-cta-frog pointer-events-none absolute -left-1 -top-5 h-14 w-14 drop-shadow-[0_3px_0_rgba(110,76,6,0.35)]"
               />
-              <span className="relative block text-[15px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
-                Unlock Plus
+              <span className="relative block text-[15px] font-black leading-tight">
+                {waitingPlusTiers > 0 ? 'Claim your Plus rewards' : 'Double your season'}
               </span>
               <span className="plus-club-sub relative mt-0.5 block truncate text-[11px] font-bold leading-tight">
                 {waitingPlusTiers > 0
-                  ? `${waitingPlusTiers} ${waitingPlusTiers === 1 ? 'tier' : 'tiers'} ready to claim`
-                  : 'Extra reward every tier'}
+                  ? `${waitingPlusTiers} already earned`
+                  : 'A second reward at every tier'}
               </span>
             </button>
             </span>
@@ -2032,7 +2037,7 @@ function LockedPlusPreview({
       : 'Claim this reward now'
     : readyCount > 0
       ? `Claim your ${readyCount} ready ${readyCount === 1 ? 'reward' : 'rewards'} now`
-      : 'Get an extra reward every tier';
+      : 'A second reward at every tier you reach';
   const featuredRarity =
     rewards
       .map((reward) => seasonRewardRarity(reward, rewardCatalog))
@@ -2246,9 +2251,9 @@ function LockedPlusPreview({
           >
             <Icon
               name="frogPlus"
-              className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
+              className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(110,76,6,0.35)]"
             />
-            <span className="relative text-[16px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">Unlock Plus</span>
+            <span className="relative text-[16px] font-black leading-tight">Unlock with Plus</span>
             <span className="plus-club-sub relative mt-0.5 text-[11.5px] font-bold leading-tight">
               {ctaLine}
             </span>

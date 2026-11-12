@@ -476,25 +476,6 @@ export function dailyRowState(
   return claimed || (complete && !hasRewards) ? 'done' : complete ? 'ready' : 'open';
 }
 
-function chestColorFrom(
-  table: SweepRollEntryInfo[],
-  rewardCatalog: Record<string, QuestRewardCatalogItem>,
-) {
-  let best = -1;
-  let color = 0;
-  for (const entry of table) {
-    const reward = entry.reward as QuestReward;
-    const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
-    if (item?.slot !== 'container') continue;
-    const rank = STREAK_PRIZE_RARITY_RANK[item.rarity] ?? 0;
-    if (rank > best) {
-      best = rank;
-      color = item.riveIndex ?? 0;
-    }
-  }
-  return color;
-}
-
 function DailyBonusStrip({
   done,
   total,
@@ -521,35 +502,12 @@ function DailyBonusStrip({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 rounded-[18px] py-2.5 pl-3 pr-3 transition-colors duration-300',
+        'flex items-center gap-3 rounded-[18px] py-3 pl-4 pr-3 transition-colors duration-300',
         ready
           ? cn(QUEST_ROW_CARD, 'bg-[var(--season-tint,#fffbeb)] dark:bg-[var(--season-soft,rgba(245,158,11,0.1))]')
           : 'border-2 border-dashed border-foreground/[0.12]',
       )}
     >
-      <button
-        type="button"
-        onClick={() => setOddsOpen(true)}
-        aria-label="See what you can win"
-        className={cn(
-          'relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-foreground/[0.05] transition-opacity dark:bg-white/[0.06]',
-          resting && 'opacity-45 grayscale-[0.5]',
-        )}
-      >
-        <GiftRive
-          width={60}
-          height={60}
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[62%]"
-          color={chestColorFrom(sweep.standardRoll, rewardCatalog)}
-          paused={paused || !ready}
-        />
-        {!resting && (
-          <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-foreground/70 text-[10px] font-black text-background">
-            ?
-          </span>
-        )}
-      </button>
-
       <button
         type="button"
         onClick={() => setOddsOpen(true)}

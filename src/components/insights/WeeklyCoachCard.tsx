@@ -211,13 +211,13 @@ function LockedPreview({
         <Icon name="frogPlus" className="-my-4 h-[72px] w-[72px] shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-black leading-tight tracking-tight">
-            Unlock your weekly read
+            See what keeps you going
           </span>
           <span className="plus-club-sub block text-[11px] font-bold">
-            A new one every week, from your own numbers
+            A coach read of your own week, every week
           </span>
         </span>
-        <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-[#f5c84c]" strokeWidth={3} />
+        <ChevronRight aria-hidden className="h-5 w-5 shrink-0 opacity-70" strokeWidth={3} />
       </button>
     </div>
   );
