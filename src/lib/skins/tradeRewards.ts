@@ -1,5 +1,5 @@
 import type { Rarity } from './catalog';
-import { isAvailableAt } from './availability';
+import { isObtainableAt } from './availability';
 import type { GiftPrize } from './gifts';
 import type { TradeModifiers } from './tradeModifiers';
 
@@ -28,7 +28,7 @@ export function pickTradeReward({
     (prize) =>
       prize.rarity === rarity &&
       prize.slot !== 'container' &&
-      isAvailableAt(prize) &&
+      isObtainableAt(prize) &&
       prizeKey(prize) !== excluded,
   );
   if (candidates.length === 0) return null;

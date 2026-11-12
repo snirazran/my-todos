@@ -9,6 +9,8 @@ import {
   findRunningSeason,
   getUserQuestSeasonState,
   grantRewardsToUser,
+  readSeasonSet,
+  resolveSeasonGifts,
   pruneQuestSeasonProgress,
   readSeasonPassConfig,
   readSeasonTierRewards,
@@ -142,7 +144,14 @@ export async function POST(req: NextRequest) {
     }
     rewards.push(...plusRewards);
 
-    const rewardSummary = grantRewardsToUser(user, rewards);
+    const rewardSummary = grantRewardsToUser(
+      user,
+      resolveSeasonGifts(
+        rewards,
+        readSeasonSet(season),
+        (user.wardrobe?.inventory ?? {}) as Record<string, number>,
+      ),
+    );
 
     let shieldsGranted = 0;
     let nextShieldState: ReturnType<typeof readShieldState> | null = null;

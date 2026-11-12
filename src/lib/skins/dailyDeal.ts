@@ -1,5 +1,5 @@
 import type { ItemDef } from './catalog';
-import { isAvailableAt } from './availability';
+import { isObtainableAt } from './availability';
 import {
   DEFAULT_SHOP_SALES,
   rerollsAllowed,
@@ -130,7 +130,7 @@ export function isShopBuyable(item: ItemDef, now: Date = new Date()): boolean {
     item.slot !== 'container' &&
     item.rarity !== 'legendary' &&
     (item.priceFlies ?? 0) > 0 &&
-    isAvailableAt(item, now)
+    isObtainableAt(item, now)
   );
 }
 
@@ -139,7 +139,7 @@ export function isLegendaryOffer(item: ItemDef, now: Date = new Date()): boolean
     item.slot !== 'container' &&
     item.rarity === 'legendary' &&
     (item.priceFlies ?? 0) > 0 &&
-    isAvailableAt(item, now)
+    isObtainableAt(item, now)
   );
 }
 
@@ -220,12 +220,28 @@ export function getShopRotation({
     ...ranked(borrowable.filter((item) => item.id !== saleItem?.id), `shop-fill:${seed}`),
   ];
 
-  const total = free + plusSlots;
-  const openSlots = total - (saleItem ? 1 : 0) - (legendaryItem ? 1 : 0);
-  const picks = queue.slice(0, Math.max(0, openSlots));
+  const freePicks = queue.slice(0, Math.max(0, saleItem ? free - 1 : free));
+  const rareQueue = queue.slice(freePicks.length);
+  const epicQueue = ranked(
+    eligible.filter((item) => item.rarity === 'epic'),
+    `shop:${seed}:epic`,
+  );
+  const plusPicks: ItemDef[] = [];
+  const plusOpen = Math.max(0, plusSlots - (legendaryItem ? 1 : 0));
+  for (let slot = 0; slot < plusOpen; slot += 1) {
+    const wantsEpic =
+      hashString(`shop-plus:${seed}:${slot}`) % 100 < config.plusEpicPercent;
+    const next =
+      (wantsEpic ? epicQueue.shift() : rareQueue.shift()) ??
+      rareQueue.shift() ??
+      epicQueue.shift();
+    if (!next) break;
+    plusPicks.push(next);
+  }
+  const picks = [...freePicks, ...plusPicks];
 
   let wishlistIndex: number | null = null;
-  const freeCount = Math.min(saleItem ? free - 1 : free, picks.length);
+  const freeCount = freePicks.length;
   if (config.wishlistSlot && wishlistItemIds.length > 0 && freeCount > 0) {
     const byId = new Map(special.map((item) => [item.id, item]));
     const candidates = wishlistItemIds
@@ -281,13 +297,13 @@ export function getShopRotation({
       onSale: false,
       wishlistSlot: index === wishlistIndex,
       sale: false,
-      plusOnly: index + offset >= free,
+      plusOnly: index >= freePicks.length,
       endsAt,
     });
   });
   if (legendaryItem) {
     const price = legendaryItem.priceFlies ?? 0;
-    deals.splice(Math.min(free, deals.length), 0, {
+    deals.splice(Math.min(offset + freePicks.length, deals.length), 0, {
       itemId: legendaryItem.id,
       priceFlies: price,
       dealPrice: price,

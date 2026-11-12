@@ -4,7 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import { CATALOG } from '@/lib/skins/catalog';
 import { invalidateCatalogCache } from '@/lib/skins/getCatalog';
-import { parseAvailabilityDate } from '@/lib/skins/availability';
+import { parseAvailabilityDate, parseSeasonMonth } from '@/lib/skins/availability';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -102,6 +102,7 @@ export async function PUT(req: NextRequest) {
       availableFrom?: string | null;
       availableUntil?: string | null;
       hidden?: boolean;
+      seasonMonth?: string | null;
     };
     try {
       body = await req.json();
@@ -132,6 +133,9 @@ export async function PUT(req: NextRequest) {
       return json({ error: 'End date must be after start date' }, 400);
     }
     if (typeof body.hidden === 'boolean') update.hidden = body.hidden;
+    if (body.seasonMonth !== undefined) {
+      update.seasonMonth = parseSeasonMonth(body.seasonMonth);
+    }
 
     const result = await CatalogItemModel.findOneAndUpdate(
       { id: body.id },

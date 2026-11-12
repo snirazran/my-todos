@@ -18,6 +18,7 @@ function toItemDef(doc: Pick<
   | 'icon'
   | 'priceFlies'
   | 'availableFrom'
+  | 'seasonMonth'
   | 'availableUntil'
   | 'variantGroup'
   | 'color'
@@ -34,6 +35,7 @@ function toItemDef(doc: Pick<
     availableUntil: iso(doc.availableUntil),
     ...(doc.variantGroup ? { variantGroup: doc.variantGroup } : {}),
     ...(doc.color ? { color: doc.color } : {}),
+    ...(doc.seasonMonth ? { seasonMonth: doc.seasonMonth } : {}),
   };
 }
 

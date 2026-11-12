@@ -17,6 +17,7 @@ import { getZonedToday } from '@/lib/utils';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { loadShopGiftStatus } from '@/lib/economy/shopGiftServer';
+import { loadSeasonSetSummaries } from '@/lib/quests/seasonSets';
 import { ECONOMY_TIMEZONE_FIELDS, type EconomyTimezoneUser } from '@/lib/economy/guards';
 import type { ShopSalesConfig } from '@/lib/skins/shopSales';
 
@@ -271,6 +272,7 @@ export async function GET(req: NextRequest) {
       catalog: visibleCatalog(fullCatalog, wardrobe, now),
       dailyDeals: rotation.deals,
       everydayItemIds: rotation.everydayIds,
+      seasonSets: await loadSeasonSetSummaries(now),
       dealRerollsLeft: rotation.rerollsLeft,
       dealRerollsAllowed: rotation.rerollsAllowed,
       dealRerollFree: rotation.rerollFree,

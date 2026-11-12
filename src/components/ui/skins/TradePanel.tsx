@@ -32,7 +32,7 @@ import { riveDevicePixelRatio } from '@/lib/riveLoader';
 import { useWishlist } from '@/hooks/useWishlist';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
-import { isAvailableAt } from '@/lib/skins/availability';
+import { isObtainableAt } from '@/lib/skins/availability';
 import { rarityRank, type ItemDef, type Rarity, type WardrobeSlot } from '@/lib/skins/catalog';
 import { sparesOf } from '@/lib/skins/tradeModifiers';
 import { cn } from '@/lib/utils';
@@ -331,7 +331,7 @@ export function TradePanel({
               item.rarity === step.from &&
               item.slot !== 'container' &&
               item.slot !== 'skin' &&
-              isAvailableAt(item),
+              isObtainableAt(item),
           ),
           index,
         );
@@ -414,7 +414,7 @@ export function TradePanel({
     if (!recipe) return { fresh: [], wished: [] };
     const fresh: Entry[] = [];
     for (const item of catalog) {
-      if (item.rarity !== recipe.to || item.slot === 'container' || !isAvailableAt(item)) continue;
+      if (item.rarity !== recipe.to || item.slot === 'container' || !isObtainableAt(item)) continue;
       if ((inventory[item.id] ?? 0) > 0) continue;
       fresh.push({
         key: `item:${item.id}`,

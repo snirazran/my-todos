@@ -13,6 +13,7 @@ export type ItemDef = {
   availableUntil?: string | null;
   variantGroup?: string | null;
   color?: string | null;
+  seasonMonth?: string | null;
 };
 
 export const RARITY_ORDER = [

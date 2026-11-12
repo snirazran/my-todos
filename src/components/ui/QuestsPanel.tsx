@@ -28,6 +28,7 @@ import type {
   MacroCategoryId,
   QuestReward,
 } from '@/lib/quests/types';
+import { SEASON_GIFT_ID } from '@/lib/quests/seasonLadder';
 import {
   DailyChecklistCard,
   getRewardQuantityLabel,
@@ -121,6 +122,7 @@ type QuestSeasonView = {
   claimablePlusTiers: number[];
   claimableCount: number;
   claimable: boolean;
+  set?: { ids: string[]; heroId: string | null; ownedIds: string[] } | null;
   rewardsByTier: Array<{
     tier: number;
     freeRewards: QuestReward[];
@@ -1106,7 +1108,7 @@ function seasonRewardRarity(
   reward: QuestReward,
   rewardCatalog: Record<string, ItemDef>,
 ): Rarity | null {
-  if (reward.type === 'FLIES') return null;
+  if (reward.type === 'FLIES' || reward.itemId === SEASON_GIFT_ID) return null;
   const catalogId = reward.itemId ?? reward.backgroundId;
   const rarity = catalogId ? rewardCatalog[catalogId]?.rarity : undefined;
   return rarity && rarity in RARITY_CONFIG ? rarity : null;
@@ -1198,6 +1200,66 @@ export function SeasonRewardTile({
         </span>
       )}
     </div>
+  );
+}
+
+function SeasonSetRow({
+  season,
+  rewardCatalog,
+}: {
+  season: QuestSeasonView;
+  rewardCatalog: Record<string, ItemDef>;
+}) {
+  const set = season.set;
+  const pieces = (set?.ids ?? []).filter((id) => !!rewardCatalog[id]);
+  if (!set || pieces.length < 2) return null;
+  const owned = new Set(set.ownedIds);
+  const have = pieces.filter((id) => owned.has(id)).length;
+  const complete = have === pieces.length;
+  return (
+    <section
+      aria-label={`${season.name} set, ${have} of ${pieces.length} collected`}
+      className="border-b border-border/50 bg-background px-[max(1.25rem,calc((100%_-_30rem)/2_+_1.25rem))] py-3 md:px-5 [@media(max-width:379px)]:px-3"
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="truncate text-[13px] font-black text-foreground">{season.name} set</h3>
+        <span
+          className={cn(
+            'shrink-0 text-[12.5px] font-black tabular-nums',
+            complete ? 'text-[var(--season-accent,#b45309)]' : 'text-muted-foreground',
+          )}
+        >
+          {complete ? 'Complete' : `${have} of ${pieces.length}`}
+        </span>
+      </div>
+      <ul className="no-scrollbar -mx-1 mt-1.5 flex gap-2.5 overflow-x-auto px-1 pb-2 pt-1.5">
+        {pieces.map((id) => {
+          const got = owned.has(id);
+          return (
+            <li
+              key={id}
+              aria-label={`${rewardCatalog[id].name}, ${got ? 'collected' : 'not collected yet'}`}
+              className="relative w-14 shrink-0"
+            >
+              <div className={cn(!got && 'opacity-45')}>
+                <SeasonRewardTile
+                  reward={{ type: 'ITEM', itemId: id, amount: 1 }}
+                  rewardCatalog={rewardCatalog}
+                  lane="free"
+                  paused
+                  compact
+                />
+              </div>
+              {got && (
+                <span className="absolute -right-1 -top-1 z-20 grid h-[18px] w-[18px] place-items-center rounded-full bg-[var(--season-accent,#447d3f)] text-[var(--season-on-accent,#fff)] ring-2 ring-background">
+                  <Check className="h-2.5 w-2.5" strokeWidth={4} />
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -1607,6 +1669,7 @@ function QuestSeasonEventOverlay({
             <div className="relative z-10">
               <div className="pb-36">
                 <div className="text-foreground">
+                  <SeasonSetRow season={season} rewardCatalog={rewardCatalog} />
                   <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-center gap-x-3 border-b border-border/50 bg-background px-[max(1.25rem,calc((100%_-_30rem)/2_+_1.25rem))] md:px-5 py-3 [@media(max-width:379px)]:px-3">
                     <div className="flex justify-center">
                       <SeasonLanePill lane="free" />

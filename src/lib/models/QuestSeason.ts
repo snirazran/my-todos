@@ -2,6 +2,7 @@ import mongoose, { Schema, type Model } from 'mongoose';
 import type { SeasonPalette } from '@/lib/seasonPaletteCore';
 import type {
   QuestSeasonTierReward,
+  SeasonSet,
   SeasonSkinIds,
 } from '@/lib/quests/seasonLadder';
 
@@ -36,6 +37,8 @@ export interface QuestSeasonDoc {
   monthKey?: string;
   name: string;
   skinIds?: SeasonSkinIds;
+  seasonSet?: SeasonSet | null;
+  ladderVersion?: number;
   images: QuestSeasonImages;
   imageFiles?: QuestSeasonImageFiles;
   palette?: SeasonPalette | null;

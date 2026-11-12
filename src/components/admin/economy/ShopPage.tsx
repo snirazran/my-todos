@@ -150,6 +150,14 @@ export function ShopPage() {
                       onChange={(everydayRarePercent) => shop.patch({ everydayRarePercent })}
                     />
                   </Field>
+                  <Field label="Plus slots that show an epic" hint="The rest of the Plus slots show rares. Free slots never show epics.">
+                    <NumberInput
+                      value={config.plusEpicPercent}
+                      max={100}
+                      suffix="%"
+                      onChange={(plusEpicPercent) => shop.patch({ plusEpicPercent })}
+                    />
+                  </Field>
                 </div>
               </AdminCard>
 

@@ -13,6 +13,7 @@ import { rewardWorth } from '@/lib/quests/priority';
 import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
 import { buildMilestoneBoard } from '@/lib/quests/milestonesServer';
 import { getQuestSeasonViews } from '@/lib/quests/seasons';
+import { SEASON_GIFT_ID, SEASON_GIFT_NAME } from '@/lib/quests/seasonLadder';
 import { getZonedToday } from '@/lib/utils';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
 import {
@@ -707,13 +708,31 @@ export async function GET(req: Request) {
       .filter(Boolean);
     const seasonRewardCatalog = buildRewardCatalog(
       dashboard.catalog,
-      [activeSeason, graceSeason].flatMap((season) =>
-        (season?.rewardsByTier ?? []).flatMap((entry) => [
+      [activeSeason, graceSeason].flatMap((season) => [
+        ...(season?.rewardsByTier ?? []).flatMap((entry) => [
           entry.freeRewards,
           entry.premiumRewards,
         ]),
-      ),
+        (season?.set?.ids ?? []).map((itemId) => ({ type: 'ITEM' as const, itemId })),
+      ]),
     );
+    const seasonArt = [activeSeason, graceSeason]
+      .map((season) => season?.images)
+      .map(
+        (images) =>
+          images?.mobile || images?.tablet || images?.web || images?.webLarge || '',
+      )
+      .find(Boolean);
+    const seasonGiftCatalog = {
+      [SEASON_GIFT_ID]: {
+        id: SEASON_GIFT_ID,
+        name: SEASON_GIFT_NAME,
+        slot: 'background',
+        rarity: 'rare',
+        riveIndex: 0,
+        ...(seasonArt ? { imageUrl: seasonArt } : {}),
+      },
+    };
     const sweepRewardCatalog = dailySweep
       ? buildRewardCatalog(dashboard.catalog, [
           sweepRollRewards(dailySweep.standardRoll),
@@ -759,6 +778,7 @@ export async function GET(req: Request) {
         rewardCatalog: {
           ...dashboard.rewardCatalog,
           ...seasonRewardCatalog,
+          ...seasonGiftCatalog,
           ...sweepRewardCatalog,
           ...moveToWebRewardCatalog,
           ...milestoneRewardCatalog,

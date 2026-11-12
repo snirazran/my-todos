@@ -16,6 +16,7 @@ import {
 } from '@/lib/skins/catalog';
 import { hapticSelect, hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { isSeasonLocked } from '@/lib/skins/availability';
 import { FilterBar } from './FilterBar';
 import { SlideSwap } from './SlideSwap';
 import {
@@ -76,9 +77,11 @@ type Source = { label: string; icon: 'store' | 'closetGifts' | 'trade' };
 const SHOP_SOURCE: Source = { label: 'Shop', icon: 'store' };
 const SPECIAL_SOURCE: Source = { label: 'Special collection', icon: 'store' };
 const GIFT_SOURCE: Source = { label: 'Gifts', icon: 'closetGifts' };
+const SEASON_SOURCE: Source = { label: 'Season', icon: 'closetGifts' };
 const TRADE_SOURCE: Source = { label: 'Trade Up', icon: 'trade' };
 
 function entrySources(entry: ClosetEntry, everydayIds?: ReadonlySet<string>): Source[] {
+  if (entry.kind === 'item' && isSeasonLocked(entry.item)) return [SEASON_SOURCE];
   if (isTradeOnlyRarity(entryRarity(entry))) return [TRADE_SOURCE, GIFT_SOURCE];
   if (entry.price > 0) {
     const special = entry.kind === 'item' && !!everydayIds?.size && !everydayIds.has(entry.item.id);

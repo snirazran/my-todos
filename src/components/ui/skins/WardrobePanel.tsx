@@ -53,6 +53,7 @@ import { ShopGiftPopup } from '@/components/ui/shop/ShopGiftPopup';
 import { WishlistButton } from './WishlistButton';
 import { WishlistSheet } from './WishlistSheet';
 import { SavedLooksButton } from './LooksRow';
+import { SeasonSetsRow } from './SeasonSetsRow';
 import { SaveOutfitButton, SavedOutfitsGrid, useOutfitSaver } from './SavedOutfits';
 import { StyleShufflePill } from '@/components/ui/SkinRotation';
 import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
@@ -1045,6 +1046,11 @@ function WardrobeManagerContent({
         slotLabel: SLOT_LABEL[purchaseItem.slot],
         kind: 'item',
         inShopToday: buyableToday.has(purchaseItem.id),
+        plusLocked:
+          !data?.isPremium &&
+          !!data?.dailyDeals?.some(
+            (deal) => deal.itemId === purchaseItem.id && deal.plusOnly,
+          ),
       }
     : purchaseBg
       ? {
@@ -1105,7 +1111,9 @@ function WardrobeManagerContent({
     ) {
       const locked = data.dailyDeals?.find((deal) => deal.itemId === item.id && deal.plusOnly);
       if (locked) {
-        openPlus('shop_plus_slot', item);
+        hapticSelect();
+        setPurchaseVariants(null);
+        showItemCard(item, null);
         return;
       }
       hapticTick();
@@ -1580,6 +1588,12 @@ function WardrobeManagerContent({
                           Tap anything to wear it
                         </p>
                       )}
+                      {activeFilter === 'all' && !!data.seasonSets?.length && (
+                        <SeasonSetsRow
+                          sets={data.seasonSets}
+                          inventory={data.wardrobe?.inventory ?? {}}
+                        />
+                      )}
                       <ClosetGrid
                         slot={closetSlot}
                         catalog={data.catalog ?? []}
@@ -1730,6 +1744,9 @@ function WardrobeManagerContent({
         isGuest={isGuest}
         isPremium={!!data?.isPremium}
         onUpgrade={() => openPlus('wishlist_slots')}
+        onUnlockPlus={
+          purchaseItem ? () => openPlus('shop_plus_slot', purchaseItem) : undefined
+        }
         equipLabel={purchaseBg ? 'Use background' : 'Equip now'}
         onBuy={async () => {
           if (purchaseItem)

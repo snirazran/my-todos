@@ -1,13 +1,17 @@
 import { v4 as uuid } from 'uuid';
 import QuestSeasonModel, { type QuestSeasonDoc } from '@/lib/models/QuestSeason';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
-import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import { rarityRank, type ItemDef, type WardrobeSlot } from '@/lib/skins/catalog';
 import { isAvailableAt } from '@/lib/skins/availability';
 import {
   buildSeasonPassLadder,
   normalizeSeasonPassConfig,
   normalizeSeasonSkinIds,
+  normalizeSeasonSet,
+  seasonSetFromSkinIds,
+  SEASON_LADDER_VERSION,
   SEASON_SKIN_SLOTS,
+  type SeasonSet,
   type SeasonSkinIds,
   type SeasonSkinSlot,
 } from '@/lib/quests/seasonLadder';
@@ -115,6 +119,30 @@ export async function pickSeasonSkins(args: {
   return result;
 }
 
+export async function resolveSeasonSet(
+  monthKey: string | undefined,
+  skinIds: SeasonSkinIds,
+): Promise<SeasonSet | null> {
+  const tagged = monthKey
+    ? (await getCachedCatalog()).filter(
+        (item) => item.slot !== 'container' && item.seasonMonth === monthKey,
+      )
+    : [];
+  if (tagged.length < 2) return seasonSetFromSkinIds(skinIds);
+  const ordered = [...tagged].sort(
+    (a, b) => rarityRank[a.rarity] - rarityRank[b.rarity] || a.id.localeCompare(b.id),
+  );
+  const top = ordered[ordered.length - 1].rarity;
+  const finalists = ordered.filter((item) => item.rarity === top);
+  const showpieces = finalists.filter((item) => FINALE_SLOTS.includes(item.slot));
+  const pool = showpieces.length > 0 ? showpieces : finalists;
+  const hero = pool[pool.length - 1];
+  return {
+    ids: [...ordered.filter((item) => item.id !== hero.id).map((item) => item.id), hero.id],
+    heroId: hero.id,
+  };
+}
+
 export async function ensureSeasonForMonth(
   monthKey: string,
 ): Promise<QuestSeasonDoc | null> {
@@ -133,6 +161,7 @@ export async function ensureSeasonForMonth(
   const template = await loadSeasonTemplate();
   const config = normalizeSeasonPassConfig(template);
   const skinIds = await pickSeasonSkins({ monthKey, template });
+  const set = await resolveSeasonSet(monthKey, skinIds);
 
   try {
     const created = await QuestSeasonModel.create({
@@ -144,7 +173,9 @@ export async function ensureSeasonForMonth(
       endsAt,
       ...config,
       skinIds,
-      tierRewards: buildSeasonPassLadder(config.tierCount, skinIds),
+      seasonSet: set,
+      ladderVersion: SEASON_LADDER_VERSION,
+      tierRewards: buildSeasonPassLadder(config.tierCount, skinIds, set),
       isActive: true,
     });
     return created.toObject();
@@ -154,10 +185,32 @@ export async function ensureSeasonForMonth(
   }
 }
 
+export async function refreshUpcomingSeasonSets(now = new Date()) {
+  const upcoming = await QuestSeasonModel.find({
+    monthKey: { $exists: true },
+    startsAt: { $gt: now },
+  }).lean<QuestSeasonDoc[]>();
+  if (upcoming.length === 0) return;
+  const template = await loadSeasonTemplate();
+  for (const season of upcoming) {
+    const skinIds = normalizeSeasonSkinIds(season.skinIds);
+    const set = await resolveSeasonSet(season.monthKey, skinIds);
+    const outdated = (season.ladderVersion ?? 1) < SEASON_LADDER_VERSION;
+    const changed =
+      JSON.stringify(normalizeSeasonSet(season.seasonSet)) !== JSON.stringify(set);
+    if (!outdated && !changed) continue;
+    await restampUpcomingSeason(season.seasonId, {
+      skinIds,
+      template: outdated ? template : undefined,
+    });
+  }
+}
+
 export async function ensureSeasonCalendar(now = new Date()) {
   const current = seasonMonthKey(now);
   await ensureSeasonForMonth(current);
   await ensureSeasonForMonth(shiftSeasonMonth(current, 1));
+  await refreshUpcomingSeasonSets(now);
 }
 
 export function seasonHasStarted(season: Pick<QuestSeasonDoc, 'startsAt'>, now = new Date()) {
@@ -182,10 +235,13 @@ export async function restampUpcomingSeason(
       ? normalizeSeasonPassConfig(input.template)
       : normalizeSeasonPassConfig(season);
   const skinIds = input.skinIds ?? normalizeSeasonSkinIds(season.skinIds);
+  const set = await resolveSeasonSet(season.monthKey, skinIds);
   season.set({
     ...config,
     skinIds,
-    tierRewards: buildSeasonPassLadder(config.tierCount, skinIds),
+    seasonSet: set,
+    ladderVersion: SEASON_LADDER_VERSION,
+    tierRewards: buildSeasonPassLadder(config.tierCount, skinIds, set),
   });
   await season.save();
   return season.toObject() as QuestSeasonDoc;

@@ -592,7 +592,7 @@ export function ShopWindow({
   const tapPick = (deal: DailyDeal, item: ItemDef) => {
     const owned = owns(item);
     if (owned) onOpenItem(item, deal.onSale ? deal.dealPrice : null);
-    else if (deal.plusOnly && !isPremium) onPlus('shop_plus_slot', item);
+    else if (deal.plusOnly && !isPremium) onOpenItem(item, null);
     else if (deal.sale && !isPremium) onPlus('shop_plus_sale', item);
     else onOpenItem(item, deal.onSale ? deal.dealPrice : null);
   };

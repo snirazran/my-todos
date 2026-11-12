@@ -4,7 +4,7 @@ import BackgroundModel from '@/lib/models/Background';
 import connectMongo from '@/lib/mongoose';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 import { CATALOG, type ItemDef, type Rarity } from './catalog';
-import { filterAvailable, isAvailableAt } from './availability';
+import { isObtainableAt } from './availability';
 import { getFullCatalog } from './getCatalog';
 import {
   advanceGiftLuck,
@@ -72,6 +72,7 @@ function itemToDef(item: {
   priceFlies?: number;
   availableFrom?: Date | string | null;
   availableUntil?: Date | string | null;
+  seasonMonth?: string | null;
 }): ItemDef {
   const iso = (value: Date | string | null | undefined) => {
     if (!value) return null;
@@ -88,6 +89,7 @@ function itemToDef(item: {
     priceFlies: item.priceFlies ?? 0,
     availableFrom: iso(item.availableFrom),
     availableUntil: iso(item.availableUntil),
+    ...(item.seasonMonth ? { seasonMonth: item.seasonMonth } : {}),
   };
 }
 
@@ -138,7 +140,7 @@ export async function getPrizePool(): Promise<GiftPrize[]> {
  * resolving items a player already owns.
  */
 export async function getRewardPool(now: Date = new Date()): Promise<GiftPrize[]> {
-  return filterAvailable(await getPrizePool(), now);
+  return (await getPrizePool()).filter((prize) => isObtainableAt(prize, now));
 }
 
 async function seedCatalogIfEmpty() {
@@ -277,7 +279,7 @@ function buildGiftBands(config: GiftConfigView, prizePool: GiftPrize[]) {
 
   if (config.dropMode === 'rarity') {
     prizePool
-      .filter((prize) => prize.slot !== 'container' && isAvailableAt(prize))
+      .filter((prize) => prize.slot !== 'container' && isObtainableAt(prize))
       .forEach((prize) => push(prize, 1));
     const weights: Partial<Record<Rarity, number>> = {};
     config.rarityDrops.forEach((entry) => {
@@ -291,7 +293,7 @@ function buildGiftBands(config: GiftConfigView, prizePool: GiftPrize[]) {
   config.drops.forEach((drop) => {
     if (!drop.item || drop.chance <= 0) return;
     if (drop.item.slot === 'container') return;
-    if (!isAvailableAt(drop.item)) return;
+    if (!isObtainableAt(drop.item)) return;
     push(drop.item, drop.chance);
   });
   const weights: Partial<Record<Rarity, number>> = {};
@@ -392,7 +394,7 @@ export function expandGiftDrops(
   prizePool: GiftPrize[],
 ): GiftDropView[] {
   if (config.dropMode !== 'rarity') {
-    return config.drops.filter((drop) => !drop.item || isAvailableAt(drop.item));
+    return config.drops.filter((drop) => !drop.item || isObtainableAt(drop.item));
   }
 
   const pool = prizePool.filter((item) => item.slot !== 'container');

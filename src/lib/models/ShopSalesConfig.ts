@@ -33,7 +33,6 @@ const LEGACY_FIELDS = [
   'maxDiscountPercent',
   'plusRerolls',
   'specialEpicPercent',
-  'plusEpicPercent',
 ] as const;
 
 const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
@@ -50,6 +49,10 @@ const ShopSalesConfigSchema = new Schema<ShopSalesConfigDoc>(
     everydayRarePercent: {
       type: Number,
       default: DEFAULT_SHOP_SALES.everydayRarePercent,
+    },
+    plusEpicPercent: {
+      type: Number,
+      default: DEFAULT_SHOP_SALES.plusEpicPercent,
     },
     wishlistSlot: { type: Boolean, default: DEFAULT_SHOP_SALES.wishlistSlot },
     saleDiscountPercent: {
@@ -101,6 +104,12 @@ export function sanitizeShopSales(
     everydayRarePercent: num(
       source.everydayRarePercent,
       DEFAULT_SHOP_SALES.everydayRarePercent,
+      0,
+      100,
+    ),
+    plusEpicPercent: num(
+      source.plusEpicPercent,
+      DEFAULT_SHOP_SALES.plusEpicPercent,
       0,
       100,
     ),

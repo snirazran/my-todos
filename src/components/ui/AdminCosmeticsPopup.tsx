@@ -535,7 +535,7 @@ function CsvImport({ onImported }: { onImported: () => void }) {
       <div>
         <p className="text-[14px] font-black">Replace the catalog from a CSV</p>
         <p className="text-[12px] font-medium text-muted-foreground">
-          Columns: id, name, rarity, price, skin, body, hat, handItem, and optional startDate / endDate (YYYY-MM-DD). Use -1 in unused
+          Columns: id, name, rarity, price, skin, body, hat, handItem, and optional startDate / endDate (YYYY-MM-DD) and season (YYYY-MM, keeps the item out of the shop, gifts and trade-up until that month ends). Use -1 in unused
           columns. Optional duplicate: rows with the same number are colors of one item. Optional color: a swatch hex like #4f8bff.
           This replaces every cosmetic.
         </p>

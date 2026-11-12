@@ -56,6 +56,7 @@ export type PurchaseTarget = {
   slotLabel?: string;
   kind?: WishlistKind;
   inShopToday?: boolean;
+  plusLocked?: boolean;
 };
 
 export function PurchaseSheet({
@@ -71,6 +72,7 @@ export function PurchaseSheet({
   onEquip,
   onGoToTrade,
   onUpgrade,
+  onUnlockPlus,
   equipLabel = 'Equip now',
   previewWide = false,
   variants,
@@ -88,6 +90,7 @@ export function PurchaseSheet({
   onEquip: () => Promise<void>;
   onGoToTrade?: () => void;
   onUpgrade?: () => void;
+  onUnlockPlus?: () => void;
   equipLabel?: string;
   previewWide?: boolean;
   variants?: { item: ItemDef; owned: boolean }[];
@@ -162,6 +165,7 @@ export function PurchaseSheet({
   const owned = (buying ? buying.ownedCount : ownedCount) > 0;
   const tradeOnly = !!target && isTradeOnlyRarity(target.rarity) && !target.inShopToday;
   const canAfford = !isGuest && balance >= price;
+  const plusLocked = !!target?.plusLocked && !isPremium && !owned && !!onUnlockPlus;
   const shortBy = Math.max(0, price - balance);
   const onDeal = !!target?.originalPrice && target.originalPrice > price;
   const savedPercent = onDeal
@@ -172,12 +176,12 @@ export function PurchaseSheet({
     !!target && (target.rarity === 'epic' || target.rarity === 'legendary');
   const showBalance = phase === 'success' || owned;
   const showGoal =
-    phase === 'confirm' && !owned && !tradeOnly && !canAfford && !isGuest;
+    phase === 'confirm' && !owned && !tradeOnly && !canAfford && !isGuest && !plusLocked;
 
   useEffect(() => {
-    if (!open || !target || isGuest || canAfford || owned || tradeOnly) return;
+    if (!open || !target || isGuest || canAfford || owned || tradeOnly || plusLocked) return;
     emitCampaignTrigger('insufficient_flies', { gap: shortBy });
-  }, [open, target?.id, isGuest, canAfford, owned, shortBy, tradeOnly]);
+  }, [open, target?.id, isGuest, canAfford, owned, shortBy, tradeOnly, plusLocked]);
 
   const handleBuy = async () => {
     if (busy) return;
@@ -335,6 +339,12 @@ export function PurchaseSheet({
                         {target.slotLabel}
                       </span>
                     )}
+                    {plusLocked && (
+                      <span className="inline-flex h-6 items-center gap-1 rounded-full bg-[#5b34c2]/10 pl-1 pr-2.5 text-[12.5px] font-black text-[#5b34c2] dark:bg-[#c9b6ff]/15 dark:text-[#c9b6ff]">
+                        <Icon name="frogPlus" className="h-5 w-5" />
+                        Plus pick
+                      </span>
+                    )}
                     {phase === 'success' && (
                       <span className="yours-seal flex items-center gap-1 rounded-full bg-[#447d3f] px-2.5 py-0.5 text-[12px] font-black text-white">
                         <Check className="h-3 w-3 stroke-[4]" />
@@ -476,6 +486,32 @@ export function PurchaseSheet({
                 <PrimaryButton ref={primaryRef} onClick={handleEquip} busy={busy}>
                   {equipLabel}
                 </PrimaryButton>
+              ) : plusLocked ? (
+                <>
+                  <button
+                    ref={primaryRef}
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onUnlockPlus?.();
+                    }}
+                    aria-label={`Unlock Plus to buy ${target.name}`}
+                    className="plus-upgrade-button plus-club relative flex h-14 w-full touch-manipulation flex-col items-center justify-center rounded-[20px] focus-visible:outline-none short:h-12"
+                  >
+                    <Icon
+                      name="frogPlus"
+                      className="plus-cta-frog pointer-events-none absolute -top-6 left-3 h-16 w-16 drop-shadow-[0_3px_0_rgba(35,13,82,0.35)]"
+                    />
+                    <span className="relative text-[16px] font-black leading-tight [text-shadow:0_1px_2px_rgba(35,13,82,0.35)]">
+                      Unlock Plus
+                    </span>
+                    <span className="plus-club-sub relative mt-0.5 text-[11.5px] font-bold leading-tight">
+                      Buy today&rsquo;s Plus picks
+                    </span>
+                  </button>
+                  {wishlistButton('Save for later', 'On your wishlist')}
+                  {hint(wishlistHint)}
+                </>
               ) : tradeOnly ? (
                 <>
                   <PrimaryButton

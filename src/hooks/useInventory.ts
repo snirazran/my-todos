@@ -9,6 +9,7 @@ import type { FocusFlyDaily } from '@/lib/types/UserDoc';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
 import type { ShopGiftStatus } from '@/lib/economy/shopGift';
+import type { SeasonSetSummary } from '@/components/ui/skins/SeasonSetsRow';
 
 export const INVENTORY_KEY = '/api/skins/inventory';
 export const INVENTORY_SUMMARY_KEY = '/api/skins/inventory?view=summary';
@@ -67,6 +68,7 @@ type ApiData = {
   unseenContainerCount?: number;
   dailyDeals?: DailyDeal[];
   everydayItemIds?: string[];
+  seasonSets?: SeasonSetSummary[];
   dealRerollsLeft?: number;
   dealRerollsAllowed?: number;
   dealRerollFree?: boolean;

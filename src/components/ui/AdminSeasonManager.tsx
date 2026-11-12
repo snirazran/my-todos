@@ -62,9 +62,23 @@ type AdminSeason = SeasonPassConfig & {
   startsAt: string;
   endsAt: string;
   skinIds: SeasonSkinIds;
+  set?: { ids: string[]; heroId: string | null } | null;
   tierRewards: QuestSeasonTierReward[];
   isActive: boolean;
 };
+
+function usesTaggedSet(season: AdminSeason) {
+  const picked = Object.values(season.skinIds);
+  return !!season.set && season.set.ids.some((id) => picked.indexOf(id) < 0);
+}
+
+function plusDayOf(season: AdminSeason, itemId: string | undefined) {
+  if (!itemId) return null;
+  const row = season.tierRewards.find((entry) =>
+    entry.premiumRewards.some((reward) => reward.type === 'ITEM' && reward.itemId === itemId),
+  );
+  return row ? row.tier : null;
+}
 
 type AdminTemplate = SeasonPassConfig & {
   slotRarities: SeasonSlotRarities;
@@ -537,6 +551,11 @@ export function AdminSeasonManager({
           This season is live. Changes reach only the days a player has not collected yet. Collected days stay as they were.
         </Notice>
       ) : null}
+      {usesTaggedSet(season) ? (
+        <Notice type="info" className="mb-3">
+          {`This season uses the ${season.set?.ids.length ?? 0} items tagged ${season.monthKey ?? 'for this month'} in the skins CSV (season column). The slots below are not used.`}
+        </Notice>
+      ) : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {SEASON_SKIN_SLOTS.map((slot) => {
           const itemId = skinAt(season, slot);
@@ -547,7 +566,7 @@ export function AdminSeasonManager({
             <div key={slot.key} className="rounded-2xl border border-border/40 bg-background/70 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[12px] font-black text-muted-foreground">
-                  {`Day ${slot.finale ? season.tierCount : slot.tier}`}
+                  {`Day ${plusDayOf(season, itemId) ?? (slot.finale ? season.tierCount : slot.tier)}`}
                 </span>
                 <span className="flex gap-1">
                   <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-black capitalize', RARITY_CHIP[rarity])}>
@@ -635,7 +654,7 @@ export function AdminSeasonManager({
 
     const outdated =
       !locked &&
-      JSON.stringify(stripLadder(buildSeasonPassLadder(season.tierCount, season.skinIds))) !==
+      JSON.stringify(stripLadder(buildSeasonPassLadder(season.tierCount, season.skinIds, season.set))) !==
         JSON.stringify(stripLadder(season.tierRewards));
 
     return (

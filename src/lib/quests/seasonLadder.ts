@@ -94,7 +94,7 @@ export type SeasonPassConfig = SeasonPassNumbers & {
 };
 
 export const SEASON_PASS_DEFAULTS: SeasonPassConfig = {
-  tierCount: 30,
+  tierCount: 20,
   tasksPerStep: 3,
   stepsPerTier: 1,
   maxStepsPerDay: 1,
@@ -148,6 +148,41 @@ export function normalizeSeasonSkinIds(input: unknown): SeasonSkinIds {
 export const SIMPLE_GIFT_ID = 'gift_box_1';
 export const FANCY_GIFT_ID = 'gift_box_rare';
 export const AMAZING_GIFT_ID = 'gift_box_legendary';
+export const SEASON_GIFT_ID = 'season_gift';
+export const SEASON_GIFT_NAME = 'Season Gift';
+export const SEASON_LADDER_VERSION = 2;
+
+export type SeasonSet = { ids: string[]; heroId: string | null };
+
+export function normalizeSeasonSet(input: unknown): SeasonSet | null {
+  const src = (input ?? {}) as { ids?: unknown; heroId?: unknown };
+  if (!Array.isArray(src.ids)) return null;
+  const ids: string[] = [];
+  src.ids.forEach((value) => {
+    if (typeof value === 'string' && value && ids.indexOf(value) < 0) ids.push(value);
+  });
+  if (ids.length === 0) return null;
+  const heroId =
+    typeof src.heroId === 'string' && ids.indexOf(src.heroId) >= 0
+      ? src.heroId
+      : ids[ids.length - 1];
+  return { ids, heroId };
+}
+
+export function seasonSetFromSkinIds(skinIds: SeasonSkinIds | undefined): SeasonSet | null {
+  const picked: string[] = [];
+  SEASON_SKIN_SLOTS.forEach((slot) => {
+    const id = skinIds?.[slot.key];
+    if (id && picked.indexOf(id) < 0) picked.push(id);
+  });
+  if (picked.length === 0) return null;
+  const [hero, ...rest] = picked;
+  return { ids: [...rest.reverse(), hero], heroId: hero };
+}
+
+export function isSeasonGift(reward: QuestReward): boolean {
+  return reward.type === 'BOX' && reward.itemId === SEASON_GIFT_ID;
+}
 
 const flies = (amount: number): QuestReward => ({
   type: 'FLIES',
@@ -160,74 +195,94 @@ const gift = (itemId: string): QuestReward => ({
   amount: 1,
   amountMode: 'fixed',
 });
-const skinOr = (
-  skinIds: SeasonSkinIds,
-  slot: SeasonSkinSlot,
-  fallback: QuestReward,
-): QuestReward => {
-  const itemId = skinIds?.[slot];
-  return itemId
-    ? { type: 'ITEM', itemId, amount: 1, amountMode: 'fixed' }
-    : fallback;
-};
+const piece = (itemId: string): QuestReward => ({
+  type: 'ITEM',
+  itemId,
+  amount: 1,
+  amountMode: 'fixed',
+});
 
-const basic = () => [gift(SIMPLE_GIFT_ID)];
-const rare = (extraFlies = 0) => [gift(FANCY_GIFT_ID), ...(extraFlies ? [flies(extraFlies)] : [])];
-const legendary = (extraFlies = 0) => [gift(AMAZING_GIFT_ID), ...(extraFlies ? [flies(extraFlies)] : [])];
+const FREE_FLIES = [2, 2, 3, 2, 3, 5, 2, 3, 3, 2, 3];
+const PLUS_FLIES = 5;
+const PLUS_HERO_AT = 0.75;
 
-const FREE_LANE: QuestRewards[] = [
-  [flies(3)],
-  basic(), basic(), basic(), basic(), basic(), basic(), basic(),
-  [flies(3)],
-  basic(), basic(),
-  rare(),
-  [flies(3)],
-  basic(), basic(),
-  legendary(),
-  [flies(3)],
-  basic(), basic(), basic(),
-  legendary(),
-  [flies(3)],
-  basic(), basic(),
-  [flies(3)], [flies(3)],
-  rare(),
-  legendary(),
-  [flies(3)],
-  rare(),
-];
-
-const PLUS_LATE_LANE: QuestRewards[] = [
-  rare(), rare(3), rare(), rare(3), legendary(), rare(), rare(4), rare(),
-  legendary(3), rare(), rare(3), rare(), legendary(), rare(4), rare(), rare(3),
-  rare(4), legendary(3), rare(5), legendary(4), rare(5), legendary(3), rare(5), legendary(5),
-];
-
-function plusLane(tier: number, skinIds: SeasonSkinIds): QuestRewards {
-  if (tier === 1) {
-    return [
-      skinOr(skinIds, 'plus1a', gift(AMAZING_GIFT_ID)),
-      skinOr(skinIds, 'plus1b', gift(FANCY_GIFT_ID)),
-    ];
-  }
-  if (tier <= 6) {
-    return [skinOr(skinIds, `plus${tier}` as SeasonSkinSlot, gift(FANCY_GIFT_ID))];
-  }
-  return PLUS_LATE_LANE[(tier - 7) % PLUS_LATE_LANE.length];
+function spread(candidates: number[], count: number): number[] {
+  if (count <= 0) return [];
+  if (count >= candidates.length) return [...candidates];
+  if (count === 1) return [candidates[0]];
+  return Array.from(
+    { length: count },
+    (_, index) => candidates[Math.round((index * (candidates.length - 1)) / (count - 1))],
+  );
 }
 
 export function buildSeasonPassLadder(
   tierCount: number,
   skinIds: SeasonSkinIds = {},
+  set?: SeasonSet | null,
 ): QuestSeasonTierReward[] {
   const count = Math.max(1, Math.floor(tierCount));
+  const resolved = set ?? seasonSetFromSkinIds(skinIds);
+  const heroId = resolved?.heroId ?? null;
+  const pieces = (resolved?.ids ?? []).filter((id) => id !== heroId);
+  const plusOrder =
+    pieces.length > 1 ? [pieces[pieces.length - 1], ...pieces.slice(0, -1)] : pieces;
+
+  const plusHeroTier = Math.max(1, Math.round(count * PLUS_HERO_AT));
+  const isPlusGiftTier = (tier: number) => tier % 4 === 2 && tier < plusHeroTier;
+  const odd: number[] = [];
+  const even: number[] = [];
+  for (let tier = 1; tier < plusHeroTier - 1; tier += 1) {
+    if (tier % 2 === 1) odd.push(tier);
+    else if (!isPlusGiftTier(tier)) even.push(tier);
+  }
+  const candidates =
+    plusOrder.length <= odd.length ? odd : [...odd, ...even].sort((a, b) => a - b);
+  const pieceTiers = spread(candidates, plusOrder.length);
+  const plusPieces = new Map<number, string[]>();
+  plusOrder.forEach((id, index) => {
+    const tier = pieceTiers.length > 0 ? pieceTiers[index % pieceTiers.length] : 1;
+    plusPieces.set(tier, [...(plusPieces.get(tier) ?? []), id]);
+  });
+
+  const chestSlots: number[] = [];
+  for (let tier = 2; tier <= count - 3; tier += 5) chestSlots.push(tier);
+  const chestCount = Math.min(chestSlots.length, Math.floor(pieces.length / 2));
+  const chestTiers = Array.from(
+    { length: chestCount },
+    (_, index) => chestSlots[Math.round((index * chestSlots.length) / chestCount)],
+  );
+
+  let flyCursor = 0;
   return Array.from({ length: count }, (_, index) => {
     const tier = index + 1;
-    const free = FREE_LANE[index % FREE_LANE.length];
-    const plus = tier <= 30 ? plusLane(tier, skinIds) : rare(3);
-    return {
-      tier,
-      freeRewards: free.map((reward) => ({ ...reward })),
-      premiumRewards: plus.map((reward) => ({ ...reward })),
-    };
+    let freeRewards: QuestRewards;
+    if (tier === count && count > 1) {
+      freeRewards = [heroId ? piece(heroId) : gift(AMAZING_GIFT_ID)];
+    } else if (tier === count - 2) {
+      freeRewards = [gift(FANCY_GIFT_ID)];
+    } else if (chestTiers.indexOf(tier) >= 0) {
+      freeRewards = [gift(SEASON_GIFT_ID)];
+    } else if (chestSlots.indexOf(tier) >= 0 || (tier % 5 === 4 && tier < count - 5)) {
+      freeRewards = [gift(SIMPLE_GIFT_ID)];
+    } else {
+      freeRewards = [flies(FREE_FLIES[flyCursor % FREE_FLIES.length])];
+      flyCursor += 1;
+    }
+
+    const tierPieces = plusPieces.get(tier) ?? [];
+    let premiumRewards: QuestRewards;
+    if (tier === plusHeroTier && heroId) {
+      premiumRewards = [piece(heroId), ...tierPieces.slice(0, 1).map(piece)];
+    } else if (tierPieces.length > 0) {
+      premiumRewards = tierPieces.slice(0, 2).map(piece);
+    } else if (tier >= count - 1) {
+      premiumRewards = [gift(AMAZING_GIFT_ID)];
+    } else if (tier === plusHeroTier + 2 || isPlusGiftTier(tier)) {
+      premiumRewards = [gift(FANCY_GIFT_ID)];
+    } else {
+      premiumRewards = [flies(PLUS_FLIES)];
+    }
+    return { tier, freeRewards, premiumRewards };
   });
 }

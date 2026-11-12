@@ -14,6 +14,7 @@ export type CatalogItemDoc = {
   hidden: boolean;
   variantGroup?: string | null;
   color?: string | null;
+  seasonMonth?: string | null;
 };
 
 const CatalogItemSchema = new Schema<CatalogItemDoc>(
@@ -30,6 +31,7 @@ const CatalogItemSchema = new Schema<CatalogItemDoc>(
     hidden: { type: Boolean, default: false },
     variantGroup: { type: String, default: null },
     color: { type: String, default: null },
+    seasonMonth: { type: String, default: null },
   },
   { collection: 'catalogItems' },
 );

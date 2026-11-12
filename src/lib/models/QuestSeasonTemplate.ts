@@ -20,6 +20,7 @@ export interface QuestSeasonTemplateDoc {
   tierSkipCost: number;
   graceHours: number;
   slotRarities?: SeasonSlotRarities;
+  ladderVersion?: number;
   skinPool?: WardrobeSlot[];
   createdAt: Date;
   updatedAt: Date;

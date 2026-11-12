@@ -31,6 +31,38 @@ export function isAvailableAt(
   return availabilityStateAt(item, now) === 'active';
 }
 
+const SEASON_MONTH_RE = /^(\d{4})-(\d{2})$/;
+
+export type SeasonTagged = { seasonMonth?: string | null };
+
+export function parseSeasonMonth(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = SEASON_MONTH_RE.exec(value.trim());
+  if (!match) return null;
+  const month = Number(match[2]);
+  return month >= 1 && month <= 12 ? `${match[1]}-${match[2]}` : null;
+}
+
+export function seasonMonthEnd(seasonMonth: string): Date | null {
+  const key = parseSeasonMonth(seasonMonth);
+  if (!key) return null;
+  const [year, month] = key.split('-').map(Number);
+  return new Date(Date.UTC(year, month, 1));
+}
+
+export function isSeasonLocked(item: SeasonTagged, now: Date = new Date()): boolean {
+  if (!item.seasonMonth) return false;
+  const end = seasonMonthEnd(item.seasonMonth);
+  return !!end && now.getTime() < end.getTime();
+}
+
+export function isObtainableAt(
+  item: AvailabilityWindow & SeasonTagged,
+  now: Date = new Date(),
+): boolean {
+  return isAvailableAt(item, now) && !isSeasonLocked(item, now);
+}
+
 export function filterAvailable<T extends AvailabilityWindow>(
   items: T[],
   now: Date = new Date(),

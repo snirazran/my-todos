@@ -1,5 +1,5 @@
 import type { CatalogItemDoc } from '@/lib/models/CatalogItem';
-import { parseAvailabilityDate } from '@/lib/skins/availability';
+import { parseAvailabilityDate, parseSeasonMonth } from '@/lib/skins/availability';
 
 export const COSMETIC_SLOTS = ['skin', 'body', 'hat', 'hand_item'] as const;
 type CosmeticSlot = (typeof COSMETIC_SLOTS)[number];
@@ -105,6 +105,16 @@ function parseVariantGroup(value: string, rowNumber: number) {
   return trimmed;
 }
 
+function parseSeasonCell(value: string, rowNumber: number) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const month = parseSeasonMonth(trimmed);
+  if (!month) {
+    throw new Error(`Row ${rowNumber}: season must be a month like 2026-12, or blank`);
+  }
+  return month;
+}
+
 function parseSwatchColor(value: string, rowNumber: number) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -185,6 +195,7 @@ export function csvToCatalogDocs(text: string) {
       hidden: false,
       variantGroup: parseVariantGroup(cell('duplicate'), rowNumber),
       color: parseSwatchColor(cell('color'), rowNumber),
+      seasonMonth: parseSeasonCell(cell('season'), rowNumber),
     });
   });
 

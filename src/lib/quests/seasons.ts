@@ -14,13 +14,19 @@ import {
 } from '@/lib/seasonPaletteCore';
 import { ensureSeasonPalette } from '@/lib/quests/seasonPaletteServer';
 import {
+  FANCY_GIFT_ID,
+  isSeasonGift,
   normalizeSeasonPassConfig,
+  normalizeSeasonSet,
   normalizeSeasonSkinIds,
   normalizeSeasonSkinPool,
   normalizeSeasonSlotRarities,
+  seasonSetFromSkinIds,
+  SEASON_LADDER_VERSION,
   SEASON_PASS_DEFAULTS,
   SEASON_PASS_LIMITS,
   type QuestSeasonTierReward,
+  type SeasonSet,
   type SeasonPassConfig,
   type SeasonSlotRarities,
 } from '@/lib/quests/seasonLadder';
@@ -74,6 +80,7 @@ export type QuestSeasonView = {
   claimableCount: number;
   claimable: boolean;
   rewardsByTier: QuestSeasonTierReward[];
+  set: { ids: string[]; heroId: string | null; ownedIds: string[] } | null;
 };
 
 export type UserQuestSeasonState = {
@@ -141,6 +148,40 @@ export function readSeasonTierRewards(doc: unknown): QuestSeasonTierReward[] {
   return normalizeSeasonTierRewards(record.dayRewards);
 }
 
+export function readSeasonSet(
+  doc: Pick<QuestSeasonDoc, 'seasonSet' | 'skinIds'> | null | undefined,
+): SeasonSet | null {
+  return (
+    normalizeSeasonSet(doc?.seasonSet) ??
+    seasonSetFromSkinIds(normalizeSeasonSkinIds(doc?.skinIds))
+  );
+}
+
+export function resolveSeasonGifts(
+  rewards: QuestRewards,
+  set: SeasonSet | null,
+  inventory: Record<string, number>,
+  random: () => number = Math.random,
+): QuestRewards {
+  if (!rewards.some(isSeasonGift)) return rewards;
+  const taken = new Set<string>();
+  rewards.forEach((reward) => {
+    if (reward.type === 'ITEM' && reward.itemId) taken.add(reward.itemId);
+  });
+  return rewards.map((reward) => {
+    if (!isSeasonGift(reward)) return reward;
+    const pool = (set?.ids ?? []).filter(
+      (id) => id !== set?.heroId && !taken.has(id) && !((inventory[id] ?? 0) > 0),
+    );
+    if (pool.length === 0) {
+      return { type: 'BOX', itemId: FANCY_GIFT_ID, amount: 1, amountMode: 'fixed' };
+    }
+    const itemId = pool[Math.floor(random() * pool.length)];
+    taken.add(itemId);
+    return { type: 'ITEM', itemId, amount: 1, amountMode: 'fixed' };
+  });
+}
+
 export function seasonToAdminView(doc: QuestSeasonDoc) {
   const config = readSeasonPassConfig(doc);
   return {
@@ -152,6 +193,7 @@ export function seasonToAdminView(doc: QuestSeasonDoc) {
     endsAt: doc.endsAt.toISOString(),
     ...config,
     skinIds: normalizeSeasonSkinIds(doc.skinIds),
+    set: readSeasonSet(doc),
     tierRewards: readSeasonTierRewards(doc),
     isActive: doc.isActive,
     createdAt: doc.createdAt?.toISOString(),
@@ -291,8 +333,11 @@ export function buildSeasonView(args: {
   flyBalance: number;
   isPremium: boolean;
   now: Date;
+  inventory?: Record<string, number> | null;
 }): QuestSeasonView {
   const { season, state, config } = args;
+  const set = normalizeSeasonSet(season.seasonSet);
+  const inventory = args.inventory ?? {};
   // A ladder authored longer than the tier count (an older doc, or a tier count
   // trimmed after the fact) would otherwise show rungs nobody can ever reach.
   const rewardsByTier = args.rewardsByTier.filter(
@@ -347,6 +392,13 @@ export function buildSeasonView(args: {
     claimableCount: claimableFreeTiers.length + claimablePlusTiers.length,
     claimable: claimableFreeTiers.length + claimablePlusTiers.length > 0,
     rewardsByTier,
+    set: set
+      ? {
+          ids: set.ids,
+          heroId: set.heroId,
+          ownedIds: set.ids.filter((id) => (inventory[id] ?? 0) > 0),
+        }
+      : null,
   };
 }
 
@@ -386,6 +438,7 @@ export async function getQuestSeasonViews(args: {
   );
 
   const tasksToday = tasksCompletedToday(user, todayKey);
+  const inventory = ((user as any).wardrobe?.inventory ?? {}) as Record<string, number>;
   const graceSeason = await findGraceSeason({
     user,
     now,
@@ -427,6 +480,7 @@ export async function getQuestSeasonViews(args: {
       flyBalance,
       isPremium,
       now,
+      inventory,
     });
   }
 
@@ -466,6 +520,7 @@ export async function getQuestSeasonViews(args: {
       flyBalance,
       isPremium,
       now,
+      inventory,
     }),
     grace: graceView,
   };
@@ -552,6 +607,18 @@ export type SeasonTemplateView = SeasonPassConfig & {
 };
 
 export async function loadSeasonTemplate(): Promise<SeasonTemplateView> {
+  await QuestSeasonTemplateModel.updateOne(
+    {
+      configId: SEASON_TEMPLATE_CONFIG_ID,
+      ladderVersion: { $ne: SEASON_LADDER_VERSION },
+    },
+    {
+      $set: {
+        tierCount: SEASON_PASS_DEFAULTS.tierCount,
+        ladderVersion: SEASON_LADDER_VERSION,
+      },
+    },
+  );
   const doc = await QuestSeasonTemplateModel.findOne({
     configId: SEASON_TEMPLATE_CONFIG_ID,
   }).lean();
@@ -576,6 +643,7 @@ export async function saveSeasonTemplate(input: {
         ...input.config,
         slotRarities: input.slotRarities,
         skinPool: input.skinPool,
+        ladderVersion: SEASON_LADDER_VERSION,
       },
       $unset: { skinIds: '' },
     },
