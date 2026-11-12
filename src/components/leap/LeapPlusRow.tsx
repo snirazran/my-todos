@@ -30,20 +30,20 @@ export function LeapPlusRow({
         onClick();
       }}
       className={cn(
-        'plus-upgrade-button relative flex min-h-[60px] w-full touch-manipulation items-center gap-2.5 rounded-[18px] py-1 pl-2 pr-3 text-left',
+        'plus-upgrade-button relative flex min-h-[64px] w-full touch-manipulation items-center gap-2 rounded-[18px] py-1.5 pl-2 pr-2.5 narrow:gap-1.5 narrow:pr-2 text-left',
         waiting ? 'plus-club' : 'plus-club-soft',
         className,
       )}
     >
-      <span className="-my-3 shrink-0">
-        <Icon name="frogPlus" label="Plus" className="plus-cta-frog h-[54px] w-[54px]" />
+      <span className="-my-3 shrink-0 narrow:-ml-0.5">
+        <Icon name="frogPlus" label="Plus" className="plus-cta-frog h-[54px] w-[54px] narrow:h-[46px] narrow:w-[46px]" />
       </span>
-      <span className="min-w-0 flex-1 text-[15px] font-black leading-tight tracking-tight">
+      <span className="min-w-0 flex-1 pr-1 text-[15px] font-black leading-tight tracking-tight narrow:text-[14px]">
         {waiting ? 'Your Plus gift is waiting' : 'Open a second gift with Plus'}
       </span>
-      <span className="flex shrink-0 items-center gap-2.5 pb-0.5 pt-2.5">
+      <span className="flex shrink-0 items-center gap-3 pb-2 pt-3.5">
         {tiles.map((reward, index) => (
-          <LeapPrizeTile key={index} reward={reward} view={view} size="md" offset={index + 2} lane="plus" className="w-[3.1rem]" />
+          <LeapPrizeTile key={index} reward={reward} view={view} size="md" offset={index + 2} lane="plus" className="w-[3.1rem] narrow:w-[2.6rem]" />
         ))}
       </span>
       <ChevronRight className="h-4 w-4 shrink-0" strokeWidth={3} aria-hidden />
