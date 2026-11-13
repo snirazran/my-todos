@@ -1554,14 +1554,26 @@ function MainView({
       )}
 
       {promo === 'reminders' && (
-        <PromoCard
-          icon={<Bell className="w-7 h-7 text-amber-200" strokeWidth={2.5} />}
-          title="Turn on reminders"
-          subtitle={`A morning plan and an evening check-in from ${frogName}.`}
-          actionLabel={notifLoading ? 'Turning on…' : 'Turn on'}
-          onAction={onEnableNotifs}
+        <button
+          type="button"
+          onClick={onEnableNotifs}
           disabled={notifLoading}
-        />
+          className="group flex w-full items-start gap-3 rounded-2xl border border-[#bcd9a9] bg-[#f2f8ed] p-4 text-left transition-colors hover:bg-[#e8f4e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-70 dark:border-emerald-800 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60"
+        >
+          <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#dcefd2] text-[#447d3f] dark:bg-emerald-900 dark:text-emerald-300">
+            <Bell className="h-6 w-6" strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-black leading-tight tracking-tight text-foreground">Turn on reminders</span>
+            <span className="mt-1 block text-[13px] font-semibold leading-snug text-muted-foreground">
+              A morning plan and an evening check-in from {frogName}.
+            </span>
+            <span className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-xl bg-[#447d3f] px-3.5 text-[13px] font-black text-white group-hover:bg-[#386c34]">
+              {notifLoading ? 'Turning on…' : 'Turn on'}
+              {!notifLoading && <ChevronRight aria-hidden className="h-4 w-4" />}
+            </span>
+          </span>
+        </button>
       )}
 
       {promo === 'widget' && (

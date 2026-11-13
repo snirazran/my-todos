@@ -4,6 +4,7 @@ import { requireAdminUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestPromptModel, { type QuestPromptDoc } from '@/lib/models/QuestPrompt';
 import PromptAnswerModel from '@/lib/models/PromptAnswer';
+import PromptExposureModel from '@/lib/models/PromptExposure';
 import PromptTallyModel from '@/lib/models/PromptTally';
 import { CHECKIN_OPTIONS, ensureSeedPrompts } from '@/lib/prompts/library';
 import type { QuestPromptKind, QuestPromptOption } from '@/lib/quests/types';
@@ -35,6 +36,20 @@ function sanitizeOptions(kind: QuestPromptKind, input: unknown): QuestPromptOpti
   return options.slice(0, max);
 }
 
+function sanitizeAudience(input: unknown): string[] {
+  const raw = Array.isArray(input) ? input : typeof input === 'string' ? input.split(',') : [];
+  const tags = raw
+    .map((value) => clean(value, 48).toLowerCase())
+    .filter((value) => /^[a-z]+:[a-z0-9-]+$/.test(value));
+  return Array.from(new Set(tags)).slice(0, 16);
+}
+
+function sanitizeWeekdays(input: unknown): number[] {
+  const raw = Array.isArray(input) ? input : [];
+  const days = raw.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value >= 0 && value <= 6);
+  return Array.from(new Set(days)).sort((a, b) => a - b);
+}
+
 function sanitizePrompt(input: any): { value?: Omit<QuestPromptDoc, 'createdAt' | 'updatedAt' | '_id'>; error?: string } {
   const kind = KINDS.has(input?.kind) ? (input.kind as QuestPromptKind) : null;
   if (!kind) return { error: 'Pick a kind' };
@@ -59,6 +74,8 @@ function sanitizePrompt(input: any): { value?: Omit<QuestPromptDoc, 'createdAt' 
       cooldownDays:
         Number.isFinite(cooldownDays) && cooldownDays >= 0 ? Math.min(365, cooldownDays) : 30,
       dateKey: /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : null,
+      audience: sanitizeAudience(input?.audience),
+      weekdays: sanitizeWeekdays(input?.weekdays),
       isActive: input?.isActive !== false,
     },
   };
@@ -72,13 +89,17 @@ export async function GET() {
   }
   await connectMongo();
   await ensureSeedPrompts();
-  const [prompts, answerCounts, tallies] = await Promise.all([
+  const [prompts, answerCounts, tallies, shownCounts] = await Promise.all([
     QuestPromptModel.find({}).sort({ createdAt: -1 }).lean<QuestPromptDoc[]>(),
     PromptAnswerModel.aggregate<{ _id: string; count: number; last: string }>([
       { $group: { _id: '$promptId', count: { $sum: 1 }, last: { $max: '$dayKey' } } },
     ]),
     PromptTallyModel.find({}).lean<Array<{ promptId: string; counts: Record<string, number>; total: number }>>(),
+    PromptExposureModel.aggregate<{ _id: string; count: number }>([
+      { $group: { _id: '$promptId', count: { $sum: 1 } } },
+    ]),
   ]);
+  const shownById = new Map(shownCounts.map((row) => [row._id, row.count]));
   const statsById = new Map(answerCounts.map((row) => [row._id, row]));
   const tallyById = new Map(tallies.map((row) => [row.promptId, row]));
   return NextResponse.json({
@@ -92,6 +113,9 @@ export async function GET() {
       weight: prompt.weight,
       cooldownDays: prompt.cooldownDays,
       dateKey: prompt.dateKey ?? null,
+      audience: prompt.audience ?? [],
+      weekdays: prompt.weekdays ?? [],
+      shown: shownById.get(prompt.promptId) ?? 0,
       isActive: prompt.isActive,
       answers: statsById.get(prompt.promptId)?.count ?? 0,
       lastAnswered: statsById.get(prompt.promptId)?.last ?? null,

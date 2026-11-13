@@ -12,6 +12,9 @@ export interface QuestPromptDoc {
   weight: number;
   cooldownDays: number;
   dateKey?: string | null;
+  audience?: string[];
+  weekdays?: number[];
+  seedVersion?: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +35,9 @@ const QuestPromptSchema = new Schema<QuestPromptDoc>(
     weight: { type: Number, default: 1 },
     cooldownDays: { type: Number, default: 30 },
     dateKey: { type: String, default: null },
+    audience: { type: [String], default: [] },
+    weekdays: { type: [Number], default: [] },
+    seedVersion: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true, index: true },
   },
   {

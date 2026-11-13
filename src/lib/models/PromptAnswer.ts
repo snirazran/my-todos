@@ -11,6 +11,8 @@ export interface PromptAnswerDoc {
   question: string;
   text?: string;
   optionId?: string;
+  optionLabel?: string;
+  optionEmoji?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +27,8 @@ const PromptAnswerSchema = new Schema<PromptAnswerDoc>(
     question: { type: String, required: true },
     text: { type: String, default: undefined },
     optionId: { type: String, default: undefined },
+    optionLabel: { type: String, default: undefined },
+    optionEmoji: { type: String, default: undefined },
   },
   {
     collection: 'prompt_answers',

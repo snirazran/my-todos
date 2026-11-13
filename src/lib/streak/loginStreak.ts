@@ -140,6 +140,16 @@ export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
   const doc = await LoginStreakConfigModel.findOne({
     configId: LOGIN_STREAK_CONFIG_ID,
   }).lean<LoginStreakConfigDoc | null>();
+  const previousDefaults: Record<number, string[]> = {
+    2: ['FLIES:1'], 5: ['FLIES:2'], 7: ['FLIES:3'], 14: ['FLIES:5', 'SHIELD:1'],
+  };
+  const savedTiers = (doc?.goalTiers ?? []).map((tier) => {
+    const old = previousDefaults[tier.days];
+    const signature = tier.rewards.map((reward) => `${reward.type}:${'amount' in reward ? reward.amount ?? 1 : 1}`).sort();
+    const replacement = DEFAULT_GOAL_TIERS.find((entry) => entry.days === tier.days);
+    return old && replacement && JSON.stringify(signature) === JSON.stringify([...old].sort())
+      ? replacement : tier;
+  });
   return {
     configId: LOGIN_STREAK_CONFIG_ID,
     isActive: doc?.isActive ?? true,
@@ -153,10 +163,9 @@ export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
         ? doc.repeatPayoutFloorPercent
         : DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT,
     repeatItemsAtFullOnly: doc?.repeatItemsAtFullOnly !== false,
-    goalTiers:
-      doc?.goalTiers && doc.goalTiers.length > 0
-        ? doc.goalTiers
-        : DEFAULT_GOAL_TIERS,
+    goalTiers: savedTiers.length
+      ? [...DEFAULT_GOAL_TIERS.filter((tier) => [2, 5, 7, 14].includes(tier.days) && !savedTiers.some((saved) => saved.days === tier.days)), ...savedTiers].sort((a, b) => a.days - b.days)
+      : DEFAULT_GOAL_TIERS,
     createdAt: doc?.createdAt ?? new Date(),
     updatedAt: doc?.updatedAt ?? new Date(),
   };
@@ -412,7 +421,7 @@ export function nextTierDaysFor(
   config: Pick<LoginStreakConfigDoc, 'goalTiers'>,
   goalsCompleted: { days: number; dayKey: string }[],
 ): number | null {
-  const tiers = [...(config.goalTiers ?? [])].sort((a, b) => a.days - b.days);
+  const tiers = [...(config.goalTiers ?? [])].filter((tier) => [2, 5, 7, 14].includes(tier.days)).sort((a, b) => a.days - b.days);
   if (tiers.length === 0) return null;
   const best = goalsCompleted.reduce((max, entry) => Math.max(max, entry.days), 0);
   return tiers.find((tier) => tier.days > best)?.days ?? tiers[tiers.length - 1].days;

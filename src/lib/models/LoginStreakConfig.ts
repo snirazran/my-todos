@@ -38,16 +38,21 @@ export const DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT = 60;
  * they open twice instead.
  */
 export const DEFAULT_GOAL_TIERS: LoginStreakGoalTier[] = [
+  { days: 2, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 3 }] },
+  { days: 5, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 8 }, { type: 'BOX', itemId: 'gift_box_1', amount: 1 }] },
   {
     days: 7,
     rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 3 },
+      { type: 'FLIES', amountMode: 'fixed', amount: 12 },
+      { type: 'BOX', itemId: 'gift_box_1', amount: 1 },
+      { type: 'SHIELD', amount: 1 },
     ],
   },
   {
     days: 14,
     rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 5 },
+      { type: 'FLIES', amountMode: 'fixed', amount: 20 },
+      { type: 'BOX', itemId: 'gift_box_rare', amount: 1 },
       { type: 'SHIELD', amount: 1 },
     ],
   },

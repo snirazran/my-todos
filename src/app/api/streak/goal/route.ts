@@ -11,6 +11,7 @@ import {
 import { isPremiumUser } from '@/lib/quests/engine';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { previousDayKey } from '@/lib/quests/streak';
+import { PLEDGE_DAYS } from '@/lib/streak/types';
 import {
   loadShieldConfig,
   readShieldState,
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!config.goalTiers.some((t) => t.days === days)) {
+    if (!(PLEDGE_DAYS as readonly number[]).includes(days) || !config.goalTiers.some((t) => t.days === days)) {
       return NextResponse.json({ error: 'Invalid goal' }, { status: 400 });
     }
 

@@ -1,6 +1,8 @@
 import type { QuestReward } from '@/lib/quests/types';
 import type { ShieldOffer } from '@/lib/shields/types';
 
+export const PLEDGE_DAYS = [2, 5, 7, 14] as const;
+
 export const STREAK_EXTENDED_HEADER = 'x-streak-extended';
 
 export type ShieldReward = {

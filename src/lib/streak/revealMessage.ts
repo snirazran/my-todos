@@ -95,6 +95,8 @@ export function streakRevealMessage(context: StreakRevealContext): string {
 }
 
 const PLEDGE_LINES: Record<number, string> = {
+  2: 'A little start, together.\nWe can do this!',
+  5: 'Five days together?\nI’m cheering for you.',
   7: 'One week, side by side.\nI’ll be right here.',
   14: 'Two weeks together?\nI believe in you.',
   30: 'A whole month with you?\nMy heart’s doing hops.',

@@ -1,7 +1,16 @@
 import QuestPromptModel, { type QuestPromptDoc } from '@/lib/models/QuestPrompt';
 import PromptAnswerModel from '@/lib/models/PromptAnswer';
-import type { QuestPromptKind, QuestPromptOption } from '@/lib/quests/types';
+import PromptExposureModel from '@/lib/models/PromptExposure';
+import type { QuestPromptKind } from '@/lib/quests/types';
 import { createSeededRandom } from '@/lib/quests/random';
+import {
+  PROMPT_DEFAULT_COOLDOWN_DAYS,
+  SEED_LIBRARY_VERSION,
+  SEED_PROMPTS,
+  type PromptSeed,
+} from './seeds';
+
+export { CHECKIN_OPTIONS, SEED_PROMPTS } from './seeds';
 
 export const PROMPT_CATEGORIES = [
   { id: 'gratitude', label: 'Gratitude' },
@@ -20,15 +29,18 @@ export const PROMPT_KINDS: { id: QuestPromptKind; label: string }[] = [
   { id: 'checkin', label: 'Check-in' },
 ];
 
-export const CHECKIN_OPTIONS: QuestPromptOption[] = [
-  { id: '1', emoji: '😣', label: 'Rough' },
-  { id: '2', emoji: '😕', label: 'Meh' },
-  { id: '3', emoji: '😐', label: 'Okay' },
-  { id: '4', emoji: '🙂', label: 'Good' },
-  { id: '5', emoji: '😄', label: 'Great' },
-];
+export const PROMPT_RECENT_WINDOW_DAYS = 150;
+export const PROMPT_PERSONAL_BOOST = 4;
+export const PROMPT_NEW_PLAYER_PERSONAL_BOOST = 8;
+export const PROMPT_NEW_PLAYER_DAYS = 7;
 
-export const PROMPT_RECENT_WINDOW_DAYS = 60;
+const PROMPT_WEEKDAY_BOOST = 6;
+const KIND_SHARE: Record<QuestPromptKind, number> = {
+  journal: 0.65,
+  checkin: 0.35,
+  poll: 0.5,
+  this_or_that: 0.5,
+};
 
 export type PromptLibraryEntry = Pick<
   QuestPromptDoc,
@@ -41,184 +53,77 @@ export type PromptLibraryEntry = Pick<
   | 'weight'
   | 'cooldownDays'
   | 'dateKey'
+  | 'audience'
+  | 'weekdays'
 >;
 
 export type RecentPromptAnswer = {
   promptId: string;
   dayKey: string;
   category: string;
+  kind?: QuestPromptKind;
+  answered?: boolean;
+  personal?: boolean;
 };
 
-const opt = (id: string, emoji: string, label: string): QuestPromptOption => ({
-  id,
-  emoji,
-  label,
-});
+export function isPersonalPrompt(prompt: Pick<PromptLibraryEntry, 'audience'>) {
+  return (prompt.audience?.length ?? 0) > 0;
+}
 
-type Seed = Omit<PromptLibraryEntry, 'weight' | 'cooldownDays' | 'dateKey' | 'options'> & {
-  options?: QuestPromptOption[];
-};
+export function promptPersonalBoost(createdAt?: Date | string | null, now = Date.now()) {
+  const created = createdAt ? new Date(createdAt).getTime() : NaN;
+  if (!Number.isFinite(created)) return PROMPT_PERSONAL_BOOST;
+  return now - created < PROMPT_NEW_PLAYER_DAYS * 86_400_000
+    ? PROMPT_NEW_PLAYER_PERSONAL_BOOST
+    : PROMPT_PERSONAL_BOOST;
+}
 
-const journal = (id: string, category: string, question: string, placeholder?: string): Seed => ({
-  promptId: `seed-${id}`,
-  kind: 'journal',
-  category,
-  question,
-  placeholder,
-});
+function seedContent(seed: PromptSeed) {
+  return {
+    kind: seed.kind,
+    question: seed.question,
+    options: seed.options ?? [],
+    category: seed.category,
+    audience: seed.audience ?? [],
+    weekdays: seed.weekdays ?? [],
+    cooldownDays: seed.cooldownDays ?? PROMPT_DEFAULT_COOLDOWN_DAYS[seed.kind],
+    seedVersion: SEED_LIBRARY_VERSION,
+    ...(seed.placeholder ? { placeholder: seed.placeholder } : {}),
+    ...(seed.weight ? { weight: seed.weight } : {}),
+  };
+}
 
-const poll = (id: string, category: string, question: string, options: QuestPromptOption[]): Seed => ({
-  promptId: `seed-${id}`,
-  kind: options.length === 2 ? 'this_or_that' : 'poll',
-  category,
-  question,
-  options,
-});
-
-const checkin = (id: string, question: string): Seed => ({
-  promptId: `seed-${id}`,
-  kind: 'checkin',
-  category: 'wellbeing',
-  question,
-  options: CHECKIN_OPTIONS,
-});
-
-export const SEED_PROMPTS: Seed[] = [
-  journal('grateful-today', 'gratitude', 'What are you grateful for today?', 'Something big or tiny…'),
-  journal('grateful-person', 'gratitude', 'Who made your life a little easier lately?', 'A friend, a stranger, anyone…'),
-  journal('grateful-small', 'gratitude', 'What small thing went right today?'),
-  journal('grateful-place', 'gratitude', 'What place makes you feel at home?'),
-  journal('grateful-body', 'gratitude', 'What is something your body did for you today?'),
-  journal('grateful-thing', 'gratitude', 'What do you own that makes every day a bit better?'),
-  journal('joy-smile', 'joy', 'What made you smile today?'),
-  journal('joy-laugh', 'joy', 'When did you last laugh really hard?'),
-  journal('joy-forward', 'joy', 'What are you looking forward to this week?'),
-  journal('joy-comfort', 'joy', 'What is your favorite way to slow down?'),
-  journal('joy-song', 'joy', 'What song has been stuck in your head lately?'),
-  journal('joy-treat', 'joy', 'How could you treat yourself this week?'),
-  journal('growth-overcome', 'growth', 'What did you overcome lately?'),
-  journal('growth-proud', 'growth', 'What are you proud of this week?'),
-  journal('growth-learned', 'growth', 'What is something new you learned recently?'),
-  journal('growth-brave', 'growth', 'When were you braver than you expected?'),
-  journal('growth-better', 'growth', 'What is one thing you do better than a year ago?'),
-  journal('growth-kind', 'growth', 'What kind thing did you do for someone?'),
-  journal('reflect-word', 'reflection', 'What word sums up your day?'),
-  journal('reflect-advice', 'reflection', 'What advice would you give yourself from last month?'),
-  journal('reflect-energy', 'reflection', 'What gave you energy today, and what drained it?'),
-  journal('reflect-change', 'reflection', 'What is one thing you would like to do differently tomorrow?'),
-  journal('reflect-letgo', 'reflection', 'What is something you are ready to let go of?'),
-  journal('reflect-today', 'reflection', 'Describe today in one sentence.'),
-  journal('well-rest', 'wellbeing', 'What helps you rest when your mind is busy?'),
-  journal('well-need', 'wellbeing', 'What do you need more of right now?'),
-  journal('well-calm', 'wellbeing', 'Where do you feel most calm?'),
-  journal('plan-one', 'planning', 'What is the one thing that would make tomorrow a good day?'),
-  journal('plan-avoid', 'planning', 'What task have you been putting off, and what is the first tiny step?'),
-  journal('plan-week', 'planning', 'What would make this week feel like a win?'),
-  poll('poll-breakfast', 'fun', 'What is the best breakfast?', [
-    opt('a', '🥞', 'Pancakes'),
-    opt('b', '🥣', 'Cereal'),
-    opt('c', '🍳', 'Eggs'),
-    opt('d', '☕', 'Just coffee'),
-  ]),
-  poll('poll-season', 'fun', 'Which season is the best?', [
-    opt('a', '🌸', 'Spring'),
-    opt('b', '☀️', 'Summer'),
-    opt('c', '🍂', 'Autumn'),
-    opt('d', '❄️', 'Winter'),
-  ]),
-  poll('poll-focus-time', 'planning', 'When do you get the most done?', [
-    opt('a', '🌅', 'Early morning'),
-    opt('b', '🌞', 'Midday'),
-    opt('c', '🌇', 'Evening'),
-    opt('d', '🌙', 'Late night'),
-  ]),
-  poll('poll-recharge', 'wellbeing', 'How do you recharge best?', [
-    opt('a', '😴', 'A nap'),
-    opt('b', '🚶', 'A walk'),
-    opt('c', '📺', 'A show'),
-    opt('d', '👯', 'Friends'),
-  ]),
-  poll('poll-pet', 'fun', 'Which pet would you pick?', [
-    opt('a', '🐶', 'Dog'),
-    opt('b', '🐱', 'Cat'),
-    opt('c', '🐸', 'Frog, obviously'),
-    opt('d', '🐠', 'Fish'),
-  ]),
-  poll('poll-snack', 'fun', 'Pick a study snack', [
-    opt('a', '🍿', 'Popcorn'),
-    opt('b', '🍫', 'Chocolate'),
-    opt('c', '🍎', 'Fruit'),
-    opt('d', '🥨', 'Pretzels'),
-  ]),
-  poll('poll-music', 'fun', 'What do you listen to while you work?', [
-    opt('a', '🎧', 'Music'),
-    opt('b', '🎙️', 'Podcasts'),
-    opt('c', '🌧️', 'Rain sounds'),
-    opt('d', '🤫', 'Silence'),
-  ]),
-  poll('poll-list', 'planning', 'How do you pick your next task?', [
-    opt('a', '🐸', 'Hardest first'),
-    opt('b', '🍰', 'Easiest first'),
-    opt('c', '⏰', 'Whatever is due'),
-    opt('d', '🎲', 'Vibes'),
-  ]),
-  poll('poll-superpower', 'fun', 'Pick a superpower', [
-    opt('a', '⏸️', 'Pause time'),
-    opt('b', '🕊️', 'Fly'),
-    opt('c', '🧠', 'Read minds'),
-    opt('d', '🌀', 'Teleport'),
-  ]),
-  poll('poll-weekend', 'fun', 'Your ideal weekend?', [
-    opt('a', '🛋️', 'Cozy at home'),
-    opt('b', '🏞️', 'Outdoors'),
-    opt('c', '🎉', 'Out with friends'),
-    opt('d', '✈️', 'A trip'),
-  ]),
-  poll('poll-stress', 'wellbeing', 'What helps most when you are stressed?', [
-    opt('a', '📝', 'Writing a list'),
-    opt('b', '🫁', 'Deep breaths'),
-    opt('c', '🗣️', 'Talking it out'),
-    opt('d', '🏃', 'Moving'),
-  ]),
-  poll('poll-reward', 'planning', 'Best reward after a long task?', [
-    opt('a', '🍦', 'A treat'),
-    opt('b', '🎮', 'A game'),
-    opt('c', '🛁', 'A long bath'),
-    opt('d', '😴', 'A nap'),
-  ]),
-  poll('tot-tea', 'fun', 'Coffee or tea?', [opt('a', '☕', 'Coffee'), opt('b', '🍵', 'Tea')]),
-  poll('tot-beach', 'fun', 'Beach or mountains?', [opt('a', '🏖️', 'Beach'), opt('b', '⛰️', 'Mountains')]),
-  poll('tot-morning', 'fun', 'Early bird or night owl?', [opt('a', '🐦', 'Early bird'), opt('b', '🦉', 'Night owl')]),
-  poll('tot-list', 'planning', 'Paper list or app list?', [opt('a', '📒', 'Paper'), opt('b', '📱', 'App')]),
-  poll('tot-sweet', 'fun', 'Sweet or salty?', [opt('a', '🍬', 'Sweet'), opt('b', '🥨', 'Salty')]),
-  poll('tot-books', 'fun', 'Books or movies?', [opt('a', '📚', 'Books'), opt('b', '🎬', 'Movies')]),
-  poll('tot-rain', 'fun', 'Sunny day or rainy day?', [opt('a', '☀️', 'Sunny'), opt('b', '🌧️', 'Rainy')]),
-  poll('tot-plan', 'planning', 'Plan everything or go with the flow?', [opt('a', '🗓️', 'Plan it'), opt('b', '🌊', 'Go with it')]),
-  poll('tot-frog', 'fun', 'Lily pad nap or pond swim?', [opt('a', '🪷', 'Lily pad nap'), opt('b', '💦', 'Pond swim')]),
-  poll('tot-cats', 'fun', 'Cats or dogs?', [opt('a', '🐱', 'Cats'), opt('b', '🐶', 'Dogs')]),
-  checkin('checkin-mood', 'How are you feeling today?'),
-  checkin('checkin-energy', 'How is your energy right now?'),
-  checkin('checkin-sleep', 'How well did you sleep?'),
-  checkin('checkin-stress', 'How calm do you feel today?'),
-  checkin('checkin-focus', 'How focused have you felt today?'),
-  checkin('checkin-week', 'How is your week going so far?'),
-  checkin('checkin-social', 'How connected do you feel to people today?'),
-];
-
-export async function ensureSeedPrompts(): Promise<void> {
-  const existing = await QuestPromptModel.estimatedDocumentCount();
-  if (existing > 0) return;
-  await QuestPromptModel.insertMany(
+async function syncSeedPrompts(): Promise<void> {
+  const newest = await QuestPromptModel.findOne({}, { seedVersion: 1 })
+    .sort({ seedVersion: -1 })
+    .lean<{ seedVersion?: number } | null>();
+  if ((newest?.seedVersion ?? 0) >= SEED_LIBRARY_VERSION) return;
+  await QuestPromptModel.bulkWrite(
     SEED_PROMPTS.map((seed) => ({
-      ...seed,
-      options: seed.options ?? [],
-      weight: 1,
-      cooldownDays: 30,
-      dateKey: null,
-      isActive: true,
+      updateOne: {
+        filter: { promptId: seed.promptId },
+        update: {
+          $set: seedContent(seed),
+          $setOnInsert: {
+            dateKey: null,
+            isActive: true,
+            ...(seed.weight ? {} : { weight: 1 }),
+          },
+        },
+        upsert: true,
+      },
     })),
     { ordered: false },
-  ).catch(() => {});
+  );
+}
+
+let seedSync: Promise<void> | null = null;
+
+export function ensureSeedPrompts(): Promise<void> {
+  seedSync ??= syncSeedPrompts().catch(() => {
+    seedSync = null;
+  });
+  return seedSync;
 }
 
 export async function loadPromptLibrary(): Promise<PromptLibraryEntry[]> {
@@ -235,6 +140,8 @@ export async function loadPromptLibrary(): Promise<PromptLibraryEntry[]> {
       weight: 1,
       cooldownDays: 1,
       dateKey: 1,
+      audience: 1,
+      weekdays: 1,
     },
   ).lean<PromptLibraryEntry[]>();
 }
@@ -243,12 +150,64 @@ export async function loadRecentPromptAnswers(
   userId: string,
   sinceDayKey: string,
 ): Promise<RecentPromptAnswer[]> {
-  return PromptAnswerModel.find(
-    { userId, dayKey: { $gte: sinceDayKey } },
-    { promptId: 1, dayKey: 1, category: 1 },
-  )
-    .sort({ dayKey: -1 })
-    .lean<RecentPromptAnswer[]>();
+  const [answers, shown] = await Promise.all([
+    PromptAnswerModel.find(
+      { userId, dayKey: { $gte: sinceDayKey } },
+      { promptId: 1, dayKey: 1, category: 1, kind: 1 },
+    ).lean<RecentPromptAnswer[]>(),
+    PromptExposureModel.find(
+      { userId, dayKey: { $gte: sinceDayKey } },
+      { promptId: 1, dayKey: 1, category: 1, kind: 1, personal: 1 },
+    ).lean<RecentPromptAnswer[]>(),
+  ]);
+  const merged = new Map<string, RecentPromptAnswer>();
+  for (const entry of shown) {
+    merged.set(`${entry.dayKey}:${entry.promptId}`, {
+      promptId: entry.promptId,
+      dayKey: entry.dayKey,
+      category: entry.category,
+      kind: entry.kind,
+      personal: !!entry.personal,
+      answered: false,
+    });
+  }
+  for (const entry of answers) {
+    const key = `${entry.dayKey}:${entry.promptId}`;
+    merged.set(key, {
+      promptId: entry.promptId,
+      dayKey: entry.dayKey,
+      category: entry.category,
+      kind: entry.kind,
+      personal: merged.get(key)?.personal,
+      answered: true,
+    });
+  }
+  return Array.from(merged.values()).sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+}
+
+export async function recordPromptExposures(
+  userId: string,
+  dayKey: string,
+  prompts: Array<Pick<PromptLibraryEntry, 'promptId' | 'kind' | 'category' | 'audience'>>,
+): Promise<void> {
+  if (prompts.length === 0) return;
+  await PromptExposureModel.bulkWrite(
+    prompts.map((prompt) => ({
+      updateOne: {
+        filter: { userId, promptId: prompt.promptId, dayKey },
+        update: {
+          $setOnInsert: {
+            kind: prompt.kind,
+            category: prompt.category,
+            personal: isPersonalPrompt(prompt),
+            createdAt: new Date(),
+          },
+        },
+        upsert: true,
+      },
+    })),
+    { ordered: false },
+  ).catch(() => {});
 }
 
 function daysBetween(fromKey: string, toKey: string) {
@@ -258,11 +217,18 @@ function daysBetween(fromKey: string, toKey: string) {
   return Math.round((to - from) / 86_400_000);
 }
 
+function weekdayOf(dayKey: string) {
+  const date = new Date(`${dayKey}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) ? date.getUTCDay() : -1;
+}
+
 export function pickPrompt(args: {
   prompts: PromptLibraryEntry[];
   categories?: string[];
   kinds?: QuestPromptKind[];
   recent: RecentPromptAnswer[];
+  audience?: string[];
+  personalBoost?: number;
   todayKey: string;
   seed: string;
   excludeIds?: string[];
@@ -270,12 +236,16 @@ export function pickPrompt(args: {
   const exclude = new Set(args.excludeIds ?? []);
   const categories = args.categories?.length ? new Set(args.categories) : null;
   const kinds = args.kinds?.length ? new Set(args.kinds) : null;
+  const tags = new Set(args.audience ?? []);
+  const weekday = weekdayOf(args.todayKey);
   const matching = args.prompts.filter(
     (prompt) =>
       !exclude.has(prompt.promptId) &&
       (!categories || categories.has(prompt.category)) &&
       (!kinds || kinds.has(prompt.kind)) &&
-      (prompt.kind === 'journal' || (prompt.options?.length ?? 0) >= 2),
+      (prompt.kind === 'journal' || (prompt.options?.length ?? 0) >= 2) &&
+      (!isPersonalPrompt(prompt) || prompt.audience!.some((tag) => tags.has(tag))) &&
+      ((prompt.weekdays?.length ?? 0) === 0 || prompt.weekdays!.includes(weekday)),
   );
   if (matching.length === 0) return null;
 
@@ -284,25 +254,64 @@ export function pickPrompt(args: {
     return pinned[Math.floor(createSeededRandom(`${args.seed}:pinned`)() * pinned.length)];
   }
 
-  const lastAnswered = new Map<string, string>();
-  for (const answer of args.recent) {
-    if (!lastAnswered.has(answer.promptId)) lastAnswered.set(answer.promptId, answer.dayKey);
+  const lastSeen = new Map<string, RecentPromptAnswer>();
+  for (const entry of args.recent) {
+    const known = lastSeen.get(entry.promptId);
+    if (!known || entry.dayKey > known.dayKey) lastSeen.set(entry.promptId, entry);
   }
+
   const undated = matching.filter((prompt) => !prompt.dateKey);
-  const fresh = undated.filter((prompt) => {
-    const last = lastAnswered.get(prompt.promptId);
-    if (!last) return true;
-    return daysBetween(last, args.todayKey) >= Math.max(0, prompt.cooldownDays ?? 30);
+  let fresh = undated.filter((prompt) => {
+    const seen = lastSeen.get(prompt.promptId);
+    return (
+      !seen || daysBetween(seen.dayKey, args.todayKey) >= Math.max(0, prompt.cooldownDays ?? 30)
+    );
   });
-  const lastCategory = args.recent[0]?.category;
-  const varied = fresh.filter((prompt) => prompt.category !== lastCategory);
-  const pool = varied.length > 0 ? varied : fresh.length > 0 ? fresh : undated;
+  if (fresh.length === 0) {
+    const stalest = [...undated].sort((a, b) =>
+      (lastSeen.get(a.promptId)?.dayKey ?? '').localeCompare(lastSeen.get(b.promptId)?.dayKey ?? ''),
+    );
+    fresh = stalest.slice(0, Math.max(1, Math.ceil(stalest.length / 4)));
+  }
+
+  const groupKinds = new Set(matching.map((prompt) => prompt.kind));
+  const trail = args.recent
+    .filter((entry) => !entry.kind || groupKinds.has(entry.kind))
+    .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+  const avoidCount = new Set(fresh.map((prompt) => prompt.category)).size >= 5 ? 2 : 1;
+  const avoid = new Set(trail.slice(0, avoidCount).map((entry) => entry.category));
+  const varied = fresh.filter((prompt) => !avoid.has(prompt.category));
+
+  const pool = varied.length > 0 ? varied : fresh;
   if (pool.length === 0) return null;
 
-  const total = pool.reduce((sum, prompt) => sum + Math.max(1, prompt.weight ?? 1), 0);
+  const personalBoost = trail[0]?.personal ? 1 : Math.max(1, args.personalBoost ?? PROMPT_PERSONAL_BOOST);
+  const baseWeight = (prompt: PromptLibraryEntry) =>
+    Math.max(1, prompt.weight ?? 1) *
+    (isPersonalPrompt(prompt) ? personalBoost : 1) *
+    ((prompt.weekdays?.length ?? 0) > 0 ? PROMPT_WEEKDAY_BOOST : 1);
+
+  const kindTotals = new Map<QuestPromptKind, number>();
+  for (const prompt of pool) {
+    kindTotals.set(prompt.kind, (kindTotals.get(prompt.kind) ?? 0) + baseWeight(prompt));
+  }
+  const lastKinds = trail.slice(0, 2).map((entry) => entry.kind);
+  const kindShare = (kind: QuestPromptKind) => {
+    if (kind === 'checkin' && lastKinds[0] === 'checkin') return KIND_SHARE[kind] * 0.25;
+    if (lastKinds.length === 2 && lastKinds.every((last) => last === kind)) {
+      return KIND_SHARE[kind] * 0.5;
+    }
+    return KIND_SHARE[kind];
+  };
+  const weightOf = (prompt: PromptLibraryEntry) =>
+    kindTotals.size > 1
+      ? (baseWeight(prompt) * kindShare(prompt.kind)) / (kindTotals.get(prompt.kind) ?? 1)
+      : baseWeight(prompt);
+
+  const total = pool.reduce((sum, prompt) => sum + weightOf(prompt), 0);
   let roll = createSeededRandom(args.seed)() * total;
   for (const prompt of pool) {
-    roll -= Math.max(1, prompt.weight ?? 1);
+    roll -= weightOf(prompt);
     if (roll <= 0) return prompt;
   }
   return pool[pool.length - 1];

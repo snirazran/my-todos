@@ -39,9 +39,12 @@ import {
   loadPromptLibrary,
   loadRecentPromptAnswers,
   pickPrompt,
+  promptPersonalBoost,
+  recordPromptExposures,
   type PromptLibraryEntry,
   type RecentPromptAnswer,
 } from '@/lib/prompts/library';
+import { buildPromptAudience } from '@/lib/prompts/audience';
 import PromptAnswerModel from '@/lib/models/PromptAnswer';
 import { ensureDefaultDailyRecipe } from './recipeDefaults';
 import type {
@@ -1088,6 +1091,8 @@ export function pickPromptForEntry(args: {
   entry: RecipePoolEntry;
   prompts: PromptLibraryEntry[];
   recent: RecentPromptAnswer[];
+  audience?: string[];
+  personalBoost?: number;
   todayKey: string;
   seed: string;
   excludeIds: string[];
@@ -1098,6 +1103,8 @@ export function pickPromptForEntry(args: {
       categories: args.entry.promptCategories,
       kinds: args.entry.promptKinds,
       recent: args.recent,
+      audience: args.audience,
+      personalBoost: args.personalBoost,
       todayKey: args.todayKey,
       seed: args.seed,
       excludeIds: args.excludeIds,
@@ -1105,6 +1112,8 @@ export function pickPromptForEntry(args: {
     pickPrompt({
       prompts: args.prompts,
       recent: args.recent,
+      audience: args.audience,
+      personalBoost: args.personalBoost,
       todayKey: args.todayKey,
       seed: args.seed,
       excludeIds: args.excludeIds,
@@ -1418,6 +1427,8 @@ function rollDailyLogic(args: {
   season: DailySeasonContext | null;
   prompts: PromptLibraryEntry[];
   recentAnswers: RecentPromptAnswer[];
+  promptAudience: string[];
+  onPromptPicked?: (prompt: PromptLibraryEntry) => void;
 }): QuestLogicBlock[] {
   const { recipe, userId, templateId, tasks, timezone, todayKey } = args;
   const special: DailySpecialAvailability = {
@@ -1492,12 +1503,15 @@ function rollDailyLogic(args: {
         entry: pick,
         prompts: args.prompts,
         recent: args.recentAnswers,
+        audience: args.promptAudience,
+        personalBoost: promptPersonalBoost(args.user.createdAt),
         todayKey,
         seed: `${slotSeed}:prompt`,
         excludeIds: usedPromptIds,
       });
       if (!prompt) return;
       usedPromptIds.push(prompt.promptId);
+      args.onPromptPicked?.(prompt);
       blocks.push({
         id: `slot-${index + 1}`,
         type: 'prompt',
@@ -1671,6 +1685,7 @@ export async function syncQuestState(args: {
       season,
       answeredPromptIds: new Set(answeredToday.map((answer) => answer.promptId)),
     };
+    const pickedPrompts: PromptLibraryEntry[] = [];
     const rolledLogic = frozenDaily?.logic?.length
       ? backfillAuthoredRewards({
           logic: frozenDaily.logic as QuestLogicBlock[],
@@ -1692,7 +1707,10 @@ export async function syncQuestState(args: {
           season,
           prompts,
           recentAnswers,
+          promptAudience: buildPromptAudience(user, categories),
+          onPromptPicked: (prompt) => pickedPrompts.push(prompt),
         });
+    void recordPromptExposures(userId, todayKey, pickedPrompts);
     if (rolledLogic.length > 0) {
       selectedDailyTemplates = [
         {

@@ -35,11 +35,16 @@ type AdminPrompt = {
   weight: number;
   cooldownDays: number;
   dateKey: string | null;
+  audience: string[];
+  weekdays: number[];
+  shown: number;
   isActive: boolean;
   answers: number;
   lastAnswered: string | null;
   tally: Record<string, number>;
 };
+
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const KIND_ORDER: QuestPromptKind[] = ['journal', 'poll', 'this_or_that', 'checkin'];
 
@@ -69,6 +74,9 @@ function blankPrompt(): AdminPrompt {
     weight: 1,
     cooldownDays: 30,
     dateKey: null,
+    audience: [],
+    weekdays: [],
+    shown: 0,
     isActive: true,
     answers: 0,
     lastAnswered: null,
@@ -536,6 +544,48 @@ export function AdminPromptManager() {
                   </Field>
                 </div>
 
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Only for players who picked" hint="area:fitness, barrier:put-off, trait:logic, overwhelm:weekly. Empty = everyone">
+                    <input
+                      type="text"
+                      value={(editing.audience ?? []).join(', ')}
+                      onChange={(event) =>
+                        setEditing({
+                          ...editing,
+                          audience: event.target.value.split(',').map((tag) => tag.trim()),
+                        })
+                      }
+                      placeholder="Everyone"
+                      className={inputClass}
+                    />
+                  </Field>
+                  <div className="space-y-2">
+                    <p className="text-[12px] font-black text-muted-foreground">Only on these days</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {WEEKDAY_LABELS.map((label, day) => {
+                        const active = (editing.weekdays ?? []).includes(day);
+                        return (
+                          <Chip
+                            key={label}
+                            tone="grape"
+                            active={active}
+                            onClick={() =>
+                              setEditing({
+                                ...editing,
+                                weekdays: active
+                                  ? (editing.weekdays ?? []).filter((value) => value !== day)
+                                  : [...(editing.weekdays ?? []), day],
+                              })
+                            }
+                          >
+                            {label}
+                          </Chip>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 <ToggleRow
                   title="In rotation"
                   description="Paused questions are never asked."
@@ -660,6 +710,21 @@ function PromptCard({
             {prompt.dateKey ? (
               <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-700 dark:text-amber-400">
                 📌 {shortDate(prompt.dateKey)}
+              </span>
+            ) : null}
+            {(prompt.audience ?? []).length > 0 ? (
+              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-700 dark:text-emerald-400">
+                🎯 {prompt.audience.join(' · ')}
+              </span>
+            ) : null}
+            {(prompt.weekdays ?? []).length > 0 ? (
+              <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-700 dark:text-sky-400">
+                {prompt.weekdays.map((day) => WEEKDAY_LABELS[day]).join(' · ')}
+              </span>
+            ) : null}
+            {prompt.shown > 0 ? (
+              <span className="text-muted-foreground">
+                {Math.round((Math.min(prompt.answers, prompt.shown) / prompt.shown) * 100)}% answered of {prompt.shown} shown
               </span>
             ) : null}
             {!prompt.isActive ? <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">Paused</span> : null}

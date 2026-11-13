@@ -35,11 +35,13 @@ function RotatingPrize({
   catalog,
   lane,
   offset,
+  compact,
 }: {
   entries: LeapPrizePreview[];
   catalog: Catalog;
   lane: Lane;
   offset: number;
+  compact: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const [order] = useState(() => shuffled(entries));
@@ -76,7 +78,7 @@ function RotatingPrize({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
         >
-          <SeasonRewardTile reward={reward} rewardCatalog={catalog} lane={lane} paused oversample={2} />
+          <SeasonRewardTile reward={reward} rewardCatalog={catalog} lane={lane} paused compact={compact} oversample={2} />
         </motion.span>
       </AnimatePresence>
     </span>
@@ -90,6 +92,7 @@ export function LeapPrizeTile({
   offset = 0,
   lane = 'free',
   done = false,
+  compact = false,
   className,
 }: {
   reward: BonusReward;
@@ -98,6 +101,7 @@ export function LeapPrizeTile({
   offset?: number;
   lane?: Lane;
   done?: boolean;
+  compact?: boolean;
   className?: string;
 }) {
   const catalog = view.rewardCatalog as unknown as Catalog;
@@ -110,14 +114,14 @@ export function LeapPrizeTile({
     <span className={cn('relative block shrink-0', SIZES[size], className)}>
       <span className={cn('block', done && 'opacity-45 grayscale-[30%]')}>
         {preview.length ? (
-          <RotatingPrize entries={preview} catalog={catalog} lane={lane} offset={offset} />
+          <RotatingPrize entries={preview} catalog={catalog} lane={lane} offset={offset} compact={compact} />
         ) : (
           <SeasonRewardTile
             reward={shown}
             rewardCatalog={catalog}
             lane={lane}
             paused
-            compact={done}
+            compact={done || compact}
             flyScale={0.86}
             oversample={2}
           />

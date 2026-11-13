@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, Heart, RefreshCw } from 'lucide-react';
+import { Check, Heart, RefreshCw, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
@@ -751,10 +751,10 @@ export function ShopWindow({
           </div>
         )}
 
-        <section aria-label="Today's picks" data-hint="shop-deals">
+        <section aria-label="Special Collection" data-hint="shop-deals">
           <ShelfHeader
-            label="Today's picks"
-            meta={countdown ? <>New in {countdown}</> : null}
+            label={<span className="flex flex-col items-start leading-tight"><span>Special Collection</span>{countdown && <span className="mt-0.5 text-[12px] font-bold normal-case tracking-normal text-muted-foreground">New in {countdown}</span>}</span>}
+            icon={<Sparkles aria-hidden className="mr-1 h-8 w-8 shrink-0 fill-amber-400 text-amber-600 dark:fill-amber-300 dark:text-amber-400" strokeWidth={1.25} strokeLinejoin="round" />}
             action={
               refreshState ? (
                 <RefreshButton
@@ -774,27 +774,18 @@ export function ShopWindow({
                 : 'You own everything that could show up here. Nice!'}
             </p>
           ) : (
-            <div key={dealsKey}>
-              {freePicks.length > 0 && <div className={PICK_GRID}>{freePicks.map(pickTile)}</div>}
-              {plusPicks.length > 0 && (
-                <>
-                  <ShelfHeader
-                    label="Plus picks"
-                    icon={<Icon name="frogPlus" className="-my-1 h-5 w-5" />}
-                    tone="text-[#7a5410] dark:text-[#fde68a]"
-                    className={cn(freePicks.length > 0 && 'mt-4')}
-                  />
-                  <div className={PICK_GRID}>
-                    {plusPicks.map((pick, i) => pickTile(pick, freePicks.length + i))}
-                  </div>
-                </>
-              )}
+            <div key={dealsKey} className={PICK_GRID}>
+              {[...freePicks, ...plusPicks].map(pickTile)}
             </div>
           )}
         </section>
 
         <section aria-label="Everyday collection" className="mt-6 md:mt-8">
-          <ShelfHeader label="Everyday" />
+          <ShelfHeader
+            label={<span className="flex flex-col items-start leading-tight"><span>Everyday</span><span className="mt-0.5 text-sm font-semibold normal-case tracking-normal text-muted-foreground">The items below are always available!</span></span>}
+            icon={<Icon name="store" className="mr-1 h-10 w-10 shrink-0" />}
+            className="mb-4"
+          />
           {loading ? (
             <GridSkeleton gridClass={gridClass} count={cols * 2} />
           ) : (

@@ -6,6 +6,7 @@ import QuestRecipeModel, {
 import PromptAnswerModel, { type PromptAnswerDoc } from '@/lib/models/PromptAnswer';
 import PromptTallyModel from '@/lib/models/PromptTally';
 import FriendshipModel from '@/lib/models/Friendship';
+import QuestCategoryModel from '@/lib/models/QuestCategory';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { getZonedToday } from '@/lib/utils';
@@ -19,7 +20,14 @@ import {
   PROMPT_RECENT_WINDOW_DAYS,
   loadPromptLibrary,
   loadRecentPromptAnswers,
+  promptPersonalBoost,
+  recordPromptExposures,
 } from './library';
+import {
+  buildPromptAudience,
+  type PromptAudienceCategory,
+  type PromptAudienceUser,
+} from './audience';
 
 export const PROMPT_TEXT_MAX = 1000;
 
@@ -88,17 +96,23 @@ export async function swapDailyPrompt(args: {
       weight: 1,
     };
 
-  const [prompts, recent] = await Promise.all([
+  const [prompts, recent, user, categories] = await Promise.all([
     loadPromptLibrary(),
     loadRecentPromptAnswers(
       args.userId,
       shiftDayKey(todayKey, -PROMPT_RECENT_WINDOW_DAYS),
     ),
+    UserModel.findById(args.userId)
+      .select('onboardingResponses focusProfile ageRange createdAt')
+      .lean<(PromptAudienceUser & { createdAt?: Date }) | null>(),
+    QuestCategoryModel.find({}, { categoryId: 1, name: 1 }).lean<PromptAudienceCategory[]>(),
   ]);
   const next = pickPromptForEntry({
     entry,
     prompts,
     recent,
+    audience: buildPromptAudience(user, categories),
+    personalBoost: promptPersonalBoost(user?.createdAt),
     todayKey,
     seed: `${args.userId}:${todayKey}:${args.seed}`,
     excludeIds: block.promptId ? [block.promptId] : [],
@@ -119,6 +133,7 @@ export async function swapDailyPrompt(args: {
   doc.progress = recomputeQuestProgress(nextLogic);
   doc.markModified('logic');
   await doc.save();
+  void recordPromptExposures(args.userId, todayKey, [next]);
   return next;
 }
 
@@ -216,15 +231,18 @@ export async function answerDailyPrompt(args: {
 
   let text: string | undefined;
   let optionId: string | undefined;
+  let optionLabel: string | undefined;
+  let optionEmoji: string | undefined;
   if (kind === 'journal') {
     text = typeof args.text === 'string' ? args.text.trim().slice(0, PROMPT_TEXT_MAX) : '';
     if (!text) throw new Error('Write a few words first');
   } else if (OPTION_KINDS.has(kind)) {
     const picked = typeof args.optionId === 'string' ? args.optionId : '';
-    if (!(block.promptOptions ?? []).some((option) => option.id === picked)) {
-      throw new Error('Pick an answer first');
-    }
+    const option = (block.promptOptions ?? []).find((item) => item.id === picked);
+    if (!option) throw new Error('Pick an answer first');
     optionId = picked;
+    optionLabel = option.label || undefined;
+    optionEmoji = option.emoji || undefined;
   }
 
   try {
@@ -237,6 +255,8 @@ export async function answerDailyPrompt(args: {
       question: block.promptQuestion ?? '',
       text,
       optionId,
+      optionLabel,
+      optionEmoji,
     });
   } catch (error: any) {
     if (error?.code !== 11000) throw error;
@@ -279,7 +299,15 @@ export async function answerDailyPrompt(args: {
 
 export type JournalEntry = Pick<
   PromptAnswerDoc,
-  'promptId' | 'dayKey' | 'kind' | 'category' | 'question' | 'text' | 'optionId'
+  | 'promptId'
+  | 'dayKey'
+  | 'kind'
+  | 'category'
+  | 'question'
+  | 'text'
+  | 'optionId'
+  | 'optionLabel'
+  | 'optionEmoji'
 > & { id: string };
 
 export async function loadJournal(userId: string, limit = 60): Promise<JournalEntry[]> {
@@ -300,5 +328,7 @@ export async function loadJournal(userId: string, limit = 60): Promise<JournalEn
     question: row.question,
     text: row.text,
     optionId: row.optionId,
+    optionLabel: row.optionLabel,
+    optionEmoji: row.optionEmoji,
   }));
 }

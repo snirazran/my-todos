@@ -706,6 +706,8 @@ type JournalEntry = {
   question: string;
   text?: string;
   optionId?: string;
+  optionLabel?: string;
+  optionEmoji?: string;
 };
 
 const CHECKIN_FACES: Record<string, { emoji: string; label: string }> = {
@@ -751,7 +753,12 @@ function JournalSection({ frogName }: { frogName: string | null }) {
       </div>
       <ul className="mt-2 divide-y divide-border/60">
         {visible.map((entry) => {
-          const face = entry.kind === 'checkin' ? CHECKIN_FACES[entry.optionId ?? ''] : null;
+          const face =
+            entry.kind !== 'checkin'
+              ? null
+              : entry.optionLabel
+                ? { emoji: entry.optionEmoji ?? '', label: entry.optionLabel }
+                : CHECKIN_FACES[entry.optionId ?? ''];
           return (
             <li key={entry.id} className="group py-3 last:pb-1">
               <div className="flex items-start gap-3">

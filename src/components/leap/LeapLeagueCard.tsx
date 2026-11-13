@@ -106,26 +106,27 @@ function LeapChestRow({ view, large = false }: { view: LeapView; large?: boolean
     <div
       ref={rowRef}
       className={cn(
-        'flex items-center gap-3 px-3.5 transition-colors duration-300',
+        'flex items-center gap-3 px-3.5 transition-colors duration-300 narrow:flex-wrap narrow:gap-x-3 narrow:gap-y-2',
         large ? 'py-3.5' : 'py-3',
         ready && 'bg-[var(--season-tint,#fffbeb)] dark:bg-[var(--season-soft,rgba(245,158,11,0.1))]',
       )}
     >
       {rewards.length > 0 && (
-        <span className="flex shrink-0 items-center gap-3 pt-2.5">
+        <span className="flex shrink-0 items-center gap-3 pt-2.5 narrow:gap-2">
           {rewards.slice(0, 2).map((reward, index) => (
             <LeapPrizeTile
               key={index}
               reward={reward}
               view={view}
               size="md"
+              className="narrow:w-11"
               offset={index}
               done={opened}
             />
           ))}
         </span>
       )}
-      <span className={cn('flex min-w-0 flex-1 flex-col', large ? 'gap-2' : 'gap-1.5')}>
+      <span className={cn('flex min-w-0 flex-1 flex-col narrow:min-w-[130px]', large ? 'gap-2' : 'gap-1.5')}>
         <span
           className={cn(
             'flex min-w-0 items-center gap-1.5 font-bold leading-tight text-foreground',

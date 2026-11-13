@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { usePathname, useRouter } from 'next/navigation';
-import { Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
+import { Check, Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
+import { PLEDGE_DAYS } from '@/lib/streak/types';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
@@ -1036,6 +1037,8 @@ function RevealStep({
 }
 
 const PLEDGE_NAMES: Record<number, string> = {
+  2: 'First steps',
+  5: 'Finding a rhythm',
   7: 'Tadpole',
   14: 'Froglet',
   30: 'Bullfrog',
@@ -1109,7 +1112,7 @@ function pledgePrizeRows(
           paused={paused}
         />
       ),
-      title: `${copies}${rewardLabel(questReward, rewardCatalog, isPremium)}`,
+      title: `${copies}${rewardLabel(questReward, rewardCatalog, isPremium)}`.replace(/^1 flies$/, '1 fly'),
       note: isFlies
         ? 'Spend them on outfits'
         : questReward.type === 'BOX'
@@ -1170,6 +1173,7 @@ function CommitStep({
   wide,
   onPicked,
   onSkip,
+  preview = false,
 }: {
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
@@ -1178,14 +1182,16 @@ function CommitStep({
   wide: boolean;
   onPicked: (view: LoginStreakView) => void;
   onSkip: () => void;
+  preview?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const [busyDays, setBusyDays] = useState<number | null>(null);
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
-  const lowestTierDays = view?.goalTiers?.length
-    ? Math.min(...view.goalTiers.map((tier) => tier.days))
+  const choices = view.goalTiers.filter((tier) => (PLEDGE_DAYS as readonly number[]).includes(tier.days));
+  const lowestTierDays = choices.length
+    ? Math.min(...choices.map((tier) => tier.days))
     : null;
-  const stepUpTier = view?.goalTiers?.find(
+  const stepUpTier = choices.find(
     (tier) => tier.days === view.nextTierDays,
   );
   const steppingUpTo =
@@ -1204,7 +1210,7 @@ function CommitStep({
     setSelectedDays(days);
     setError(null);
     hapticSelect();
-    const longest = Math.max(...view.goalTiers.map((tier) => tier.days));
+    const longest = Math.max(...choices.map((tier) => tier.days));
     frogRef.current?.fireEmote(
       days >= longest ? 'celebrate' : days === lowestTierDays ? 'hop' : 'love',
     );
@@ -1212,13 +1218,9 @@ function CommitStep({
   const [error, setError] = useState<string | null>(null);
   const selectedTier =
     view.goalTiers.find((tier) => tier.days === selectedDays) ?? null;
-  const topTier = view.goalTiers.reduce<LoginStreakView['goalTiers'][number] | null>(
-    (best, tier) => (!best || tier.days > best.days ? tier : best),
-    null,
-  );
   const bestStartDays =
     steppingUpTo === null &&
-    view.goalTiers.some(
+    choices.some(
       (tier) => tier.days === lowestTierDays && tier.repeatIndex === 0 && tier.payoutPercent >= 100,
     )
       ? lowestTierDays
@@ -1229,6 +1231,7 @@ function CommitStep({
   }
 
   const pickGoal = async (days: number) => {
+    if (preview) return;
     if (busyDays !== null) return;
     setBusyDays(days);
     setError(null);
@@ -1281,31 +1284,22 @@ function CommitStep({
           wide ? 'text-[32px]' : 'text-[clamp(1.5rem,7vw,1.75rem)]',
         )}
         >
-          Make a pledge
+          How many days will you pledge?
         </h2>
-        <p
-          id="streak-goal-hint"
-          className={cn(
-          'mt-1 text-pretty text-center text-sm font-semibold leading-snug text-[color:var(--pl-on-bg-muted)]',
-          !wide && 'max-w-[30ch]',
-        )}
-        >
-          Get one thing done every day. Keep it up and the prize is yours.
-        </p>
     </>
   );
 
   const tierPanel = (
-    <div className="relative z-10 w-full rounded-[26px] bg-white p-2 shadow-[0_5px_0_0_rgba(0,0,0,0.16)] dark:bg-[hsl(var(--card-raised))]">
+    <div className="relative z-10 w-full">
       <fieldset
         className="w-full"
         aria-labelledby="streak-goal-heading"
-        aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
+        aria-describedby={error ? 'streak-goal-error' : undefined}
         disabled={busyDays !== null}
       >
         <legend className="sr-only">Pledge length</legend>
-        <div className="flex flex-col gap-1">
-          {view.goalTiers.map((tier, index) => {
+        <div className="flex flex-col gap-2.5 short-screen:gap-2">
+          {choices.map((tier) => {
             const selected = selectedDays === tier.days;
             const badge =
               tier.days === steppingUpTo
@@ -1317,10 +1311,10 @@ function CommitStep({
               <label
                 key={tier.days}
                 className={cn(
-                  'relative flex cursor-pointer items-center gap-3 rounded-[20px] border-2 py-2 pl-2 pr-2.5 transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.985] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:disabled]:cursor-wait short-screen:py-1.5',
+                  'relative flex min-h-[60px] cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-2 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-white has-[:disabled]:cursor-wait short-screen:min-h-[50px]',
                   selected
-                    ? 'border-[color:var(--pl-pick)] bg-[color:var(--pl-pick-soft)] dark:border-teal-400/70 dark:bg-teal-400/10'
-                    : 'border-transparent hover:bg-[#f5f7fb] dark:hover:bg-white/[0.04]',
+                    ? 'border-white bg-white text-[#174e48]'
+                    : 'border-white/40 bg-white/10 text-white hover:bg-white/15',
                 )}
               >
                 <input
@@ -1332,78 +1326,40 @@ function CommitStep({
                   className="sr-only"
                 />
                 {badge && (
-                  <span className="absolute left-[36px] top-0 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950 shadow-[0_1px_0_0_#b45309] short-screen:left-[34px]">
+                  <span className="absolute right-3 top-2 whitespace-nowrap rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black leading-none text-amber-950">
                     {badge}
                   </span>
                 )}
-                <span
-                  aria-hidden
-                  className={cn(
-                    'flex h-[52px] w-[52px] shrink-0 flex-col items-center justify-center rounded-2xl transition-[background-color,color,box-shadow] duration-150 short-screen:h-12 short-screen:w-12',
-                    selected
-                      ? 'bg-[color:var(--pl-pick)] text-[color:var(--pl-pick-ink)] shadow-[0_3px_0_0_var(--pl-pick-edge)]'
-                      : 'bg-[#f1f4f9] text-foreground shadow-[0_3px_0_0_#e1e6ef] dark:bg-white/[0.07] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.35)]',
-                  )}
-                >
-                  <span className="font-display text-[24px] leading-none tracking-wide">
-                    {tier.days}
-                  </span>
-                  <span
-                    className={cn(
-                      'mt-0.5 text-[9.5px] font-black leading-none',
-                      selected ? 'opacity-85' : 'text-muted-foreground',
-                    )}
-                  >
-                    days
-                  </span>
-                </span>
+                <span className="w-[72px] shrink-0 text-[17px] font-black tabular-nums">{tier.days} days</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="truncate text-[15px] font-black leading-tight text-foreground">
+                    <span className="truncate text-[14px] font-black leading-tight">
                       {pledgeName(tier.days)}
                     </span>
                   </span>
-                  <span
-                    className={cn(
-                      'mt-1 block truncate text-[12px] font-bold leading-tight',
-                      selected
-                        ? 'text-[color:var(--pl-pick)] dark:text-teal-300'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    {selected
-                      ? `Ends ${formatPledgeEnd(tier.days)}`
-                      : tier.payoutPercent < 100
-                        ? `Flies pay ${tier.payoutPercent}%`
-                        : `${tier.days} days in a row`}
-                  </span>
                 </span>
-                <PledgeRewardTiles
-                  rewards={tier.rewards}
-                  rewardCatalog={rewardCatalog}
-                  isPremium={isPremium}
-                  hydrateDelayMs={300 + index * 110}
-                  paused={!selected}
-                  still={!selected}
-                  flatLimit={3}
-                />
+                {selected && !badge && <Check aria-hidden className="h-5 w-5 shrink-0 text-[#0a6f66]" strokeWidth={3} />}
               </label>
             );
           })}
         </div>
       </fieldset>
       {selectedTier && (
-        <p
+        <div
           aria-live="polite"
-          className="px-3 pb-1.5 pt-2.5 text-center text-[12.5px] font-semibold leading-snug text-muted-foreground short-screen:pt-2"
+          className="mt-3 rounded-2xl bg-black/10 px-4 py-3 text-white"
         >
-          <span className="font-black text-foreground">
-            {pledgeName(selectedTier.days)} prize:
-          </span>{' '}
-          {pledgePrizeSummary(selectedTier.rewards, rewardCatalog, isPremium)}
-          {selectedTier.payoutPercent < 100 &&
-            `. Kept before, so flies pay ${selectedTier.payoutPercent}%`}
-        </p>
+          <p className="mb-2 text-xs font-black">Your prize</p>
+          <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+            {pledgePrizeRows(selectedTier.rewards, rewardCatalog, isPremium, false).map((prize) => (
+              <div key={prize.key} className="flex min-w-[52px] max-w-[88px] flex-col items-center gap-1 text-center">
+                {prize.tile}
+                <span className="text-[11px] font-bold leading-tight">{prize.title}</span>
+              </div>
+            ))}
+          </div>
+          {selectedTier.payoutPercent < 100 && <p className="mt-2 text-xs font-semibold text-white/85">Kept before, so flies pay {selectedTier.payoutPercent}%</p>}
+        </div>
       )}
     </div>
   );
@@ -1432,16 +1388,8 @@ function CommitStep({
         {busyDays !== null
           ? 'Starting…'
           : selectedDays !== null
-            ? `Pledge ${selectedDays} days`
+            ? 'Commit to this goal!'
             : 'Pick a pledge'}
-      </button>
-      <button
-        type="button"
-        onClick={onSkip}
-        disabled={busyDays !== null}
-        className="mt-1 min-h-11 px-4 text-sm font-bold text-[color:var(--pl-on-bg-muted)] hover:text-[color:var(--pl-on-bg)] focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
-      >
-        Skip the prize
       </button>
     </div>
   );
@@ -1495,10 +1443,10 @@ function CommitStep({
         style={{ contain: 'paint' }}
       >
         <div className="flex min-h-full flex-col px-4 pb-6 pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 short-screen:pb-4 short-screen:pt-[calc(env(safe-area-inset-top)+3rem)] md:px-8 md:pt-14">
-          <div className="mx-auto my-auto flex w-full max-w-sm flex-col items-center">
+          <div className="mx-auto mb-auto flex w-full max-w-sm flex-col items-center">
             {heading}
 
-            <div className="relative mt-[80px] w-full short-screen:mt-[74px]">
+            <div className="relative mt-[104px] w-full short-screen:mt-[88px]">
               <div
                 className="pointer-events-none absolute bottom-[calc(100%-11px)] left-[-22px] z-20"
                 style={{ width: frogWidth, height: frogHeight }}
@@ -1516,7 +1464,7 @@ function CommitStep({
                   messageClassName="!text-[14px]"
                   className={cn(
                     '[--bubble-max:calc(100vw-11.5rem)] md:[--bubble-max:14rem]',
-                    shortScreen ? '!left-[128px] !top-[-30px]' : '!left-[144px] !top-[-30px]',
+                    shortScreen ? '!left-[128px] !top-[-42px]' : '!left-[144px] !top-[-42px]',
                   )}
                 />
               )}
@@ -1532,6 +1480,21 @@ function CommitStep({
       </div>
     </div>
   );
+}
+
+export function PledgeDesignPreview() {
+  const view: LoginStreakView = {
+    count: 0, longestStreak: 0, lastDayKey: '', checkedInToday: false,
+    alive: true, shields: 0, shieldCap: 3, shieldedDayKeys: [], protectedDayKeys: [],
+    goal: null, nextTierDays: 2,
+    goalTiers: [
+      { days: 2, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 3 }], repeatIndex: 0, payoutPercent: 100 },
+      { days: 5, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 8 }, { type: 'BOX', itemId: 'gift_box_1', amount: 1 }], repeatIndex: 0, payoutPercent: 100 },
+      { days: 7, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 12 }, { type: 'BOX', itemId: 'gift_box_1', amount: 1 }, { type: 'SHIELD', amount: 1 }], repeatIndex: 0, payoutPercent: 100 },
+      { days: 14, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 20 }, { type: 'BOX', itemId: 'gift_box_rare', amount: 1 }, { type: 'SHIELD', amount: 1 }], repeatIndex: 0, payoutPercent: 100 },
+    ],
+  };
+  return <div style={PLEDGE_COLORS} className="fixed inset-0 z-[9999] flex flex-col bg-[color:var(--pl-bg)]"><CommitStep view={view} indices={{}} rewardCatalog={Object.fromEntries(CATALOG.map((item) => [item.id, item]))} isPremium={false} wide={false} onPicked={() => {}} onSkip={() => {}} preview /></div>;
 }
 
 function HomeStep({
