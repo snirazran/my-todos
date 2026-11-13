@@ -18,6 +18,7 @@ export type StarterTaskTemplate = {
   group?: string;
   movement?: boolean;
   company?: boolean;
+  anytime?: boolean;
 };
 
 export type StarterBarrier = {
@@ -313,11 +314,11 @@ export function buildStarterPlan(args: {
     const key = textKey(template.text);
     const group = template.group ? `group:${template.group}` : null;
     const moment = `moment:${template.moment ?? 'day'}`;
-    if (!usable(template) || seen.has(moment)) return false;
+    if (!usable(template) || (!template.anytime && seen.has(moment))) return false;
     const days = starterCadenceDays(template.cadence, template.days);
     seen.add(template.id);
     seen.add(key);
-    seen.add(moment);
+    if (!template.anytime) seen.add(moment);
     if (group) seen.add(group);
     picked.push({
       id: `${category.id}:${template.id}`,

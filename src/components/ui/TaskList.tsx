@@ -1725,7 +1725,7 @@ export default function TaskList({
   onReorderSections,
 }: {
   tasks: Task[];
-  toggle: (id: string, completed?: boolean) => void;
+  toggle: (id: string, completed?: boolean, onComplete?: () => void) => void;
   showConfetti: boolean;
   renderBullet?: (task: Task, isVisuallyDone: boolean, paused: boolean) => React.ReactNode;
   visuallyCompleted?: Set<string>;
@@ -1893,7 +1893,6 @@ export default function TaskList({
     new Set(),
   );
   const { showNotification } = useNotification();
-  const prevCompletedRef = useRef<Map<string, boolean> | null>(null);
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
   const { data: profile } = useSWR<{ name?: string | null }>(
@@ -1904,21 +1903,16 @@ export default function TaskList({
   const firstName = friendlyFirstName(profile?.name);
   usePreloadDoneToastFrog(true);
 
-  useEffect(() => {
-    const prev = prevCompletedRef.current;
-    prevCompletedRef.current = new Map(tasks.map((t) => [t.id, !!t.completed]));
-    if (!prev) return;
-    const flipped = tasks.find(
-      (t) => t.completed && prev.get(t.id) === false,
-    );
-    if (!flipped) return;
+  const showCompletion = (task: Task) => {
     emitCampaignTrigger('task_completed');
-    if (flipped.isStarter) return;
-    const id = flipped.id;
+    if (task.isStarter) return;
+    const id = task.id;
     const now = new Date();
     const moment = buildDoneMoment({
-      task: flipped,
-      dayTasks: tasks,
+      task: { ...task, completed: true },
+      dayTasks: tasks.map((item) =>
+        item.id === id ? { ...item, completed: true } : item,
+      ),
       tags: userTags,
       todayKey: format(now, 'yyyy-MM-dd'),
       now,
@@ -1937,11 +1931,10 @@ export default function TaskList({
       },
       {
         durationMs: moment.confetti ? DONE_TOAST_CELEBRATION_MS : DONE_TOAST_MS,
-        menu: { title: flipped.text, actionHint: 'Puts it back on your list' },
+        menu: { title: task.text, actionHint: 'Puts it back on your list' },
       },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
+  };
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [sectionEditor, setSectionEditor] = useState<
@@ -2247,7 +2240,7 @@ export default function TaskList({
       }
     }
 
-    toggle(task.id, forceState);
+    toggle(task.id, forceState, isCompleting ? () => showCompletion(task) : undefined);
   };
 
   const [nowMinutes, setNowMinutes] = useState<number | null>(null);
@@ -3428,7 +3421,7 @@ export default function TaskList({
             tags={userTags}
             isCompleted={isCompletedTask}
             isWeekly={isWeekly}
-            onComplete={() => toggle(sheetTask.id)}
+            onComplete={() => handleTaskToggle(sheetTask)}
             onStartTimer={
               onStartTimer ? () => onStartTimer(sheetTask as any) : undefined
             }

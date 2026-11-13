@@ -604,7 +604,7 @@ export default function HomeDashboard() {
     });
   };
 
-  const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
+  const handleToggle = async (taskId: string, explicitCompleted?: boolean, onComplete?: () => void) => {
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
     const completed =
@@ -674,6 +674,7 @@ export default function HomeDashboard() {
       allowGolden: true,
       queueIfBusy: true,
       onPersist: async () => {
+        onComplete?.();
         if (user) {
           await toggleTask(taskId, true);
           await mutateQuests();

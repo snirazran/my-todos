@@ -12,6 +12,7 @@ export const STARTER_BASICS: StarterTaskTemplate[] = [
     text: 'Drink a glass of water',
     cadence: 'daily',
     moment: 'morning',
+    anytime: true,
   },
   {
     id: 'make-your-bed',
@@ -29,16 +30,16 @@ const PROFILE_EASY_WINS: Record<
   exhale: {
     id: 'ew-long-exhale',
     emoji: '🌬️',
-    text: 'Take 3 slow breaths with a long exhale',
+    text: 'Take 3 slow breaths after you brush your teeth',
     cadence: 'daily',
     moment: 'day',
     group: 'breathing',
-    reason: 'For stressful moments',
+    reason: 'For calmer days',
   },
   windDown: {
     id: 'ew-phone-wind-down',
     emoji: '🔌',
-    text: 'Put your phone on its charger 30 minutes before bed',
+    text: 'Charge your phone away from your bed',
     cadence: 'daily',
     moment: 'night',
     group: 'phone-charger',
@@ -71,7 +72,8 @@ export function starterEasyWinsFor(profile: StarterProfile): StarterTaskTemplate
   if (profile.sleep === 'under-5' || profile.sleep === '5-7') wins.push(PROFILE_EASY_WINS.windDown);
   if (profile.activity === 'sitting') wins.push(PROFILE_EASY_WINS.standUp);
   if (profile.sleep === 'over-9') wins.push(PROFILE_EASY_WINS.curtains);
-  return [...wins, ...STARTER_BASICS].map((task) => ({ ...task }));
+  const [instant, ...rest] = STARTER_BASICS;
+  return [instant, ...wins, ...rest].map((task) => ({ ...task }));
 }
 
 export const GENTLE_MOVE_TASK: StarterTaskTemplate = {
@@ -86,9 +88,16 @@ export const GENTLE_MOVE_TASK: StarterTaskTemplate = {
 const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
   productivity: [
     {
-      id: 'top-three',
+      id: 'two-minute-task',
+      emoji: '✅',
+      text: 'Finish one 2-minute task',
+      cadence: 'daily',
+      moment: 'day',
+    },
+    {
+      id: 'one-must-do',
       emoji: '🎯',
-      text: 'Pick your top 3 for today',
+      text: 'Pick your one must-do for today',
       cadence: 'daily',
       moment: 'morning',
     },
@@ -100,16 +109,9 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       moment: 'night',
     },
     {
-      id: 'focus-ten',
+      id: 'focus-five',
       emoji: '⏱️',
-      text: 'Focus on one task for 10 minutes',
-      cadence: 'daily',
-      moment: 'day',
-    },
-    {
-      id: 'two-minute-task',
-      emoji: '✅',
-      text: 'Finish one 2-minute task',
+      text: 'Focus on one task for 5 minutes',
       cadence: 'daily',
       moment: 'day',
     },
@@ -119,7 +121,7 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       id: 'slow-breaths',
       group: 'breathing',
       emoji: '🌬️',
-      text: 'Take 5 slow breaths',
+      text: 'Take 3 slow breaths when you wake up',
       cadence: 'daily',
       moment: 'wake',
     },
@@ -133,14 +135,14 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
     {
       id: 'step-outside',
       emoji: '🌤️',
-      text: 'Step outside for 2 minutes',
+      text: 'Step outside for a minute after lunch',
       cadence: 'daily',
       moment: 'day',
     },
     {
       id: 'quiet-minute',
       emoji: '🧘',
-      text: 'Sit quietly for 1 minute',
+      text: 'Sit quietly for 1 minute after dinner',
       cadence: 'daily',
       moment: 'evening',
     },
@@ -151,7 +153,7 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       group: 'stretch',
       movement: true,
       emoji: '🙆',
-      text: 'Stretch for 2 minutes',
+      text: 'Stretch for 1 minute after you wake up',
       cadence: 'daily',
       moment: 'wake',
     },
@@ -160,16 +162,16 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       group: 'walk',
       movement: true,
       emoji: '🚶',
-      text: 'Take a 5-minute walk after dinner',
+      text: 'Take a 2-minute walk after dinner',
       cadence: 'daily',
       moment: 'evening',
     },
     {
-      id: 'ten-squats',
+      id: 'five-squats',
       group: 'squats',
       movement: true,
       emoji: '🦵',
-      text: 'Do 10 squats',
+      text: 'Do 5 squats after brushing your teeth',
       cadence: 'daily',
       moment: 'morning',
     },
@@ -178,23 +180,23 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       group: 'walk',
       movement: true,
       emoji: '🚶',
-      text: 'Take a 5-minute walk after lunch',
+      text: 'Take a 2-minute walk after lunch',
       cadence: 'daily',
       moment: 'day',
     },
   ],
   learning: [
     {
-      id: 'read-five',
+      id: 'read-two',
       emoji: '📖',
-      text: 'Read 5 pages',
+      text: 'Read 2 pages before bed',
       cadence: 'daily',
       moment: 'night',
     },
     {
-      id: 'learn-five',
+      id: 'learn-two',
       emoji: '🧠',
-      text: 'Learn something for 5 minutes',
+      text: "Spend 2 minutes on something you're learning",
       cadence: 'daily',
       moment: 'morning',
     },
@@ -213,14 +215,6 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       text: 'Send someone a kind message',
       cadence: 'daily',
       moment: 'day',
-    },
-    {
-      id: 'ask-their-day',
-      company: true,
-      emoji: '🗣️',
-      text: 'Ask someone how their day really went',
-      cadence: 'daily',
-      moment: 'evening',
     },
     {
       id: 'say-thanks',
@@ -244,6 +238,14 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       cadence: 'daily',
       moment: 'morning',
     },
+    {
+      id: 'ask-their-day',
+      company: true,
+      emoji: '🗣️',
+      text: 'Ask someone how their day really went',
+      cadence: 'daily',
+      moment: 'evening',
+    },
   ],
   home: [
     {
@@ -254,9 +256,9 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       moment: 'night',
     },
     {
-      id: 'kitchen-clean',
+      id: 'clear-sink',
       emoji: '🍽️',
-      text: 'Leave the kitchen clean',
+      text: 'Clear the sink after dinner',
       cadence: 'daily',
       moment: 'evening',
     },
@@ -277,9 +279,9 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
       moment: 'night',
     },
     {
-      id: 'make-ten',
+      id: 'make-five',
       emoji: '🎨',
-      text: 'Make something for 10 minutes',
+      text: 'Make something for 5 minutes',
       cadence: 'daily',
       moment: 'evening',
     },
@@ -323,9 +325,9 @@ const DEFAULTS: Record<string, StarterTaskTemplate[]> = {
   ],
   hobbies: [
     {
-      id: 'hobby-ten',
+      id: 'hobby-five',
       emoji: '🎸',
-      text: 'Spend 10 minutes on your hobby',
+      text: 'Spend 5 minutes on your hobby',
       cadence: 'daily',
       moment: 'evening',
     },
@@ -403,9 +405,9 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
         moment: 'day',
       }),
       barrier('stuck', '🌀', "I don't know where to start", 'For a clear start', {
-        id: 'b-first-step',
-        emoji: '✏️',
-        text: 'Write the first step of one task',
+        id: 'b-one-must-do',
+        emoji: '🎯',
+        text: 'Pick your one must-do for today',
         moment: 'morning',
       }),
       barrier('forget', '🤔', 'I forget things', 'For when things slip your mind', {
@@ -435,7 +437,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       barrier('restless', '⚡', 'Sitting still feels hard', 'No sitting needed', {
         id: 'b-slow-sip',
         emoji: '☕',
-        text: 'Savor the first sip of your morning drink',
+        text: 'Take 3 slow sips of your morning drink',
         moment: 'morning',
       }),
       barrier('not-sure', '🤷', "I'm not sure how", 'An easy way in', {
@@ -454,7 +456,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
         group: 'walk',
         movement: true,
         emoji: '🚶',
-        text: 'Take a 5-minute walk after lunch',
+        text: 'Take a 2-minute walk after lunch',
         moment: 'day',
       }),
       barrier('low-energy', '🔋', "I'm low on energy", 'For low-energy days', {
@@ -500,7 +502,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       barrier('focus', '📱', 'I lose focus', 'For when focus slips', {
         id: 'b-phone-free-learning',
         emoji: '📵',
-        text: 'Learn for 5 minutes with your phone in another room',
+        text: 'Learn for 2 minutes with your phone out of reach',
         moment: 'day',
       }),
       barrier('forget', '🧠', 'I forget what I learn', 'For things you want to keep', {
@@ -517,7 +519,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       barrier('drift', '🌊', 'I lose touch with people', 'For people you miss', {
         id: 'b-message-someone',
         emoji: '💌',
-        text: "Message someone you haven't talked to in a while",
+        text: "Text one person you've been thinking about",
         moment: 'day',
       }),
       barrier('busy', '⏰', "I'm too busy", 'For busy days', {
@@ -546,7 +548,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       barrier('put-off', '⏳', 'I put chores off', 'For chores you put off', {
         id: 'b-dishes-after-eating',
         emoji: '🍽️',
-        text: 'Wash your dishes right after you eat',
+        text: 'Wash your dishes right after dinner',
         moment: 'evening',
       }),
       barrier('piles-up', '🧺', 'Mess piles up fast', 'For mess that piles up', {
@@ -622,7 +624,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       barrier('cost', '💸', 'Healthy food feels pricey', 'Easy on your wallet', {
         id: 'b-snack-from-home',
         emoji: '🥜',
-        text: 'Make one snack at home instead of buying it',
+        text: 'Pack one snack from home',
         moment: 'day',
       }),
     ],
@@ -645,7 +647,7 @@ const BARRIERS: Record<string, StarterBarrierSet> = {
       barrier('phone', '📱', 'My phone takes over', 'For scroll-heavy evenings', {
         id: 'b-swap-scroll',
         emoji: '🔄',
-        text: 'Swap 10 minutes of scrolling for your hobby',
+        text: 'Do 2 minutes of your hobby before you scroll',
         moment: 'evening',
       }),
       barrier('guilty', '😅', 'Fun feels like wasted time', 'Rest counts too', {
