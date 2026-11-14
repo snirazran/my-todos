@@ -261,8 +261,8 @@ export default function FriendsPage() {
         >
           <button
             type="button"
-            onClick={() => setAddOpen(true)}
-            aria-label="Add friends"
+            onClick={() => setInviteOpen(true)}
+            aria-label="Invite a friend"
             className={cn(
               HEADER_CONTROL_ICON_BUTTON,
               'touch-manipulation text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
@@ -384,6 +384,7 @@ export default function FriendsPage() {
       <InviteFriendsModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
+        initialStep="overview"
       />
       <FriendRequestsInbox
         open={inboxOpen}

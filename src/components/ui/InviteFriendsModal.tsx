@@ -6,28 +6,22 @@ import { AppImage } from '@/components/ui/AppImage';
 import {
   motion,
   AnimatePresence,
-  useAnimationControls,
   useReducedMotion,
 } from 'framer-motion';
 import {
   Check,
-  ChevronRight,
+  ChevronLeft,
   Gift,
   Loader2,
   X,
 } from 'lucide-react';
 import useSWR from 'swr';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { pickEmote } from '@/lib/frogEmotes';
 import Fly from '@/components/ui/fly';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftOutfitPreview } from '@/components/ui/friends/GiftOutfitPreview';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { RarityBadge } from '@/components/ui/skins/RarityBadge';
 import { TileArt } from '@/components/ui/skins/DressingRoom';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
 import { hapticSelect } from '@/lib/haptics';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuestReward } from '@/lib/quests/types';
@@ -83,9 +77,11 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 export function InviteFriendsModal({
   open,
   onClose,
+  initialStep = 'pick',
 }: {
   open: boolean;
   onClose: () => void;
+  initialStep?: Step;
 }) {
   useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
@@ -104,7 +100,7 @@ export function InviteFriendsModal({
     { revalidateOnFocus: false },
   );
 
-  const [step, setStep] = useState<Step>('pick');
+  const [step, setStep] = useState<Step>(initialStep);
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -150,11 +146,11 @@ export function InviteFriendsModal({
 
   useEffect(() => {
     if (!open) return;
-    setStep('pick');
+    setStep(initialStep);
     setInviteError(null);
     setSelectedGiftId(null);
     setSentVia(null);
-  }, [open]);
+  }, [open, initialStep]);
 
   const handleSelectGift = (id: string) => {
     if (id === activeGift?.id) return;
@@ -260,7 +256,6 @@ export function InviteFriendsModal({
                       ready={entered && stepEntered}
                       error={inviteError}
                       config={config}
-                      claimedCount={claimedCount}
                       gift={activeGift}
                       onSelect={handleSelectGift}
                       onClose={closeInvite}
@@ -349,7 +344,7 @@ function OverviewStep({
 
   return (
     <div className="flex h-full min-h-0 flex-col md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)]">
-      <div className="relative flex h-[clamp(8.5rem,36dvh,19rem)] shrink-0 flex-col justify-end overflow-hidden bg-[#447d3f] px-6 pb-7 pt-6 text-center text-white sm:h-[clamp(9rem,38dvh,20rem)] md:h-[clamp(8rem,32dvh,16rem)] md:pb-6 lg:h-[clamp(8.5rem,32dvh,17rem)]">
+      <div className="relative flex h-[clamp(11rem,36dvh,19rem)] shrink-0 flex-col justify-end overflow-hidden bg-[#447d3f] px-6 pb-7 pt-6 text-center text-white md:h-[clamp(10rem,34dvh,17rem)] md:pb-6">
         <motion.div
           className="absolute inset-0 transform-gpu will-change-transform [backface-visibility:hidden]"
           initial={reduceMotion ? undefined : { scale: 1.08 }}
@@ -362,7 +357,7 @@ function OverviewStep({
             className="absolute inset-0 h-full w-full object-cover object-[center_35%] md:object-[center_41%]"
           />
         </motion.div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
+        <div aria-hidden className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_25%,rgba(13,38,18,0.12)_48%,rgba(13,38,18,0.82)_100%)]" />
         <svg
           aria-hidden
           preserveAspectRatio="none"
@@ -375,15 +370,12 @@ function OverviewStep({
           onClose={onClose}
           className="right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] text-white"
         />
-        <Reveal
-          delay={0.05}
-          className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center"
-        >
-          <h2 className="text-[25px] font-black leading-[1.08] tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)] sm:text-3xl">
-            Your thank-you rewards
+        <Reveal delay={0.05} className="relative z-10 mx-auto max-w-xl text-center">
+          <h2 className="text-balance text-[25px] font-black leading-[1.08] tracking-tight text-white [text-shadow:0_2px_6px_rgba(0,0,0,0.65)] sm:text-3xl">
+            Good friends, great rewards
           </h2>
-          <p className="mt-1.5 max-w-md text-[13px] font-medium text-white/95 [text-shadow:0_1px_0_rgba(25,83,43,0.7),0_3px_10px_rgba(0,0,0,0.28)] sm:mt-2 sm:text-[15px]">
-            Earn these as friends join with your gifts.
+          <p className="mt-2 text-balance text-[13px] font-semibold leading-snug text-white [text-shadow:0_1px_5px_rgba(0,0,0,0.8)] sm:text-[15px]">
+            Send a welcome gift. Earn rewards when friends join.
           </p>
         </Reveal>
       </div>
@@ -411,8 +403,7 @@ function OverviewStep({
             disabled={!config.giftOptions?.length}
             className={GIFT_CTA}
           >
-            <Gift className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-            {config.giftOptions?.length ? 'Pick a gift' : 'No gifts configured yet'}
+            {config.giftOptions?.length ? 'Choose a gift for a friend' : 'No gifts available right now'}
           </button>
         </Reveal>
       </div>
@@ -431,7 +422,6 @@ function RewardProgressTrack({
   totalTiers: number;
   ready: boolean;
 }) {
-  const reduceMotion = useReducedMotion();
   const progressPct =
     totalTiers > 0 ? Math.min(100, Math.max(0, (claimedCount / totalTiers) * 100)) : 0;
   const firstPos = milestonePositionPct(0, rewards.length);
@@ -439,24 +429,25 @@ function RewardProgressTrack({
   const railStart = 8;
   const railEnd = 92;
   const railSpan = railEnd - railStart;
-  const initialProgressPct = 6;
   // The last milestone sits inset from the rail's end, so tracking it exactly
   // left a dead grey tail after the final friend joined. Once every tier is
   // claimed the fill runs the whole rail — the track reads as completed
   // rather than stuck one step short.
   const progressEnd =
     claimedCount <= 0
-      ? initialProgressPct
+      ? 0
       : claimedCount >= totalTiers
         ? 100
         : ((firstPos - railStart) / railSpan) * 100 +
           progressPct * ((lastPos - firstPos) / railSpan);
 
-  const nextReward =
-    rewards.find((r) => r.tier > claimedCount) ?? rewards[rewards.length - 1] ?? null;
+  const nextReward = rewards.find((r) => r.tier > claimedCount) ?? null;
 
   return (
     <div className="mx-auto max-w-2xl px-1 pt-0">
+      <p className="mb-4 text-center text-[13px] font-semibold text-muted-foreground" role="status">
+        {claimedCount} {claimedCount === 1 ? 'friend has' : 'friends have'} joined with your invite
+      </p>
       <div className="relative mx-auto h-[clamp(9rem,26dvh,14rem)] [--card-size:clamp(3.75rem,20vw,7rem)] [--label-top:calc(var(--rail-top)+1.75rem)] [--rail-top:calc(var(--card-size)+1.1rem)] min-[380px]:h-[clamp(10.25rem,28dvh,14rem)] min-[380px]:[--card-size:clamp(4.5rem,13dvh,7rem)] min-[380px]:[--label-top:calc(var(--rail-top)+2rem)] min-[380px]:[--rail-top:calc(var(--card-size)+1.35rem)]">
         {rewards.map((reward, index) => {
           const pos = milestonePositionPct(index, rewards.length);
@@ -491,18 +482,7 @@ function RewardProgressTrack({
           className="absolute top-[var(--rail-top)] h-3 -translate-y-1/2 overflow-hidden rounded-full"
           style={{ left: `${railStart}%`, width: `${railSpan * (progressEnd / 100)}%` }}
         >
-          <motion.div
-            className="h-full w-full rounded-full bg-primary shadow-sm"
-            animate={reduceMotion ? undefined : {
-              filter: ['brightness(1)', 'brightness(1.08)', 'brightness(1)'],
-              boxShadow: [
-                '0 1px 2px rgba(0,0,0,0.08)',
-                '0 0 14px rgba(34,197,94,0.35)',
-                '0 1px 2px rgba(0,0,0,0.08)',
-              ],
-            }}
-            transition={{ duration: 2.2, ease: 'easeInOut', repeat: Infinity }}
-          />
+          <div className="h-full w-full rounded-full bg-primary" />
         </div>
 
         {rewards.map((reward, index) => {
@@ -546,14 +526,17 @@ function RewardProgressTrack({
 
       {nextReward && (
         <div className="mt-2 text-center">
-          <p className="text-[13px] font-black text-muted-foreground/70">
-            Your rewards
+          <p className="text-[13px] font-black text-muted-foreground">
+            Your next reward
           </p>
           <p className="mx-auto mt-2 max-w-sm text-base font-medium leading-snug text-foreground">
             {rewardSentence(nextReward)}
           </p>
           <RarityBadge rarity={nextReward.item?.rarity} className="mt-2" />
         </div>
+      )}
+      {!nextReward && rewards.length > 0 && (
+        <p className="mt-2 text-center text-sm font-semibold text-foreground">You’ve earned all your invite rewards!</p>
       )}
     </div>
   );
@@ -590,22 +573,29 @@ function giftDisplayName(gift: GiftOption | null) {
   return gift.name || gift.item?.name || 'Welcome outfit';
 }
 
-function PickStep({ ready, config, claimedCount, gift, onSelect, onClose, onOpenRewards, onSend, creating, error, sentVia }: {
-  ready: boolean; config?: InviteConfig; claimedCount: number; gift: GiftOption | null; onSelect: (id: string) => void;
+function PickStep({ ready, config, gift, onSelect, onClose, onOpenRewards, onSend, creating, error, sentVia }: {
+  ready: boolean; config?: InviteConfig; gift: GiftOption | null; onSelect: (id: string) => void;
   onClose: () => void; onOpenRewards: () => void; onSend: () => void; creating: boolean; error?: string | null;
   sentVia: SentVia | null;
 }) {
   if (!config) return <Loading onClose={onClose} />;
   const giftName = giftDisplayName(gift);
-  const nextReward = config.rewards.find((reward) => reward.tier > claimedCount) ?? null;
   return (
-    <div role="dialog" aria-modal="true" aria-label="Choose a welcome gift" className="flex h-full min-h-0 flex-col bg-background text-foreground md:max-h-[calc(100dvh-2rem)]">
-      <GiftStage gift={gift} ready={ready} sent={!!sentVia} onClose={onClose} />
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
-        <p className="text-center text-[13px] font-semibold text-muted-foreground">
-          Free for them when they join with your link
-        </p>
-        <div role="group" aria-label="Welcome outfits" className="mt-4 grid grid-cols-3 gap-x-2.5 gap-y-4 min-[520px]:grid-cols-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="gift-picker-title" className="flex h-full min-h-0 flex-col bg-background text-foreground md:max-h-[calc(100dvh-2rem)]">
+      <header className="shrink-0 bg-[#f5f8f3] px-5 pb-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:bg-[#18251a] md:pt-5">
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={onOpenRewards} aria-label="Back to invite rewards" className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <ChevronLeft className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+          </button>
+          <button type="button" onClick={onClose} aria-label="Close gift picker" className="grid h-10 w-10 place-items-center rounded-full bg-muted text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
+        <h2 id="gift-picker-title" className="mt-5 text-[23px] font-black leading-tight tracking-tight">Choose their welcome gift</h2>
+        <p className="mt-1 text-[13px] font-semibold leading-snug text-muted-foreground">It’s free for your friend when they join with your link.</p>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-3">
+        <div role="group" aria-label="Welcome gifts" className="grid grid-cols-3 gap-x-2.5 gap-y-5 px-1 pt-1 min-[520px]:grid-cols-4">
           {config.giftOptions.map((option) => (
             <GiftTile
               key={option.id}
@@ -619,7 +609,6 @@ function PickStep({ ready, config, claimedCount, gift, onSelect, onClose, onOpen
         {!config.giftOptions.length && <p role="status" className="py-8 text-center text-[13px] font-medium text-muted-foreground">Welcome gifts are being restocked. Try again a little later.</p>}
       </div>
       <div className="shrink-0 border-t border-border/50 bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3">
-        {nextReward && <NextRewardRow reward={nextReward} onClick={onOpenRewards} />}
         <AnimatePresence initial={false} mode="wait">
           {error ? (
             <motion.p key="error" role="alert" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-2.5 text-center text-[12.5px] font-bold text-destructive">
@@ -633,128 +622,11 @@ function PickStep({ ready, config, claimedCount, gift, onSelect, onClose, onOpen
           ) : null}
         </AnimatePresence>
         <button type="button" onClick={onSend} disabled={!gift || creating} className={GIFT_CTA}>
-          {creating ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden /> : <Gift className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden />}
+          {creating && <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />}
           <span className="truncate">
             {creating ? 'Wrapping their gift…' : sentVia ? 'Send to another friend' : giftName ? `Send the ${giftName}` : 'No gifts yet'}
           </span>
         </button>
-      </div>
-    </div>
-  );
-}
-
-function PondBackdrop() {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return <div className="h-full w-full bg-gradient-to-b from-sky-200 via-emerald-100 to-emerald-200 dark:from-sky-950 dark:via-emerald-950 dark:to-emerald-900" />;
-  }
-  return (
-    <picture className="block h-full w-full">
-      <source media="(min-width: 768px)" srcSet={DEFAULT_BACKGROUND_IMAGES.tablet} />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={DEFAULT_BACKGROUND_IMAGES.mobile}
-        alt=""
-        draggable={false}
-        onError={() => setFailed(true)}
-        className="h-full w-full object-cover object-bottom"
-      />
-    </picture>
-  );
-}
-
-function GiftStage({ gift, ready, sent, onClose }: { gift: GiftOption | null; ready: boolean; sent: boolean; onClose: () => void }) {
-  const reduceMotion = useReducedMotion();
-  const roomy = useMediaQuery('(min-width: 380px)');
-  const hop = useAnimationControls();
-  const frogRef = React.useRef<FrogHandle | null>(null);
-  const [dressed, setDressed] = useState(false);
-  const shownGiftRef = React.useRef<string | null>(null);
-  const item = gift?.item ?? null;
-  const isBox = item?.slot === 'container';
-  const live = ready && !reduceMotion;
-  const frogWidth = roomy ? 248 : 216;
-  const frogHeight = Math.round(frogWidth * 1.125);
-  const indices = React.useMemo(() => giftPreviewIndices(item), [item]);
-
-  useEffect(() => {
-    if (sent) frogRef.current?.fireEmote('loveHeartbeat');
-  }, [sent]);
-
-  useEffect(() => {
-    const id = gift?.id ?? null;
-    const previous = shownGiftRef.current;
-    shownGiftRef.current = id;
-    if (!id || !previous || previous === id || reduceMotion) return;
-    void hop.start({
-      y: [0, -18, 0, 0],
-      scaleX: [1, 0.96, 1.05, 1],
-      scaleY: [1, 1.05, 0.94, 1],
-      transition: { duration: 0.5, times: [0, 0.38, 0.72, 1], ease: 'easeOut' },
-    });
-    frogRef.current?.fireEmote(pickEmote('pick'));
-  }, [gift?.id, hop, reduceMotion]);
-
-  return (
-    <div className="relative h-[calc(env(safe-area-inset-top)+clamp(12rem,31dvh,15rem))] shrink-0 overflow-hidden md:h-60">
-      <div className="absolute inset-0">
-        <PondBackdrop />
-        <div className="absolute inset-0 dark:bg-black/20" />
-        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/45 via-black/15 to-transparent" />
-      </div>
-
-      <div className="absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-5 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-5">
-        <div className="min-w-0 text-white [text-shadow:0_1px_0_rgba(25,83,43,0.55),0_2px_12px_rgba(0,0,0,0.35)]">
-          <p className="text-[12px] font-black text-white/90">A welcome gift from you</p>
-          <h2 className="mt-0.5 text-[23px] font-black leading-tight tracking-tight">Pick their first look</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close gift picker"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-colors hover:bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-        >
-          <X className="h-5 w-5" aria-hidden />
-        </button>
-      </div>
-
-      <svg
-        aria-hidden
-        preserveAspectRatio="none"
-        viewBox="0 0 100 16"
-        className="absolute inset-x-0 bottom-[-1px] z-10 h-5 w-full fill-background"
-      >
-        <path d="M0 8 Q50 -8 100 8 L100 16 L0 16 Z" />
-      </svg>
-      <span aria-hidden className="absolute bottom-[10px] left-1/2 z-10 h-3 w-36 -translate-x-1/2 rounded-[50%] bg-black/[0.14] blur-[5px] dark:bg-black/40" />
-
-      <div className="pointer-events-none absolute inset-x-0 z-20 flex justify-center" style={{ bottom: isBox ? 17 : 18 - Math.round(frogHeight * 0.045) }}>
-        <motion.div animate={hop} style={{ transformOrigin: '50% 100%' }}>
-          {isBox && item ? (
-            <div className="h-[150px] w-[150px]">
-              <GiftRive width={150} height={150} color={item.riveIndex} isMilestone={false} paused={!live} />
-            </div>
-          ) : (
-            <div className="relative" style={{ width: frogWidth, height: frogHeight }}>
-              {reduceMotion && (
-                <div className="absolute inset-0">
-                  <FrogSnapshot width={frogWidth} height={frogHeight} indices={indices} cachedOnly={!ready} />
-                </div>
-              )}
-              {live && (
-                <div className={cn('absolute inset-0 transition-opacity duration-200', dressed ? 'opacity-100' : 'opacity-0')}>
-                  <Frog
-                    ref={frogRef}
-                    width={frogWidth}
-                    height={frogHeight}
-                    indices={indices}
-                    onDressed={() => setDressed(true)}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </motion.div>
       </div>
     </div>
   );
@@ -777,7 +649,8 @@ function GiftTile({ gift, chosen, ready, onSelect }: {
         rarity={item?.rarity ?? 'common'}
         className={cn(
           'transition-transform duration-150 group-active:scale-95',
-          chosen && 'ring-[3px] ring-primary dark:ring-primary',
+          item?.rarity === 'common' && 'bg-[#f1f6ef] ring-[#d6e4d2] dark:bg-[#293a2a] dark:ring-[#526b50]',
+          chosen && 'ring-[3px] ring-inset ring-primary dark:ring-primary',
         )}
       >
         {item && !isContainer(item) ? (
@@ -801,7 +674,7 @@ function GiftTile({ gift, chosen, ready, onSelect }: {
           </span>
         )}
       </TileArt>
-      <span className={cn('w-full truncate px-0.5 text-[12px] font-black leading-tight', chosen ? 'text-primary' : 'text-foreground')}>
+      <span className={cn('w-full break-words px-0.5 text-[12px] font-black leading-tight', chosen ? 'text-primary' : 'text-foreground')}>
         {name}
       </span>
       <RarityBadge rarity={item?.rarity} className="-mt-0.5" />
@@ -811,53 +684,6 @@ function GiftTile({ gift, chosen, ready, onSelect }: {
 
 function isContainer(item: CatalogItem) {
   return item.slot === 'container';
-}
-
-function NextRewardRow({ reward, onClick }: { reward: RewardTier; onClick: () => void }) {
-  const flies = rewardFlies(reward);
-  const prize = [reward.item?.name, flies].filter(Boolean).join(' + ') || 'A reward';
-  const ordinal = reward.label.replace(/\s*friend.*$/i, '').trim() || 'next';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="mb-3 flex w-full items-center gap-3 rounded-2xl text-left transition-opacity active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-    >
-      {reward.item ? (
-        <span className={cn('relative flex h-10 w-10 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-br', RARITY_CONFIG[reward.item.rarity ?? 'common'].gradient)}>
-          {isContainer(reward.item) ? (
-            <span className="absolute inset-0 flex items-center justify-center">
-              <span className="h-[124%] w-[124%] -translate-y-[13%]">
-                <GiftRive className="h-full w-full" color={reward.item.riveIndex} paused />
-              </span>
-            </span>
-          ) : (
-            <span className="shrink-0">
-              <FrogSnapshot width={52} height={52} indices={giftPreviewIndices(reward.item)} visualOffsetY={0} />
-            </span>
-          )}
-        </span>
-      ) : (
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/[0.12]">
-          <Fly size={30} y={-2} paused interactive={false} />
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-black leading-tight text-foreground">{prize} for you</span>
-        <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-muted-foreground">When your {ordinal} friend joins</span>
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
-    </button>
-  );
-}
-
-function rewardFlies(reward: RewardTier): string | null {
-  for (const r of reward.rewards ?? []) {
-    if (r.type !== 'FLIES') continue;
-    if (r.amountMode === 'random' && r.maxAmount) return `up to ${r.maxAmount} flies`;
-    if (r.amount) return `${r.amount} flies`;
-  }
-  return reward.flies ? `${reward.flies} flies` : null;
 }
 
 function CloseButton({

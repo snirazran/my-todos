@@ -1,85 +1,15 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr';
-import { useReducedMotion } from 'framer-motion';
 import { Search, QrCode, Gift } from 'lucide-react';
-import { type QuestRewardCatalogItem } from '@/components/ui/QuestCards';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { giftPreviewIndices } from '@/lib/friends/social';
-import { warmFrogStamps } from '@/lib/frogStampEngine';
-import { riveDevicePixelRatio } from '@/lib/riveLoader';
-import { cn } from '@/lib/utils';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { EnterFriendCodeModal } from '@/components/ui/EnterFriendCodeModal';
 import { QRFriendModal } from '@/components/ui/QRFriendModal';
 import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
-import Fly from '@/components/ui/fly';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
-type GiftOptionItem = QuestRewardCatalogItem | null;
-
-type InviteConfigResponse = {
-  rewards?: { tier: number; item?: { name?: string } }[];
-  giftOptions?: { id: string; itemId: string; item: GiftOptionItem }[];
-};
-
-/**
- * The welcome gift has no identity until the sender picks one, so the tile
- * cycles the outfits that can actually be sent — the promise is real, the
- * particular outfit is not.
- */
-const ROLL_FROG_PX = 58;
-
-function GiftOutfitRoll({
-  items,
-  active,
-}: {
-  items: QuestRewardCatalogItem[];
-  active: boolean;
-}) {
-  const reduceMotion = useReducedMotion();
-  const [shown, setShown] = useState(0);
-
-  useEffect(() => {
-    if (!active || reduceMotion || items.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setShown((current) => {
-        let next = current;
-        while (next === current)
-          next = Math.floor(Math.random() * items.length);
-        return next;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [active, reduceMotion, items.length]);
-
-  const item = items[shown % Math.max(1, items.length)];
-  const rarity = item?.rarity ?? 'uncommon';
-  return (
-    <span
-      className={cn(
-        'flex h-11 w-11 shrink-0 items-end justify-center overflow-hidden rounded-xl border-2 bg-gradient-to-br',
-        RARITY_CONFIG[rarity].gradient,
-        RARITY_CONFIG[rarity].border,
-      )}
-    >
-      {item ? (
-        <span className="shrink-0">
-          <FrogSnapshot
-            width={ROLL_FROG_PX}
-            height={ROLL_FROG_PX}
-            visualOffsetY={0}
-            indices={giftPreviewIndices(item)}
-          />
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 export function AddFriendsSheet({
   open,
@@ -94,53 +24,13 @@ export function AddFriendsSheet({
   const [codeOpen, setCodeOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
 
-  // "Show progress and what comes next" is the one thing referral screens are
-  // consistently faulted for missing — the ladder already exists, so the sheet
-  // states where you are on it instead of asking blind.
-  const { data: inviteConfig } = useSWR<InviteConfigResponse>(
-    '/api/invite/config',
-    fetcher,
-    { revalidateOnFocus: false },
-  );
-  const { data: inviteStatus } = useSWR<{ claimedCount?: number }>(
-    open ? '/api/invite/status' : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
-
   // The rate is admin-tunable, so the pitch reads it live rather than baking a
   // number that can quietly stop being true.
   const { data: friendsData } = useSWR<{
     pond?: { tasksPerGeneration?: number; fliesPerGeneration?: number };
   }>(open ? '/api/friends' : null, fetcher, { revalidateOnFocus: false });
-  const perTasks = friendsData?.pond?.tasksPerGeneration ?? 5;
-  const perFlies = friendsData?.pond?.fliesPerGeneration ?? 2;
-
-  const giftItems = useMemo(
-    () =>
-      (inviteConfig?.giftOptions ?? [])
-        .map((g) => g.item)
-        .filter((item): item is QuestRewardCatalogItem => !!item),
-    [inviteConfig],
-  );
-
-  useEffect(() => {
-    if (!giftItems.length) return;
-    return warmFrogStamps(
-      giftItems.map(giftPreviewIndices),
-      Math.round(ROLL_FROG_PX * riveDevicePixelRatio()),
-    );
-  }, [giftItems]);
-
-  const joined = inviteStatus?.claimedCount ?? 0;
-  const nextReward =
-    (inviteConfig?.rewards ?? [])
-      .slice()
-      .sort((a, b) => a.tier - b.tier)
-      .find((r) => r.tier > joined) ?? null;
-  const progressPct = nextReward
-    ? Math.min(100, Math.round((joined / Math.max(1, nextReward.tier)) * 100))
-    : 0;
+  const perTasks = friendsData?.pond?.tasksPerGeneration;
+  const perFlies = friendsData?.pond?.fliesPerGeneration;
 
   return (
     <>
@@ -164,7 +54,7 @@ export function AddFriendsSheet({
               <img
                 src="/friend-share.webp"
                 alt="Frogs passing the flies they catch to each other across a pond"
-                className="h-[24dvh] max-h-[230px] w-full object-cover object-center sm:h-[210px] sm:max-h-none"
+                className="h-[18dvh] max-h-[180px] w-full object-cover object-center sm:h-[210px] sm:max-h-none"
               />
               <div
                 aria-hidden="true"
@@ -174,45 +64,14 @@ export function AddFriendsSheet({
 
             <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-6">
               <h2 className="text-center text-[25px] font-black leading-[1.1] tracking-tight text-foreground min-[400px]:text-[28px]">
-                Your friends catch flies for you
+                Better together
               </h2>
               <p className="mx-auto mt-2 max-w-[21rem] text-center text-[13px] font-semibold leading-snug text-muted-foreground min-[400px]:text-sm">
-                Every {perTasks} tasks a friend finishes drops {perFlies} flies
-                in your pond.
+                Invite a friend and give them a welcome outfit.{' '}
+                {perTasks != null && perFlies != null
+                  ? `You’ll earn ${perFlies} ${perFlies === 1 ? 'fly' : 'flies'} for every ${perTasks} tasks they finish.`
+                  : 'You’ll earn flies as they finish tasks.'}
               </p>
-
-              {/* Both sides of the trade, stated plainly — the practice every
-                  referral teardown lands on. */}
-              <div className="mt-4 grid grid-cols-2 gap-2.5">
-                <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3.5 text-center">
-                  <span className="text-[11px] font-black text-muted-foreground">
-                    They get
-                  </span>
-                  <span className="flex h-11 items-center justify-center">
-                    <GiftOutfitRoll items={giftItems} active={entered} />
-                  </span>
-                  <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
-                    A free outfit
-                  </span>
-                </div>
-                <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3.5 text-center">
-                  <span className="text-[11px] font-black text-muted-foreground">
-                    You get
-                  </span>
-                  <span className="flex h-11 w-[4.3rem] items-center justify-center">
-                    <Fly size={38} interactive={false} paused />
-                    <Fly
-                      size={38}
-                      interactive={false}
-                      paused
-                      className="-ml-3 translate-y-1"
-                    />
-                  </span>
-                  <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
-                    {perFlies} flies per {perTasks} tasks
-                  </span>
-                </div>
-              </div>
 
               {/* One primary action, sized and coloured so nothing competes. */}
               <button
@@ -223,28 +82,6 @@ export function AddFriendsSheet({
                 <Gift className="h-5 w-5" strokeWidth={2.5} />
                 Invite friends
               </button>
-
-              {nextReward && (
-                <div className="mt-2.5 flex items-center gap-2.5 px-1">
-                  <span
-                    role="progressbar"
-                    aria-label="Invite reward progress"
-                    aria-valuemin={0}
-                    aria-valuemax={nextReward.tier}
-                    aria-valuenow={Math.min(joined, nextReward.tier)}
-                    className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#447d3f]/15"
-                  >
-                    <span
-                      className="block h-full w-full origin-left rounded-full bg-[#447d3f] transition-transform duration-300"
-                      style={{ transform: `scaleX(${progressPct / 100})` }}
-                    />
-                  </span>
-                  <span className="shrink-0 text-[11px] font-black text-muted-foreground">
-                    {joined}/{nextReward.tier} joined
-                    {nextReward.item?.name ? ` · ${nextReward.item.name}` : ''}
-                  </span>
-                </div>
-              )}
 
               <FriendSuggestionsRow
                 enabled={open && entered}
@@ -291,6 +128,7 @@ export function AddFriendsSheet({
       </BaseSheet>
 
       <InviteFriendsModal
+        initialStep="overview"
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
       />
