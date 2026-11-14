@@ -1184,26 +1184,28 @@ export function SeasonRewardTile({
     <div
       className={cn(
         'relative aspect-square w-full border-2',
-        compact ? 'rounded-[12px] p-0.5' : 'rounded-[16px] p-1',
+        compact ? 'rounded-[12px]' : 'rounded-[16px]',
         lane === 'plus'
           ? 'border-[#f2c75c] bg-gradient-to-b from-[#fff7df] to-[#ffe9ad] shadow-[0_4px_0_#e0b043] dark:border-amber-400/50 dark:from-amber-400/20 dark:to-amber-500/10 dark:shadow-[0_4px_0_rgba(180,120,20,0.5)]'
           : 'border-[#bcd9a9] bg-gradient-to-b from-[#f3faee] to-[#dcedcf] shadow-[0_4px_0_#a9cb93] dark:border-white/15 dark:from-white/[0.09] dark:to-white/[0.04] dark:shadow-[0_4px_0_rgba(0,0,0,0.4)]',
       )}
     >
-      <SeasonRewardPreview
-        reward={reward}
-        rewardCatalog={rewardCatalog}
-        isPremium={lane === 'plus'}
-        paused={paused}
-        still={paused}
-        bare
-        dense={compact}
-        flyScale={flyScale}
-        foil={rarity}
-        oversample={oversample}
-        hideQuantityBadge={!compact || reward.type !== 'FLIES'}
-        className={cn('h-full w-full', muted && 'saturate-[0.85]')}
-      />
+      <div className={cn('absolute', compact ? 'inset-1' : 'inset-1.5')}>
+        <SeasonRewardPreview
+          reward={reward}
+          rewardCatalog={rewardCatalog}
+          isPremium={lane === 'plus'}
+          paused={paused}
+          still={paused}
+          bare
+          dense={compact}
+          flyScale={flyScale}
+          foil={rarity}
+          oversample={oversample}
+          hideQuantityBadge={!compact || reward.type !== 'FLIES'}
+          className={cn('h-full w-full', muted && 'saturate-[0.85]')}
+        />
+      </div>
       {showTag && (
         <span
           className={cn(
