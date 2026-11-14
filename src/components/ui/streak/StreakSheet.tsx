@@ -769,7 +769,7 @@ function RevealStep({
   );
   const digitBottom = Math.round(frogHeight * 0.32);
   const stageHeight = digitBottom + Math.round(numeralSize * 0.78) + 8;
-  const bubbleY = Math.round(frogHeight * 0.11);
+  const bubbleY = Math.round(frogHeight * 0.15) + 10;
 
   const revealMessage = streakRevealMessage({
     count: view.count,
@@ -821,7 +821,7 @@ function RevealStep({
       />
 
       <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+1.5rem)] short-screen:pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-10 md:pt-8">
-        <div className="mx-auto mt-auto flex w-full max-w-sm shrink-0 flex-col items-center md:max-w-md">
+        <div className="mx-auto my-auto flex w-full max-w-sm shrink-0 flex-col items-center md:max-w-md">
           <p className="sr-only" aria-live="polite">
             {view.count} day streak
           </p>
@@ -841,14 +841,14 @@ function RevealStep({
             >
               <div
                 className={cn(
-                  'absolute inset-0 transition-[opacity,transform] duration-[900ms] ease-[cubic-bezier(0.23,1,0.32,1)]',
+                  'absolute inset-0 transition-[opacity,transform] duration-[900ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
                   popped ? 'scale-100 opacity-100' : 'scale-75 opacity-40',
                 )}
                 style={{ background: 'var(--streak-sun)' }}
               />
               <div
                 className={cn(
-                  'absolute inset-0 transition-opacity duration-700',
+                  'absolute inset-0 transition-opacity duration-700 motion-reduce:transition-none',
                   popped ? 'opacity-[var(--streak-sun-ray-opacity)]' : 'opacity-0',
                 )}
                 style={{
@@ -916,7 +916,7 @@ function RevealStep({
                 className={cn(
                   'font-display leading-[0.78] tracking-[0.01em] transition-[color,filter] duration-500',
                   popped
-                    ? 'text-[color:var(--streak-numeral)] [filter:drop-shadow(0_6px_0_var(--streak-ink-shadow))_drop-shadow(0_0_28px_var(--streak-numeral-glow))]'
+                    ? 'text-[color:var(--streak-numeral)] [filter:drop-shadow(0_3px_4px_rgba(35,58,28,0.8))_drop-shadow(0_0_12px_var(--streak-numeral-glow))]'
                     : 'text-white/60 [filter:drop-shadow(0_6px_0_var(--streak-ink-shadow))]',
                 )}
               />
@@ -981,7 +981,7 @@ function RevealStep({
                         : 'fill-transparent text-muted-foreground',
                     )}
                   />
-                  Day streak
+                  {view.count}-day streak
                 </span>
                 {newBest ? (
                   <motion.span
@@ -1037,22 +1037,22 @@ function RevealStep({
 }
 
 const PLEDGE_NAMES: Record<number, string> = {
-  2: 'First steps',
-  5: 'Finding a rhythm',
-  7: 'Tadpole',
-  14: 'Froglet',
-  30: 'Bullfrog',
-  50: 'Legend',
+  2: 'A fresh start',
+  5: 'Find your rhythm',
+  7: 'One week strong',
+  14: 'Growing stronger',
+  30: 'Making it stick',
+  50: 'On a roll',
 };
 
 const PLEDGE_COLORS = {
-  '--pl-bg': '#0a6f66',
+  '--pl-bg': '#63875c',
   '--pl-on-bg': '#ffffff',
   '--pl-on-bg-muted': 'rgba(255,255,255,0.88)',
   '--pl-cta': '#ffc531',
   '--pl-cta-ink': '#3b2800',
   '--pl-cta-edge': '#c98b00',
-  '--pl-pick': '#0a6f66',
+  '--pl-pick': '#63875c',
   '--pl-pick-ink': '#ffffff',
   '--pl-pick-edge': '#064a44',
   '--pl-pick-soft': '#e9f6f4',
@@ -1280,7 +1280,7 @@ function CommitStep({
         <h2
           id="streak-goal-heading"
           className={cn(
-          'text-center font-black tracking-tight text-[color:var(--pl-on-bg)]',
+          'max-w-[20rem] text-balance text-center font-black leading-tight tracking-tight text-[color:var(--pl-on-bg)]',
           wide ? 'text-[32px]' : 'text-[clamp(1.5rem,7vw,1.75rem)]',
         )}
         >
@@ -1311,10 +1311,10 @@ function CommitStep({
               <label
                 key={tier.days}
                 className={cn(
-                  'relative flex min-h-[60px] cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-2 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-white has-[:disabled]:cursor-wait short-screen:min-h-[50px]',
+                  'relative flex min-h-[60px] cursor-pointer items-center gap-2 rounded-2xl border-2 px-4 py-2 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-white has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[#63875c] has-[:disabled]:cursor-wait short-screen:min-h-[50px]',
                   selected
-                    ? 'border-white bg-white text-[#174e48]'
-                    : 'border-white/40 bg-white/10 text-white hover:bg-white/15',
+                    ? 'border-white bg-white text-[#365633]'
+                    : 'border-white/35 bg-[#496d44] text-white [@media(hover:hover)]:hover:bg-[#3f613b] dark:bg-white/10',
                 )}
               >
                 <input
@@ -1325,12 +1325,7 @@ function CommitStep({
                   onChange={() => choose(tier.days)}
                   className="sr-only"
                 />
-                {badge && (
-                  <span className="absolute right-3 top-2 whitespace-nowrap rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black leading-none text-amber-950">
-                    {badge}
-                  </span>
-                )}
-                <span className="w-[72px] shrink-0 text-[17px] font-black tabular-nums">{tier.days} days</span>
+                <span className="w-[76px] shrink-0 whitespace-nowrap text-[17px] font-black tabular-nums">{tier.days} days</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-[14px] font-black leading-tight">
@@ -1338,7 +1333,12 @@ function CommitStep({
                     </span>
                   </span>
                 </span>
-                {selected && !badge && <Check aria-hidden className="h-5 w-5 shrink-0 text-[#0a6f66]" strokeWidth={3} />}
+                {badge && (
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-300 px-2 py-1 text-[10px] font-black leading-none text-amber-950">
+                    {badge}
+                  </span>
+                )}
+                {selected && !badge && <Check aria-hidden className="h-5 w-5 shrink-0 text-[#447d3f]" strokeWidth={3} />}
               </label>
             );
           })}
@@ -1347,7 +1347,7 @@ function CommitStep({
       {selectedTier && (
         <div
           aria-live="polite"
-          className="mt-3 rounded-2xl bg-black/10 px-4 py-3 text-white"
+          className="mt-4 border-t border-white/30 px-1 pt-3 text-white"
         >
           <p className="mb-2 text-xs font-black">Your prize</p>
           <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
@@ -1382,7 +1382,7 @@ function CommitStep({
           if (selectedDays !== null) void pickGoal(selectedDays);
         }}
         aria-live="polite"
-        className="flex h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[color:var(--pl-cta)] px-4 text-base font-black text-[color:var(--pl-cta-ink)] shadow-[0_5px_0_0_var(--pl-cta-edge)] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-white/20 disabled:text-[color:var(--pl-on-bg-muted)] disabled:shadow-none disabled:hover:brightness-100"
+        className="flex h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[color:var(--pl-cta)] px-4 text-base font-black text-[color:var(--pl-cta-ink)] shadow-[0_5px_0_0_var(--pl-cta-edge)] transition-[transform,box-shadow,filter] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#63875c] active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:bg-white/20 disabled:text-[color:var(--pl-on-bg-muted)] disabled:shadow-none disabled:hover:brightness-100"
       >
         {selectedDays !== null && <SolidFlame className="h-[22px] w-[22px] -translate-y-px text-[#ea580c]" />}
         {busyDays !== null
@@ -1448,7 +1448,7 @@ function CommitStep({
 
             <div className="relative mt-[104px] w-full short-screen:mt-[88px]">
               <div
-                className="pointer-events-none absolute bottom-[calc(100%-11px)] left-[-22px] z-20"
+                className="pointer-events-none absolute bottom-[calc(100%-8px)] left-[-22px] z-20"
                 style={{ width: frogWidth, height: frogHeight }}
               >
                 {frog}

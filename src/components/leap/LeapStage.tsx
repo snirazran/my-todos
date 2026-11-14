@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { X } from 'lucide-react';
+import { Lock, X } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -87,15 +87,48 @@ export function LilyPodium({
   nextNote,
   size = 'md',
   burst = 0,
+  still = false,
 }: {
   leagues: string[];
   focus: number;
   nextNote?: string | null;
   size?: 'md' | 'lg';
   burst?: number;
+  still?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const large = size === 'lg';
+  if (still) {
+    const current = leagues[focus];
+    const next = leagues[focus + 1];
+    return (
+      <div className="relative mx-auto h-[242px] w-full max-w-sm short-screen:h-[190px]">
+        {current && (
+          <div className="absolute bottom-0 left-1/2 flex w-[68%] -translate-x-1/2 flex-col items-center text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={leagueArt(focus)} alt="" draggable={false} className="h-[168px] w-full origin-bottom scale-[1.15] object-contain object-bottom drop-shadow-[0_8px_10px_rgba(25,50,20,0.25)] short-screen:h-[122px]" />
+            <span className="mt-2 text-[19px] font-black leading-tight text-white">{current}</span>
+            <span className="mt-1 rounded-full bg-[#486a43] px-2 py-0.5 text-[11px] font-bold leading-tight text-white dark:bg-black/25">Your league</span>
+          </div>
+        )}
+        {next && (
+          <div className="absolute bottom-0 right-0 flex w-[33%] min-w-0 flex-col items-center text-center">
+            <span className="relative block w-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={leagueArt(focus + 1)} alt="" draggable={false} className="h-[108px] w-full origin-bottom scale-110 object-contain object-bottom brightness-[0.7] short-screen:h-[80px]" />
+              <span aria-hidden className="absolute bottom-0 right-1 grid h-6 w-6 place-items-center rounded-full bg-[#ffdc7b] text-[#604312] ring-2 ring-[#63875c] dark:ring-[#385a37]">
+                <Lock className="h-3 w-3" strokeWidth={3} />
+              </span>
+            </span>
+            <span className="mt-2 rounded-xl bg-[#486a43] px-2 py-1 text-white dark:bg-black/25">
+              <span className="block text-[12px] font-black leading-tight">{next}<span className="sr-only">, locked</span></span>
+              <span className="mt-0.5 block text-[11px] font-bold leading-tight">Next league</span>
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div
       className={cn(
@@ -139,7 +172,8 @@ export function LilyPodium({
               draggable={false}
               className={cn(
                 'h-full w-full select-none object-contain object-bottom',
-                center && 'leap-pond-bob drop-shadow-[0_10px_14px_rgba(6,38,48,0.38)]',
+                center && 'drop-shadow-[0_10px_14px_rgba(6,38,48,0.25)]',
+                center && 'leap-pond-bob',
               )}
             />
             <motion.span
@@ -176,15 +210,17 @@ export function LeapStagePanel({ children, className }: { children: ReactNode; c
 export function LeapStageButton({
   children,
   onClick,
+  onGreen = false,
 }: {
   children: ReactNode;
   onClick: () => void;
+  onGreen?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex h-14 w-full items-center justify-center gap-1.5 rounded-2xl bg-primary text-[17px] font-black tracking-tight text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 active:translate-y-[3px] active:shadow-none short-screen:h-[52px]"
+      className={cn('flex h-14 w-full items-center justify-center gap-1.5 rounded-2xl text-[17px] font-black tracking-tight transition-[transform,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-[3px] active:shadow-none short-screen:h-[52px]', onGreen ? 'bg-white text-[#365633] shadow-[0_4px_0_0_#365633] focus-visible:ring-white' : 'bg-primary text-primary-foreground shadow-[0_4px_0_0_#34631f] focus-visible:ring-primary/50')}
     >
       {children}
     </button>
@@ -203,6 +239,8 @@ export type LeapStageProps = {
   celebrate: boolean;
   panel: ReactNode;
   actions: ReactNode;
+  prize?: ReactNode;
+  greenBackground?: boolean;
 };
 
 export function LeapStageBody({
@@ -216,6 +254,8 @@ export function LeapStageBody({
   celebrate,
   panel,
   actions,
+  prize,
+  greenBackground = false,
   active,
   quiet = false,
   wide = false,
@@ -280,21 +320,24 @@ export function LeapStageBody({
       className={cn(
         'leap-scene relative shrink-0 overflow-hidden',
         wide
-          ? 'h-[460px] rounded-[40px] shadow-[0_18px_40px_-22px_rgba(8,40,50,0.7)]'
-          : 'h-[calc(env(safe-area-inset-top)+clamp(12.5rem,33dvh,17rem))] short-screen:h-[calc(env(safe-area-inset-top)+11rem)]',
+          ? cn('h-[460px] rounded-[40px]', !greenBackground && 'shadow-[0_18px_40px_-22px_rgba(8,40,50,0.7)]')
+          : greenBackground ? 'h-[calc(env(safe-area-inset-top)+clamp(17rem,38dvh,20rem))] short-screen:h-[calc(env(safe-area-inset-top)+14rem)]' : 'h-[calc(env(safe-area-inset-top)+clamp(12.5rem,33dvh,17rem))] short-screen:h-[calc(env(safe-area-inset-top)+11rem)]',
       )}
     >
-      <PondBackdrop className="absolute inset-0 h-full w-full" />
-      <div className="absolute inset-0 dark:bg-black/25" />
-      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[rgba(12,74,84,0.42)] to-transparent" />
-      <PondLife scene />
-      <div className={cn('absolute inset-x-0', wide ? 'bottom-10' : 'bottom-9')}>
+      {!greenBackground && <>
+        <PondBackdrop className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 dark:bg-black/25" />
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[rgba(12,74,84,0.42)] to-transparent" />
+        <PondLife scene />
+      </>}
+      <div className={cn('absolute inset-x-0', wide ? 'bottom-10' : greenBackground ? 'bottom-4' : 'bottom-9')}>
         <LilyPodium
           leagues={leagues}
           focus={focus}
           nextNote={nextNote}
           size={wide ? 'lg' : 'md'}
           burst={landed ? 1 : 0}
+          still={greenBackground}
         />
       </div>
     </div>
@@ -305,7 +348,8 @@ export function LeapStageBody({
       <motion.h2
         {...reveal(0)}
         className={cn(
-          'text-balance font-black tracking-tight text-[color:var(--leap-ink)]',
+          'text-balance font-black tracking-tight',
+          greenBackground ? 'text-white' : 'text-[color:var(--leap-ink)]',
           wide ? 'text-[40px] leading-[1.04]' : 'text-[26px] leading-[1.1] short-screen:text-[23px]',
         )}
       >
@@ -315,8 +359,10 @@ export function LeapStageBody({
         <motion.p
           {...reveal(0.08)}
           className={cn(
-            'text-pretty font-bold leading-snug text-[color:var(--leap-ink-muted)]',
-            wide ? 'mt-3 max-w-[34ch] text-[17px]' : 'mt-1.5 max-w-[30ch] text-[14px]',
+            'text-pretty leading-snug',
+            greenBackground ? 'font-semibold' : 'font-bold',
+            greenBackground ? 'text-white' : 'text-[color:var(--leap-ink-muted)]',
+            wide ? cn('mt-3 max-w-[34ch]', greenBackground ? 'text-[18px]' : 'text-[19px]') : greenBackground ? 'mt-2 max-w-[30ch] text-[18px]' : 'mt-1.5 max-w-[30ch] text-[14px]',
           )}
         >
           {body}
@@ -325,7 +371,11 @@ export function LeapStageBody({
     </div>
   );
 
-  const frogPanel = (
+  const frogPanel = greenBackground && !panel ? null : greenBackground ? (
+    <motion.div {...reveal(0.18)} className="mt-5 w-full">
+      <LeapStagePanel>{panel}</LeapStagePanel>
+    </motion.div>
+  ) : (
     <motion.div
       {...reveal(0.18)}
       className={cn(
@@ -374,7 +424,7 @@ export function LeapStageBody({
   const actionBlock = <div className="flex w-full flex-col items-center gap-3">{actions}</div>;
 
   return (
-    <div className="leap-stage relative flex h-full min-h-0 flex-1 flex-col bg-background">
+    <div className={cn('leap-stage relative flex h-full min-h-0 flex-1 flex-col', greenBackground ? 'bg-[#63875c] dark:bg-[#385a37]' : 'bg-background')}>
 
       {wide ? (
         <div className="no-scrollbar relative flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-12 py-10">
@@ -383,6 +433,7 @@ export function LeapStageBody({
             <div className="w-full max-w-[26rem] justify-self-center">
               {heading}
               {frogPanel}
+              {prize}
               <motion.div {...reveal(0.3)} className="mt-6">
                 {actionBlock}
               </motion.div>
@@ -403,10 +454,12 @@ export function LeapStageBody({
         <>
           <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain pb-2">
             {scene}
-            <div className="relative z-10 -mt-7 flex-1 rounded-t-[28px] bg-background px-6 pt-6 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)] short-screen:pt-5">
+            <div className={cn('relative z-10 flex-1 px-6 short-screen:pt-5', greenBackground ? 'pt-1' : '-mt-7 rounded-t-[28px] bg-background pt-6 shadow-[0_-10px_24px_-16px_rgba(15,23,42,0.4)] dark:shadow-[0_-10px_24px_-14px_rgba(0,0,0,0.8)]')}>
               <div className="mx-auto flex w-full max-w-sm flex-col items-center">
+                {greenBackground && <div aria-hidden className="mb-5 h-px w-16 rounded-full bg-white/40" />}
                 {heading}
                 {frogPanel}
+                {prize}
               </div>
             </div>
           </div>

@@ -116,10 +116,6 @@ export function leapDaysLeft(view: LeapView) {
   return days <= 1 ? 'Last day' : `${days} days`;
 }
 
-function startsNextWeek(view: LeapView) {
-  return view.week.daysLeft <= 1 && view.week.scheduledDays < 2;
-}
-
 export function leapRule(view: LeapView): string {
   if (!leapHasHabits(view) || !leapCompeting(view)) return 'Your weekly habit league';
   const next = nextLeagueName(view);
@@ -147,8 +143,7 @@ export function leapStatus(view: LeapView): string {
     return next ? 'Promotion locked in!' : 'Top prize won this week';
   }
   if (!leapCompeting(view)) {
-    if (startsNextWeek(view)) return `Your league week starts ${weekdayOf(week.weekKey)}`;
-    return week.scheduledDays < 2 ? 'Add a habit on another day' : 'Add one more habit';
+    return week.scheduledDays < 2 ? 'Schedule habits on at least 2 days to unlock a weekly target' : 'Add one more habit to unlock a weekly target';
   }
   if (week.hops >= week.leap.target && week.activeDays < week.leap.minDays) {
     return 'Finish a habit on another day';
@@ -197,7 +192,7 @@ export function joinFrogLine(view: LeapView): string {
   if (leapHasHabits(view) && leapCompeting(view) && !week.leap.reached && next) {
     return `${leapTarget(view)} habits by ${weekEndDay(week.weekKey)} opens our gift, and we leap to ${next}!`;
   }
-  return `Every habit you finish counts. Our first league week starts ${weekdayOf(week.weekKey)}.`;
+  return 'Every repeating goal you finish counts toward this week’s progress.';
 }
 
 export function resultFrogLine(result: LeapWeekResult): string {

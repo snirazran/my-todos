@@ -1,25 +1,12 @@
 'use client';
 
-import { useReducedMotion } from 'framer-motion';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import {
   enqueueQuestRewardReveal,
   type RevealCatalog,
 } from '@/components/ui/questRewardReveal';
 import type { LeapJoin, LeapView } from '@/lib/leap/types';
-import {
-  joinFrogLine,
-  leagueName,
-  leagueTitle,
-  leapCompeting,
-  leapHasHabits,
-  leapTarget,
-  nextLeagueName,
-  weekEndDay,
-  weekdayOf,
-} from './leapCopy';
+import { nextLeagueName } from './leapCopy';
 import { LeapStage, LeapStageBody, LeapStageButton, type LeapStageProps } from './LeapStage';
-import { LeapWeekGoal } from './LeapStagePanels';
 
 const GIFT_RIVE_FALLBACKS: Record<string, number> = {
   gift_box_1: 0,
@@ -44,64 +31,40 @@ export function openJoinGifts(join: LeapJoin, view: LeapView) {
   );
 }
 
-function JoinPanel({ view }: { view: LeapView }) {
-  const { week } = view;
-  const next = nextLeagueName(view);
-  if (leapHasHabits(view) && leapCompeting(view) && next) {
-    return (
-      <LeapWeekGoal
-        done={week.hops}
-        target={leapTarget(view)}
-        goal={next}
-        goalIndex={view.league + 1}
-        caption={`Finish them by ${weekEndDay(week.weekKey)}`}
-      />
-    );
-  }
-  return (
-    <LeapWeekGoal
-      done={week.hops}
-      target={0}
-      goal={leagueName(view)}
-      goalIndex={view.league}
-      caption={`Your league week starts ${weekdayOf(week.weekKey)}`}
-    />
-  );
-}
-
 function useJoinStage(
   join: LeapJoin,
   view: LeapView,
-  active: boolean,
   onClose: (openGift: boolean) => void,
 ): LeapStageProps {
-  const reduceMotion = useReducedMotion();
   const gift = join.giftIds[0];
   return {
     leagues: view.leagues.map((league) => league.label),
     from: view.league,
     to: view.league,
     eyebrow: 'Weekly Leap',
-    title: `You joined the ${leagueTitle(leagueName(view))}!`,
-    frogLine: joinFrogLine(view),
+    title: 'Welcome to Weekly Leap!',
+    body: nextLeagueName(view)
+      ? 'Finish repeating goals to earn gifts and move up.'
+      : 'Finish repeating goals to earn weekly gifts.',
+    frogLine: '',
+    greenBackground: true,
     celebrate: true,
-    panel: <JoinPanel view={view} />,
+    panel: null,
+    prize: gift ? (
+      <div className="mt-6 flex w-full items-center gap-3 rounded-2xl bg-[#486a43] px-4 py-2 text-white dark:bg-black/20" aria-label="Your welcome prize is ready to open">
+        <span aria-hidden="true" className="grid h-20 w-20 shrink-0 place-items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/gift1.webp" alt="" className="h-full w-full object-contain" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[15px] font-black">Your welcome prize</span>
+          <span className="mt-1 block text-[13px] font-semibold text-white">Earned by finishing a habit.</span>
+        </span>
+      </div>
+    ) : null,
     actions: (
-      <LeapStageButton onClick={() => onClose(!!gift)}>
-        {gift && (
-          <span
-            aria-hidden="true"
-            className="-my-5 -ml-1 aspect-[282/381] h-[60px] w-auto shrink-0 -translate-y-[12px]"
-          >
-            <GiftRive
-              className="h-full w-full"
-              color={giftRiveIndexFor(view.rewardCatalog, gift)}
-              paused={!active || !!reduceMotion}
-              ambient="jump"
-            />
-          </span>
-        )}
-        {gift ? 'Open your gift' : "Let's go"}
+      <LeapStageButton onGreen onClick={() => onClose(!!gift)}>
+        {gift ? 'Open your prize' : "Let's go"}
       </LeapStageButton>
     ),
   };
@@ -122,7 +85,7 @@ export function LeapJoinContent({
   quiet?: boolean;
   wide?: boolean;
 }) {
-  const stage = useJoinStage(join, view, active, onClose);
+  const stage = useJoinStage(join, view, onClose);
   return <LeapStageBody {...stage} active={active} quiet={quiet} wide={wide} />;
 }
 
@@ -137,7 +100,7 @@ export function LeapJoinSheet({
   open: boolean;
   onClose: (openGift: boolean) => void;
 }) {
-  const stage = useJoinStage(join, view, open, onClose);
+  const stage = useJoinStage(join, view, onClose);
   return (
     <LeapStage
       {...stage}

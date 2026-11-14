@@ -352,7 +352,7 @@ export function StreakRescueSheet({
   const moon = (
     <div aria-hidden className="relative w-full" style={{ height: moonHeight }}>
       <span
-        className="absolute left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full bg-[#223b6b] ring-[10px] ring-[#1f3766] dark:bg-[#1d3359] dark:ring-[#1b2f54]"
+        className="absolute left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full bg-[#75996e] ring-[10px] ring-[#6d9166] dark:bg-[#385a37] dark:ring-[#314e30]"
         style={{
           bottom: MOON_DIGIT_BOTTOM + Math.round(moonSize * 0.36),
           width: Math.round(moonSize * 1.12),
@@ -363,7 +363,7 @@ export function StreakRescueSheet({
         initial={{ opacity: 0, y: 14 }}
         animate={frogGo ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
         transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-        className="absolute inset-x-0 flex justify-center font-display leading-[0.78] tracking-[0.01em] tabular-nums text-[#dbe5fb] [filter:drop-shadow(0_6px_0_#0f1f3d)] dark:text-[#c4d2f0]"
+        className="absolute inset-x-0 flex justify-center font-display leading-[0.78] tracking-[0.01em] tabular-nums text-[#f2f8ef] [filter:drop-shadow(0_6px_0_#365633)] dark:text-[#e1f0dc]"
         style={{
           bottom: MOON_DIGIT_BOTTOM - Math.round(moonSize * 0.06),
           fontSize: moonSize,
@@ -510,7 +510,7 @@ export function StreakRescueSheet({
           transition={{ duration: 0.2 }}
           className={
             wide
-              ? 'absolute inset-y-0 left-[42%] right-0 z-20 flex items-end bg-[#1c3461]/70'
+              ? 'absolute inset-y-0 left-[42%] right-0 z-20 flex items-end bg-[#344f31]/70'
               : 'absolute inset-0 z-20 flex items-end justify-center bg-black/60'
           }
           onClick={closeConfirm}
@@ -633,7 +633,7 @@ export function StreakRescueSheet({
             if ((definition as { y?: unknown }).y === 0) releaseFrog();
           }}
           style={{ willChange: 'transform' }}
-          className="fixed inset-0 z-[1400] select-none bg-[#1c3461] text-foreground"
+          className="fixed inset-0 z-[1400] select-none bg-[#63875c] text-foreground"
         >
           <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-black/30 dark:block" />
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[46%]">
@@ -685,7 +685,7 @@ export function StreakRescueSheet({
             role="dialog"
             aria-modal="true"
             aria-label={multi ? `Keep your ${rows.length} streaks` : `Keep your ${days(heroCount)} streak`}
-            className="relative flex h-[min(40rem,calc(100dvh-3rem))] w-[min(100%,60rem)] overflow-hidden rounded-[32px] bg-[#1c3461] shadow-2xl"
+            className="relative flex h-[min(40rem,calc(100dvh-3rem))] w-[min(100%,60rem)] overflow-hidden rounded-[32px] bg-[#63875c] shadow-2xl"
           >
             <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-black/30 dark:block" />
             <SheetEnteredContext.Provider value>
@@ -694,7 +694,7 @@ export function StreakRescueSheet({
                   {starField}
                 </div>
                 <div className="relative mt-auto px-8">{moon}</div>
-                <div className="relative h-[30%] shrink-0 bg-[#24416f] [border-top-left-radius:50%_36px] [border-top-right-radius:50%_36px] dark:bg-[#1d3359]">
+                <div className="relative h-[30%] shrink-0 bg-[#75996e] [border-top-left-radius:50%_36px] [border-top-right-radius:50%_36px] dark:bg-[#385a37]">
                   {frogSeat}
                 </div>
               </div>
