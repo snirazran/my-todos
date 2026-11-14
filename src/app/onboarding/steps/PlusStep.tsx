@@ -365,6 +365,7 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
     linking,
     linkError,
     pricingFailed,
+    pricingLoading,
     reduceMotion,
     setPricingAttempt,
     markClose,
@@ -441,7 +442,8 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
   const checkout = page === 'checkout';
   const period = plan === 'yearly' ? 'year' : 'month';
   const trialDuration = formatTrialPeriod(trial);
-  const pricesReady = !pricesPending;
+  const pricesReady = !pricingLoading && !pricesPending;
+  const canContinueFree = page === 'free' && pricesReady;
   const frogHidden = checkout && !desktop;
   const lookPage = frogHidden ? pages[Math.max(0, index - 1)] : page;
   const look = useMemo(() => pageLook(lookPage, catalog, indices), [lookPage, catalog, indices]);
@@ -756,6 +758,11 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
             {purchaseError}
           </p>
         ) : null}
+        {page === 'free' && pricingFailed && !pricingLoading && !selected ? (
+          <p role="status" className="text-center text-[13px] font-semibold text-muted-foreground">
+            The offer couldn’t load. You can continue for free.
+          </p>
+        ) : null}
         {!checkout ? (
           <p
             className={cn(
@@ -791,8 +798,8 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
         ) : null}
         <OnboardingButton
           onClick={advance}
-          disabled={(checkout && pricesPending) || (!checkout && !pricesReady)}
-          loading={purchasing || pricesPending}
+          disabled={!pricesReady}
+          loading={purchasing || !pricesReady}
           className={cn('isolate overflow-hidden transition-[transform,box-shadow,filter]', checkout && 'short:h-12')}
         >
           <span
@@ -805,8 +812,8 @@ export default function PlusStep({ frogName, indices, onDone }: Props) {
           <OnboardingButton
             variant="ghost"
             onClick={skip}
-            disabled={page !== 'free'}
-            className={cn('mt-1.5 h-10 short:mt-0.5 short:h-8', page !== 'free' && 'invisible')}
+            disabled={!canContinueFree}
+            className={cn('mt-1.5 h-10 short:mt-0.5 short:h-8', !canContinueFree && 'invisible')}
           >
             Continue for free
           </OnboardingButton>

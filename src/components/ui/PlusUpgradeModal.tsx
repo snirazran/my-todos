@@ -178,6 +178,7 @@ export function usePlusPaywall({
     Record<PlanId, PlusPriceInfo>
   > | null>(null);
   const [pricingFailed, setPricingFailed] = useState(false);
+  const [pricingLoading, setPricingLoading] = useState(true);
   const isDesktop = useIsDesktop();
   const reduceMotion = useReducedMotion();
   const [pricingAttempt, setPricingAttempt] = useState(0);
@@ -225,6 +226,7 @@ export function usePlusPaywall({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    setPricingLoading(true);
     setPricingFailed(false);
     const uid = auth?.currentUser?.uid;
     setPricing(
@@ -259,6 +261,9 @@ export function usePlusPaywall({
           error_code: purchaseErrorCode(err),
           reason: err instanceof Error ? err.message.slice(0, 80) : 'unknown',
         });
+      })
+      .finally(() => {
+        if (!cancelled) setPricingLoading(false);
       });
     return () => {
       cancelled = true;
@@ -495,6 +500,7 @@ export function usePlusPaywall({
     linkError,
     pricing,
     pricingFailed,
+    pricingLoading,
     isDesktop,
     reduceMotion,
     setPricingAttempt,
