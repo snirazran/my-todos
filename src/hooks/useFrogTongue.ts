@@ -54,7 +54,8 @@ const MOUTH_CLOSE_LEAD_MS = 30;
 const BITS_COLORS = ['#fb7185', '#86efac', '#fde68a', '#7dd3fc'];
 const GOLDEN_CHANCE = 0.05;
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const ROOT_SHADE_UNITS = 6.8;
+const ROOT_SHADE_RX = 7.5;
+const ROOT_SHADE_RY = 3.4;
 const ROOT_SHADE_STOPS: [number, number][] = [
   [0, 1],
   [0.35, 1],
@@ -524,7 +525,9 @@ export function useFrogTongue({
       rootGrad = document.createElementNS(SVG_NS, 'radialGradient');
       rootGrad.setAttribute('id', rootId);
       rootGrad.setAttribute('gradientUnits', 'userSpaceOnUse');
-      rootGrad.setAttribute('r', `${ROOT_SHADE_UNITS * frogScale}`);
+      rootGrad.setAttribute('cx', '0');
+      rootGrad.setAttribute('cy', '0');
+      rootGrad.setAttribute('r', `${ROOT_SHADE_RX * frogScale}`);
       for (const [offset, opacity] of ROOT_SHADE_STOPS) {
         const stop = document.createElementNS(SVG_NS, 'stop');
         stop.setAttribute('offset', `${offset}`);
@@ -776,8 +779,12 @@ export function useFrogTongue({
 
       if (pathNode) pathNode.setAttribute('d', shape.body);
       if (rootGrad && rootNode) {
-        rootGrad.setAttribute('cx', `${p0Doc.x - (world ? 0 : offX)}`);
-        rootGrad.setAttribute('cy', `${p0Doc.y - (world ? 0 : offY)}`);
+        rootGrad.setAttribute(
+          'gradientTransform',
+          `translate(${p0Doc.x - (world ? 0 : offX)} ${
+            p0Doc.y - (world ? 0 : offY)
+          }) scale(1 ${ROOT_SHADE_RY / ROOT_SHADE_RX})`,
+        );
         rootNode.setAttribute('d', shape.body);
       }
       if (glossNode) {

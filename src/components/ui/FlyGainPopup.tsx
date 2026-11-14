@@ -70,7 +70,7 @@ export function FlyGainPopup() {
   );
 }
 
-function Sparks() {
+function Sparks({ delay }: { delay: number }) {
   return (
     <span
       aria-hidden="true"
@@ -83,7 +83,7 @@ function Sparks() {
           className="task-enter-spark"
           style={{
             ['--spark-angle' as string]: `${i * 45 + 22}deg`,
-            animationDelay: `${240 + i * 14}ms`,
+            animationDelay: `${delay + i * 14}ms`,
             backgroundColor: i % 2 ? '#f59e0b' : '#447d3f',
           }}
         />
@@ -92,14 +92,69 @@ function Sparks() {
   );
 }
 
+const PUNCH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const FIRST_TICK_MS = 340;
+const MERGE_TICK_MS = 110;
+
+function punch(node: HTMLElement | null, peak: number, duration: number) {
+  node?.animate(
+    [
+      { transform: 'scale(1)' },
+      { transform: `scale(${peak})`, offset: 0.3 },
+      { transform: 'scale(0.96)', offset: 0.68 },
+      { transform: 'scale(1)' },
+    ],
+    { duration, easing: PUNCH_EASE },
+  );
+}
+
 function Pill({ toast }: { toast: Toast }) {
   const reduce = useReducedMotion();
   const [value, setValue] = useState(toast.from);
+  const [firstTo] = useState(toast.to);
+  const merged = toast.to !== firstTo;
+  const numberRef = useRef<HTMLSpanElement>(null);
+  const chipRef = useRef<HTMLSpanElement>(null);
+  const flyRef = useRef<HTMLSpanElement>(null);
+  const haloRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setValue(toast.to), 280);
+    if (merged && !reduce) punch(chipRef.current, 1.32, 300);
+    const timer = window.setTimeout(
+      () => {
+        setValue(toast.to);
+        if (reduce) return;
+        punch(numberRef.current, 1.3, 380);
+        numberRef.current?.animate(
+          [
+            { color: 'hsl(var(--primary))' },
+            { color: 'hsl(var(--primary))', offset: 0.45 },
+            {},
+          ],
+          { duration: 520, easing: 'ease-out' },
+        );
+        flyRef.current?.animate(
+          [
+            { transform: 'scale(1) rotate(0deg)' },
+            { transform: 'scale(1.22) rotate(-12deg)', offset: 0.28 },
+            { transform: 'scale(0.95) rotate(6deg)', offset: 0.62 },
+            { transform: 'scale(1) rotate(0deg)' },
+          ],
+          { duration: 520, easing: PUNCH_EASE },
+        );
+        haloRef.current?.animate(
+          [
+            { opacity: 0, transform: 'scale(0.8)' },
+            { opacity: 1, transform: 'scale(1.1)', offset: 0.3 },
+            { opacity: 0, transform: 'scale(1.45)' },
+          ],
+          { duration: 700, easing: PUNCH_EASE },
+        );
+      },
+      merged ? MERGE_TICK_MS : FIRST_TICK_MS,
+    );
     return () => window.clearTimeout(timer);
-  }, [toast.to]);
+  }, [toast.to, merged, reduce]);
 
   const delta = toast.to - toast.from;
 
@@ -135,22 +190,46 @@ function Pill({ toast }: { toast: Toast }) {
           transition={{ type: 'spring', stiffness: 560, damping: 17, delay: 0.12 }}
           className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/[0.16] ring-1 ring-inset ring-primary/25"
         >
-          <Fly size={27} paused y={-3} interactive={false} />
-          {!reduce && <Sparks key={toast.to} />}
+          <span
+            ref={haloRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-2 rounded-full bg-[radial-gradient(closest-side,rgba(245,158,11,0.34),rgba(79,145,73,0.16)_60%,transparent)] opacity-0"
+          />
+          <span ref={flyRef} className="relative grid place-items-center">
+            <Fly size={27} paused y={-3} interactive={false} />
+          </span>
+          {!reduce && (
+            <Sparks
+              key={toast.to}
+              delay={(merged ? MERGE_TICK_MS : FIRST_TICK_MS) - 20}
+            />
+          )}
         </motion.span>
-        <AnimatedNumber
-          value={value}
-          haptics
-          className="min-w-[2ch] text-[16px] font-black leading-none tabular-nums text-foreground"
-        />
+        <span ref={numberRef} className="inline-block origin-center text-foreground">
+          <AnimatedNumber
+            value={value}
+            haptics
+            className="inline-block min-w-[2ch] text-[16px] font-black leading-none tabular-nums"
+          />
+        </span>
         <motion.span
-          key={delta}
-          initial={reduce ? false : { scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 600, damping: 20, delay: 0.24 }}
-          className="grid h-[26px] place-items-center rounded-full bg-[#447d3f] px-2.5 text-[12.5px] font-black leading-none text-white shadow-[0_2px_0_0_#2c511a]"
+          initial={reduce ? false : { scale: 0.2, opacity: 0, rotate: -14, x: 6 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0, x: 0 }}
+          transition={{
+            type: 'spring',
+            stiffness: 620,
+            damping: 15,
+            delay: 0.2,
+            opacity: { duration: 0.1, delay: 0.2 },
+          }}
+          className="inline-grid"
         >
-          +{delta}
+          <span
+            ref={chipRef}
+            className="grid h-[26px] place-items-center rounded-full bg-[#447d3f] px-2.5 text-[12.5px] font-black leading-none tabular-nums text-white shadow-[0_2px_0_0_#2c511a]"
+          >
+            +{delta}
+          </span>
         </motion.span>
       </div>
     </motion.div>

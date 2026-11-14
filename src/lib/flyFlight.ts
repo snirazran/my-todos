@@ -1,5 +1,7 @@
 'use client';
 
+import { playFlyLand } from '@/lib/catchSounds';
+
 type FlightOptions = {
   from: DOMRect;
   to?: Element | null;
@@ -40,8 +42,11 @@ export function holdFlyCounter(): () => void {
 
 const FLY_SIZE = 30;
 const MAX_FLIES = 8;
-const STAGGER_MS = 55;
-const BURST_MS = 280;
+const BURST_MS = 260;
+const HANG_MS = 70;
+const BURST_EASE = 'cubic-bezier(0.2,0.9,0.3,1)';
+const FLIGHT_AMBER = '#f59e0b';
+const FLIGHT_GREEN = '#447d3f';
 
 function onScreen(node: Element) {
   const rect = node.getBoundingClientRect();
@@ -92,16 +97,66 @@ function createLayer() {
   return layer;
 }
 
+function pulseRing(
+  layer: HTMLElement,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  duration: number,
+  spread = 1.7,
+) {
+  const ring = document.createElement('div');
+  ring.style.cssText = `position:absolute;left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px;border-radius:9999px;border:2px solid ${color};will-change:transform,opacity`;
+  layer.appendChild(ring);
+  const animation = ring.animate(
+    [
+      { transform: 'scale(0.35)', opacity: 0.85 },
+      { transform: `scale(${spread})`, opacity: 0 },
+    ],
+    { duration, easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'both' },
+  );
+  animation.onfinish = () => ring.remove();
+  animation.oncancel = () => ring.remove();
+}
+
+const mix = (from: number, to: number, weight: number) =>
+  from + (to - from) * weight;
+
+function homingEase(lead: number) {
+  return `cubic-bezier(${mix(0.7, 0.45, lead).toFixed(3)},0,${mix(0.9, 0.3, lead).toFixed(3)},${mix(0.45, 1, lead).toFixed(3)})`;
+}
+
+function punchTarget(node: Element, step: number, last: boolean) {
+  if (!node.isConnected) return;
+  const peak = last ? 1.2 : 1.09 + Math.min(step, 6) * 0.012;
+  try {
+    node.animate(
+      [
+        { transform: 'scale(1)' },
+        { transform: `scale(${peak})`, offset: 0.35 },
+        { transform: 'scale(1)' },
+      ],
+      {
+        duration: last ? 320 : 170,
+        easing: 'cubic-bezier(0.22,1,0.36,1)',
+        composite: 'add',
+      },
+    );
+  } catch {
+    return;
+  }
+}
+
 export function flyFliesToCounter({ from, to, count, onFirstLand, onAllLanded }: FlightOptions): void {
-  const target =
+  const targetNode =
     typeof document === 'undefined'
       ? null
-      : to
-        ? to.getBoundingClientRect()
-        : findCounterTarget();
+      : (to ?? findVisible('[data-fly-counter]'));
+  const target = targetNode?.getBoundingClientRect() ?? null;
   const reduceMotion = prefersReducedMotion();
 
-  if (!target || reduceMotion || typeof document.body.animate !== 'function') {
+  if (!targetNode || !target || reduceMotion || typeof document.body.animate !== 'function') {
     onFirstLand?.();
     onAllLanded?.();
     return;
@@ -109,19 +164,46 @@ export function flyFliesToCounter({ from, to, count, onFirstLand, onAllLanded }:
 
   const layer = createLayer();
 
-  const startX = from.left + from.width / 2 - FLY_SIZE / 2;
-  const startY = from.top + from.height / 2 - FLY_SIZE / 2;
-  const dx = target.left + target.width / 2 - FLY_SIZE / 2 - startX;
-  const dy = target.top + target.height / 2 - FLY_SIZE / 2 - startY;
+  const originX = from.left + from.width / 2;
+  const originY = from.top + from.height / 2;
+  const endX = target.left + target.width / 2;
+  const endY = target.top + target.height / 2;
+  const startX = originX - FLY_SIZE / 2;
+  const startY = originY - FLY_SIZE / 2;
+  const dx = endX - originX;
+  const dy = endY - originY;
   const total = Math.max(1, Math.min(count, MAX_FLIES));
+  const stagger = Math.max(50, Math.min(90, 480 / total));
+  const travel = Math.max(420, Math.min(700, 340 + Math.hypot(dx, dy) * 0.4));
+  const pairs = Math.ceil(total / 2);
+  const endScale = Math.max(
+    0.4,
+    Math.min(0.7, (Math.min(target.width, target.height) / FLY_SIZE) * 0.6),
+  );
   let landed = 0;
 
-  const land = () => {
+  pulseRing(layer, originX, originY, 44, FLIGHT_AMBER, 380);
+
+  const land = (arrived: boolean) => {
     landed += 1;
+    const last = landed === total;
     if (landed === 1) onFirstLand?.();
-    if (landed === total) {
-      layer.remove();
+    if (arrived) {
+      playFlyLand(landed - 1, last && total > 1);
+      if (landed > 1) punchTarget(targetNode, landed, last);
+      pulseRing(
+        layer,
+        endX,
+        endY,
+        last ? 40 : 26,
+        landed % 2 ? FLIGHT_AMBER : FLIGHT_GREEN,
+        last ? 420 : 280,
+        last ? 2 : 1.7,
+      );
+    }
+    if (last) {
       onAllLanded?.();
+      window.setTimeout(() => layer.remove(), arrived ? 460 : 0);
     }
   };
 
@@ -140,23 +222,26 @@ export function flyFliesToCounter({ from, to, count, onFirstLand, onAllLanded }:
     layer.appendChild(xLayer);
 
     const angle = (index / total) * Math.PI * 2 + Math.random() * 0.7;
-    const radius = 34 + Math.random() * 30;
+    const radius = 30 + Math.random() * 34;
     const burstX = Math.cos(angle) * radius;
-    const burstY = Math.sin(angle) * radius;
-    const flight = 560 + Math.random() * 160;
-    const duration = BURST_MS + flight;
+    const burstY = Math.sin(angle) * radius - 10;
+    const duration = BURST_MS + HANG_MS + travel + (Math.random() * 2 - 1) * 24;
     const burstEnd = BURST_MS / duration;
-    const delay = index * STAGGER_MS;
+    const hangEnd = (BURST_MS + HANG_MS) / duration;
+    const delay = index * stagger;
+    const spread = 0.4 * (1 - Math.floor(index / 2) / pairs);
+    const xLead = index % 2 === 0 ? 0.5 + spread : 0.5 - spread;
     const spin = (Math.random() > 0.5 ? 1 : -1) * (14 + Math.random() * 16);
     const timing: KeyframeAnimationOptions = { duration, delay, fill: 'both' };
 
     xLayer.animate(
       [
-        { transform: 'translate3d(0,0,0)', easing: 'cubic-bezier(0.2,0.9,0.3,1)' },
+        { transform: 'translate3d(0,0,0)', easing: BURST_EASE },
+        { transform: `translate3d(${burstX}px,0,0)`, offset: burstEnd },
         {
-          transform: `translate3d(${burstX}px,0,0)`,
-          offset: burstEnd,
-          easing: 'cubic-bezier(0.4,0,0.2,1)',
+          transform: `translate3d(${burstX * 1.08}px,0,0)`,
+          offset: hangEnd,
+          easing: homingEase(xLead),
         },
         { transform: `translate3d(${dx}px,0,0)` },
       ],
@@ -164,11 +249,12 @@ export function flyFliesToCounter({ from, to, count, onFirstLand, onAllLanded }:
     );
     yLayer.animate(
       [
-        { transform: 'translate3d(0,0,0)', easing: 'cubic-bezier(0.2,0.9,0.3,1)' },
+        { transform: 'translate3d(0,0,0)', easing: BURST_EASE },
+        { transform: `translate3d(0,${burstY}px,0)`, offset: burstEnd },
         {
-          transform: `translate3d(0,${burstY}px,0)`,
-          offset: burstEnd,
-          easing: 'cubic-bezier(0.6,0,0.9,0.4)',
+          transform: `translate3d(0,${burstY * 1.08}px,0)`,
+          offset: hangEnd,
+          easing: homingEase(1 - xLead),
         },
         { transform: `translate3d(0,${dy}px,0)` },
       ],
@@ -176,15 +262,32 @@ export function flyFliesToCounter({ from, to, count, onFirstLand, onAllLanded }:
     );
     const flyAnimation = fly.animate(
       [
-        { transform: 'scale(0.3) rotate(0deg)', opacity: 0 },
-        { transform: `scale(1.15) rotate(${spin}deg)`, opacity: 1, offset: burstEnd },
-        { transform: `scale(0.85) rotate(${-spin}deg)`, opacity: 1, offset: 0.9 },
-        { transform: 'scale(0.4) rotate(0deg)', opacity: 0 },
+        {
+          transform: 'scale(0.2) rotate(0deg)',
+          opacity: 0,
+          easing: 'cubic-bezier(0.34,1.56,0.64,1)',
+        },
+        {
+          transform: `scale(1.12) rotate(${spin}deg)`,
+          opacity: 1,
+          offset: burstEnd,
+        },
+        {
+          transform: `scale(1) rotate(${-spin * 0.6}deg)`,
+          opacity: 1,
+          offset: hangEnd,
+        },
+        {
+          transform: `scale(${endScale * 1.05}) rotate(${spin * 0.3}deg)`,
+          opacity: 1,
+          offset: 0.94,
+        },
+        { transform: `scale(${endScale * 0.7}) rotate(0deg)`, opacity: 0 },
       ],
       timing,
     );
-    flyAnimation.onfinish = land;
-    flyAnimation.oncancel = land;
+    flyAnimation.onfinish = () => land(true);
+    flyAnimation.oncancel = () => land(false);
   }
 }
 

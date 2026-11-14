@@ -190,6 +190,44 @@ export function playPop(combo = 0) {
   }
 }
 
+export function playFlyLand(step = 0, last = false) {
+  if (!catchSoundsEnabled()) return;
+  try {
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const base = 880 * comboPitch(step) * vary(0.15);
+    const tail = last ? 0.24 : 0.09;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(base, now);
+    osc.frequency.exponentialRampToValueAtTime(base * 1.12, now + 0.05);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(last ? 0.075 : 0.06, now + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + tail);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + tail + 0.02);
+
+    if (last) {
+      const shine = ctx.createOscillator();
+      shine.type = 'triangle';
+      shine.frequency.setValueAtTime(base * 2, now);
+      const sGain = ctx.createGain();
+      sGain.gain.setValueAtTime(0.001, now);
+      sGain.gain.exponentialRampToValueAtTime(0.03, now + 0.01);
+      sGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+      shine.connect(sGain).connect(ctx.destination);
+      shine.start(now);
+      shine.stop(now + 0.34);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function playSlurp(duration = 0.28) {
   if (!catchSoundsEnabled()) return;
   try {

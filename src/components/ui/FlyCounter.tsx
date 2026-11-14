@@ -77,7 +77,7 @@ export function FlyCounter({
     setBump((curr) => ({ delta: (curr?.delta ?? 0) + delta }));
     hapticTick();
     if (bumpTimer.current) window.clearTimeout(bumpTimer.current);
-    bumpTimer.current = window.setTimeout(() => setBump(null), 1400);
+    bumpTimer.current = window.setTimeout(() => setBump(null), 1200);
     if (
       typeof window === 'undefined' ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -252,17 +252,35 @@ export function FlyCounter({
         {bump && (
           <motion.span
             key="bump"
-            initial={{ opacity: 0, x: '-50%', y: -6, scale: 0.5 }}
-            animate={{ opacity: 1, x: '-50%', y: 8, scale: 1 }}
-            exit={{ opacity: 0, x: '-50%', y: 16, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 520, damping: 26 }}
+            initial={{ opacity: 0, x: '-50%', y: -10, scale: 0.3, rotate: -10 }}
+            animate={{
+              opacity: 1,
+              x: '-50%',
+              y: 8,
+              scale: bump.delta >= 10 ? 1.14 : bump.delta >= 5 ? 1.07 : 1,
+              rotate: 0,
+            }}
+            exit={{
+              opacity: 0,
+              x: '-50%',
+              y: -8,
+              scale: 0.4,
+              transition: { duration: 0.18, ease: [0.5, 0, 0.9, 0.4] },
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 560,
+              damping: 19,
+              opacity: { duration: 0.12 },
+            }}
+            style={{ transformOrigin: '50% 0%' }}
             className="pointer-events-none absolute left-1/2 top-full z-20 mt-0.5 grid h-6 place-items-center rounded-full bg-[#447d3f] px-2.5 text-[12px] font-black leading-none text-white shadow-[0_2px_0_0_#2c511a]"
           >
             <motion.span
               key={bump.delta}
-              initial={{ scale: 1.4 }}
+              initial={{ scale: 1.5 }}
               animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+              transition={{ type: 'spring', stiffness: 560, damping: 16 }}
               className="inline-block tabular-nums"
             >
               +{bump.delta}
