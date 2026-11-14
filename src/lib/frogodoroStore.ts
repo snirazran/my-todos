@@ -40,7 +40,7 @@ export function announceSessionEnded(detail?: SessionEndedDetail): void {
 export const TEN_SECOND_MINUTES = 10 / 60;
 export const MAX_DURATION_MINUTES = 180;
 
-export const FOCUS_PRESETS = [15, 25, 45, 60];
+export const FOCUS_PRESETS = [5, 15, 25, 45];
 export const BREAK_PRESETS = [5, 10, 15, 30];
 
 export const DEFAULT_SETTINGS: FrogodoroSettings = {

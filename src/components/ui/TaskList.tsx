@@ -97,6 +97,11 @@ import {
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyLine } from '@/components/ui/BuddyBadge';
+import {
+  FocusNudge,
+  FOCUS_NUDGE_MINUTES,
+  useFocusNudge,
+} from '@/components/ui/FocusNudge';
 import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
 import {
   matchesTaskFilters,
@@ -151,6 +156,7 @@ interface Task {
   /** Consecutive-completion streak for a repeating task, as of today. */
   streak?: number;
   /** Flies ticking this row would pay right now, streak rate included. */
+  missedRun?: number;
   flyWorth?: number;
   isStarter?: boolean;
   sectionId?: string | null;
@@ -349,7 +355,10 @@ interface SortableTaskItemProps {
   isGuest?: boolean;
   isGlowActive?: boolean;
   isSortDragging?: boolean;
-  onStartTimer?: (task: Task, opts?: { autoStart?: boolean }) => void;
+  onStartTimer?: (
+    task: Task,
+    opts?: { autoStart?: boolean; minutes?: number },
+  ) => void;
   onOpenDetail?: (task: Task) => void;
   onToggleChecklistItem?: (task: Task, itemId: string) => void;
   stepsOpen?: boolean;
@@ -358,6 +367,9 @@ interface SortableTaskItemProps {
   hintPeekPrimary?: boolean;
   isDesktop?: boolean;
   isNextTimed?: boolean;
+  showFocusNudge?: boolean;
+  onAcceptFocusNudge?: () => void;
+  onDismissFocusNudge?: () => void;
 }
 
 const clockMinutes = (hhmm?: string): number | null => {
@@ -421,6 +433,9 @@ const TaskRowBody = React.memo(function TaskRowBody(
       hintPeekPrimary = false,
       isDesktop = false,
       isNextTimed = false,
+      showFocusNudge = false,
+      onAcceptFocusNudge,
+      onDismissFocusNudge,
       isDragging,
       onSwipeOpenChange,
     }: TaskRowBodyProps,
@@ -1093,6 +1108,19 @@ const TaskRowBody = React.memo(function TaskRowBody(
                   isDone={isDone}
                   date={new Intl.DateTimeFormat('en-CA').format(new Date())}
                 />
+                {showFocusNudge && !isDone && onStartTimer && (
+                  <FocusNudge
+                    className="mt-1"
+                    onAccept={() => {
+                      onAcceptFocusNudge?.();
+                      onStartTimer(task, {
+                        autoStart: true,
+                        minutes: FOCUS_NUDGE_MINUTES,
+                      });
+                    }}
+                    onDismiss={() => onDismissFocusNudge?.()}
+                  />
+                )}
             </div>
 
             {isDesktop &&
@@ -1751,7 +1779,7 @@ export default function TaskList({
     data: { startTime: string; endTime: string; reminder: string },
     scope?: 'one' | 'all',
   ) => Promise<void> | void;
-  onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }, opts?: { autoStart?: boolean }) => void;
+  onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }, opts?: { autoStart?: boolean; minutes?: number }) => void;
   onUpdateDetails?: (
     taskId: string,
     details: { notes?: string; checklist?: ChecklistItem[] },
@@ -2462,6 +2490,8 @@ export default function TaskList({
       }
     }
   }
+
+  const focusNudge = useFocusNudge(sortedActiveTasks, !!onStartTimer);
 
   // Exactly one row demos the swipe: the same one the coach has spotlit, so a
   // tagged guide never nudges rows sitting behind its own dim.
@@ -3183,6 +3213,9 @@ export default function TaskList({
                           hintPeekPrimary={isHintPeekPrimary}
                           isDesktop={!usesSwipeTrays}
                           isNextTimed={task.id === nextTimedTaskId}
+                          showFocusNudge={task.id === focusNudge.taskId}
+                          onAcceptFocusNudge={focusNudge.accept}
+                          onDismissFocusNudge={focusNudge.dismiss}
                         />
                       );
                     })}

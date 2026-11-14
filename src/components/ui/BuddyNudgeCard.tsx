@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { useBuddyBonusFlies, useHasBuddy } from '@/hooks/useBuddyState';
-import { useNudge } from '@/hooks/useNudge';
+import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
@@ -20,6 +19,7 @@ type FrogIndices = React.ComponentProps<typeof Frog>['indices'];
 
 const FROG_W = 110;
 const FROG_H = 100;
+const DISMISS_FOR_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function BuddyNudgeCardView({
   indices,
@@ -92,12 +92,49 @@ export function BuddyNudgeCardView({
 export function BuddyNudgeCard() {
   const { user } = useAuth();
   const { indices } = useWardrobeIndices(!!user);
-  const hasBuddy = useHasBuddy(!!user);
-  const { show, dismiss, engage } = useNudge('home_buddy', {
-    enabled: hasBuddy === false,
-  });
+  const uid = user?.uid;
+  const [dismissedUntil, setDismissedUntil] = useState<number | null>(null);
+  const [readyUser, setReadyUser] = useState<string | null>(null);
   const bonusFlies = useBuddyBonusFlies(!!user);
   const [flowOpen, setFlowOpen] = useState(false);
+
+  useEffect(() => {
+    if (!uid) return;
+    const key = `frogress.home-buddy.dismissed-until.${uid}`;
+    const sync = () => {
+      try {
+        const until = Number(localStorage.getItem(key));
+        setDismissedUntil(Number.isFinite(until) && until > Date.now() ? until : null);
+      } catch {
+        setDismissedUntil(null);
+      }
+      setReadyUser(uid);
+    };
+    sync();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === key || event.key === null) sync();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [uid]);
+
+  useEffect(() => {
+    if (dismissedUntil === null) return;
+    const timer = window.setTimeout(() => setDismissedUntil(null), Math.max(0, dismissedUntil - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [dismissedUntil]);
+
+  const show = !!uid && readyUser === uid && dismissedUntil === null;
+  const dismiss = () => {
+    if (!uid) return;
+    const until = Date.now() + DISMISS_FOR_MS;
+    setDismissedUntil(until);
+    try {
+      localStorage.setItem(`frogress.home-buddy.dismissed-until.${uid}`, String(until));
+    } catch {
+      // Keep the dismissal for this session when storage is unavailable.
+    }
+  };
 
   const { data } = useSWR<{ friends: FriendSummary[] }>(
     user && (show || flowOpen) ? '/api/friends' : null,
@@ -115,7 +152,6 @@ export function BuddyNudgeCard() {
           indices={indices}
           bonusFlies={bonusFlies}
           onOpen={() => {
-            engage();
             setFlowOpen(true);
           }}
           onDismiss={dismiss}

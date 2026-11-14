@@ -78,7 +78,7 @@ export type UserWardrobe = {
   unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;
-  /** Flies earned from focus time (1 per 15 focused minutes, daily-capped). */
+  /** Flies earned from focus time (1 at 2 focused minutes, then 1 per 15, daily-capped). */
   focusFlyDaily?: FocusFlyDaily;
   /** Deep-focus pledge bonus flies awarded today (daily-capped). */
   deepFocusDaily?: DeepFocusDaily;

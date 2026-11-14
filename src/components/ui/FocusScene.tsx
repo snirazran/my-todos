@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
+import Frog, { type FrogArrival, type FrogHandle } from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
@@ -31,6 +31,8 @@ export function entrySideFor(drift: (typeof FOCUS_DRIFTS)[number]): number {
  * timer runs out) does the tongue actually land: fly snatched, love emote,
  * "+1" pop.
  */
+const GAIN_FLIGHT_MS = 550;
+
 export function FocusScene({
   indices,
   running,
@@ -39,6 +41,7 @@ export function FocusScene({
   fliesPotential = 0,
   catchImminent,
   frogWidth = 144,
+  arrive,
   counterRef,
   onGainLand,
   suspended = false,
@@ -59,6 +62,7 @@ export function FocusScene({
    *  tongues don't collide. Read on demand, never subscribed. */
   catchImminent?: () => boolean;
   frogWidth?: number;
+  arrive?: FrogArrival;
   /** The caught-count chip a snatched fly flies into (currency-gain style). */
   counterRef?: React.RefObject<HTMLElement | null>;
   onGainLand?: () => void;
@@ -140,6 +144,18 @@ export function FocusScene({
       to: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
     });
   }, [counterRef]);
+
+  const onGainLandRef = useRef(onGainLand);
+  onGainLandRef.current = onGainLand;
+  const gainId = gain?.id ?? null;
+  useEffect(() => {
+    if (gainId === null) return;
+    const timer = window.setTimeout(() => {
+      setGain((current) => (current?.id === gainId ? null : current));
+      onGainLandRef.current?.();
+    }, GAIN_FLIGHT_MS);
+    return () => window.clearTimeout(timer);
+  }, [gainId]);
 
   const {
     grab,
@@ -345,11 +361,7 @@ export function FocusScene({
             className="pointer-events-none fixed left-0 top-0 z-[1150]"
             initial={{ x: gain.from.x - 13, y: gain.from.y - 13, scale: 0.95, opacity: 1 }}
             animate={{ x: gain.to.x - 13, y: gain.to.y - 13, scale: 0.5, opacity: 1 }}
-            transition={{ duration: 0.55, ease: [0.35, 0, 0.55, 1] }}
-            onAnimationComplete={() => {
-              setGain(null);
-              onGainLand?.();
-            }}
+            transition={{ duration: GAIN_FLIGHT_MS / 1000, ease: [0.35, 0, 0.55, 1] }}
           >
             <Fly size={30} interactive={false} alwaysPlay />
           </motion.span>,
@@ -373,13 +385,18 @@ export function FocusScene({
             the home frog (FrogDisplay), so it can't be buried by the card's
             stacking. */}
         {speech && (
-          <FrogSpeechBubble
-            rate={0}
-            done={0}
-            total={0}
-            fixedMessage={speech}
-            className="!top-[78px]"
-          />
+          <div
+            className="absolute inset-x-0 h-0"
+            style={{ top: Math.round(frogWidth * (78 / 144)) }}
+          >
+            <FrogSpeechBubble
+              rate={0}
+              done={0}
+              total={0}
+              fixedMessage={speech}
+              className="!top-0"
+            />
+          </div>
         )}
         <Frog
           ref={frogRef}
@@ -387,6 +404,7 @@ export function FocusScene({
           height={Math.round(frogWidth * 1.125)}
           indices={indices}
           onDressed={onFrogReady}
+          arrive={arrive}
           ignoreIdlePause
           mouthOpen={!!grab}
           mouthOffset={{

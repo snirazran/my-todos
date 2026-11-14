@@ -43,13 +43,7 @@ import {
   consumeQuickAdd,
 } from '@/lib/widget/quickAdd';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
-import { FocusFabSatellite } from '@/components/ui/FocusFabSatellite';
 import { isContainerTaskId } from '@/lib/focusSubject';
-import {
-  HomeFocusFlies,
-  HOME_FOCUS_FLY_PREFIX,
-} from '@/components/ui/HomeFocusFlies';
-import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { Icon } from '@/components/ui/Icon';
 import { hapticSelect } from '@/lib/haptics';
@@ -196,6 +190,7 @@ export default function HomeDashboard() {
   }, []);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [timerAutoStart, setTimerAutoStart] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState<number | null>(null);
   const [showTimer, setShowTimer] = useState(false);
   const [frogodoroHydrated, setFrogodoroHydrated] = useState(
     () => useFrogodoroStore.persist?.hasHydrated?.() ?? false,
@@ -813,28 +808,6 @@ export default function HomeDashboard() {
             shouldStart={(x, y) => frogRef.current?.hitTest(x, y) !== false}
           >
             <div className="flex flex-col gap-2 lg:gap-4">
-            {user &&
-              (() => {
-                // Covers both the fly keys (home-focus-fly-N) and the miss
-                // aim key (home-focus-miss) — hiding the layer mid-lunge
-                // unmounts the flies and desyncs both surfaces.
-                const focusGrabActive =
-                  !!grab && grab.key.startsWith('home-focus');
-                return (
-                  <HomeFocusFlies
-                    frogRef={frogRef}
-                    frogBoxRef={frogBoxRef}
-                    flyRefs={flyRefs}
-                    triggerTongue={triggerTongue}
-                    visuallyDone={visuallyDone}
-                    sheetOpen={showTimer}
-                    hidden={
-                      ((cinematic || !!grab) && !focusGrabActive) ||
-                      (isAnyPanelOpen && !showTimer)
-                    }
-                  />
-                );
-              })()}
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -1026,6 +999,7 @@ export default function HomeDashboard() {
                     }
                     setTimerTask(t as Task);
                     setTimerAutoStart(!!opts?.autoStart);
+                    setTimerMinutes(opts?.minutes ?? null);
                     setShowTimer(true);
                   }}
                   onUpdateDetails={(id, details) => {
@@ -1314,31 +1288,18 @@ export default function HomeDashboard() {
         open={showTimer}
         onOpenChange={(v) => {
           setShowTimer(v);
-          if (!v) setTimerAutoStart(false);
+          if (!v) {
+            setTimerAutoStart(false);
+            setTimerMinutes(null);
+          }
         }}
         task={timerTask}
         tags={tags}
         autoStart={timerAutoStart}
+        presetMinutes={timerMinutes}
         onMutateToday={() => mutateToday()}
         onSubjectChange={(picked) => setTimerTask(picked as unknown as Task)}
       />
-
-      {!showTimer && (
-        <FrogodoroPill
-          onClick={() => {
-            const t = runningSubjectTask();
-            if (t) setTimerTask(t);
-            setShowTimer(true);
-          }}
-          taskName={
-            frogTaskId && isContainerTaskId(frogTaskId)
-              ? frogSubjectName
-              : (data.find((t) => t.id === frogTaskId)?.text ??
-                backlogTasks.find((t) => t.id === frogTaskId)?.text)
-          }
-        />
-      )}
-
 
       <QuestOnboardingPopup
         show={
@@ -1379,7 +1340,6 @@ export default function HomeDashboard() {
           } as React.CSSProperties
         }
       >
-        <FocusFabSatellite hidden={webLayout} concealed={fabsConcealed} />
         <button
           type="button"
           aria-label="Add task"

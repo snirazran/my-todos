@@ -17,7 +17,6 @@ import { useUIStore } from '@/lib/uiStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import CircularTimer from '@/components/ui/CircularTimer';
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -116,15 +115,6 @@ export default function GlobalFrogodoroMini() {
 
   return (
     <>
-      {/* Compact circular timer at the side; tap to expand controls. Only on
-          pages that don't host the full timer UI (Home/Planner have their own
-          pill). The completion popup below is global — always rendered and
-          top-most — so a finished timer is acknowledged above any open popup or
-          settings panel on any page. */}
-      {fullTimerHosts === 0 && blockingPopups === 0 && !loadingScreenVisible && (
-        <CircularTimer />
-      )}
-
       {mounted &&
         createPortal(
           <AnimatePresence>

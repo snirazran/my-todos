@@ -4,6 +4,7 @@ import FocusSessionModel from '@/lib/models/FocusSession';
 import { subjectKindOf, type FocusSubjectKind } from '@/lib/focusSubject';
 import {
   FOCUS_FLY_RATE_SECONDS,
+  FOCUS_FIRST_FLY_SECONDS,
   FOCUS_FLY_DAILY_CAP,
   CATCH_LEAD_SECONDS,
 } from '@/lib/focusFlies';
@@ -25,15 +26,17 @@ export type FocusSessionRef = {
   subjectLabel: string;
 };
 
-// Credits flies for focused time: 1 fly per 15 focused minutes, capped per day.
+// Credits flies for focused time: 1 for the day's first 2 focused minutes, then
+// 1 per 15, capped per day.
 // Runs as a single aggregation-pipeline update so concurrent flushes (live
 // ticks, pause saves, the completion processor) can never double-award.
 //
 // WHEN each of those flies lands depends on what the flush describes:
 //
 //   `runningPhase` given (a live/paused focus phase)  → pay on the phase's own
-//     marks, spread evenly across its length, so the credit lands on the tick
-//     the frog is seen catching it. Mirrors `focusPhaseCatches` on the client
+//     marks (the day's first fly on its boundary, the rest spread evenly over
+//     what is left), so the credit lands on the tick the frog is seen catching
+//     it. Mirrors `focusPhaseCatches` on the client
 //     exactly — same integer arithmetic, same lead — so no surface can show a
 //     catch the wallet hasn't been paid for, or vice versa.
 //
@@ -59,7 +62,12 @@ async function awardFocusFlies(
   const curveOf = (value: unknown) => ({
     $min: [
       FOCUS_FLY_DAILY_CAP,
-      { $floor: { $divide: [value, FOCUS_FLY_RATE_SECONDS] } },
+      {
+        $add: [
+          { $cond: [{ $gte: [value, FOCUS_FIRST_FLY_SECONDS] }, 1, 0] },
+          { $floor: { $divide: [value, FOCUS_FLY_RATE_SECONDS] } },
+        ],
+      },
     ],
   });
 
@@ -84,6 +92,7 @@ async function awardFocusFlies(
                 potential: curveOf({
                   $add: ['$$banked', runningPhase.fullSeconds],
                 }),
+                early: { $subtract: [FOCUS_FIRST_FLY_SECONDS, '$$banked'] },
               },
               in: {
                 $let: {
@@ -95,18 +104,74 @@ async function awardFocusFlies(
                         $min: [
                           '$$owed',
                           {
-                            $floor: {
-                              $divide: [
-                                {
-                                  $multiply: [
-                                    runningPhase.elapsedSeconds +
-                                      CATCH_LEAD_SECONDS,
-                                    '$$owed',
+                            $cond: [
+                              { $gt: ['$$early', 0] },
+                              {
+                                $cond: [
+                                  {
+                                    $lt: [
+                                      runningPhase.elapsedSeconds +
+                                        CATCH_LEAD_SECONDS,
+                                      '$$early',
+                                    ],
+                                  },
+                                  0,
+                                  {
+                                    $add: [
+                                      1,
+                                      {
+                                        $floor: {
+                                          $divide: [
+                                            {
+                                              $multiply: [
+                                                {
+                                                  $subtract: [
+                                                    runningPhase.elapsedSeconds +
+                                                      CATCH_LEAD_SECONDS,
+                                                    '$$early',
+                                                  ],
+                                                },
+                                                {
+                                                  $max: [
+                                                    0,
+                                                    { $subtract: ['$$owed', 1] },
+                                                  ],
+                                                },
+                                              ],
+                                            },
+                                            {
+                                              $max: [
+                                                1,
+                                                {
+                                                  $subtract: [
+                                                    runningPhase.fullSeconds,
+                                                    '$$early',
+                                                  ],
+                                                },
+                                              ],
+                                            },
+                                          ],
+                                        },
+                                      },
+                                    ],
+                                  },
+                                ],
+                              },
+                              {
+                                $floor: {
+                                  $divide: [
+                                    {
+                                      $multiply: [
+                                        runningPhase.elapsedSeconds +
+                                          CATCH_LEAD_SECONDS,
+                                        '$$owed',
+                                      ],
+                                    },
+                                    runningPhase.fullSeconds,
                                   ],
                                 },
-                                runningPhase.fullSeconds,
-                              ],
-                            },
+                              },
+                            ],
                           },
                         ],
                       },

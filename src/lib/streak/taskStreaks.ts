@@ -133,6 +133,41 @@ export function computeGroupStreak(
   return streak;
 }
 
+export const MISSED_RUN_LOOKBACK_DAYS = 21;
+
+export function computeMissedRun(sibs: TaskDoc[], today: string, tz: string) {
+  if (sibs.length === 0) return 0;
+  const completed = new Set<string>();
+  const movedAway = new Set<string>();
+  const starts = new Map<TaskDoc, string | undefined>();
+  let earliestStart: string | undefined;
+  for (const s of sibs) {
+    for (const d of s.completedDates ?? []) completed.add(d);
+    for (const m of liveMoves(s)) movedAway.add(m.from);
+    const rs = repeatStartForDoc(s, tz);
+    starts.set(s, rs);
+    if (rs && (!earliestStart || rs < earliestStart)) earliestStart = rs;
+  }
+  let missed = 0;
+  let d = addDaysYMD(today, -1);
+  for (let step = 0; step < MISSED_RUN_LOOKBACK_DAYS; step += 1) {
+    if (earliestStart && d < earliestStart) break;
+    const due =
+      sibs.some((s) => !!movedInOn(s, d)) ||
+      (!movedAway.has(d) &&
+        sibs.some((s) => {
+          const rs = starts.get(s);
+          return !(rs && d < rs) && siblingOccursOn(s, d);
+        }));
+    if (due) {
+      if (completed.has(d)) break;
+      missed += 1;
+    }
+    d = addDaysYMD(d, -1);
+  }
+  return missed;
+}
+
 const STREAK_SELECT = {
   id: 1,
   text: 1,

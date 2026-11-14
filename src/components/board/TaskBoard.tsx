@@ -76,7 +76,6 @@ import { useBoardPager } from './hooks/useBoardPager';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { useSections } from '@/hooks/useSections';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
-import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import BacklogTray from './BacklogTray';
 import {
   TOUR_EVENT,
@@ -3277,17 +3276,6 @@ export default function TaskBoard({
         onMutateToday={() => window.dispatchEvent(new Event('board-refresh'))}
         onSubjectChange={(picked) => setTimerTask(picked as any)}
       />
-
-      {!showTimer && (
-        <FrogodoroPill
-          onClick={() => {
-            const t = findTaskById(frogTaskId);
-            if (t) setTimerTask(t);
-            setShowTimer(true);
-          }}
-          taskName={findTaskById(frogTaskId)?.text}
-        />
-      )}
 
       <QuickAddSheet
         open={showQuickAdd}

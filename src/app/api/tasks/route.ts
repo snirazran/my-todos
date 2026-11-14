@@ -100,6 +100,7 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 import {
   computeGroupStreak,
+  computeMissedRun,
   isWithinStreakCreditWindow,
 } from '@/lib/streak/taskStreaks';
 import { loadProtectedDays } from '@/lib/streak/loginStreak';
@@ -200,6 +201,7 @@ async function streakMapForWeeklyDocs(
   weeklyDocs: TaskDoc[],
   today: string,
   tz: string,
+  missedRuns?: Map<string, number>,
 ) {
   const map = new Map<string, number>();
   if (weeklyDocs.length === 0) return map;
@@ -257,6 +259,7 @@ async function streakMapForWeeklyDocs(
       d.id,
       computeGroupStreak(sibs, today, tz, { protectedDays, freeSlipEveryDays }),
     );
+    missedRuns?.set(d.id, computeMissedRun(sibs, today, tz));
   }
   return map;
 }
@@ -2950,11 +2953,13 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       .filter((t: TaskDoc) => t.type === 'weekly')
       .map((t: TaskDoc) => t.id),
   );
+  const missedRuns = new Map<string, number>();
   const streakMap = await streakMapForWeeklyDocs(
     userId,
     filtered.filter((t) => t.type === 'weekly'),
     todayLocal,
     tz,
+    date === todayLocal ? missedRuns : undefined,
   );
   const economyConfig = await loadFlyEconomyConfig();
   const output = filtered
@@ -2988,6 +2993,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       movedFrom: movedInOn(t, date)?.from,
       completedDates: t.completedDates ?? [],
       streak,
+      missedRun: missedRuns.get(t.id) ?? 0,
       flyWorth: taskFlyWorthNow({
         checklist: checklistForDate(t, date),
         streak: projectedStreak,

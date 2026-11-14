@@ -22,6 +22,10 @@ export function FocusTimerLauncher() {
   const closeLauncher = useFrogodoroUiStore((state) => state.closeFocusLauncher);
   const [timerOpen, setTimerOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TimerTask | null>(null);
+  const sessionLive = useFrogodoroStore(
+    (state) => state.timerActive && !state.awaitingDone,
+  );
+  const openSheets = useFrogodoroUiStore((state) => state.openSheets);
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     [],
@@ -62,6 +66,19 @@ export function FocusTimerLauncher() {
       );
     });
   }, [launcherOpen, closeLauncher]);
+
+  useEffect(() => {
+    if (!sessionLive || timerOpen || openSheets > 0) return;
+    const store = useFrogodoroStore.getState();
+    if (!store.selectedTaskId) return;
+    setSelectedTask({
+      id: store.selectedTaskId,
+      text: store.selectedTaskName || 'Focus session',
+      completed: false,
+      subjectKind: store.subjectKind,
+    });
+    setTimerOpen(true);
+  }, [sessionLive, timerOpen, openSheets]);
 
   return (
     <FrogodoroSheet

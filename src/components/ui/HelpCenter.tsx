@@ -70,11 +70,11 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What is the focus timer?',
-        a: 'Pick one task, set a length, and work on just that until the timer ends — then take the break it offers. Working in short protected stretches beats grinding for hours. Your frog hunts while you focus: you catch a fly every 15 focused minutes (up to 5 a day), plus a bonus fly for finishing a 15-minute session without pausing. Every focused minute also counts toward quests.',
+        a: 'Pick one task, set a length, and work on just that until the timer ends — then take the break it offers. Working in short protected stretches beats grinding for hours. Your frog hunts while you focus: the first fly lands after 2 minutes, then one more every 15 focused minutes (up to 5 a day), plus a bonus fly for finishing a 15-minute session without pausing. Every focused minute also counts toward quests.',
       },
       {
         q: 'How long should a focus session be?',
-        a: 'Start with 15 minutes — long enough to earn a fly, short enough that starting is easy. Once that feels natural, work up to 25 or more. The best session length is the one you\'ll actually start.',
+        a: 'Start with 5 minutes — your frog catches its first fly after 2, and starting is the hard part. Once that feels natural, work up to 15 or 25. The best session length is the one you\'ll actually start.',
       },
       {
         q: 'What is the backlog?',

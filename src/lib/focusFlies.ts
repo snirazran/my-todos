@@ -1,4 +1,5 @@
 export const FOCUS_FLY_RATE_SECONDS = 15 * 60;
+export const FOCUS_FIRST_FLY_SECONDS = 2 * 60;
 export const FOCUS_FLY_DAILY_CAP = 5;
 export const DEEP_FOCUS_MIN_SECONDS = 15 * 60;
 export const DEEP_FOCUS_BONUS_FLIES = 1;
@@ -22,13 +23,17 @@ export function deepFocusPledgeLive(s: {
   );
 }
 
-// Flies the server has credited for a whole day of focused seconds. The daily
-// cap lives here, so every "caught" count a surface shows is the difference
-// between two points on this curve and can never promise more than the payout.
+// Flies the server has credited for a whole day of focused seconds: one for
+// the day's first FOCUS_FIRST_FLY_SECONDS, then one per FOCUS_FLY_RATE_SECONDS.
+// The daily cap lives here, so every "caught" count a surface shows is the
+// difference between two points on this curve and can never promise more than
+// the payout.
 export function focusFliesEarnedForDay(dayFocusSeconds: number): number {
+  const seconds = Math.max(0, dayFocusSeconds);
   return Math.min(
     FOCUS_FLY_DAILY_CAP,
-    Math.max(0, Math.floor(dayFocusSeconds / FOCUS_FLY_RATE_SECONDS)),
+    (seconds >= FOCUS_FIRST_FLY_SECONDS ? 1 : 0) +
+      Math.floor(seconds / FOCUS_FLY_RATE_SECONDS),
   );
 }
 
@@ -56,28 +61,16 @@ export type FocusPhaseCatches = {
   nextCatchIn: number | null;
 };
 
-/**
- * WHEN a focus phase's flies are caught, as opposed to how many it pays.
- *
- * The payout curve is untouched — `focusFliesEarnedForDay` still decides what
- * the server credits, and `potential` here is the same number every surface
- * showed before. What changes is the rhythm: instead of landing on raw
- * 15-minute boundaries (which made a 25-minute session catch its only fly at
- * 15:00 and then coast for ten empty minutes), the phase's flies are spread
- * evenly across its own length. 25 min → one catch at the end. 35 min → two,
- * at the halfway mark and the end.
- *
- * A proportional mark is never earlier than the boundary that pays for it
- * (a phase yielding N flies is at least N * 15 minutes long), so the frog can
- * only ever catch a fly the server has already credited — never the reverse.
- */
-export function focusPhaseCatches({
-  sessionFocusSeconds,
-  phaseElapsedSeconds,
-  phaseFullSeconds,
-  priorFocusSeconds,
-  onFocusPhase,
-}: {
+type PhaseSchedule = {
+  before: number;
+  potential: number;
+  owed: number;
+  full: number;
+  elapsed: number;
+  early: number | null;
+};
+
+type PhaseInput = {
   /** Live focused seconds this session, the running phase included. */
   sessionFocusSeconds: number;
   /** Seconds elapsed in the running focus phase. */
@@ -86,41 +79,111 @@ export function focusPhaseCatches({
   phaseFullSeconds: number;
   /** Focused seconds banked earlier today, outside this session. */
   priorFocusSeconds: number;
-  /** False on a break or once the phase has finished. */
-  onFocusPhase: boolean;
-}): FocusPhaseCatches {
+};
+
+function phaseSchedule({
+  sessionFocusSeconds,
+  phaseElapsedSeconds,
+  phaseFullSeconds,
+  priorFocusSeconds,
+}: PhaseInput): PhaseSchedule {
   const prior = Math.max(0, priorFocusSeconds);
   const sessionFocus = Math.max(0, sessionFocusSeconds);
-  if (!onFocusPhase) {
-    const done = fliesCaughtFor(sessionFocus, prior);
-    return { caught: done, potential: done, nextCatchIn: null };
-  }
   const full = Math.max(1, Math.round(phaseFullSeconds));
   const elapsed = Math.min(full, Math.max(0, Math.round(phaseElapsedSeconds)));
   // Focus banked by earlier phases of this session. Derived by subtraction so
   // it holds still as the phase runs and the count never ticks backwards.
-  const before = fliesCaughtFor(Math.max(0, sessionFocus - elapsed), prior);
-  const potential = fliesCaughtFor(
-    Math.max(0, sessionFocus - elapsed) + full,
-    prior,
-  );
+  const bankedInSession = Math.max(0, sessionFocus - elapsed);
+  const before = fliesCaughtFor(bankedInSession, prior);
+  const potential = fliesCaughtFor(bankedInSession + full, prior);
   const owed = potential - before;
+  const banked = prior + bankedInSession;
+  return {
+    before,
+    potential,
+    owed,
+    full,
+    elapsed,
+    early:
+      owed > 0 && banked < FOCUS_FIRST_FLY_SECONDS
+        ? FOCUS_FIRST_FLY_SECONDS - banked
+        : null,
+  };
+}
+
+function markSecond(schedule: PhaseSchedule, index: number): number {
+  const { owed, full, early } = schedule;
+  if (early === null) return (index * full) / owed;
+  if (index <= 1 || owed <= 1) return early;
+  return early + ((index - 1) * (full - early)) / (owed - 1);
+}
+
+function marksReached(schedule: PhaseSchedule, second: number): number {
+  const { owed, full, early } = schedule;
+  if (early === null) {
+    return Math.min(owed, Math.floor((second * owed) / full));
+  }
+  if (second < early) return 0;
+  return Math.min(
+    owed,
+    1 +
+      Math.floor(
+        ((second - early) * Math.max(0, owed - 1)) / Math.max(1, full - early),
+      ),
+  );
+}
+
+/**
+ * WHEN a focus phase's flies are caught, as opposed to how many it pays.
+ *
+ * `focusFliesEarnedForDay` decides what the server credits; this decides the
+ * rhythm. The day's first fly lands on its own boundary, two minutes in, so a
+ * new session pays before the user has had time to wonder whether it will.
+ * Every other fly the phase owes is spread evenly across what is left of it,
+ * the last one landing as the timer runs out. 5 min → one catch at 2:00.
+ * 25 min → 2:00 and the end. 45 min → 2:00, then three more to the end.
+ *
+ * A mark is never earlier than the boundary that pays for it, so the frog can
+ * only ever catch a fly the server has already credited — never the reverse.
+ */
+export function focusPhaseCatches({
+  onFocusPhase,
+  ...input
+}: PhaseInput & {
+  /** False on a break or once the phase has finished. */
+  onFocusPhase: boolean;
+}): FocusPhaseCatches {
+  if (!onFocusPhase) {
+    const done = fliesCaughtFor(
+      Math.max(0, input.sessionFocusSeconds),
+      Math.max(0, input.priorFocusSeconds),
+    );
+    return { caught: done, potential: done, nextCatchIn: null };
+  }
+  const schedule = phaseSchedule(input);
+  const { before, potential, owed, elapsed } = schedule;
   if (owed <= 0) return { caught: before, potential, nextCatchIn: null };
 
-  // Integer math throughout: mark k sits at k * full / owed, and the last one
-  // lands on the exact tick the phase ends rather than a frame either side.
-  const hit = Math.min(
-    owed,
-    Math.floor(((elapsed + CATCH_LEAD_SECONDS) * owed) / full),
-  );
+  const hit = marksReached(schedule, elapsed + CATCH_LEAD_SECONDS);
   return {
     caught: before + hit,
     potential,
     nextCatchIn:
       hit >= owed
         ? null
-        : Math.ceil(((hit + 1) * full) / owed) - CATCH_LEAD_SECONDS - elapsed,
+        : Math.ceil(markSecond(schedule, hit + 1)) -
+          CATCH_LEAD_SECONDS -
+          elapsed,
   };
+}
+
+export function focusPhaseMarks(input: PhaseInput): number[] {
+  const schedule = phaseSchedule(input);
+  const marks: number[] = [];
+  for (let index = 1; index <= schedule.owed; index += 1) {
+    marks.push(Math.min(1, markSecond(schedule, index) / schedule.full));
+  }
+  return marks;
 }
 
 // Focused seconds banked EARLIER today, outside the running session — the

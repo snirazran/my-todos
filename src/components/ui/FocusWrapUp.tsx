@@ -14,7 +14,8 @@ import {
 } from 'framer-motion';
 import { Check, ChevronsUpDown, Coffee, Play, Plus, X, Zap } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { PondBackdrop } from '@/components/ui/PondBackdrop';
+import { SheetEnteredContext } from '@/lib/sheetEntered';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { FlyIcon } from '@/components/ui/FlyAmount';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -188,9 +189,9 @@ function TaskCheckRow({
           {done && (
             <motion.span
               key="check"
-              initial={{ scale: 0, rotate: -35 }}
-              animate={{ scale: 1, rotate: 0 }}
-              exit={{ scale: 0 }}
+              initial={{ scale: 0.4, opacity: 0, rotate: -35 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              exit={{ scale: 0.4, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 640, damping: 24 }}
             >
               <Check className={big ? 'h-[18px] w-[18px]' : 'h-4 w-4'} strokeWidth={3.5} />
@@ -621,12 +622,38 @@ export function FocusWrapUp({
         onClick={() => finish({ kind: 'done' })}
         aria-label="Close"
         className={cn(
-          'grid place-items-center rounded-full bg-white/20 text-white transition-[background-color,transform] hover:bg-white/30 active:scale-95',
+          'grid place-items-center rounded-full bg-card/95 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.16)] ring-1 ring-black/5 transition-[background-color,transform] hover:bg-card active:scale-95',
           wide ? 'h-11 w-11' : 'h-10 w-10',
         )}
       >
         <X className="h-5 w-5" strokeWidth={2.75} />
       </button>
+    );
+
+    const heroPills = (
+      <>
+        {showFly && (
+          <motion.span
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.8 }}
+            className="flex h-8 items-center gap-1.5 rounded-full bg-card/95 pl-2.5 pr-3 text-[13px] font-black text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.16)] ring-1 ring-black/5"
+          >
+            <FlyIcon textPx={14} />+{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
+          </motion.span>
+        )}
+        {scene.bonusFly && (
+          <motion.span
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.92 }}
+            className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
+          >
+            <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+            +1 fly · Deep focus
+          </motion.span>
+        )}
+      </>
     );
 
     const heroStats = (
@@ -644,16 +671,16 @@ export function FocusWrapUp({
         >
           <span
             className={cn(
-              'font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums',
-              wide ? 'text-[136px]' : compact ? 'text-[68px]' : 'text-[84px]',
+              'font-black leading-none tracking-tighter text-white [text-shadow:0_2px_0_rgba(15,23,42,0.28),0_6px_18px_rgba(15,23,42,0.45)] tabular-nums',
+              wide ? 'text-[136px]' : compact ? 'text-[60px]' : 'text-[84px]',
             )}
           >
             <CountUp value={amount.value} run={!reduceMotion} />
           </span>
           <span
             className={cn(
-              'font-black leading-none tracking-tight text-white/80 drop-shadow-lg',
-              wide ? 'text-[40px]' : compact ? 'text-[24px]' : 'text-[28px]',
+              'font-black leading-none tracking-tight text-white [text-shadow:0_2px_0_rgba(15,23,42,0.28),0_4px_12px_rgba(15,23,42,0.45)]',
+              wide ? 'text-[40px]' : compact ? 'text-[22px]' : 'text-[28px]',
             )}
           >
             {amount.unit}
@@ -662,45 +689,20 @@ export function FocusWrapUp({
         <motion.p
           {...rise(0.3)}
           className={cn(
-            'font-black text-white/85',
+            'font-black text-white [text-shadow:0_1px_0_rgba(15,23,42,0.3),0_2px_8px_rgba(15,23,42,0.5)]',
             wide
               ? 'mt-1 line-clamp-2 max-w-[26rem] text-[22px] leading-snug'
-              : 'mt-2.5 max-w-[19rem] truncate text-[15px]',
+              : compact
+                ? 'mt-1.5 max-w-[19rem] truncate text-[15px]'
+                : 'mt-2.5 max-w-[19rem] truncate text-[15px]',
           )}
           aria-hidden="true"
         >
           {subtitle}
         </motion.p>
 
-        {(showFly || scene.bonusFly) && (
-          <div
-            className={cn(
-              'flex flex-wrap items-center gap-2',
-              wide ? 'mt-6' : 'mt-3 justify-center',
-            )}
-          >
-            {showFly && (
-              <motion.span
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.8 }}
-                className="flex h-8 items-center gap-1.5 rounded-full bg-black/20 pl-2.5 pr-3 text-[13px] font-black text-white"
-              >
-                <FlyIcon textPx={14} />+{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
-              </motion.span>
-            )}
-            {scene.bonusFly && (
-              <motion.span
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={reduceMotion ? { duration: 0.2 } : { ...POP, delay: 0.92 }}
-                className="flex h-8 items-center gap-1.5 rounded-full bg-amber-300 pl-2.5 pr-3 text-[13px] font-black text-amber-950"
-              >
-                <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-                +1 fly · Deep focus
-              </motion.span>
-            )}
-          </div>
+        {wide && (showFly || scene.bonusFly) && (
+          <div className="mt-6 flex flex-wrap items-center gap-2">{heroPills}</div>
         )}
       </>
     );
@@ -725,46 +727,32 @@ export function FocusWrapUp({
           />
         )}
         {!reduceMotion && <Burst />}
-        <motion.div
-          className="absolute inset-0"
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -40, scale: 0.85 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={
-            reduceMotion
-              ? { duration: 0.2 }
-              : { delay: 0.42, type: 'spring', stiffness: 380, damping: 19 }
-          }
-        >
-          {!frogDressed && (
-            <FrogSnapshot
-              indices={frogIndices}
+        <SheetEnteredContext.Provider value={entered}>
+          <div className="absolute inset-0">
+            <Frog
+              ref={frogRef}
               width={frogWidth}
               height={frogHeight}
-              className="absolute inset-0"
+              indices={frogIndices}
+              emote={cheering ? 'love' : null}
+              greet={(review?.focusSeconds ?? 0) >= LONG_FOCUS_SECONDS ? 'tada' : 'celebrate'}
+              ignoreIdlePause
+              arrive="drop"
+              onArrived={() => setFrogDressed(true)}
             />
-          )}
-          {entered && (
-            <div className="absolute inset-0">
-              <Frog
-                ref={frogRef}
-                width={frogWidth}
-                height={frogHeight}
-                indices={frogIndices}
-                emote={cheering ? 'love' : null}
-                greet={(review?.focusSeconds ?? 0) >= LONG_FOCUS_SECONDS ? 'tada' : 'celebrate'}
-                ignoreIdlePause
-                onDressed={() => setFrogDressed(true)}
-              />
-            </div>
-          )}
-        </motion.div>
+          </div>
+        </SheetEnteredContext.Provider>
       </div>
     );
 
     const panelBody = (
       <>
         {(tasksLoading || subjectTask || others.length > 0) && (
-          <motion.section {...rise(0.4)} aria-labelledby="focus-wrapup-tasks" className="mb-5">
+          <motion.section
+            {...rise(0.4)}
+            aria-labelledby="focus-wrapup-tasks"
+            className={!wide && compact ? 'mb-3' : 'mb-5'}
+          >
             <h3
               id="focus-wrapup-tasks"
               className="mb-3 px-0.5 text-[19px] font-black tracking-[-0.01em] text-foreground"
@@ -854,7 +842,10 @@ export function FocusWrapUp({
               <button
                 type="button"
                 onClick={() => finish({ kind: 'done' })}
-                className="h-11 w-full rounded-2xl text-[15px] font-black text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                className={cn(
+                  'w-full rounded-2xl text-[15px] font-black text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground',
+                  !wide && compact ? 'h-9' : 'h-11',
+                )}
               >
                 I&apos;m done for now
               </button>
@@ -867,9 +858,10 @@ export function FocusWrapUp({
     if (wide) {
       return (
         <div className="relative flex min-h-full px-12 py-12">
+          <PondBackdrop className="absolute inset-0 -z-10 [&_img]:object-[50%_70%]" />
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_45%,rgba(255,255,255,0.13),transparent_55%)]"
+            className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-black/45 via-black/20 to-black/10"
           />
           <div className="relative m-auto grid w-full max-w-[64rem] grid-cols-[1.1fr_1fr] items-center gap-16">
             <div className="flex min-w-0 flex-col items-start text-left">{heroStats}</div>
@@ -900,25 +892,33 @@ export function FocusWrapUp({
     return (
       <div className="flex min-h-full flex-col">
         <div className="relative flex flex-1 flex-col items-center px-5 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-          <div className="relative z-30 flex w-full justify-end">{closeButton}</div>
-          <div className="flex w-full flex-1 flex-col items-center justify-center pb-2 text-center">
+          <PondBackdrop className="absolute inset-x-0 -bottom-10 top-0 -z-10 [&_img]:object-[50%_82%]" />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[62%] bg-gradient-to-b from-black/40 via-black/15 to-transparent"
+          />
+          <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30">
+            {closeButton}
+          </div>
+          {(showFly || scene.bonusFly) && (
+            <div className="absolute left-4 top-[calc(env(safe-area-inset-top)+1rem)] z-30 flex flex-col items-start gap-1.5">
+              {heroPills}
+            </div>
+          )}
+          <div className="flex w-full flex-1 flex-col items-center justify-center pb-2 pt-1 text-center">
             {heroStats}
           </div>
           {!reduceMotion && <Ripples />}
           {frogStage}
         </div>
-        <motion.div
-          initial={reduceMotion ? { opacity: 0 } : { y: '100%' }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={
-            reduceMotion
-              ? { duration: 0.2 }
-              : { type: 'spring', stiffness: 300, damping: 34, delay: 0.2 }
-          }
-          className="relative z-10 rounded-t-[32px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-7 text-foreground shadow-[0_-14px_32px_-14px_rgba(10,40,16,0.5)]"
+        <div
+          className={cn(
+            'relative z-10 rounded-t-[32px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] text-foreground',
+            compact ? 'pt-5' : 'pt-7',
+          )}
         >
           <div className="mx-auto w-full max-w-[28rem]">{panelBody}</div>
-        </motion.div>
+        </div>
       </div>
     );
   })();
@@ -932,6 +932,9 @@ export function FocusWrapUp({
     return { top: edge, right: side, bottom: edge, left: side };
   };
   const origin: WrapUpOrigin = scene?.origin ?? defaultOrigin();
+  const fadeIn =
+    !!reduceMotion ||
+    origin.top + origin.right + origin.bottom + origin.left === 0;
 
   return createPortal(
     <>
@@ -946,15 +949,19 @@ export function FocusWrapUp({
             tabIndex={-1}
             onPointerDownCapture={acknowledge}
             onKeyDownCapture={acknowledge}
-            initial={reduceMotion ? { opacity: 0 } : { clipPath: clipFrom(origin) }}
+            initial={fadeIn ? { opacity: 0 } : { clipPath: clipFrom(origin) }}
             animate={
-              reduceMotion
+              fadeIn
                 ? { opacity: 1 }
                 : { clipPath: 'inset(0px 0px 0px 0px round 0px)' }
             }
             exit={{ opacity: 0, transition: { duration: 0.22, ease: 'easeOut' } }}
-            transition={reduceMotion ? { duration: 0.2 } : { duration: 0.5, ease: EXPAND_EASE }}
-            className="fixed inset-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-primary text-primary-foreground outline-none dark:bg-green-700 dark:text-white"
+            transition={
+              fadeIn
+                ? { duration: reduceMotion ? 0.2 : 0.28, ease: 'easeOut' }
+                : { duration: 0.5, ease: EXPAND_EASE }
+            }
+            className="fixed inset-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-background text-white outline-none"
             style={{ zIndex: Z_INDEX }}
           >
             {content}

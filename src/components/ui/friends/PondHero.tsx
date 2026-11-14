@@ -5,7 +5,6 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronRight, UserPlus } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { HomeFocusFlies } from '@/components/ui/HomeFocusFlies';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { FrogBellyDeck } from '@/components/ui/FrogBellyDeck';
 import { StatusDock, statusDockRowClass } from '@/components/home/StatusDock';
@@ -220,7 +219,6 @@ export function PondHero({ indices, paused = false, friends, claimable, claiming
   const reduceMotion = useReducedMotion();
   const frogRef = React.useRef<FrogHandle | null>(null);
   const frogBoxRef = React.useRef<HTMLDivElement | null>(null);
-  const [mouthOpen, setMouthOpen] = React.useState(false);
   const pin = keepsakeEmoji(pinnedKeepsakeId);
   const seated = React.useMemo(() => seatOrder(friends), [friends]);
   const narrow = useMediaQuery('(max-width: 767px)');
@@ -241,8 +239,7 @@ export function PondHero({ indices, paused = false, friends, claimable, claiming
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center">
           <FlyCatchSwipeLauncher source="friends" shouldStart={(x, y) => frogRef.current?.hitTest(x, y) !== false}>
             <div ref={frogBoxRef} data-fly-hero className="relative h-[270px] w-[240px]">
-              <HomeFocusFlies frogRef={frogRef} frogBoxRef={frogBoxRef} onGrabActive={setMouthOpen} hidden={paused} />
-              <div data-fly-hero-frog className="h-full w-full [&_*]:pointer-events-none"><Frog ref={frogRef} width={240} height={270} indices={indices} visualOffsetY={FROG_SEAT_OFFSET} paused={paused || !!reduceMotion} mouthOpen={mouthOpen} stage fidget /></div>
+              <div data-fly-hero-frog className="h-full w-full [&_*]:pointer-events-none"><Frog ref={frogRef} width={240} height={270} indices={indices} visualOffsetY={FROG_SEAT_OFFSET} paused={paused || !!reduceMotion} stage fidget /></div>
               <button type="button" aria-label="Say hello with your frog" onClick={() => frogRef.current?.poke()} className="pointer-events-auto absolute bottom-0 left-1/2 h-[190px] w-[150px] -translate-x-1/2 touch-manipulation rounded-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
               {pin ? <span className="pointer-events-none absolute bottom-[104px] right-[30px] grid h-9 w-9 place-items-center rounded-full border border-amber-400/40 bg-card text-xl shadow-sm">{pin}</span> : null}
             </div>

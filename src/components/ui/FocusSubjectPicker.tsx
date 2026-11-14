@@ -104,12 +104,12 @@ export function FocusSubjectPanel({
   const openSelected = currentSubjectId === OPEN_FOCUS_ID;
 
   return (
-    <div className="flex h-full flex-col text-white">
+    <div className="flex h-full flex-col text-foreground">
       <div
         onPointerDown={onHeaderPointerDown}
         className="shrink-0 touch-none px-4 pb-2 pt-2"
       >
-        <div className="mx-auto mb-1.5 h-1.5 w-12 rounded-full bg-white/50" />
+        <div className="mx-auto mb-1.5 h-1.5 w-12 rounded-full bg-muted-foreground/30" />
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-[19px] font-black tracking-tight">Focus on</h3>
           <button
@@ -120,7 +120,7 @@ export function FocusSubjectPanel({
               onClose();
             }}
             aria-label="Back to timer"
-            className="grid h-9 w-9 place-items-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+            className="grid h-9 w-9 place-items-center rounded-full bg-muted/70 text-muted-foreground transition-[transform,background-color,color] duration-150 ease-out hover:bg-muted hover:text-foreground active:scale-95"
           >
             <X className="h-[18px] w-[18px]" strokeWidth={2.75} />
           </button>
@@ -136,17 +136,15 @@ export function FocusSubjectPanel({
           }
           className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
             openSelected
-              ? 'bg-white text-emerald-900'
-              : 'bg-white/10 active:bg-white/20 [@media(hover:hover)]:hover:bg-white/15'
+              ? 'bg-primary/[0.14] ring-1 ring-inset ring-primary/30'
+              : 'bg-muted/50 active:bg-muted [@media(hover:hover)]:hover:bg-muted/80'
           }`}
         >
           <span
-            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${
-              openSelected ? 'bg-emerald-100' : 'bg-white/90'
-            }`}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card ring-1 ring-border/60"
           >
             {pendingId === 'open' ? (
-              <Loader2 className="h-4 w-4 animate-spin text-emerald-700" aria-hidden="true" />
+              <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />
             ) : (
               <Icon name="clock" className="h-6 w-6" />
             )}
@@ -155,28 +153,26 @@ export function FocusSubjectPanel({
             <span className="block text-[15px] font-black leading-tight">
               Just focus
             </span>
-            <span
-              className={`block text-[12px] font-semibold leading-tight ${
-                openSelected ? 'text-emerald-800/70' : 'text-white/70'
-              }`}
-            >
+            <span className="block text-[12px] font-semibold leading-tight text-muted-foreground">
               Tick off what you finished after
             </span>
           </span>
-          {openSelected && <Check className="h-5 w-5 shrink-0" strokeWidth={3} />}
+          {openSelected && (
+            <Check className="h-5 w-5 shrink-0 text-primary" strokeWidth={3} />
+          )}
         </button>
 
         {tasksLoading ? (
           <div className="flex h-24 items-center justify-center" role="status">
-            <Loader2 className="h-5 w-5 animate-spin text-white/70" aria-hidden="true" />
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
           </div>
         ) : (
           tasks.length > 0 && (
             <section className="mt-4">
-              <h4 className="mb-1.5 px-1 text-[11px] font-black uppercase tracking-wider text-white/60">
+              <h4 className="mb-1.5 px-1 text-[13px] font-black text-muted-foreground">
                 Today
               </h4>
-              <div className="overflow-hidden rounded-2xl bg-white/10">
+              <div className="overflow-hidden rounded-2xl bg-muted/40 ring-1 ring-inset ring-border/50">
                 {shownTasks.map((task, index) => {
                   const selected = currentSubjectId === task.id;
                   const tag = (task.tags ?? [])
@@ -193,29 +189,30 @@ export function FocusSubjectPanel({
                         else onPick({ ...task, subjectKind: 'task' });
                       }}
                       className={`flex min-h-[48px] w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${
-                        index > 0 ? 'border-t border-white/10' : ''
+                        index > 0 ? 'border-t border-border/50' : ''
                       } ${
                         selected
-                          ? 'bg-white text-emerald-900'
-                          : 'active:bg-white/15 [@media(hover:hover)]:hover:bg-white/[0.08]'
+                          ? 'bg-primary/[0.14]'
+                          : 'active:bg-muted [@media(hover:hover)]:hover:bg-muted/70'
                       }`}
                     >
                       <span
                         aria-hidden
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{
-                          backgroundColor: tag?.color ?? 'rgba(255,255,255,0.35)',
+                          backgroundColor:
+                            tag?.color ?? 'hsl(var(--muted-foreground) / 0.4)',
                         }}
                       />
                       <span className="min-w-0 flex-1 truncate text-[15px] font-bold">
                         {task.text}
                       </span>
                       {selected ? (
-                        <Check className="h-5 w-5 shrink-0" strokeWidth={3} />
+                        <Check className="h-5 w-5 shrink-0 text-primary" strokeWidth={3} />
                       ) : (
                         <Play
                           aria-hidden="true"
-                          className="h-3.5 w-3.5 shrink-0 fill-current text-white/50"
+                          className="h-3.5 w-3.5 shrink-0 fill-current text-muted-foreground/50"
                         />
                       )}
                     </button>
@@ -229,7 +226,7 @@ export function FocusSubjectPanel({
                     hapticTick();
                     setShowAllTasks(true);
                   }}
-                  className="mt-1.5 w-full rounded-xl py-2 text-[12px] font-black text-white/70 transition-colors hover:text-white"
+                  className="mt-1.5 w-full rounded-xl py-2 text-[12px] font-black text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Show {tasks.length - shownTasks.length} more
                 </button>
@@ -240,7 +237,7 @@ export function FocusSubjectPanel({
 
         {(areas.length > 0 || tags.length > 0) && (
           <section className="mt-4">
-            <h4 className="mb-1.5 px-1 text-[11px] font-black uppercase tracking-wider text-white/60">
+            <h4 className="mb-1.5 px-1 text-[13px] font-black text-muted-foreground">
               Count it toward
             </h4>
             <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -256,7 +253,9 @@ export function FocusSubjectPanel({
                       selected ? onClose() : void pickContainer('area', area.id, key)
                     }
                     className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-[13px] font-black transition-[transform,background-color] active:scale-95 ${
-                      selected ? 'bg-white text-emerald-900' : 'bg-white/15'
+                      selected
+                        ? 'bg-primary/[0.14] ring-1 ring-inset ring-primary/30'
+                        : 'bg-muted/60'
                     }`}
                   >
                     <span
@@ -295,7 +294,9 @@ export function FocusSubjectPanel({
                       selected ? onClose() : void pickContainer('tag', tag.id, key)
                     }
                     className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-[13px] font-black transition-[transform,background-color] active:scale-95 ${
-                      selected ? 'bg-white text-emerald-900' : 'bg-white/10'
+                      selected
+                        ? 'bg-primary/[0.14] ring-1 ring-inset ring-primary/30'
+                        : 'bg-muted/60'
                     }`}
                   >
                     {pendingId === key ? (
@@ -303,7 +304,7 @@ export function FocusSubjectPanel({
                     ) : (
                       <span
                         aria-hidden
-                        className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/30"
+                        className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-border"
                         style={{ backgroundColor: tag.color }}
                       />
                     )}

@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
-import { HomeFocusFlies } from '@/components/ui/HomeFocusFlies';
 import { WardrobePageContent, type WardrobeSection } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
 import { useIsFrogHungry } from '@/hooks/useFrogHunger';
@@ -23,7 +22,6 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
-  const [frogMouthOpen, setFrogMouthOpen] = useState(false);
   const { data } = useInventory(true);
   const isFrogHungry = useIsFrogHungry(true);
   const { data: bgData } = useBackgrounds(true);
@@ -105,11 +103,6 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
           ref={frogBoxRef}
           className="relative translate-y-[73px] pointer-events-none md:translate-y-[5.21rem]"
         >
-          <HomeFocusFlies
-            frogRef={frogRef}
-            frogBoxRef={frogBoxRef}
-            onGrabActive={setFrogMouthOpen}
-          />
           {purchaseBurst && (
             <PurchaseBurst
               key={purchaseBurst.key}
@@ -121,7 +114,6 @@ export function WardrobeStagePage({ section }: { section: WardrobeSection }) {
             <div className={purchaseBurst ? 'purchase-hop' : undefined}>
               <Frog
                 ref={frogRef}
-                mouthOpen={frogMouthOpen}
                 indices={stageIndices}
                 paused={false}
                 stage

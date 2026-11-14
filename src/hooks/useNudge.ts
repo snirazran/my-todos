@@ -20,14 +20,6 @@ type NudgeConfig = {
 };
 
 const NUDGES = {
-  home_buddy: {
-    maxImpressions: Number.POSITIVE_INFINITY,
-    cooldownHours: 48,
-    suppressAfterDismissals: 3,
-    minVisits: 1,
-    blocking: false,
-    inline: true,
-  },
   friends_buddy: {
     maxImpressions: 2,
     cooldownHours: 24 * 7,
