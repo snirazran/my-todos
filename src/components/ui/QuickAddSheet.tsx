@@ -199,6 +199,7 @@ export default function QuickAddSheet({
   focusCategoryIds,
   categoryTagMap,
   submitLabel = 'Add goal',
+  deferredSubmit = false,
   defaultRepeatDaily = false,
   sections = [],
   defaultSectionId = null,
@@ -1283,20 +1284,20 @@ export default function QuickAddSheet({
     hapticSuccess();
     markIntroSeenRef.current('quickAddNl');
     const origin = sendRef.current?.getBoundingClientRect();
-    if (origin) launchTaskEntranceFrom(origin);
+    if (origin && !deferredSubmit) launchTaskEntranceFrom(origin);
     onOpenChange(false);
 
     const attempt = async (): Promise<void> => {
       try {
         let data = submitData;
-        if (ideaTag) {
+        if (ideaTag && !deferredSubmit) {
           const tagId = await ensureIdeaTag(ideaTag);
           if (tagId && data.tags.indexOf(tagId) < 0) {
             data = { ...data, tags: [...data.tags, tagId] };
           }
         }
         await onSubmit(data);
-        if (idea) {
+        if (idea && !deferredSubmit) {
           trackAnalyticsEvent('habit_idea_added', {
             item_id: idea.id,
             kind: idea.categoryId,
@@ -1366,6 +1367,7 @@ export default function QuickAddSheet({
   };
 
   const handleTaskPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (deferredSubmit) return;
     const pasted = event.clipboardData.getData('text/plain');
     if (!/[\r\n]/.test(pasted)) return;
     const target = event.currentTarget;
@@ -1380,6 +1382,7 @@ export default function QuickAddSheet({
 
   const handleSubmit = async () => {
     hapticTick();
+    if (deferredSubmit) return doSubmit(false);
     if (!pickedBacklogTaskId) {
       return doSubmit(false);
     }
@@ -1551,7 +1554,7 @@ export default function QuickAddSheet({
                       >
                         New goal
                       </h2>
-                      {!isDesktop && (
+                      {!isDesktop && !deferredSubmit && (
                         <button
                           type="button"
                           onPointerDown={(e) => e.stopPropagation()}
@@ -2058,7 +2061,7 @@ export default function QuickAddSheet({
                     tap={keyboardSafeTap}
                     onPickIdea={pickIdea}
                     onUnpickIdea={unpickIdea}
-                    onInstantAdd={instantAddIdea}
+                    onInstantAdd={deferredSubmit ? pickIdea : instantAddIdea}
                     onPickSaved={(task) =>
                       applySavedPick({
                         text: task.text,
@@ -2085,14 +2088,14 @@ export default function QuickAddSheet({
                   )}
                   {isDesktop && (
                     <div className="relative flex flex-none items-center justify-between gap-3 border-t border-border/60 bg-popover px-5 py-3">
-                      <button
+                      {!deferredSubmit && <button
                         type="button"
                         onClick={() => openBulkAdd([])}
                         className="-ml-2 inline-flex h-10 items-center gap-2 rounded-xl px-2.5 text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       >
                         <ListPlus className="h-4 w-4" strokeWidth={2.5} />
                         Add multiple
-                      </button>
+                      </button>}
                       <span className="flex items-center gap-2">
                         <button
                           ref={sendRef}

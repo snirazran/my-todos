@@ -3598,7 +3598,7 @@ body.dragging {
 @keyframes frog-arrive-drop {
   0% {
     opacity: 0;
-    transform: translate3d(0, -34%, 0) scale(0.92, 1.1);
+    transform: translate3d(0, var(--frog-drop-start, -34%), 0) scale(0.92, 1.1);
     animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
   }
   18% {
@@ -3619,6 +3619,37 @@ body.dragging {
   100% {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* The buddy frog travels farther than the standard drop, with a softer landing. */
+.buddy-flow-frog .frog-arrive-drop {
+  animation: buddy-frog-drop 850ms both;
+}
+
+@keyframes buddy-frog-drop {
+  0% {
+    transform: translate3d(0, var(--frog-drop-start, -100dvh), 0);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  52% {
+    transform: translate3d(0, 0, 0) scale(1.08, 0.92);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  70% {
+    transform: translate3d(0, -22px, 0) scale(0.98, 1.02);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  84% {
+    transform: translate3d(0, 0, 0) scale(1.025, 0.975);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  93% {
+    transform: translate3d(0, -3px, 0) scale(1);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
@@ -3675,6 +3706,9 @@ body.dragging {
   .frog-arrive-drop,
   .frog-arrive-rise,
   .frog-arrive-pop {
+    animation: none;
+  }
+  .buddy-flow-frog .frog-arrive-drop {
     animation: none;
   }
 }

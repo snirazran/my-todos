@@ -54,6 +54,8 @@ export type QuickAddSheetProps = Readonly<{
   hideRepeatPicker?: boolean;
   /** Overrides the submit button label (default "Add Task"). */
   submitLabel?: string;
+  /** Compose a draft without adding or moving a task. */
+  deferredSubmit?: boolean;
   /** Preselect all 7 weekdays so the repeat defaults to "Every day". */
   defaultRepeatDaily?: boolean;
   focusCategoryIds?: MacroCategoryId[];

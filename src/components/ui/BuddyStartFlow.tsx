@@ -26,6 +26,10 @@ import { RarityBadge } from '@/components/ui/skins/RarityBadge';
 import { checkNotifGranted, requestNotif } from '@/components/ui/BuddyUpFlow';
 import type { BuddyGiftOption } from '@/components/ui/buddy/BuddyGoalSheet';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
+import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import type { QuickAddSubmit } from '@/components/ui/quick-add/types';
+import { buddyScheduleSummary, isOneTimeParams, isShareableParams } from '@/lib/buddy/bond';
+import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { readCachedBackground } from '@/hooks/useBackgrounds';
@@ -72,15 +76,14 @@ type ShareableResponse = { habits?: ShareableTask[]; today?: ShareableTask[] };
 
 type Goal =
   | { kind: 'habit' | 'today'; id: string; text: string; schedule: string }
-  | { kind: 'new'; text: string; choice: BuddyRepeatChoice; days: number[] };
+  | { kind: 'new'; text: string; choice: BuddyRepeatChoice; days: number[] }
+  | { kind: 'quick'; text: string; task: QuickAddSubmit; params: BuddyCreateParams; schedule: string };
 
 type Target = { kind: 'friend'; friend: FriendSummary } | { kind: 'link' };
 
 type Step = 'goal' | 'new' | 'friend' | 'send' | 'sent';
 
 type Sent = { name?: string; url?: string; copiedOnly?: boolean };
-
-const isTallStep = (step: string | null | undefined) => step === 'send' || step === 'sent';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -93,7 +96,7 @@ const firstName = (friend: FriendSummary) =>
 async function shareInviteUrl(url: string, goal: string): Promise<ShareResult> {
   const result = await shareLink({
     title: "Let's chase a goal together on Frogress!",
-    text: `I set up "${goal}" as a shared goal for us. Tap to join me and grab a gift.`,
+    text: `Want to be my goal buddy on Frogress? 🐸\n\nLet's work on "${goal}" together. Join me with this link and pick up your welcome gift!`,
     url,
     dialogTitle: 'Invite your goal buddy',
   });
@@ -174,14 +177,8 @@ function BuddyFlowScreen({
   const [sent, setSent] = useState<Sent | null>(null);
   const [notifGranted, setNotifGranted] = useState(true);
   const [inputFocused, setInputFocused] = useState(false);
-  const [space, setSpace] = useState(0);
-  const stepRef = useRef(step);
-  stepRef.current = step;
-  const measureRef = useRef<() => void>(() => {});
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const frogRef = useRef<FrogHandle | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const footerRef = useRef<HTMLDivElement>(null);
   const { inset } = useKeyboardInset(step === 'new');
   const keyboardInset = inputFocused ? inset : 0;
   useRegisterOpenSheet(true);
@@ -221,35 +218,12 @@ function BuddyFlowScreen({
   }, [giftOptions, giftId]);
 
   useEffect(() => {
-    const root = rootRef.current;
-    const body = bodyRef.current;
-    const footer = footerRef.current;
-    if (!root || !body || !footer || typeof ResizeObserver === 'undefined') return;
-    const measure = () => {
-      const rendered = body.lastElementChild?.getAttribute('data-step');
-      if (rendered !== stepRef.current || !isTallStep(rendered)) return;
-      setSpace(Math.max(0, root.clientHeight - body.offsetHeight - footer.offsetHeight));
-    };
-    measureRef.current = measure;
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(root);
-    observer.observe(body);
-    observer.observe(footer);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!isTallStep(step)) setSpace(0);
-  }, [step]);
-
-  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !quickAddOpen) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, quickAddOpen]);
 
   useEffect(() => {
     if (step === 'friend') frogRef.current?.fireEmote('hop');
@@ -331,8 +305,8 @@ function BuddyFlowScreen({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
-            goal.kind === 'new'
-              ? {
+            goal.kind === 'new' || goal.kind === 'quick'
+              ? goal.kind === 'quick' ? { ...goal.task, ...goal.params, timezone } : {
                   friendId: target.friend.userId,
                   ...toBuddyCreateParams(goal.text, goal.choice, goal.days, todayYmd()),
                   timezone,
@@ -355,8 +329,8 @@ function BuddyFlowScreen({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          goal.kind === 'new'
-            ? {
+          goal.kind === 'new' || goal.kind === 'quick'
+            ? goal.kind === 'quick' ? { giftOptionId: giftId, buddyTask: goal.params } : {
                 giftOptionId: giftId,
                 buddyTask: toBuddyCreateParams(goal.text, goal.choice, goal.days, todayYmd()),
               }
@@ -380,17 +354,20 @@ function BuddyFlowScreen({
     }
   };
 
-  const tall = step === 'send' || step === 'sent';
   const bubble =
-    step === 'sent'
-      ? sent?.url
-        ? 'Link ready! Send it to\nwhoever you want to team up with.'
-        : `Sent! Toes crossed that\n${sent?.name ?? 'they'} says *yes!*`
-      : step === 'send' && goal
-        ? goal.kind === 'today' || (goal.kind === 'new' && goal.choice === 'once')
-          ? "Wanna be my goal buddy?\nLet's get this done *together!*"
-          : "Wanna be my goal buddy?\nLet's build this habit *together!*"
-        : null;
+    step === 'goal'
+      ? 'Pick a goal. Friendly\npeer pressure awaits!'
+      : step === 'friend'
+        ? 'Pick your partner\nin *crimes of productivity!*'
+        : step === 'sent'
+          ? sent?.url
+            ? 'A buddy awaits!\nShare the link to get started.'
+            : `Sent! Toes crossed that\n${sent?.name ?? 'they'} says *yes!*`
+          : step === 'send' && goal
+            ? goal.kind === 'today' || (goal.kind === 'new' && goal.choice === 'once') || (goal.kind === 'quick' && isOneTimeParams(goal.params))
+              ? "Wanna be my goal buddy?\nLet's get this done *together!*"
+              : "Wanna be my goal buddy?\nLet's build this habit *together!*"
+            : null;
 
   const footer = (() => {
     if (step === 'goal') {
@@ -486,7 +463,6 @@ function BuddyFlowScreen({
 
   return (
     <motion.div
-      ref={rootRef}
       role="dialog"
       aria-modal="true"
       aria-label="Share a goal with a friend"
@@ -499,23 +475,24 @@ function BuddyFlowScreen({
     >
       <SheetEnteredContext.Provider value={entered}>
         <PondHeader
-          tall={tall}
-          fill={space}
+          tall={false}
+          goalStep={step === 'goal' || step === 'friend' || step === 'send' || step === 'sent'}
+          plainBackground={step === 'goal' || step === 'friend' || step === 'send' || step === 'sent'}
+          fill={0}
           indices={indices}
           frogRef={frogRef}
           bubble={bubble}
-          target={tall ? target : null}
+          target={null}
           onBack={step === 'sent' ? null : goBack}
           onClose={onClose}
         />
       </SheetEnteredContext.Provider>
 
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div ref={bodyRef}>
+        <div>
           <AnimatePresence
             mode="wait"
             initial={false}
-            onExitComplete={() => requestAnimationFrame(() => measureRef.current())}
           >
             <motion.div
               key={step}
@@ -527,6 +504,7 @@ function BuddyFlowScreen({
               className="mx-auto w-full max-w-md px-4 pb-6 pt-2"
             >
               {step === 'goal' && (
+                <>
                 <GoalStep
                   loading={!shareable}
                   habits={habits}
@@ -535,9 +513,11 @@ function BuddyFlowScreen({
                   onPick={pickGoal}
                   onNew={() => {
                     hapticSelect();
-                    setStep('new');
+                    setQuickAddOpen(true);
                   }}
                 />
+                {error && <p role="status" className="mt-3 text-center text-sm font-semibold text-rose-600 dark:text-rose-400">{error}</p>}
+                </>
               )}
               {step === 'new' && (
                 <NewGoalStep
@@ -557,6 +537,7 @@ function BuddyFlowScreen({
               {step === 'send' && goal && (
                 <SendStep
                   goal={goal}
+                  target={target}
                   bonusFlies={bonusFlies}
                   wantsLink={wantsLink}
                   giftOptions={giftOptions}
@@ -576,7 +557,6 @@ function BuddyFlowScreen({
       </div>
 
       <div
-        ref={footerRef}
         className="shrink-0 border-t border-border/50 bg-background px-4 pt-3"
         style={{
           paddingBottom: keyboardInset
@@ -586,12 +566,38 @@ function BuddyFlowScreen({
       >
         <div className="mx-auto w-full max-w-md">{footer}</div>
       </div>
+      <QuickAddSheet
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        defaultRepeat="this-week"
+        submitLabel="Choose goal"
+        deferredSubmit
+        onSubmit={(task) => {
+          const dates = task.dates?.length ? task.dates : undefined;
+          const params: BuddyCreateParams = {
+            text: task.text,
+            repeat: task.repeat === 'custom' ? 'this-week' : task.repeat,
+            days: task.days.filter((day) => day !== -1),
+            dates,
+            repeatRule: task.repeatRule ?? undefined,
+            repeatEndDate: task.repeatEndDate ?? undefined,
+          };
+          if (!isShareableParams(params) || (isOneTimeParams(params) && (dates?.length ?? 0) !== 1)) {
+            setError('Choose one date or a repeating schedule to share with a buddy.');
+            return;
+          }
+          setGoal({ kind: 'quick', text: task.text, task, params, schedule: buddyScheduleSummary(params) || 'Just once' });
+          afterGoal();
+        }}
+      />
     </motion.div>
   );
 }
 
 function PondHeader({
   tall,
+  goalStep,
+  plainBackground,
   fill,
   indices,
   frogRef,
@@ -601,6 +607,8 @@ function PondHeader({
   onClose,
 }: {
   tall: boolean;
+  goalStep: boolean;
+  plainBackground: boolean;
   fill: number;
   indices?: WardrobeIndices;
   frogRef: React.MutableRefObject<FrogHandle | null>;
@@ -622,11 +630,13 @@ function PondHeader({
       style={{
         height: tall
           ? `max(calc(env(safe-area-inset-top) + clamp(17rem, 42dvh, 21rem)), min(${fill}px, 66dvh))`
-          : 'calc(env(safe-area-inset-top) + clamp(11rem, 26dvh, 13.5rem))',
+          : goalStep
+            ? 'calc(env(safe-area-inset-top) + clamp(12rem, 29dvh, 15rem))'
+            : 'calc(env(safe-area-inset-top) + clamp(11rem, 26dvh, 13.5rem))',
       }}
     >
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-sky-300 via-emerald-200 to-emerald-300 dark:from-sky-950 dark:via-emerald-950 dark:to-emerald-900">
-        {!failed && (
+      <div aria-hidden className={cn('absolute inset-0', plainBackground ? 'bg-[#63875c] dark:bg-[#385a37]' : 'bg-gradient-to-b from-sky-300 via-emerald-200 to-emerald-300 dark:from-sky-950 dark:via-emerald-950 dark:to-emerald-900')}>
+        {!plainBackground && !failed && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image}
@@ -636,8 +646,8 @@ function PondHeader({
             className="h-full w-full object-cover object-bottom"
           />
         )}
-        <div className="absolute inset-0 dark:bg-black/20" />
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/35 to-transparent" />
+        {!plainBackground && <div className="absolute inset-0 dark:bg-black/20" />}
+        {!plainBackground && <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/35 to-transparent" />}
       </div>
 
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pt-[calc(env(safe-area-inset-top)+0.625rem)]">
@@ -698,21 +708,16 @@ function PondHeader({
       >
         <path d="M0 8 Q50 -8 100 8 L100 16 L0 16 Z" />
       </svg>
-      <span
-        aria-hidden
-        className="absolute bottom-[10px] left-1/2 z-10 h-3 w-28 -translate-x-1/2 rounded-[50%] bg-black/[0.14] blur-[5px] dark:bg-black/40"
-      />
-
       <div
-        className="pointer-events-none absolute inset-x-0 z-20 flex justify-center"
-        style={{ bottom: FROG_SEAT_PX }}
+        className="buddy-flow-frog pointer-events-none absolute inset-x-0 z-20 flex justify-center"
+        style={{ bottom: FROG_SEAT_PX, '--frog-drop-start': 'calc(-1 * (env(safe-area-inset-top) + clamp(17rem, 42dvh, 21rem) + 2rem))' } as React.CSSProperties}
       >
         <Frog
           ref={frogRef}
           width={FROG_W}
           height={FROG_H}
           indices={indices}
-          arrive="rise"
+          arrive="drop"
           greet="hop"
           onArrived={() => setLanded(true)}
         />
@@ -759,12 +764,14 @@ function ChoiceRow({
   leading,
   title,
   subtitle,
+  goalStyle = false,
 }: {
   selected: boolean;
   onClick: () => void;
   leading: React.ReactNode;
   title: string;
   subtitle?: string;
+  goalStyle?: boolean;
 }) {
   return (
     <button
@@ -773,15 +780,16 @@ function ChoiceRow({
       aria-checked={selected}
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-[20px] border-2 bg-card py-2.5 pl-2.5 pr-3.5 text-left transition-[border-color,background-color,transform] duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]/40',
+        'flex w-full items-center gap-3 rounded-[20px] border-2 bg-card text-left transition-[border-color,background-color,transform] duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]/40',
+        goalStyle ? 'min-h-[70px] px-4 py-3' : 'py-2.5 pl-2.5 pr-3.5',
         selected
           ? 'border-[#447d3f] bg-[#447d3f]/[0.06]'
-          : 'border-border/60 [@media(hover:hover)]:hover:border-[#447d3f]/35',
+          : goalStyle ? 'border-[#447d3f]/20 [@media(hover:hover)]:hover:border-[#447d3f]/45' : 'border-border/60 [@media(hover:hover)]:hover:border-[#447d3f]/35',
       )}
     >
       {leading}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15.5px] font-black leading-tight tracking-tight text-foreground">
+        <span className={cn('block text-[15.5px] font-black leading-tight tracking-tight text-foreground', goalStyle ? 'break-words' : 'truncate')}>
           {title}
         </span>
         {subtitle && (
@@ -790,7 +798,7 @@ function ChoiceRow({
           </span>
         )}
       </span>
-      <span
+      {(!goalStyle || selected) && <span
         aria-hidden
         className={cn(
           'grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-colors duration-150',
@@ -798,7 +806,7 @@ function ChoiceRow({
         )}
       >
         {selected && <Check className="h-3.5 w-3.5" strokeWidth={4} />}
-      </span>
+      </span>}
     </button>
   );
 }
@@ -833,26 +841,17 @@ function GoalStep({
   onPick: (goal: Goal) => void;
   onNew: () => void;
 }) {
-  const selectedId = goal && goal.kind !== 'new' ? goal.id : null;
+  const selectedId = goal && (goal.kind === 'habit' || goal.kind === 'today') ? goal.id : null;
   return (
     <>
-      <StepTitle>What do you want to do together?</StepTitle>
-
-      <button
-        type="button"
-        onClick={onNew}
-        className="flex w-full items-center gap-3 rounded-[20px] border-2 border-dashed border-[#447d3f]/40 bg-[#447d3f]/[0.04] py-2.5 pl-2.5 pr-3.5 text-left transition-transform active:scale-[0.985]"
-      >
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#447d3f] text-white">
-          <Plus className="h-5 w-5" strokeWidth={3} />
-        </span>
-        <span className="min-w-0 flex-1 text-[15.5px] font-black tracking-tight text-foreground">
-          Start a new goal
-        </span>
-      </button>
+      <div className="px-2 pb-5 pt-5 text-center">
+        <h2 className="text-balance text-[21px] font-black leading-tight tracking-tight text-foreground">
+          Which goal would you like to be more consistent with?
+        </h2>
+      </div>
 
       {loading ? (
-        <div className="mt-5 space-y-2">
+        <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <div key={i} className="skeleton h-[66px] rounded-[20px] bg-muted/60" />
           ))}
@@ -861,11 +860,11 @@ function GoalStep({
         <div role="radiogroup" aria-label="Your tasks">
           {habits.length > 0 && (
             <>
-              <SectionLabel>Your habits</SectionLabel>
               <div className="space-y-2">
                 {habits.map((task) => (
                   <ChoiceRow
                     key={task.id}
+                    goalStyle
                     selected={selectedId === task.id}
                     onClick={() => onPick({ kind: 'habit', ...task })}
                     leading={
@@ -887,6 +886,7 @@ function GoalStep({
                 {todayTasks.map((task) => (
                   <ChoiceRow
                     key={task.id}
+                    goalStyle
                     selected={selectedId === task.id}
                     onClick={() => onPick({ kind: 'today', ...task })}
                     leading={
@@ -901,13 +901,30 @@ function GoalStep({
               </div>
             </>
           )}
-          {habits.length === 0 && todayTasks.length === 0 && (
+          {habits.length === 0 && todayTasks.length === 0 && goal?.kind !== 'quick' && (
             <p className="mt-5 px-4 text-center text-[13.5px] font-semibold text-muted-foreground">
-              Nothing on your list to share yet. Start a new goal above.
+              Nothing on your list to share yet. Start a new goal below.
             </p>
           )}
         </div>
       )}
+      {goal?.kind === 'quick' && (
+        <div className="mt-2" role="radiogroup" aria-label="Your new goal">
+          <ChoiceRow selected goalStyle onClick={() => onPick(goal)} leading={<IconWell tone="green"><Check className="h-5 w-5" strokeWidth={2.5} /></IconWell>} title={goal.text} subtitle={goal.schedule} />
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onNew}
+        className="mt-2 flex min-h-[70px] w-full items-center gap-3 rounded-[20px] border-2 border-[#447d3f]/20 bg-card px-4 py-3 text-left transition-[border-color,transform] active:scale-[0.985] hover:border-[#447d3f]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]/40"
+      >
+        <IconWell tone="green">
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </IconWell>
+        <span className="min-w-0 flex-1 text-[15.5px] font-black tracking-tight text-foreground">
+          Start a new goal
+        </span>
+      </button>
     </>
   );
 }
@@ -1080,7 +1097,7 @@ function FriendStep({
 }
 
 function GoalCard({ goal }: { goal: Goal }) {
-  const repeating = goal.kind === 'habit' || (goal.kind === 'new' && goal.choice !== 'once');
+  const repeating = goal.kind === 'habit' || (goal.kind === 'new' && goal.choice !== 'once') || (goal.kind === 'quick' && !isOneTimeParams(goal.params));
   return (
     <div className="flex items-center gap-3 rounded-[20px] border-2 border-[#447d3f]/30 bg-card py-2.5 pl-2.5 pr-3.5">
       <IconWell tone={repeating ? 'green' : 'amber'}>
@@ -1091,7 +1108,7 @@ function GoalCard({ goal }: { goal: Goal }) {
         )}
       </IconWell>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] font-black leading-tight tracking-tight text-foreground">
+        <span className="block break-words text-[16px] font-black leading-tight tracking-tight text-foreground">
           {goal.text}
         </span>
         <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-muted-foreground">
@@ -1104,13 +1121,13 @@ function GoalCard({ goal }: { goal: Goal }) {
 
 function BonusLine({ bonusFlies }: { bonusFlies: number }) {
   return (
-    <div className="mt-3 flex items-center gap-2.5 rounded-2xl bg-amber-50 px-3 py-2.5 dark:bg-amber-400/10">
-      <span className="grid h-9 w-9 shrink-0 place-items-center">
-        <Fly size={34} y={-2} paused interactive={false} />
+    <div className="mt-2.5 flex items-center gap-2.5 rounded-2xl bg-amber-50 px-3 py-2 dark:bg-amber-400/10">
+      <span className="grid h-8 w-8 shrink-0 place-items-center">
+        <Fly size={30} y={-2} paused interactive={false} />
       </span>
       <p className="text-balance text-[13px] font-semibold leading-snug text-amber-900 dark:text-amber-200">
-        When you both finish it, you each get{' '}
-        <span className="whitespace-nowrap font-black">+{bonusFlies} flies.</span>
+        Both finish? You each get{' '}
+        <span className="whitespace-nowrap font-black">+{bonusFlies} {bonusFlies === 1 ? 'fly' : 'flies'}.</span>
       </p>
     </div>
   );
@@ -1118,6 +1135,7 @@ function BonusLine({ bonusFlies }: { bonusFlies: number }) {
 
 function SendStep({
   goal,
+  target,
   bonusFlies,
   wantsLink,
   giftOptions,
@@ -1125,6 +1143,7 @@ function SendStep({
   onGift,
 }: {
   goal: Goal;
+  target: Target | null;
   bonusFlies: number;
   wantsLink: boolean;
   giftOptions?: BuddyGiftOption[];
@@ -1132,14 +1151,31 @@ function SendStep({
   onGift: (id: string) => void;
 }) {
   return (
-    <div className="pt-3">
+    <div className="pt-1">
+      <div className="px-2 pb-3 pt-2 text-center">
+        <h2 className="text-balance text-[21px] font-black leading-tight tracking-tight text-foreground">Ready to team up?</h2>
+      </div>
+      {target?.kind === 'friend' && (
+        <div className="mb-3 flex items-center gap-3 px-1">
+          <BuddyFrogFace indices={target.friend.indices} size={40} className="shrink-0" />
+          <span className="min-w-0 text-sm font-semibold text-muted-foreground">
+            Inviting{' '}
+            <span className="break-words font-black text-foreground">
+              {target.friend.name || target.friend.frogName}
+            </span>
+          </span>
+        </div>
+      )}
       <GoalCard goal={goal} />
       <BonusLine bonusFlies={bonusFlies} />
       {wantsLink && (
         <>
-          <SectionLabel>Their welcome gift</SectionLabel>
-          {giftOptions ? (
-            <div className="grid grid-cols-3 gap-2">
+          <div className="mb-2 mt-4 px-1">
+            <h3 className="text-[14px] font-black text-foreground">Choose their welcome gift</h3>
+            <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">They’ll get it when they join.</p>
+          </div>
+          {giftOptions?.length ? (
+            <div role="group" aria-label="Choose their welcome gift" className="grid grid-cols-3 gap-2">
               {giftOptions.map((gift) => {
                 const selected = giftId === gift.id;
                 return (
@@ -1150,14 +1186,15 @@ function SendStep({
                     aria-label={'Choose ' + gift.name}
                     onClick={() => onGift(gift.id)}
                     className={cn(
-                      'flex min-w-0 flex-col overflow-hidden rounded-[18px] border-2 bg-card p-1.5 text-left transition-[border-color,transform] active:scale-95',
-                      selected ? 'border-[#447d3f] ring-4 ring-inset ring-[#447d3f]/15' : 'border-border/50',
+                      'relative flex min-w-0 flex-col overflow-hidden rounded-[18px] border-2 bg-card p-1.5 text-left transition-[border-color,transform] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#447d3f]/50 focus-visible:ring-offset-2',
+                      selected ? 'border-[#447d3f]' : 'border-border/60',
                     )}
                   >
-                    <span className="block aspect-square w-full overflow-hidden rounded-xl bg-muted/40">
+                    {selected && <span aria-hidden className="absolute right-2 top-2 z-10 grid h-5 w-5 place-items-center rounded-full bg-[#447d3f] text-white"><Check className="h-3 w-3" strokeWidth={3} /></span>}
+                    <span className="block h-20 w-full overflow-hidden rounded-xl bg-muted/40 sm:h-24">
                       <GiftOutfitPreview item={gift.item} ready />
                     </span>
-                    <span className="mt-1.5 truncate text-[11px] font-black leading-tight text-foreground">
+                    <span className="mt-1.5 w-full break-words text-[11px] font-black leading-tight text-foreground">
                       {gift.name}
                     </span>
                     <RarityBadge rarity={gift.item?.rarity} className="mt-1" />
@@ -1165,11 +1202,13 @@ function SendStep({
                 );
               })}
             </div>
+          ) : giftOptions ? (
+            <p role="status" className="rounded-2xl bg-muted/40 px-3 py-3 text-sm text-muted-foreground">Welcome gifts are unavailable right now. Please try again later.</p>
           ) : (
             <div aria-hidden className="grid grid-cols-3 gap-2">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="rounded-[18px] border-2 border-border/50 bg-card p-1.5">
-                  <div className="skeleton aspect-square w-full rounded-xl bg-muted/60" />
+                  <div className="skeleton h-20 w-full rounded-xl bg-muted/60 sm:h-24" />
                   <div className="skeleton mt-1.5 h-3 w-3/4 rounded bg-muted/60" />
                   <div className="skeleton mt-1 h-4 w-12 rounded-full bg-muted/60" />
                 </div>
